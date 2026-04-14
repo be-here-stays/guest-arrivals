@@ -421,7 +421,7 @@
           </div>
           <div class="field">
             <label for="guest-email">Email address</label>
-            <input type="email" id="guest-email" required />
+            <input type="email" id="guest-email" />
             <div class="error-msg" id="err-email">Please enter a valid email address.</div>
           </div>
           <div class="field">
@@ -487,7 +487,7 @@
           <div class="field">
             <label for="notes">Additional notes <span class="hint">(optional)</span></label>
             <textarea id="notes" rows="3"
-              placeholder="Accessibility requirements, extra travel cots, special occasions, dietary needs, or anything else we should know..."
+              placeholder="Accessibility requirements, extra travel cots, special occasions, or anything else we should know..."
               style="resize:vertical"></textarea>
           </div>
         </div>
@@ -629,7 +629,7 @@ function buildForm(p, ref) {
     var alwaysBox       = document.createElement('div');
     alwaysBox.className = 'beds-always-box';
     alwaysBox.innerHTML =
-      '<div class="beds-always-title">Beds in this property</div>' +
+      '<div class="beds-always-title">Fixed beds in this property</div>' +
       '<div>' + renderFloorText(p.fixedBeds) + '</div>';
     bedsContainer.appendChild(alwaysBox);
   }
@@ -710,7 +710,7 @@ function validateForm() {
     : setErr(nameEl, byId('err-name'), 'Please enter your name.');
 
   var emailEl = byId('guest-email');
-  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value.trim())
+  (!emailEl.value.trim() || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value.trim()))
     ? clrErr(emailEl, byId('err-email'))
     : setErr(emailEl, byId('err-email'), 'Please enter a valid email address.');
 

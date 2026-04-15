@@ -1,0 +1,809 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Guest Arrival Details - Be Here Stays</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --brand:     #272F2E;
+      --brand-lt:  #eaede4;
+      --accent:    #AF926A;
+      --text:      #272F2E;
+      --muted:     #989782;
+      --border:    #e0ddd6;
+      --radius:    10px;
+      --shadow:    0 4px 24px rgba(39,47,46,.10);
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      background: #D5D0C4;
+      color: var(--text);
+      min-height: 100vh;
+      padding: 40px 16px 80px;
+    }
+    .card {
+      max-width: 640px;
+      margin: 0 auto;
+      background: #fff;
+      border-radius: 16px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+    .card-header {
+      background: var(--brand);
+      color: #fff;
+      padding: 0;
+    }
+    .brand-bar {
+      padding: 16px 36px 14px;
+      background: #272F2E;
+      border-bottom: none;
+      display: flex;
+      align-items: center;
+      gap: 0;
+    }
+    .brand-bar .brand-logo {
+      height: 36px;
+      width: auto;
+      display: block;
+    }
+    .brand-bar .brand-logo-placeholder {
+      /* shown until logo is provided */
+      font-size: 1rem;
+      font-weight: 800;
+      letter-spacing: -.01em;
+      color: #fff;
+      opacity: .95;
+    }
+    .header-body {
+      padding: 22px 36px 26px;
+    }
+    .card-header .property-name {
+      font-size: 1.5rem;
+      font-weight: 700;
+      letter-spacing: -.01em;
+    }
+    .card-header .subtitle {
+      margin-top: 6px;
+      font-size: .95rem;
+      opacity: .8;
+    }
+    .card-header .booking-ref {
+      margin-top: 10px;
+      font-size: .82rem;
+      opacity: .60;
+      font-family: 'Courier New', monospace;
+      letter-spacing: .04em;
+    }
+    .card-body { padding: 32px 36px; }
+
+    /* -- Section ---------------------------------------- */
+    .section {
+      margin-bottom: 28px;
+      padding-bottom: 28px;
+      border-bottom: 1px solid var(--border);
+    }
+    .section:last-of-type { border-bottom: none; margin-bottom: 0; }
+    .section-title {
+      font-size: .78rem;
+      font-weight: 700;
+      letter-spacing: .08em;
+      text-transform: uppercase;
+      color: var(--brand);
+      margin-bottom: 16px;
+    }
+
+    /* -- Field ------------------------------------------ */
+    .field { margin-bottom: 18px; }
+    .field:last-child { margin-bottom: 0; }
+    label {
+      display: block;
+      font-size: .88rem;
+      font-weight: 600;
+      color: var(--text);
+      margin-bottom: 6px;
+    }
+    label .hint {
+      font-weight: 400;
+      color: var(--muted);
+      font-size: .82rem;
+    }
+    input[type="text"],
+    input[type="email"],
+    input[type="date"],
+    input[type="number"],
+    textarea {
+      width: 100%;
+      padding: 10px 14px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      font-size: .92rem;
+      color: var(--text);
+      background: #fff;
+      transition: border-color .15s, box-shadow .15s;
+      appearance: none;
+    }
+    input:focus, textarea:focus {
+      outline: none;
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(39,47,46,.12);
+    }
+    input[readonly] {
+      background: #f6f5f2;
+      color: var(--muted);
+      cursor: default;
+    }
+    input[readonly]:focus {
+      border-color: var(--border);
+      box-shadow: none;
+    }
+    .number-row {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 14px;
+    }
+    @media (max-width: 480px) { .number-row { grid-template-columns: 1fr; } }
+
+    /* -- Pre-filled notice ------------------------------ */
+    .prefilled-notice {
+      background: #fffbf3;
+      border: 1.5px solid #f0d99a;
+      border-radius: var(--radius);
+      padding: 11px 14px;
+      font-size: .83rem;
+      color: #7a5c1e;
+      margin-bottom: 20px;
+      display: flex;
+      align-items: flex-start;
+      gap: 8px;
+    }
+    .prefilled-notice .icon { flex-shrink: 0; margin-top: 1px; }
+
+    /* -- Bed option cards ------------------------------- */
+    .bed-options {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      margin-top: 4px;
+    }
+    .bed-option { position: relative; }
+    .bed-option input[type="radio"] {
+      position: absolute;
+      opacity: 0;
+      width: 0;
+      height: 0;
+    }
+    .bed-option label {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 14px 18px;
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      cursor: pointer;
+      font-weight: 500;
+      font-size: .92rem;
+      transition: all .15s;
+      background: #fff;
+      margin-bottom: 0;
+    }
+    .bed-option input[type="radio"]:checked + label {
+      border-color: var(--brand);
+      background: var(--brand-lt);
+      color: var(--brand);
+      font-weight: 600;
+    }
+    .bed-option label::before {
+      content: '';
+      width: 18px;
+      height: 18px;
+      border: 2px solid var(--border);
+      border-radius: 50%;
+      flex-shrink: 0;
+      transition: all .15s;
+      background: #fff;
+    }
+    .bed-option input[type="radio"]:checked + label::before {
+      border-color: var(--brand);
+      background: var(--brand);
+      box-shadow: inset 0 0 0 4px #fff;
+    }
+
+    /* -- Floor badges ----------------------------------- */
+    .floor-badge {
+      display: inline-block;
+      font-size: .70rem;
+      font-weight: 700;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+      padding: 2px 7px;
+      border-radius: 20px;
+      vertical-align: middle;
+      margin-left: 4px;
+      white-space: nowrap;
+    }
+    .floor-gf    { background: #d1fae5; color: #065f46; border: 1px solid #6ee7b7; }
+    .floor-upper { background: #e0e7ff; color: #3730a3; border: 1px solid #a5b4fc; }
+
+    /* -- Fixed beds info box ---------------------------- */
+    .beds-always-box {
+      background: var(--brand-lt);
+      border: 1.5px solid var(--border);
+      border-radius: var(--radius);
+      padding: 14px 18px;
+      font-size: .88rem;
+      color: var(--text);
+      margin-bottom: 18px;
+    }
+    .beds-always-box .beds-always-title {
+      font-weight: 700;
+      font-size: .78rem;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+      color: var(--brand);
+      margin-bottom: 6px;
+    }
+
+    /* -- Submit ----------------------------------------- */
+    .btn-submit {
+      display: block;
+      width: 100%;
+      padding: 15px;
+      background: var(--brand);
+      color: #fff;
+      border: none;
+      border-radius: var(--radius);
+      font-size: 1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background .15s, transform .1s;
+      margin-top: 8px;
+    }
+    .btn-submit:hover { background: #646955; }
+    .btn-submit:active { transform: scale(.99); }
+
+    /* -- Success ---------------------------------------- */
+    #success {
+      display: none;
+      text-align: center;
+      padding: 60px 36px;
+    }
+    #success .tick { font-size: 3rem; margin-bottom: 16px; }
+    #success h2 { font-size: 1.4rem; color: var(--brand); margin-bottom: 10px; }
+    #success p  { color: var(--muted); font-size: .95rem; line-height: 1.6; }
+
+    /* -- Error ------------------------------------------ */
+    .error-msg {
+      display: none;
+      color: #c0392b;
+      font-size: .82rem;
+      margin-top: 4px;
+    }
+    input.invalid { border-color: #c0392b !important; }
+
+    /* -- Invalid / no link state ------------------------ */
+    #no-link {
+      display: none;
+      text-align: center;
+      padding: 60px 36px;
+    }
+    #no-link .icon  { font-size: 2.5rem; margin-bottom: 16px; }
+    #no-link h2     { color: var(--brand); margin-bottom: 10px; font-size: 1.2rem; }
+    #no-link p      { color: var(--muted); font-size: .9rem; line-height: 1.6; margin-bottom: 12px; }
+    #no-link .email { color: var(--brand); font-weight: 600; }
+  </style>
+</head>
+<body>
+
+<!--
+=================================================================
+  BE HERE STAYS -- Guest Arrival Form
+  Version: 3.0 (URL-driven, no embedded property config)
+
+  HOW IT WORKS:
+  This form has NO property config built in.
+  All guest and property data arrives via a base64-encoded URL
+  parameter generated by Make.com when processing the
+  Guesty weekly arrivals report.
+
+  URL format:
+    guest-form.html?booking=CWPR-1234&data=BASE64_JSON
+
+  The base64 JSON payload contains:
+  {
+    "bookingRef":    "CWPR-1234",
+    "guestName":     "Jane Smith",
+    "guestEmail":    "jane@example.com",
+    "arrivalDate":   "2026-05-15",
+    "property":      "Ardross",
+    "numAdults":     4,
+    "numChildren":   2,
+    "numBabies":     0,
+    "numPets":       1,
+    "maxOccupancy":  8,
+    "allowsChildren":true,
+    "maxChildren":   6,
+    "allowsBabies":  true,
+    "allowsPets":    true,
+    "maxPets":       2,
+    "fixedBeds":     "1 Superking [upper] & 1 King [GF]",
+    "bedOptions":    ["2 more Superking","1 Superking and 2 singles","4 singles"]
+  }
+
+  ADDING NEW PROPERTIES:
+  Add a row to the Monday.com Property Config board.
+  No changes to this file are needed -- ever.
+
+  Make.com reads the config and encodes it into the URL
+  at the time the guest link is generated.
+
+  FLOOR ANNOTATIONS (optional, add to fixedBeds / bedOptions):
+    [GF]          -> green "Ground floor" badge
+    [upper]       -> blue  "Upstairs" badge
+    [ground floor], [downstairs], [first floor], [upstairs]
+    are also recognised.
+
+  WEBHOOK (form submission):
+    https://hook.eu2.make.com/kbjg9w1boxs5x135lwy9p7p2ltpjo9tc
+=================================================================
+-->
+
+<div class="card">
+
+  <!-- No personalised link -->
+  <div id="no-link">
+    <div class="icon">&#127968;</div>
+    <h2>Welcome to Be Here Stays</h2>
+    <p>This page needs a personalised link to display your arrival form.<br>
+       Please use the link sent to you in your booking confirmation or by our team.</p>
+    <p>If you need help, please contact us at<br>
+       <span class="email">hello@be-here.travel</span></p>
+  </div>
+
+  <!-- Main form (shown when valid ?data= present) -->
+  <div id="form-wrap" style="display:none">
+
+    <div class="card-header">
+      <div class="brand-bar">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 215.0001 45.6329" height="34" aria-label="Be Here Stays">
+          <path d="M33.5812,26.2451c-4.585,0-8.3018,3.6929-8.3018,8.2482s3.7168,8.2482,8.3018,8.2482,8.3017-3.6928,8.3017-8.2482-3.7168-8.2482-8.3017-8.2482Z" fill="#fff"/>
+          <polygon points="10.8809 19.7103 19.0665 19.7103 19.0665 11.5778 19.0665 11.3457 10.8822 3.2139 10.6473 3.2139 2.463 11.3457 2.463 11.5778 2.463 19.7103 10.648 19.7103 10.8809 19.7103" fill="#fff"/>
+          <path d="M40.5754,5.4963l-5.4656-.2394c-4.4287-.1941-8.2128,3.2233-8.4095,7.594l-.243,5.4044,14.0587-12.6953.0595-.0638Z" fill="#fff"/>
+          <polygon points="40.581 5.4903 40.5754 5.4963 40.5812 5.4966 40.581 5.4903" fill="#fff"/>
+          <polygon points="40.5859 5.4968 40.5812 5.4966 40.5814 5.5009 40.5859 5.4968" fill="#fff"/>
+          <path d="M27.6033,19.3885l5.4768-.2207c4.4294-.1785,7.9053-3.901,7.7245-8.2724l-.2232-5.3945-.0656.0592-12.9125,13.8284Z" fill="#fff"/>
+          <polygon points="23.5662 22.0664 23.5662 0 22.0665 0 22.0665 22.0664 0 22.0664 0 23.5661 22.0665 23.5661 22.0665 45.6329 23.5662 45.6329 23.5662 23.5661 45.6329 23.5661 45.6329 22.0664 23.5662 22.0664" fill="#fff"/>
+          <path d="M12.5345,33.8375c-1.8062-.127-3.257-2.1802-5.0582-1.9879-1.5029.1609-2.5817,1.8435-4.0738,2.0993-.319.0545-.6313.0405-.9396-.0181v3.1036c.3165.0619.6371.0784.9636.0222,1.4922-.2549,2.5709-1.9384,4.0739-2.0993,1.8012-.1931,3.2519,1.86,5.0581,1.9879,2.0581.1453,3.7267-2.2256,5.7881-2.1563.2469.0084.4863.0521.7199.1205v-3.1003c-.2418-.0726-.4888-.1188-.744-.1279-2.0605-.0693-3.7299,2.3015-5.788,2.1563Z" fill="#fff"/>
+          <path d="M12.5229,28.1871c-1.8062-.1263-3.257-2.1794-5.0582-1.9872-1.5029.1609-2.5817,1.8436-4.0738,2.0994-.3149.0536-.6231.0404-.928-.0157v3.1037c.3132.0602.6297.0751.952.0197,1.4922-.2549,2.5709-1.9384,4.0739-2.0993,1.8012-.193,3.252,1.8609,5.0581,1.9879,2.0581.1453,3.7267-2.2255,5.788-2.1562.2511.0082.4948.0536.7316.1237v-3.1011c-.2452-.0743-.4962-.1221-.7556-.1312-2.0605-.0693-3.73,2.3015-5.788,2.1562Z" fill="#fff"/>
+          <path d="M12.5774,39.4868c-1.8061-.127-3.2569-2.1802-5.058-1.9879-1.503.1609-2.5817,1.8435-4.0739,2.0993-.3339.057-.6603.0388-.9835-.0255v3.1036c.3306.0693.6653.0891,1.0075.0314,1.4921-.255,2.5709-1.9385,4.0738-2.0994,1.8012-.1922,3.252,1.8609,5.0581,1.988,2.0581.1452,3.7267-2.2257,5.7881-2.1563.2319.0074.4565.047.6769.108v-3.1028c-.2279-.0651-.4606-.1064-.701-.1146-2.0604-.0693-3.7299,2.3015-5.788,2.1562Z" fill="#fff"/>
+          <path d="M79.2201,29.1735c0,5.3627-4.4154,8.2131-11.8064,8.2131h-12.0464l.144-1.6426,2.4956-.2899c.9119-.0966,1.2479-.2898,1.2479-.6763V9.752c0-.3865-.24-.4831-1.2479-.6281l-2.4956-.2899-.144-1.6426h12.2384c7.9189,0,10.5106,3.1403,10.5106,6.6671,0,3.865-2.9756,7.0053-7.2951,7.7783v.1932c5.8073.6281,8.3989,3.7684,8.3989,7.3435ZM75.0447,29.5117c0-4.493-3.6955-6.7154-8.8788-6.7154h-2.9757v12.1747l3.7435.6764,1.3919-.0483c3.5515-.1933,6.7191-2.1741,6.7191-6.0874ZM73.8928,15.0663c0-3.7683-2.3517-6.1357-7.679-6.1357h-3.0236v12.078l3.7915-.0483c4.7994-.0483,6.9111-3.1403,6.9111-5.8941Z" fill="#fff"/>
+          <path d="M100.4881,32.652c-1.7275,3.4302-4.895,5.411-8.6385,5.411-5.5673,0-9.6468-4.5414-9.6468-10.822,0-7.0536,5.0394-12.1264,10.9906-12.1264,4.5114,0,7.3907,2.8505,7.3907,7.0053,0,.8213-.096,1.8842-.24,2.5606l-14.4457-.1933c-.048.1933-.048.9663-.048,1.1595,0,5.4593,3.1675,9.3726,7.535,9.3726,2.2077,0,4.4154-.8696,6.1431-2.947l.9596.5797ZM96.7449,22.9895c.24-3.7683-1.5358-6.1839-4.4154-6.1839-2.6397,0-5.4713,2.319-6.2392,6.2323,0,0,10.8466-.0484,10.6546-.0484Z" fill="#fff"/>
+          <path d="M109.9551,35.1159c0,1.546-1.2,2.9954-2.928,2.9954-1.776,0-3.024-1.4494-3.024-2.9954s1.248-2.8987,3.024-2.8987c1.728,0,2.928,1.3527,2.928,2.8987Z" fill="#fff"/>
+          <path d="M144.3351,37.3866h-11.71l.143-1.6426,2.496-.2899c.912-.0966,1.248-.2898,1.248-.6763v-11.8849h-15.502v11.9332c0,.3865.288.5314,1.248.628l2.496.2899.144,1.6426h-11.711l.144-1.6426,2.496-.2899c.912-.0966,1.248-.2898,1.248-.6763V9.752c0-.3865-.24-.4831-1.248-.6281l-2.496-.2899-.144-1.6426h11.711l-.144,1.6426-2.496.2899c-.912.0966-1.248.2899-1.248.6764v11.1118h15.502v-11.1601c0-.4348-.24-.5314-1.248-.6281l-2.496-.2899-.143-1.6426h11.71l-.144,1.6426-2.496.2899c-.912.0966-1.248.2899-1.248.6764v25.0258c0,.3865.24.4831,1.248.628l2.496.2899.144,1.6426Z" fill="#fff"/>
+          <path d="M165.9261,32.652c-1.728,3.4302-4.896,5.411-8.639,5.411-5.568,0-9.647-4.5414-9.647-10.822,0-7.0536,5.039-12.1264,10.991-12.1264,4.511,0,7.391,2.8505,7.391,7.0053,0,.8213-.096,1.8842-.24,2.5606l-14.446-.1933c-.048.1933-.048.9663-.048,1.1595,0,5.4593,3.167,9.3726,7.535,9.3726,2.207,0,4.415-.8696,6.143-2.947l.96.5797ZM162.1821,22.9895c.24-3.7683-1.536-6.1839-4.415-6.1839-2.64,0-5.472,2.319-6.24,6.2323,0,0,10.847-.0484,10.655-.0484Z" fill="#fff"/>
+          <path d="M185.4281,17.5302c0,1.3528-.816,2.464-2.256,2.464-1.008,0-1.871-.7247-2.303-1.546-1.488.9179-3.696,3.1403-4.896,5.5559v10.8703c0,.3865.192.628,1.296.6764l2.544.1932.144,1.6426h-10.703l.144-1.6426,1.92-.1932c.864-.0484,1.2-.2416,1.2-.7247v-13.6724c0-2.2224-.24-2.5123-1.488-2.8505l-1.968-.2898.096-1.3045,6.815-1.5943v6.2806h.192c2.784-4.6863,4.512-6.3289,6.575-6.3289,1.728,0,2.688,1.1112,2.688,2.4639Z" fill="#fff"/>
+          <path d="M205.7931,32.652c-1.728,3.4302-4.895,5.411-8.639,5.411-5.567,0-9.647-4.5414-9.647-10.822,0-7.0536,5.04-12.1264,10.991-12.1264,4.511,0,7.391,2.8505,7.391,7.0053,0,.8213-.096,1.8842-.24,2.5606l-14.446-.1933c-.048.1933-.048.9663-.048,1.1595,0,5.4593,3.168,9.3726,7.535,9.3726,2.208,0,4.415-.8696,6.143-2.947l.96.5797ZM202.0501,22.9895c.24-3.7683-1.536-6.1839-4.416-6.1839-2.64,0-5.471,2.319-6.239,6.2323,0,0,10.847-.0484,10.655-.0484Z" fill="#fff"/>
+          <path d="M215.0001,35.1159c0,1.546-1.199,2.9954-2.927,2.9954-1.776,0-3.024-1.4494-3.024-2.9954s1.248-2.8987,3.024-2.8987c1.728,0,2.927,1.3527,2.927,2.8987Z" fill="#fff"/>
+        </svg>
+      </div>
+      <div class="header-body">
+        <div class="property-name" id="header-property"></div>
+        <div class="subtitle">Please confirm your arrival details below</div>
+        <div class="booking-ref" id="header-booking-ref"></div>
+      </div>
+    </div>
+
+    <div class="card-body">
+
+      <div class="prefilled-notice">
+        <span class="icon">&#9432;</span>
+        <span>We have pre-filled what we know from your booking. Please check everything is correct and update anything that has changed since you booked.</span>
+      </div>
+
+      <form id="guest-form" novalidate>
+
+        <!-- Your details -->
+        <div class="section">
+          <div class="section-title">Your Details</div>
+          <div class="field">
+            <label for="guest-name">Full name</label>
+            <input type="text" id="guest-name" required />
+            <div class="error-msg" id="err-name">Please enter your name.</div>
+          </div>
+          <div class="field">
+            <label for="guest-email">Email address</label>
+            <input type="email" id="guest-email" required />
+            <div class="error-msg" id="err-email">Please enter a valid email address.</div>
+          </div>
+          <div class="field">
+            <label for="arrival-date">Arrival date</label>
+            <input type="date" id="arrival-date" required />
+            <div class="error-msg" id="err-date">Please select your arrival date.</div>
+          </div>
+        </div>
+
+        <!-- Party size -->
+        <div class="section">
+          <div class="section-title">Party Size</div>
+
+          <!-- Occupancy bar -->
+          <div id="occupancy-bar" style="display:none;margin-bottom:18px">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+              <span style="font-size:.85rem;font-weight:600;color:var(--muted)">Spaces used</span>
+              <span id="occupancy-label" style="font-size:.85rem;font-weight:700;color:var(--brand)"></span>
+            </div>
+            <div style="background:var(--border);border-radius:99px;height:8px;overflow:hidden">
+              <div id="occupancy-fill" style="height:100%;border-radius:99px;background:var(--brand);transition:width .2s,background .2s;width:0%"></div>
+            </div>
+            <div class="error-msg" id="err-occupancy" style="margin-top:6px"></div>
+          </div>
+
+          <div class="number-row">
+            <div class="field">
+              <label for="num-adults">Adults</label>
+              <input type="number" id="num-adults" min="1" value="1" required />
+              <div class="error-msg" id="err-adults"></div>
+            </div>
+            <div class="field" id="field-children" style="display:none">
+              <label for="num-children">Children <span class="hint">(under 16)</span></label>
+              <input type="number" id="num-children" min="0" value="0" />
+            </div>
+          </div>
+
+          <div class="number-row">
+            <div class="field" id="field-babies" style="display:none">
+              <label for="num-babies">Travel cot required <span class="hint">(6 months&ndash;2 years)</span></label>
+              <input type="number" id="num-babies" min="0" max="1" value="0" />
+              <div style="margin-top:6px;font-size:.82rem;color:var(--muted)">
+                We provide one travel cot per property. If you need more than one, please mention it in the notes below.
+              </div>
+            </div>
+            <div class="field" id="field-pets" style="display:none">
+              <label for="num-pets">Pets <span class="hint" id="max-pets-hint"></span></label>
+              <input type="number" id="num-pets" min="0" value="0" />
+              <div class="error-msg" id="err-pets"></div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Bed configuration -->
+        <div class="section" id="section-beds">
+          <div class="section-title">Bed Configuration</div>
+          <div id="beds-container"></div>
+        </div>
+
+        <!-- Notes -->
+        <div class="section">
+          <div class="section-title">Anything Else?</div>
+          <div class="field">
+            <label for="notes">Additional notes <span class="hint">(optional)</span></label>
+            <textarea id="notes" rows="3"
+              placeholder="Accessibility requirements, extra travel cots, special occasions, dietary needs, or anything else we should know..."
+              style="resize:vertical"></textarea>
+          </div>
+        </div>
+
+        <button type="submit" class="btn-submit" id="btn-submit">Confirm Arrival Details &rarr;</button>
+
+      </form>
+    </div>
+  </div>
+
+  <!-- Success -->
+  <div id="success">
+    <div class="tick">&#10003;</div>
+    <h2>Thank you!</h2>
+    <p>We have received your arrival details and will make sure everything is ready for your stay.<br><br>
+       If anything changes before you arrive, just reply to your booking confirmation email and we will update your details.</p>
+    <p style="margin-top:16px;font-size:.82rem;color:var(--muted)">Be Here Stays &mdash; be-here.travel</p>
+  </div>
+
+</div><!-- /card -->
+
+<script>
+// =============================================================
+// URL DECODING
+// Expected: ?booking=CWPR-1234&data=BASE64_ENCODED_JSON
+// =============================================================
+var params      = new URLSearchParams(window.location.search);
+var bookingRef  = params.get('booking') || '';
+var dataParam   = params.get('data')    || '';
+var prop        = null;
+
+if (dataParam) {
+  try {
+    prop = JSON.parse(atob(dataParam));
+  } catch(e) {
+    prop = null;
+  }
+}
+
+if (!prop) {
+  document.getElementById('no-link').style.display = 'block';
+} else {
+  document.getElementById('form-wrap').style.display = 'block';
+  buildForm(prop, bookingRef || prop.bookingRef || '');
+}
+
+// =============================================================
+// BUILD FORM
+// =============================================================
+function buildForm(p, ref) {
+  document.title = p.property + ' - Arrival Details';
+  document.getElementById('header-property').textContent = p.property;
+  if (ref) {
+    document.getElementById('header-booking-ref').textContent = 'Booking ref: ' + ref;
+  }
+
+  // Pre-fill known values (guests can correct them)
+  if (p.guestName)    document.getElementById('guest-name').value     = p.guestName;
+  if (p.guestEmail)   document.getElementById('guest-email').value    = p.guestEmail;
+  if (p.arrivalDate)  document.getElementById('arrival-date').value   = p.arrivalDate;
+  if (p.numAdults)    document.getElementById('num-adults').value     = p.numAdults;
+
+  // -- Occupancy bar --
+  if (p.maxOccupancy) {
+    document.getElementById('occupancy-bar').style.display = '';
+
+    var updateOccupancy = function() {
+      var adults   = parseInt(document.getElementById('num-adults').value)   || 0;
+      var children = p.allowsChildren
+        ? (parseInt(document.getElementById('num-children').value) || 0) : 0;
+      var total = adults + children;
+      var pct   = Math.min(100, Math.round(total / p.maxOccupancy * 100));
+
+      var fill  = document.getElementById('occupancy-fill');
+      var lbl   = document.getElementById('occupancy-label');
+      var err   = document.getElementById('err-occupancy');
+      if (!fill || !lbl || !err) return;
+
+      fill.style.width      = pct + '%';
+      fill.style.background = total > p.maxOccupancy ? '#c0392b'
+                            : total === p.maxOccupancy ? '#AF926A' : 'var(--brand)';
+      lbl.textContent    = total + ' of ' + p.maxOccupancy;
+      lbl.style.color    = total > p.maxOccupancy ? '#c0392b' : 'var(--brand)';
+      err.style.display  = total > p.maxOccupancy ? 'block' : 'none';
+      err.textContent    = total > p.maxOccupancy
+        ? 'Total guests (' + total + ') exceeds the maximum of ' + p.maxOccupancy
+          + ' for this property (adults + children). Please adjust your numbers.' : '';
+    };
+
+    document.getElementById('num-adults').addEventListener('input', updateOccupancy);
+    if (p.allowsChildren) {
+      document.getElementById('num-children').addEventListener('input', updateOccupancy);
+    }
+    updateOccupancy();
+  }
+
+  // -- Children --
+  if (p.allowsChildren) {
+    document.getElementById('field-children').style.display = '';
+    if (p.numChildren) document.getElementById('num-children').value = p.numChildren;
+    if (p.maxChildren) {
+      document.getElementById('num-children').max = p.maxChildren;
+    }
+  }
+
+  // -- Travel cot (6mo-2yr, only where property provides one) --
+  if (p.allowsBabies) {
+    document.getElementById('field-babies').style.display = '';
+    if (p.numBabies) document.getElementById('num-babies').value = p.numBabies;
+  }
+
+  // -- Pets --
+  if (p.allowsPets) {
+    document.getElementById('field-pets').style.display = '';
+    if (p.numPets) document.getElementById('num-pets').value = p.numPets;
+    if (p.maxPets) {
+      var hint = document.getElementById('max-pets-hint');
+      if (hint) hint.textContent = '(max ' + p.maxPets + ')';
+      document.getElementById('num-pets').max = p.maxPets;
+    }
+  }
+
+  // -- Bed configuration --
+  var bedsContainer = document.getElementById('beds-container');
+
+  // Converts [GF]/[ground floor]/[downstairs] to green badge
+  // Converts [upper]/[upstairs]/[first floor] to blue badge
+  function renderFloorText(str) {
+    str = str.replace(/\[(GF|ground floor|ground|downstairs)\]/gi, function() {
+      return '<span class="floor-badge floor-gf">Ground floor</span>';
+    });
+    str = str.replace(/\[(upper|upstairs|first floor|1st floor)\]/gi, function() {
+      return '<span class="floor-badge floor-upper">Upstairs</span>';
+    });
+    return str;
+  }
+
+  if (p.fixedBeds) {
+    var alwaysBox       = document.createElement('div');
+    alwaysBox.className = 'beds-always-box';
+    alwaysBox.innerHTML =
+      '<div class="beds-always-title">Beds in this property</div>' +
+      '<div>' + renderFloorText(p.fixedBeds) + '</div>';
+    bedsContainer.appendChild(alwaysBox);
+  }
+
+  if (p.bedOptions && p.bedOptions.length > 0) {
+    var chooseLabel           = document.createElement('label');
+    chooseLabel.style.display = 'block';
+    chooseLabel.style.marginBottom = '10px';
+    chooseLabel.innerHTML = p.fixedBeds
+      ? 'How would you like the <strong>remaining bedroom(s)</strong> configured?'
+      : 'How would you like the bedrooms configured?';
+    bedsContainer.appendChild(chooseLabel);
+
+    var optionsDiv       = document.createElement('div');
+    optionsDiv.className = 'bed-options';
+
+    p.bedOptions.forEach(function(opt, i) {
+      var wrapper       = document.createElement('div');
+      wrapper.className = 'bed-option';
+      var radioId       = 'bed-opt-' + i;
+      var input         = document.createElement('input');
+      input.type        = 'radio';
+      input.name        = 'bed-config';
+      input.id          = radioId;
+      input.value       = opt;
+      if (i === 0) input.checked = true;
+      var lbl = document.createElement('label');
+      lbl.setAttribute('for', radioId);
+      lbl.innerHTML = renderFloorText(opt);
+      wrapper.appendChild(input);
+      wrapper.appendChild(lbl);
+      optionsDiv.appendChild(wrapper);
+    });
+
+    bedsContainer.appendChild(optionsDiv);
+
+  } else if (!p.fixedBeds) {
+    var noConfig          = document.createElement('p');
+    noConfig.style.cssText = 'color:var(--muted);font-size:.88rem';
+    noConfig.textContent  = 'Bed configuration details will be confirmed with your welcome information.';
+    bedsContainer.appendChild(noConfig);
+  } else {
+    var fixedOnly          = document.createElement('p');
+    fixedOnly.style.cssText = 'color:var(--muted);font-size:.88rem;margin-top:4px';
+    fixedOnly.textContent  = 'The bed configuration in this property is fixed.';
+    bedsContainer.appendChild(fixedOnly);
+  }
+}
+
+// =============================================================
+// SUBMIT
+// =============================================================
+document.getElementById('guest-form').addEventListener('submit', function(e) {
+  e.preventDefault();
+  if (validateForm()) submitForm();
+});
+
+function validateForm() {
+  var ok = true;
+
+  function setErr(el, errEl, msg) {
+    if (!el || !errEl) return;
+    el.classList.add('invalid');
+    errEl.textContent   = msg;
+    errEl.style.display = 'block';
+    if (ok) { el.focus(); ok = false; }
+  }
+  function clrErr(el, errEl) {
+    if (!el || !errEl) return;
+    el.classList.remove('invalid');
+    errEl.style.display = 'none';
+  }
+  function byId(id) { return document.getElementById(id); }
+
+  var nameEl  = byId('guest-name');
+  nameEl.value.trim()
+    ? clrErr(nameEl, byId('err-name'))
+    : setErr(nameEl, byId('err-name'), 'Please enter your name.');
+
+  var emailEl = byId('guest-email');
+  /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(emailEl.value.trim())
+    ? clrErr(emailEl, byId('err-email'))
+    : setErr(emailEl, byId('err-email'), 'Please enter a valid email address.');
+
+  var dateEl  = byId('arrival-date');
+  dateEl.value
+    ? clrErr(dateEl, byId('err-date'))
+    : setErr(dateEl, byId('err-date'), 'Please select your arrival date.');
+
+  var adults  = parseInt(byId('num-adults').value) || 0;
+  adults >= 1
+    ? clrErr(byId('num-adults'), byId('err-adults'))
+    : setErr(byId('num-adults'), byId('err-adults'), 'Please enter at least 1 adult.');
+
+  if (prop && prop.maxOccupancy) {
+    var children = prop.allowsChildren ? (parseInt(byId('num-children').value) || 0) : 0;
+    var total    = adults + children;
+    var occErr   = byId('err-occupancy');
+    if (total > prop.maxOccupancy) {
+      if (occErr) {
+        occErr.textContent  = 'Total (' + total + ') exceeds the maximum of '
+          + prop.maxOccupancy + ' for this property. Please adjust your numbers.';
+        occErr.style.display = 'block';
+      }
+      byId('num-adults').classList.add('invalid');
+      if (prop.allowsChildren) byId('num-children').classList.add('invalid');
+      if (ok) { byId('num-adults').focus(); ok = false; }
+    } else {
+      if (occErr) occErr.style.display = 'none';
+      byId('num-adults').classList.remove('invalid');
+      if (prop.allowsChildren) byId('num-children').classList.remove('invalid');
+    }
+  }
+
+  if (prop && prop.allowsPets && prop.maxPets) {
+    var pets = parseInt(byId('num-pets').value) || 0;
+    pets <= prop.maxPets
+      ? clrErr(byId('num-pets'), byId('err-pets'))
+      : setErr(byId('num-pets'), byId('err-pets'), 'Maximum ' + prop.maxPets + ' pets for this property.');
+  }
+
+  return ok;
+}
+
+function submitForm() {
+  var ref      = bookingRef || (prop && prop.bookingRef) || '';
+  var name     = document.getElementById('guest-name').value.trim();
+  var email    = document.getElementById('guest-email').value.trim();
+  var arrival  = document.getElementById('arrival-date').value;
+  var adults   = parseInt(document.getElementById('num-adults').value)   || 0;
+  var children = prop.allowsChildren  ? (parseInt(document.getElementById('num-children').value) || 0) : 0;
+  var babies   = prop.allowsBabies    ? (parseInt(document.getElementById('num-babies').value)   || 0) : 0;
+  var pets     = prop.allowsPets      ? (parseInt(document.getElementById('num-pets').value)      || 0) : 0;
+  var notes    = document.getElementById('notes').value.trim();
+
+  var bedChoice = '';
+  if (prop.bedOptions && prop.bedOptions.length > 0) {
+    var selected = document.querySelector('input[name="bed-config"]:checked');
+    if (selected) {
+      bedChoice = (prop.fixedBeds ? prop.fixedBeds + ' + ' : '') + selected.value;
+    }
+  } else if (prop.fixedBeds) {
+    bedChoice = prop.fixedBeds + ' (fixed)';
+  }
+
+  var payload = {
+    bookingRef:  ref,
+    guestName:   name,
+    guestEmail:  email,
+    arrivalDate: arrival,
+    property:    prop.property,
+    numAdults:   adults,
+    numChildren: children,
+    numBabies:   babies,
+    numPets:     pets,
+    bedConfig:   bedChoice,
+    notes:       notes || ''
+  };
+
+  var btn         = document.getElementById('btn-submit');
+  btn.textContent = 'Sending...';
+  btn.disabled    = true;
+
+  fetch('https://hook.eu2.make.com/kbjg9w1boxs5x135lwy9p7p2ltpjo9tc', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body:    JSON.stringify(payload)
+  })
+  .then(function() {
+    document.getElementById('form-wrap').style.display = 'none';
+    document.getElementById('success').style.display   = 'block';
+  })
+  .catch(function() {
+    btn.textContent = 'Confirm Arrival Details';
+    btn.disabled    = false;
+    alert('Sorry, there was a problem submitting your details. Please try again or contact us directly.');
+  });
+}
+</script>
+</body>
+</html>

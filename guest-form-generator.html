@@ -1,0 +1,438 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Be Here — Guest Form Generator</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      background: #f5f4f0;
+      color: #1a1a1a;
+      min-height: 100vh;
+      padding: 40px 20px;
+    }
+    .container { max-width: 640px; margin: 0 auto; }
+    header { margin-bottom: 28px; }
+    header h1 { font-size: 22px; font-weight: 600; color: #2d5a3d; letter-spacing: -0.3px; }
+    header p { font-size: 14px; color: #666; margin-top: 4px; }
+
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      padding: 24px 28px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.08);
+      margin-bottom: 16px;
+    }
+    .card h2 {
+      font-size: 12px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: #999;
+      margin-bottom: 16px;
+    }
+
+    /* API key section */
+    .api-section {
+      display: flex;
+      gap: 10px;
+      align-items: flex-end;
+    }
+    .api-section .field { flex: 1; }
+    .api-status {
+      font-size: 13px;
+      margin-top: 10px;
+      padding: 8px 12px;
+      border-radius: 7px;
+      display: none;
+    }
+    .api-status.ok { background: #f0f7f2; color: #2d5a3d; }
+    .api-status.err { background: #fff0f0; color: #c0392b; }
+    .api-status.loading { background: #f5f4f0; color: #888; }
+
+    .row { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .row.thirds { grid-template-columns: 1fr 1fr 1fr; }
+    .field { display: flex; flex-direction: column; gap: 5px; }
+    label { font-size: 13px; font-weight: 500; color: #444; }
+    label span.req { color: #c0392b; margin-left: 2px; }
+
+    input, select {
+      padding: 9px 12px;
+      border: 1.5px solid #ddd;
+      border-radius: 8px;
+      font-size: 14px;
+      color: #1a1a1a;
+      background: #fff;
+      transition: border-color 0.15s;
+      width: 100%;
+    }
+    input:focus, select:focus { outline: none; border-color: #2d5a3d; }
+    input:disabled, select:disabled { background: #f5f5f5; color: #aaa; cursor: not-allowed; }
+
+    .prop-info {
+      margin-top: 12px;
+      padding: 11px 13px;
+      background: #f0f7f2;
+      border-radius: 8px;
+      font-size: 13px;
+      color: #2d5a3d;
+      display: none;
+      line-height: 1.6;
+    }
+    .prop-info strong { font-weight: 600; }
+
+    .btn {
+      padding: 10px 18px;
+      border: none;
+      border-radius: 8px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+      white-space: nowrap;
+    }
+    .btn-primary { background: #2d5a3d; color: #fff; }
+    .btn-primary:hover { background: #234a30; }
+    .btn-primary:disabled { background: #aaa; cursor: not-allowed; }
+    .btn-secondary { background: #eef5f0; color: #2d5a3d; }
+    .btn-secondary:hover { background: #ddeee3; }
+
+    .generate-btn {
+      width: 100%;
+      padding: 13px;
+      background: #2d5a3d;
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      font-size: 15px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background 0.15s;
+    }
+    .generate-btn:hover { background: #234a30; }
+
+    .result-card { display: none; }
+    .url-box {
+      background: #f5f4f0;
+      border-radius: 8px;
+      padding: 12px 14px;
+      font-size: 12px;
+      color: #444;
+      word-break: break-all;
+      line-height: 1.5;
+      max-height: 90px;
+      overflow-y: auto;
+      margin-bottom: 14px;
+    }
+    .button-row { display: flex; gap: 10px; }
+    .copy-btn, .open-btn {
+      flex: 1;
+      padding: 11px;
+      border-radius: 9px;
+      font-size: 14px;
+      font-weight: 600;
+      cursor: pointer;
+      border: none;
+      transition: background 0.15s;
+    }
+    .copy-btn { background: #2d5a3d; color: #fff; }
+    .copy-btn:hover { background: #234a30; }
+    .copy-btn.copied { background: #27ae60; }
+    .open-btn { background: #eef5f0; color: #2d5a3d; }
+    .open-btn:hover { background: #ddeee3; }
+
+    .error-msg { color: #c0392b; font-size: 13px; margin-top: 8px; display: none; }
+
+    .token-wrap { position: relative; }
+    .token-wrap input { padding-right: 60px; font-family: monospace; font-size: 12px; }
+    .toggle-show {
+      position: absolute;
+      right: 10px;
+      top: 50%;
+      transform: translateY(-50%);
+      font-size: 11px;
+      color: #888;
+      cursor: pointer;
+      user-select: none;
+    }
+    .toggle-show:hover { color: #2d5a3d; }
+  </style>
+</head>
+<body>
+<div class="container">
+  <header>
+    <h1>Be Here — Guest Form Generator</h1>
+    <p>Generate a guest arrival form link for any booking</p>
+  </header>
+
+  <!-- API Key -->
+  <div class="card">
+    <h2>Monday.com Connection</h2>
+    <div class="api-section">
+      <div class="field">
+        <label>API Token</label>
+        <div class="token-wrap">
+          <input type="password" id="apiToken" placeholder="Paste your Monday.com API token" oninput="onTokenInput()">
+          <span class="toggle-show" onclick="toggleShow()">show</span>
+        </div>
+      </div>
+      <button class="btn btn-primary" id="loadBtn" onclick="loadProperties()" disabled>Load Properties</button>
+    </div>
+    <div class="api-status" id="apiStatus"></div>
+  </div>
+
+  <!-- Booking Details -->
+  <div class="card">
+    <h2>Booking Details</h2>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="row">
+        <div class="field">
+          <label>Booking Reference <span class="req">*</span></label>
+          <input type="text" id="bookingRef" placeholder="e.g. HM9XJJZ42D">
+        </div>
+        <div class="field">
+          <label>Arrival Date <span class="req">*</span></label>
+          <input type="date" id="arrivalDate">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Guest Name <span class="req">*</span></label>
+          <input type="text" id="guestName" placeholder="e.g. Jane Smith">
+        </div>
+        <div class="field">
+          <label>Guest Email</label>
+          <input type="email" id="guestEmail" placeholder="e.g. jane@example.com">
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Property -->
+  <div class="card">
+    <h2>Property</h2>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="field">
+        <label>Property <span class="req">*</span></label>
+        <select id="property" onchange="onPropertyChange()">
+          <option value="">— Load properties first —</option>
+        </select>
+      </div>
+      <div class="prop-info" id="propInfo"></div>
+    </div>
+  </div>
+
+  <!-- Guest Party -->
+  <div class="card">
+    <h2>Guest Party</h2>
+    <div style="display:flex;flex-direction:column;gap:14px;">
+      <div class="row thirds">
+        <div class="field">
+          <label>Adults <span class="req">*</span></label>
+          <input type="number" id="numAdults" min="1" max="20" value="2">
+        </div>
+        <div class="field">
+          <label>Children</label>
+          <input type="number" id="numChildren" min="0" max="20" value="0">
+        </div>
+        <div class="field">
+          <label>Babies</label>
+          <input type="number" id="numBabies" min="0" max="10" value="0">
+        </div>
+      </div>
+      <div class="row">
+        <div class="field">
+          <label>Pets</label>
+          <input type="number" id="numPets" min="0" max="10" value="0">
+        </div>
+        <div></div>
+      </div>
+    </div>
+  </div>
+
+  <button class="generate-btn" onclick="generate()">Generate Form Link</button>
+  <p class="error-msg" id="errorMsg"></p>
+  <br>
+
+  <div class="result-card card" id="resultCard">
+    <h2>Generated Link</h2>
+    <div class="url-box" id="urlDisplay"></div>
+    <div class="button-row">
+      <button class="copy-btn" id="copyBtn" onclick="copyUrl()">Copy Link</button>
+      <button class="open-btn" onclick="openUrl()">Open Form ↗</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const BOARD_ID = '5094466278';
+let properties = {};
+let generatedUrl = '';
+
+function onTokenInput() {
+  const val = document.getElementById('apiToken').value.trim();
+  document.getElementById('loadBtn').disabled = !val;
+}
+
+function toggleShow() {
+  const inp = document.getElementById('apiToken');
+  const btn = document.querySelector('.toggle-show');
+  if (inp.type === 'password') { inp.type = 'text'; btn.textContent = 'hide'; }
+  else { inp.type = 'password'; btn.textContent = 'show'; }
+}
+
+async function loadProperties() {
+  const token = document.getElementById('apiToken').value.trim();
+  if (!token) return;
+
+  const status = document.getElementById('apiStatus');
+  const loadBtn = document.getElementById('loadBtn');
+  status.className = 'api-status loading';
+  status.textContent = 'Loading properties from Monday…';
+  status.style.display = 'block';
+  loadBtn.disabled = true;
+
+  const query = `{
+    boards(ids: [${BOARD_ID}]) {
+      items_page(limit: 200) {
+        items {
+          name
+          column_values(ids: ["text_mm2a2a78","long_text_mm2a30dy","numeric_mm2aa6z7","boolean_mm2asf5h","boolean_mm2atzeb","boolean_mm2agent","numeric_mm2a1hwj"]) {
+            id value
+          }
+        }
+      }
+    }
+  }`;
+
+  try {
+    const resp = await fetch('https://api.monday.com/v2', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': token,
+        'API-Version': '2024-01'
+      },
+      body: JSON.stringify({ query })
+    });
+
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const json = await resp.json();
+
+    if (json.errors) throw new Error(json.errors[0].message);
+
+    const items = json.data.boards[0].items_page.items;
+    properties = {};
+
+    for (const item of items) {
+      const cv = {};
+      for (const col of item.column_values) cv[col.id] = col.value;
+
+      const parse = (v) => { try { return JSON.parse(v); } catch { return null; } };
+      const fixedBeds = parse(cv['text_mm2a2a78']) || '';
+      const bedOptionsRaw = parse(cv['long_text_mm2a30dy']);
+      const bedOptions = (bedOptionsRaw?.text || '').split('|').map(s => s.trim()).filter(Boolean);
+      const maxOccupancy = parseInt(parse(cv['numeric_mm2aa6z7'])) || 0;
+      const allowsChildren = parse(cv['boolean_mm2asf5h'])?.checked || false;
+      const allowsBabies = parse(cv['boolean_mm2atzeb'])?.checked || false;
+      const allowsPets = parse(cv['boolean_mm2agent'])?.checked || false;
+      const maxPets = parseInt(parse(cv['numeric_mm2a1hwj'])) || 0;
+
+      properties[item.name] = { maxOccupancy, allowsChildren, allowsBabies, allowsPets, maxPets, fixedBeds, bedOptions };
+    }
+
+    // Populate dropdown
+    const sel = document.getElementById('property');
+    sel.innerHTML = '<option value="">— Select property —</option>';
+    Object.keys(properties).sort().forEach(name => {
+      const opt = document.createElement('option');
+      opt.value = name;
+      opt.textContent = name;
+      sel.appendChild(opt);
+    });
+
+    const count = Object.keys(properties).length;
+    status.className = 'api-status ok';
+    status.textContent = `✓ Loaded ${count} properties from Monday · ${new Date().toLocaleTimeString()}`;
+    loadBtn.disabled = false;
+    loadBtn.textContent = 'Refresh';
+
+  } catch (e) {
+    status.className = 'api-status err';
+    status.textContent = `Error: ${e.message}`;
+    loadBtn.disabled = false;
+  }
+}
+
+function onPropertyChange() {
+  const name = document.getElementById('property').value;
+  const info = document.getElementById('propInfo');
+  if (!name || !properties[name]) { info.style.display = 'none'; return; }
+  const p = properties[name];
+  const pets = p.allowsPets ? `✓ Pets (max ${p.maxPets})` : '✗ No pets';
+  const children = p.allowsChildren ? '✓ Children' : '✗ No children';
+  const babies = p.allowsBabies ? '✓ Babies' : '✗ No babies';
+  const beds = p.fixedBeds ? `Beds: ${p.fixedBeds}` : (p.bedOptions.length ? 'Beds: configurable' : 'Beds: no preference needed');
+  info.innerHTML = `<strong>Max occupancy:</strong> ${p.maxOccupancy} &nbsp;·&nbsp; ${children} &nbsp;·&nbsp; ${babies} &nbsp;·&nbsp; ${pets}<br>${beds}`;
+  info.style.display = 'block';
+}
+
+function generate() {
+  const err = document.getElementById('errorMsg');
+  err.style.display = 'none';
+
+  const bookingRef = document.getElementById('bookingRef').value.trim();
+  const arrivalDate = document.getElementById('arrivalDate').value;
+  const guestName = document.getElementById('guestName').value.trim();
+  const guestEmail = document.getElementById('guestEmail').value.trim();
+  const property = document.getElementById('property').value;
+  const numAdults = parseInt(document.getElementById('numAdults').value) || 0;
+  const numChildren = parseInt(document.getElementById('numChildren').value) || 0;
+  const numBabies = parseInt(document.getElementById('numBabies').value) || 0;
+  const numPets = parseInt(document.getElementById('numPets').value) || 0;
+
+  const missing = [];
+  if (!bookingRef) missing.push('Booking Reference');
+  if (!arrivalDate) missing.push('Arrival Date');
+  if (!guestName) missing.push('Guest Name');
+  if (!property) missing.push('Property');
+  if (numAdults < 1) missing.push('at least 1 adult');
+
+  if (missing.length) {
+    err.textContent = 'Please fill in: ' + missing.join(', ');
+    err.style.display = 'block';
+    return;
+  }
+
+  const p = properties[property] || { maxOccupancy: 8, allowsChildren: true, allowsBabies: true, allowsPets: true, maxPets: 2, fixedBeds: '', bedOptions: [] };
+
+  const data = { bookingRef, guestName, guestEmail, arrivalDate, property, numAdults, numChildren, numBabies, numPets, maxOccupancy: p.maxOccupancy, allowsChildren: p.allowsChildren, allowsBabies: p.allowsBabies, allowsPets: p.allowsPets, maxPets: p.maxPets, fixedBeds: p.fixedBeds, bedOptions: p.bedOptions };
+
+  const encoded = btoa(JSON.stringify(data));
+  generatedUrl = `https://be-here-stays.github.io/guest-arrivals/?booking=${encodeURIComponent(bookingRef)}&data=${encoded}`;
+
+  document.getElementById('urlDisplay').textContent = generatedUrl;
+  document.getElementById('resultCard').style.display = 'block';
+  document.getElementById('copyBtn').textContent = 'Copy Link';
+  document.getElementById('copyBtn').classList.remove('copied');
+  document.getElementById('resultCard').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+
+function copyUrl() {
+  if (!generatedUrl) return;
+  navigator.clipboard.writeText(generatedUrl).then(() => {
+    const btn = document.getElementById('copyBtn');
+    btn.textContent = 'Copied!';
+    btn.classList.add('copied');
+    setTimeout(() => { btn.textContent = 'Copy Link'; btn.classList.remove('copied'); }, 2500);
+  });
+}
+
+function openUrl() {
+  if (generatedUrl) window.open(generatedUrl, '_blank');
+}
+</script>
+</body>
+</html>

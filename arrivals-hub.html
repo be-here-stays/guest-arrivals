@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Be Here — Arrivals Hub</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:        #D5D0C4;
+      --dark:      #272F2E;
+      --sage:      #646955;
+      --sage-mid:  #989782;
+      --gold:      #AF926A;
+      --cream:     #F3E3C3;
+      --surface:   #fff;
+      --border:    #e0ddd6;
+      --text:      #272F2E;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    header { background: var(--dark); color: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
+    .header-logo svg { display: block; width: 130px; height: auto; }
+    .header-sub { font-size: 11px; color: var(--cream); opacity: 0.6; margin-top: 4px; }
+    header .subtitle { font-size: 13px; opacity: 0.65; margin-top: 2px; color: var(--cream); }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+
+    /* API bar */
+    .api-bar { background: #1e2522; padding: 10px 32px; display: flex; align-items: center; gap: 12px; }
+    .api-bar label { font-size: 12px; color: rgba(255,255,255,0.7); white-space: nowrap; }
+    .api-bar input { flex: 1; max-width: 340px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.1); color: #fff; font-size: 12px; font-family: monospace; }
+    .api-bar input::placeholder { color: rgba(255,255,255,0.4); }
+    .api-bar input:focus { outline: none; border-color: rgba(255,255,255,0.5); }
+    .load-btn { padding: 6px 16px; background: var(--cream); color: var(--dark); border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit; }
+    .load-btn:hover { background: #f3e3c3cc; }
+    .load-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .api-status { font-size: 12px; color: rgba(255,255,255,0.8); }
+
+    /* Tabs */
+    .tabs { background: var(--surface); border-bottom: 2px solid var(--border); padding: 0 32px; display: flex; gap: 0; }
+    .tab { padding: 14px 20px; font-size: 14px; font-weight: 500; color: var(--sage-mid); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
+    .tab:hover { color: var(--sage); }
+    .tab.active { color: var(--dark); border-bottom-color: var(--gold); font-weight: 700; }
+
+    /* Content */
+    .content { padding: 28px 32px; display: none; }
+    .content.active { display: block; }
+
+    /* Stat cards */
+    .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: var(--surface); border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(39,47,46,0.08); }
+    .stat-card .label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--sage-mid); margin-bottom: 8px; }
+    .stat-card .value { font-size: 32px; font-weight: 700; color: var(--text); letter-spacing: -1px; }
+    .stat-card .sub { font-size: 13px; color: var(--sage-mid); margin-top: 4px; }
+    .stat-card.green .value { color: var(--sage); }
+    .stat-card.orange .value { color: #a86c00; }
+    .stat-card.red .value { color: #8B2020; }
+
+    /* Charts */
+    .chart-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
+    .chart-card { background: var(--surface); border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(39,47,46,0.08); }
+    .chart-card h3 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--sage-mid); margin-bottom: 16px; }
+    .chart-card canvas { max-height: 260px; }
+
+    /* Laundry tab */
+    .laundry-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
+    .laundry-header h2 { font-size: 20px; font-weight: 600; color: var(--text); }
+    .laundry-header .date-info { font-size: 14px; color: var(--sage-mid); }
+    .date-nav { display: flex; align-items: center; gap: 10px; }
+    .date-nav button { padding: 6px 12px; border: 1.5px solid var(--border); border-radius: 7px; background: var(--surface); font-size: 13px; cursor: pointer; font-family: inherit; }
+    .date-nav button:hover { border-color: var(--dark); color: var(--dark); }
+    .date-nav .date-label { font-size: 15px; font-weight: 600; min-width: 160px; text-align: center; }
+
+    .laundry-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 14px; margin-bottom: 24px; }
+    .property-card { background: var(--surface); border-radius: 12px; padding: 18px 20px; box-shadow: 0 1px 3px rgba(39,47,46,0.08); border-left: 4px solid var(--border); }
+    .property-card.form-received { border-left-color: var(--sage); }
+    .property-card.form-sent { border-left-color: var(--gold); }
+    .property-card.form-pending { border-left-color: #B98B73; }
+    .property-card .prop-name { font-size: 15px; font-weight: 700; color: var(--text); margin-bottom: 4px; }
+    .property-card .guest-name { font-size: 13px; color: var(--sage-mid); margin-bottom: 10px; }
+    .property-card .party { display: flex; gap: 12px; margin-bottom: 10px; }
+    .property-card .party span { font-size: 12px; background: var(--bg); padding: 3px 8px; border-radius: 20px; color: var(--text); }
+    .property-card .beds-label { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; color: var(--sage-mid); margin-bottom: 4px; }
+    .property-card .beds { font-size: 13px; color: var(--sage); font-weight: 600; }
+    .property-card .bed-options { font-size: 12px; color: #aaa; margin-top: 4px; font-style: italic; }
+    .property-card .status-badge { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 8px; border-radius: 10px; margin-top: 8px; }
+    .status-received { background: #eaede4; color: var(--sage); }
+    .status-sent { background: #f5efe8; color: #8a5c2a; }
+    .status-pending { background: #f5ebe5; color: #7a3a20; }
+    .status-none { background: var(--bg); color: var(--sage-mid); }
+
+    .beds-summary { background: var(--surface); border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(39,47,46,0.08); }
+    .beds-summary h3 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--sage-mid); margin-bottom: 14px; }
+    .bed-totals { display: flex; flex-wrap: wrap; gap: 10px; }
+    .bed-total { background: #eaede4; border-radius: 8px; padding: 10px 16px; }
+    .bed-total .count { font-size: 24px; font-weight: 700; color: var(--sage); }
+    .bed-total .type { font-size: 12px; color: var(--text); margin-top: 2px; }
+
+    /* Empty state */
+    .empty { text-align: center; padding: 60px 20px; color: var(--sage-mid); }
+    .empty p { font-size: 15px; }
+
+    /* Loading */
+    .loading { text-align: center; padding: 40px; color: var(--sage-mid); font-size: 14px; }
+
+    /* ── Changeovers tab ── */
+    .co-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
+    .co-title { font-size: 20px; font-weight: 700; color: var(--text); }
+    .co-subtitle { font-size: 13px; color: var(--sage-mid); margin-top: 3px; }
+    .co-actions { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .co-summary { font-size: 13px; color: var(--sage-mid); }
+    .co-refresh-btn { padding: 7px 14px; border: 1.5px solid var(--border); border-radius: 8px; background: var(--surface); font-size: 13px; font-weight: 600; cursor: pointer; color: var(--sage); font-family: inherit; }
+    .co-refresh-btn:hover { border-color: var(--dark); color: var(--dark); }
+    .co-log-btn { padding: 7px 14px; background: var(--dark); color: var(--cream); border-radius: 8px; font-size: 13px; font-weight: 700; text-decoration: none; }
+    .co-log-btn:hover { background: var(--sage); }
+
+    .co-legend { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; margin-bottom: 20px; font-size: 12px; }
+    .co-legend-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--sage-mid); }
+    .co-key-item { display: flex; align-items: center; gap: 5px; color: var(--text); }
+    .co-dot { font-size: 16px; line-height: 1; }
+    .co-done { color: var(--sage); }
+    .co-todo { color: var(--border); }
+    .co-blocked { color: var(--gold); }
+    .co-tasks-key { display: flex; gap: 12px; margin-left: auto; color: var(--sage-mid); font-size: 12px; }
+    .co-tasks-key span { white-space: nowrap; }
+
+    .co-table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(39,47,46,0.08); }
+    .co-table thead th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--sage-mid); padding: 12px 14px 10px; border-bottom: 2px solid var(--border); }
+    .co-table thead th.co-th-task { text-align: center; width: 64px; }
+    .co-table thead th.co-th-prog { text-align: right; width: 150px; }
+    .co-table tbody tr { border-bottom: 1px solid #eae8e2; transition: background 0.1s; }
+    .co-table tbody tr:last-child { border-bottom: none; }
+    .co-table tbody tr:hover { background: #f7f5f0; }
+    .co-table td { padding: 13px 14px; vertical-align: middle; }
+    .co-table tbody tr td:first-child { border-left: 4px solid transparent; padding-left: 20px; }
+    .co-table tbody tr.co-all   td:first-child { border-left-color: var(--sage); }
+    .co-table tbody tr.co-part  td:first-child { border-left-color: var(--gold); }
+    .co-table tbody tr.co-none  td:first-child { border-left-color: #B98B73; }
+    .co-prop-name { font-size: 15px; font-weight: 700; }
+    .co-guest-sub { font-size: 12px; color: var(--sage-mid); margin-top: 2px; }
+    .co-task-cell { text-align: center; }
+    .co-tdot { display: inline-flex; width: 26px; height: 26px; border-radius: 50%; align-items: center; justify-content: center; font-size: 12px; font-weight: 700; }
+    .co-tdot-done    { background: var(--sage); color: #fff; font-size: 11px; }
+    .co-tdot-todo    { background: var(--bg); color: var(--sage-mid); border: 2px solid var(--border); font-size: 14px; }
+    .co-tdot-blocked { background: #f5efe0; color: #8a6020; border: 2px solid var(--gold); }
+    .co-tdot-na      { background: transparent; color: var(--border); font-size: 16px; }
+    .co-prog-cell { text-align: right; }
+    .co-prog-wrap { display: flex; align-items: center; gap: 8px; justify-content: flex-end; }
+    .co-prog-bg { flex: 1; max-width: 100px; height: 7px; background: var(--bg); border-radius: 4px; overflow: hidden; }
+    .co-prog-fill { height: 100%; border-radius: 4px; transition: width 0.4s; }
+    .co-fill-full { background: var(--sage); }
+    .co-fill-part { background: var(--gold); }
+    .co-fill-none { background: var(--bg); }
+    .co-prog-lbl { font-size: 12px; font-weight: 700; color: var(--sage-mid); min-width: 32px; text-align: right; }
+    .co-empty { text-align: center; padding: 50px 20px; color: var(--sage-mid); font-size: 15px; }
+    .co-sum-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-logo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 215.0001 45.6329" aria-label="Be Here">
+      <path d="M33.5812,26.2451c-4.585,0-8.3018,3.6929-8.3018,8.2482s3.7168,8.2482,8.3018,8.2482,8.3017-3.6928,8.3017-8.2482-3.7168-8.2482-8.3017-8.2482Z" style="fill:#fff;"/>
+      <polygon points="10.8809 19.7103 19.0665 19.7103 19.0665 11.5778 19.0665 11.3457 10.8822 3.2139 10.6473 3.2139 2.463 11.3457 2.463 11.5778 2.463 19.7103 10.648 19.7103 10.8809 19.7103" style="fill:#fff;"/>
+      <path d="M40.5754,5.4963l-5.4656-.2394c-4.4287-.1941-8.2128,3.2233-8.4095,7.594l-.243,5.4044,14.0587-12.6953.0595-.0638Z" style="fill:#fff;"/>
+      <path d="M27.6033,19.3885l5.4768-.2207c4.4294-.1785,7.9053-3.901,7.7245-8.2724l-.2232-5.3945-.0656.0592-12.9125,13.8284Z" style="fill:#fff;"/>
+      <polygon points="23.5662 22.0664 23.5662 0 22.0665 0 22.0665 22.0664 0 22.0664 0 23.5661 22.0665 23.5661 22.0665 45.6329 23.5662 45.6329 23.5662 23.5661 45.6329 23.5661 45.6329 22.0664 23.5662 22.0664" style="fill:#fff;"/>
+      <path d="M12.5345,33.8375c-1.8062-.127-3.257-2.1802-5.0582-1.9879-1.5029.1609-2.5817,1.8435-4.0738,2.0993-.319.0545-.6313.0405-.9396-.0181v3.1036c.3165.0619.6371.0784.9636.0222,1.4922-.2549,2.5709-1.9384,4.0739-2.0993,1.8012-.1931,3.2519,1.86,5.0581,1.9879,2.0581.1453,3.7267-2.2256,5.7881-2.1563.2469.0084.4863.0521.7199.1205v-3.1003c-.2418-.0726-.4888-.1188-.744-.1279-2.0605-.0693-3.7299,2.3015-5.788,2.1563Z" style="fill:#fff;"/>
+      <path d="M12.5229,28.1871c-1.8062-.1263-3.257-2.1794-5.0582-1.9872-1.5029.1609-2.5817,1.8436-4.0738,2.0994-.3149.0536-.6231.0404-.928-.0157v3.1037c.3132.0602.6297.0751.952.0197,1.4922-.2549,2.5709-1.9384,4.0739-2.0993,1.8012-.193,3.252,1.8609,5.0581,1.9879,2.0581.1453,3.7267-2.2255,5.788-2.1562.2511.0082.4948.0536.7316.1237v-3.1011c-.2452-.0743-.4962-.1221-.7556-.1312-2.0605-.0693-3.73,2.3015-5.788,2.1562Z" style="fill:#fff;"/>
+      <path d="M12.5774,39.4868c-1.8061-.127-3.2569-2.1802-5.058-1.9879-1.503.1609-2.5817,1.8435-4.0739,2.0993-.3339.057-.6603.0388-.9835-.0255v3.1036c.3306.0693.6653.0891,1.0075.0314,1.4921-.255,2.5709-1.9385,4.0738-2.0994,1.8012-.1922,3.252,1.8609,5.0581,1.988,2.0581.1452,3.7267-2.2257,5.7881-2.1563.2319.0074.4565.047.6769.108v-3.1028c-.2279-.0651-.4606-.1064-.701-.1146-2.0604-.0693-3.7299,2.3015-5.788,2.1562Z" style="fill:#fff;"/>
+      <path d="M79.2201,29.1735c0,5.3627-4.4154,8.2131-11.8064,8.2131h-12.0464l.144-1.6426,2.4956-.2899c.9119-.0966,1.2479-.2898,1.2479-.6763V9.752c0-.3865-.24-.4831-1.2479-.6281l-2.4956-.2899-.144-1.6426h12.2384c7.9189,0,10.5106,3.1403,10.5106,6.6671,0,3.865-2.9756,7.0053-7.2951,7.7783v.1932c5.8073.6281,8.3989,3.7684,8.3989,7.3435ZM75.0447,29.5117c0-4.493-3.6955-6.7154-8.8788-6.7154h-2.9757v12.1747l3.7435.6764,1.3919-.0483c3.5515-.1933,6.7191-2.1741,6.7191-6.0874ZM73.8928,15.0663c0-3.7683-2.3517-6.1357-7.679-6.1357h-3.0236v12.078l3.7915-.0483c4.7994-.0483,6.9111-3.1403,6.9111-5.8941Z" style="fill:#fff;"/>
+      <path d="M100.4881,32.652c-1.7275,3.4302-4.895,5.411-8.6385,5.411-5.5673,0-9.6468-4.5414-9.6468-10.822,0-7.0536,5.0394-12.1264,10.9906-12.1264,4.5114,0,7.3907,2.8505,7.3907,7.0053,0,.8213-.096,1.8842-.24,2.5606l-14.4457-.1933c-.048.1933-.048.9663-.048,1.1595,0,5.4593,3.1675,9.3726,7.535,9.3726,2.2077,0,4.4154-.8696,6.1431-2.947l.9596.5797ZM96.7449,22.9895c.24-3.7683-1.5358-6.1839-4.4154-6.1839-2.6397,0-5.4713,2.319-6.2392,6.2323,0,0,10.8466-.0484,10.6546-.0484Z" style="fill:#fff;"/>
+      <path d="M109.9551,35.1159c0,1.546-1.2,2.9954-2.928,2.9954-1.776,0-3.024-1.4494-3.024-2.9954s1.248-2.8987,3.024-2.8987c1.728,0,2.928,1.3527,2.928,2.8987Z" style="fill:#fff;"/>
+      <path d="M144.3351,37.3866h-11.71l.143-1.6426,2.496-.2899c.912-.0966,1.248-.2898,1.248-.6763v-11.8849h-15.502v11.9332c0,.3865.288.5314,1.248.628l2.496.2899.144,1.6426h-11.711l.144-1.6426,2.496-.2899c.912-.0966,1.248-.2898,1.248-.6763V9.752c0-.3865-.24-.4831-1.248-.6281l-2.496-.2899-.144-1.6426h11.711l-.144,1.6426-2.496.2899c-.912.0966-1.248.2899-1.248.6764v11.1118h15.502v-11.1601c0-.4348-.24-.5314-1.248-.6281l-2.496-.2899-.143-1.6426h11.71l-.144,1.6426-2.496.2899c-.912.0966-1.248.2899-1.248.6764v25.0258c0,.3865.24.4831,1.248.628l2.496.2899.144,1.6426Z" style="fill:#fff;"/>
+      <path d="M165.9261,32.652c-1.728,3.4302-4.896,5.411-8.639,5.411-5.568,0-9.647-4.5414-9.647-10.822,0-7.0536,5.039-12.1264,10.991-12.1264,4.511,0,7.391,2.8505,7.391,7.0053,0,.8213-.096,1.8842-.24,2.5606l-14.446-.1933c-.048.1933-.048.9663-.048,1.1595,0,5.4593,3.167,9.3726,7.535,9.3726,2.207,0,4.415-.8696,6.143-2.947l.96.5797ZM162.1821,22.9895c.24-3.7683-1.536-6.1839-4.415-6.1839-2.64,0-5.472,2.319-6.24,6.2323,0,0,10.847-.0484,10.655-.0484Z" style="fill:#fff;"/>
+      <path d="M185.4281,17.5302c0,1.3528-.816,2.464-2.256,2.464-1.008,0-1.871-.7247-2.303-1.546-1.488.9179-3.696,3.1403-4.896,5.5559v10.8703c0,.3865.192.628,1.296.6764l2.544.1932.144,1.6426h-10.703l.144-1.6426,1.92-.1932c.864-.0484,1.2-.2416,1.2-.7247v-13.6724c0-2.2224-.24-2.5123-1.488-2.8505l-1.968-.2898.096-1.3045,6.815-1.5943v6.2806h.192c2.784-4.6863,4.512-6.3289,6.575-6.3289,1.728,0,2.688,1.1112,2.688,2.4639Z" style="fill:#fff;"/>
+      <path d="M205.7931,32.652c-1.728,3.4302-4.895,5.411-8.639,5.411-5.567,0-9.647-4.5414-9.647-10.822,0-7.0536,5.04-12.1264,10.991-12.1264,4.511,0,7.391,2.8505,7.391,7.0053,0,.8213-.096,1.8842-.24,2.5606l-14.446-.1933c-.048.1933-.048.9663-.048,1.1595,0,5.4593,3.168,9.3726,7.535,9.3726,2.208,0,4.415-.8696,6.143-2.947l.96.5797ZM202.0501,22.9895c.24-3.7683-1.536-6.1839-4.416-6.1839-2.64,0-5.471,2.319-6.239,6.2323,0,0,10.847-.0484,10.655-.0484Z" style="fill:#fff;"/>
+      <path d="M215.0001,35.1159c0,1.546-1.199,2.9954-2.927,2.9954-1.776,0-3.024-1.4494-3.024-2.9954s1.248-2.8987,3.024-2.8987c1.728,0,2.927,1.3527,2.927,2.8987Z" style="fill:#fff;"/>
+    </svg>
+    <div class="header-sub">Arrivals Hub · Live from Monday.com</div>
+  </div>
+  <div class="header-right">
+    <span id="lastLoaded" style="font-size:12px;opacity:0.55;color:#F3E3C3;"></span>
+  </div>
+</header>
+
+<div class="api-bar">
+  <button class="load-btn" id="loadBtn" onclick="loadAll()">Refresh</button>
+  <span class="api-status" id="apiStatus"></span>
+</div>
+
+<div class="tabs">
+  <div class="tab active" onclick="switchTab('overview', this)">📊 Arrivals Overview</div>
+  <div class="tab" onclick="switchTab('laundry', this)">🛏 Laundry Planner</div>
+  <div class="tab" onclick="switchTab('changeovers', this)">🏠 Changeovers</div>
+</div>
+
+<!-- OVERVIEW TAB -->
+<div class="content active" id="tab-overview">
+  <div id="overviewContent">
+    <div class="empty"><p>Loading…</p></div>
+  </div>
+</div>
+
+<!-- CHANGEOVERS TAB -->
+<div class="content" id="tab-changeovers">
+  <div class="co-header">
+    <div>
+      <h2 class="co-title">Today's Changeovers</h2>
+      <div class="co-subtitle" id="co-subtitle">Loading…</div>
+    </div>
+    <div class="co-actions">
+      <span class="co-summary" id="co-summary"></span>
+      <button class="co-refresh-btn" onclick="renderChangeovers()">↺ Refresh</button>
+      <a href="changeover-form.html" class="co-log-btn">+ Log Activity</a>
+    </div>
+  </div>
+  <div class="co-legend">
+    <span class="co-legend-label">Key</span>
+    <span class="co-key-item"><span class="co-dot co-done">●</span> Done</span>
+    <span class="co-key-item"><span class="co-dot co-todo">○</span> Not yet</span>
+    <span class="co-key-item"><span class="co-dot co-blocked">⏸</span> Waiting (clean first)</span>
+    <span class="co-key-item"><span style="color:#ccc;font-size:15px">—</span> N/A</span>
+    <span class="co-tasks-key">
+      <span>🧹 Clean</span><span>🚐 Laundry</span><span>🛒 Restock</span><span>✅ Check</span><span>🌿 Outside</span>
+    </span>
+  </div>
+  <div id="changeoversContent">
+    <div class="empty"><p>Loading…</p></div>
+  </div>
+</div>
+
+<!-- LAUNDRY TAB -->
+<div class="content" id="tab-laundry">
+  <div class="laundry-header">
+    <div>
+      <h2>Laundry Planner</h2>
+      <div class="date-info">Bed configurations for arriving guests</div>
+    </div>
+    <div class="date-nav">
+      <button onclick="changeDay(-1)">◀</button>
+      <span class="date-label" id="laundryDateLabel">—</span>
+      <button onclick="changeDay(1)">▶</button>
+    </div>
+  </div>
+  <div id="laundryContent">
+    <div class="empty"><p>Loading…</p></div>
+  </div>
+</div>
+
+<script>
+const BOARD_ID = '5094453064';
+const PROP_CONFIG_BOARD_ID = '5094466278';
+
+// ── READ-ONLY API TOKEN ──
+// Paste the Be Here viewer account's Monday.com API token here.
+// Use a dedicated Monday.com user with Viewer-only access to the two boards above.
+const MONDAY_API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NTg1MTIxMiwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTVUMDg6NTM6MTkuMzQxWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.AnJa58nVNbSv1Ydgf8BVmIBY4zoN4rOgl7IAKs51RtA';
+const STATUS = { '0': 'Sent', '1': 'Received', '2': 'Pending', 'none': 'Not Set' };
+const STATUS_CLASS = { '0': 'form-sent', '1': 'form-received', '2': 'form-pending', 'none': '' };
+const BADGE_CLASS = { '0': 'status-sent', '1': 'status-received', '2': 'status-pending', 'none': 'status-none' };
+const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+
+let allItems = [];
+let propConfigs = {};
+let currentDate = null;
+let dowChart = null;
+let statusChart = null;
+
+function formatBeds(str) {
+  if (!str) return 'Not specified';
+  // Strip "Fixed - no choice needed" and similar placeholder text
+  if (/fixed\s*[-–]\s*no choice needed/i.test(str) || str.trim().toLowerCase() === 'fixed') {
+    return 'Fixed (see property notes)';
+  }
+  // If it already reads like a bed description, prefix with Fixed:
+  // e.g. "1 King", "2 Kings & 1 Superking", "3 Kings & 2 Singles"
+  return str;
+}
+
+function switchTab(tab, el) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tab-' + tab).classList.add('active');
+  if (tab === 'laundry' && allItems.length) renderLaundry();
+  if (tab === 'changeovers') renderChangeovers();
+}
+
+function changeDay(delta) {
+  const d = new Date(currentDate);
+  d.setDate(d.getDate() + delta);
+  currentDate = d.toISOString().split('T')[0];
+  renderLaundry();
+}
+
+async function mondayQuery(token, query) {
+  const resp = await fetch('https://api.monday.com/v2', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': token, 'API-Version': '2024-01' },
+    body: JSON.stringify({ query })
+  });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const json = await resp.json();
+  if (json.errors) throw new Error(json.errors[0].message);
+  return json.data;
+}
+
+async function fetchAllItems(token) {
+  let items = [], cursor = null;
+  do {
+    const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+    const data = await mondayQuery(token, `{ boards(ids: [${BOARD_ID}]) { items_page(limit: 500${cursorPart}) { cursor items { id name column_values(ids: ["date_mm2adtwg","color_mm2aw8fx","text_mm2ahbrx","text_mm2ab56m","numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x"]) { id value } } } } }`);
+    const page = data.boards[0].items_page;
+    items = items.concat(page.items);
+    cursor = page.cursor;
+  } while (cursor);
+  return items;
+}
+
+async function fetchPropConfigs(token) {
+  const data = await mondayQuery(token, `{ boards(ids: [${PROP_CONFIG_BOARD_ID}]) { items_page(limit: 200) { items { name column_values(ids: ["text_mm2a2a78","long_text_mm2a30dy","numeric_mm2aa6z7","boolean_mm2asf5h","boolean_mm2atzeb","boolean_mm2agent","numeric_mm2a1hwj"]) { id value } } } } }`);
+  const configs = {};
+  for (const item of data.boards[0].items_page.items) {
+    const cv = {};
+    for (const c of item.column_values) cv[c.id] = c.value;
+    const p = v => { try { return JSON.parse(v); } catch { return null; } };
+    const bedOpts = (p(cv['long_text_mm2a30dy'])?.text || '').split('|').map(s=>s.trim()).filter(Boolean);
+    configs[item.name] = {
+      fixedBeds: p(cv['text_mm2a2a78']) || '',
+      bedOptions: bedOpts,
+      maxOccupancy: parseInt(p(cv['numeric_mm2aa6z7'])) || 0,
+      allowsPets: p(cv['boolean_mm2agent'])?.checked || false,
+    };
+  }
+  return configs;
+}
+
+async function loadAll() {
+  const status = document.getElementById('apiStatus');
+  const btn = document.getElementById('loadBtn');
+  btn.disabled = true;
+  status.textContent = 'Loading…';
+  document.getElementById('overviewContent').innerHTML = '<div class="loading">Loading data from Monday…</div>';
+  try {
+    [allItems, propConfigs] = await Promise.all([fetchAllItems(MONDAY_API_TOKEN), fetchPropConfigs(MONDAY_API_TOKEN)]);
+    const today = new Date(); today.setHours(0,0,0,0);
+    const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+    currentDate = tomorrow.toISOString().split('T')[0];
+    status.textContent = `✓ ${allItems.length} bookings loaded · ${new Date().toLocaleTimeString()}`;
+    document.getElementById('lastLoaded').textContent = 'Updated ' + new Date().toLocaleTimeString();
+    btn.disabled = false;
+    renderOverview();
+    renderLaundry();
+  } catch(e) {
+    status.textContent = 'Error: ' + e.message;
+    btn.disabled = false;
+  }
+}
+
+function parseItem(item) {
+  const cv = {};
+  for (const c of item.column_values) cv[c.id] = c.value;
+  const p = v => { try { return JSON.parse(v); } catch { return null; } };
+  const dateVal = p(cv['date_mm2adtwg']);
+  const statusVal = p(cv['color_mm2aw8fx']);
+  const bedConfigVal = p(cv['text_mm2ab56m']);
+  return {
+    id: item.id,
+    name: item.name,
+    property: p(cv['text_mm2ahbrx']) || '',
+    arrivalDate: dateVal?.date || null,
+    formStatus: statusVal ? String(statusVal.index ?? 'none') : 'none',
+    bedConfig: bedConfigVal || '',
+    adults: parseInt(p(cv['numeric_mm2a5s8r'])) || 0,
+    children: parseInt(p(cv['numeric_mm2add81'])) || 0,
+    pets: parseInt(p(cv['numeric_mm2ahz0x'])) || 0,
+  };
+}
+
+function renderOverview() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const todayStr = today.toISOString().split('T')[0];
+
+  const parsed = allItems.map(parseItem);
+  const future = parsed.filter(i => i.arrivalDate && i.arrivalDate > todayStr);
+
+  // Status counts
+  const statusCounts = { '0':0, '1':0, '2':0, 'none':0 };
+  for (const i of parsed) statusCounts[i.formStatus] = (statusCounts[i.formStatus]||0) + 1;
+
+  // This week: build 7 labels starting from today
+  const weekDates = [];
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today); d.setDate(today.getDate() + i);
+    weekDates.push(d);
+  }
+  const weekLabels = weekDates.map(d => d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' }));
+  const weekKeys = weekDates.map(d => d.toISOString().split('T')[0]);
+
+  const dowCounts = {};
+  for (const s of ['0','1','2','none']) dowCounts[s] = Array(7).fill(0);
+  for (const i of parsed) {
+    if (!i.arrivalDate) continue;
+    const idx = weekKeys.indexOf(i.arrivalDate);
+    if (idx === -1) continue;
+    dowCounts[i.formStatus][idx]++;
+  }
+
+  const received = statusCounts['1'];
+  const sent = statusCounts['0'];
+  const pending = statusCounts['2'];
+  const total = future.length;
+  const pct = total > 0 ? Math.round(received/total*100) : 0;
+
+  document.getElementById('overviewContent').innerHTML = `
+    <div class="stat-row">
+      <div class="stat-card">
+        <div class="label">Future Bookings</div>
+        <div class="value">${total.toLocaleString()}</div>
+        <div class="sub">arrivals scheduled</div>
+      </div>
+      <div class="stat-card green">
+        <div class="label">Form Received</div>
+        <div class="value">${received}</div>
+        <div class="sub">${pct}% completion rate</div>
+      </div>
+      <div class="stat-card orange">
+        <div class="label">Form Sent</div>
+        <div class="value">${sent}</div>
+        <div class="sub">awaiting response</div>
+      </div>
+      <div class="stat-card red">
+        <div class="label">Form Pending</div>
+        <div class="value">${pending}</div>
+        <div class="sub">not yet sent</div>
+      </div>
+    </div>
+    <div class="chart-row">
+      <div class="chart-card">
+        <h3>Arrivals This Week</h3>
+        <canvas id="dowChart"></canvas>
+      </div>
+      <div class="chart-card">
+        <h3>Form Status</h3>
+        <canvas id="statusChart"></canvas>
+      </div>
+    </div>`;
+
+  // This Week Chart
+  if (dowChart) dowChart.destroy();
+  const dowCtx = document.getElementById('dowChart').getContext('2d');
+  dowChart = new Chart(dowCtx, {
+    type: 'bar',
+    data: {
+      labels: weekLabels,
+      datasets: [
+        { label: 'Form Received', data: dowCounts['1'], backgroundColor: '#646955', borderRadius: 4 },
+        { label: 'Form Sent', data: dowCounts['0'], backgroundColor: '#AF926A', borderRadius: 4 },
+        { label: 'Pending', data: dowCounts['2'], backgroundColor: '#B98B73', borderRadius: 4 },
+        { label: 'Not Set', data: dowCounts['none'], backgroundColor: '#D5D0C4', borderRadius: 4 },
+      ]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: {
+        legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 12 } },
+        tooltip: {
+          callbacks: {
+            footer: (items) => {
+              const total = items.reduce((s,i) => s + i.parsed.y, 0);
+              return 'Total: ' + total;
+            }
+          }
+        }
+      },
+      scales: {
+        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
+        y: { stacked: true, grid: { color: '#f0f0f0' }, ticks: { precision: 0 } }
+      }
+    }
+  });
+
+  // Status Chart
+  if (statusChart) statusChart.destroy();
+  const sCtx = document.getElementById('statusChart').getContext('2d');
+  statusChart = new Chart(sCtx, {
+    type: 'doughnut',
+    data: {
+      labels: ['Received','Sent','Pending','Not Set'],
+      datasets: [{ data: [received, sent, pending, statusCounts['none']], backgroundColor: ['#646955','#AF926A','#B98B73','#D5D0C4'], borderWidth: 2, borderColor: '#fff' }]
+    },
+    options: {
+      responsive: true, maintainAspectRatio: true,
+      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 12 } } }
+    }
+  });
+}
+
+function renderLaundry() {
+  if (!allItems.length || !currentDate) return;
+  const parsed = allItems.map(parseItem);
+  const dayArrivals = parsed.filter(i => i.arrivalDate === currentDate);
+
+  // Deduplicate by property (take highest priority: received > sent > pending > none)
+  const byProp = {};
+  const priority = { '1':0, '0':1, '2':2, 'none':3 };
+  for (const i of dayArrivals) {
+    if (!byProp[i.property] || priority[i.formStatus] < priority[byProp[i.property].formStatus]) {
+      byProp[i.property] = i;
+    }
+  }
+  const arrivals = Object.values(byProp).sort((a,b) => a.property.localeCompare(b.property));
+
+  const d = new Date(currentDate + 'T12:00:00');
+  const dayName = DAYS[d.getDay()];
+  const dateStr = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+  document.getElementById('laundryDateLabel').textContent = d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
+
+  if (arrivals.length === 0) {
+    document.getElementById('laundryContent').innerHTML = `<div class="empty"><p>No arrivals on ${dateStr}</p></div>`;
+    return;
+  }
+
+  // Bed totals
+  const bedTotals = { Superking:0, King:0, Double:0, Single:0 };
+  function countBeds(str) {
+    if (!str || str.toLowerCase().includes('fixed') || str.toLowerCase().includes('no choice')) return;
+    const s = str.toLowerCase();
+    const m = t => { const r = new RegExp('(\\d+)\\s*' + t, 'i'); const x = s.match(r); return x ? parseInt(x[1]) : (s.includes(t.toLowerCase()) ? 1 : 0); };
+    bedTotals.Superking += m('superking');
+    bedTotals.King += m('king') - m('superking'); // avoid double counting
+    if (bedTotals.King < 0) bedTotals.King = 0;
+    bedTotals.Double += m('double');
+    bedTotals.Single += (str.match(/(\d+)\s*single/gi)||[]).reduce((a,x)=>a+parseInt(x),0) || (s.includes('single')?1:0);
+  }
+
+  let cards = '';
+  for (const a of arrivals) {
+    const cfg = propConfigs[a.property] || {};
+    const fixedBeds = a.bedConfig || cfg.fixedBeds || 'Unknown';
+    const bedOptions = cfg.bedOptions || [];
+    const hasOptions = bedOptions.length > 0;
+    const confirmed = a.formStatus === '1' && a.bedConfig;
+    countBeds(fixedBeds);
+
+    const partyParts = [];
+    if (a.adults) partyParts.push(`👤 ${a.adults} adult${a.adults>1?'s':''}`);
+    if (a.children) partyParts.push(`🧒 ${a.children}`);
+    if (a.pets) partyParts.push(`🐾 ${a.pets}`);
+
+    cards += `
+      <div class="property-card ${STATUS_CLASS[a.formStatus]}">
+        <div class="prop-name">${a.property}</div>
+        <div class="guest-name">${a.name || '—'}</div>
+        ${partyParts.length ? `<div class="party">${partyParts.map(p=>`<span>${p}</span>`).join('')}</div>` : ''}
+        <div class="beds-label">${confirmed ? 'Confirmed Beds' : (hasOptions ? 'Fixed Beds (choice pending)' : 'Fixed Beds')}</div>
+        <div class="beds">${formatBeds(fixedBeds)}</div>
+        ${hasOptions && !confirmed ? `<div class="bed-options">Guest chooses from: ${bedOptions.join(' · ')}</div>` : ''}
+        <span class="status-badge ${BADGE_CLASS[a.formStatus]}">${STATUS[a.formStatus]}</span>
+      </div>`;
+  }
+
+  // Bed summary
+  const totalCounts = Object.entries(bedTotals).filter(([,v])=>v>0);
+  const bedSummaryHtml = totalCounts.length > 0 ? totalCounts.map(([t,c])=>
+    `<div class="bed-total"><div class="count">${c}</div><div class="type">${t}</div></div>`
+  ).join('') : '<p style="color:#aaa;font-size:13px">Unable to calculate — check bed configs</p>';
+
+  document.getElementById('laundryContent').innerHTML = `
+    <div style="margin-bottom:16px;font-size:14px;color:#666;">${dateStr} · <strong>${arrivals.length}</strong> propert${arrivals.length===1?'y':'ies'} arriving</div>
+    <div class="laundry-grid">${cards}</div>
+    <div class="beds-summary">
+      <h3>Bed Totals for ${dayName}</h3>
+      <div class="bed-totals">${bedSummaryHtml}</div>
+      <p style="font-size:11px;color:#bbb;margin-top:12px;">* Fixed beds only. Properties with pending bed choice options are shown above — totals will update once forms are received.</p>
+    </div>`;
+}
+
+// Auto-load on open — no token entry required
+window.addEventListener('DOMContentLoaded', loadAll);
+
+// ════════════════════════════════════════════════════════════
+// CHANGEOVERS TAB
+// ════════════════════════════════════════════════════════════
+const LOG_BOARD  = 5094663022;
+
+// Properties with NO outside clean (internal changeover only)
+const NO_OUTSIDE = new Set(['Essitone House']);
+
+// Activity name → index (matches changeover-form.html)
+const ACT_MAP = {
+  'House Cleaned': 0, 'Laundry Dropped': 1,
+  'Restocked': 2, 'House Checked': 3, 'Outside Clean': 4
+};
+
+async function fetchChangeoverLog(todayStr) {
+  const data = await mondayQuery(MONDAY_API_TOKEN, `{
+    boards(ids: [${LOG_BOARD}]) {
+      items_page(limit: 500) {
+        items { name created_at }
+      }
+    }
+  }`);
+  const items = data?.boards?.[0]?.items_page?.items || [];
+  // Use created_at as the date — items are always created on the day they're logged
+  return items.filter(item => item.created_at?.split('T')[0] === todayStr);
+}
+
+function hasOutsideClean(prop) {
+  // Outside clean shown for all properties — staff know if it applies.
+  // Suppressed only for known internal-only properties.
+  return !NO_OUTSIDE.has(prop);
+}
+
+async function renderChangeovers() {
+  const container = document.getElementById('changeoversContent');
+  const subtitle  = document.getElementById('co-subtitle');
+  const summary   = document.getElementById('co-summary');
+
+  container.innerHTML = '<div class="loading">Loading sign-off data…</div>';
+  summary.textContent = '';
+
+  const todayStr = new Date().toISOString().split('T')[0];
+  const todayLabel = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
+  subtitle.textContent = todayLabel;
+
+  if (!allItems.length) {
+    container.innerHTML = '<div class="co-empty">Arrivals data not loaded — hit Refresh at the top first.</div>';
+    return;
+  }
+
+  // Today's arrivals straight from Guesty (via Guest Arrivals board)
+  const todayArrivals = allItems.map(parseItem).filter(i => i.arrivalDate === todayStr);
+
+  // De-duplicate by property and collect guest info per property
+  const propMap = {};
+  for (const a of todayArrivals) {
+    if (!a.property) continue;
+    if (!propMap[a.property]) propMap[a.property] = { guests: 0, bookings: 0 };
+    propMap[a.property].guests += (a.adults || 0) + (a.children || 0);
+    propMap[a.property].bookings++;
+  }
+
+  // Fetch sign-off log
+  let logItems = [];
+  try {
+    logItems = await fetchChangeoverLog(todayStr);
+  } catch(err) {
+    console.warn('Changeover Log fetch failed:', err);
+  }
+
+  // Build activity log: property → Set of activity indices done today
+  const actLog = {};
+  for (const item of logItems) {
+    const parts = item.name.split(' • ');
+    const prop  = parts[0]?.trim();
+    const act   = ACT_MAP[parts[1]?.trim()];
+    if (!prop || act === undefined) continue;
+    if (!actLog[prop]) actLog[prop] = new Set();
+    actLog[prop].add(act);
+  }
+
+  // Merge: include any property from the log that isn't already in propMap
+  for (const prop of Object.keys(actLog)) {
+    if (!propMap[prop]) propMap[prop] = { guests: 0, bookings: 0 };
+  }
+  const properties = Object.keys(propMap).sort();
+
+  // Update subtitle with data counts for transparency
+  subtitle.textContent = `${todayLabel} · ${properties.length} propert${properties.length!==1?'ies':'y'} · ${logItems.length} sign-off${logItems.length!==1?'s':''} logged`;
+
+  if (properties.length === 0) {
+    container.innerHTML = '<div class="co-empty">No arrivals or changeovers today.</div>';
+    return;
+  }
+
+  // Render
+  let cntDone = 0, cntPart = 0, cntNone = 0;
+
+  const rows = properties.map(prop => {
+    const done    = actLog[prop] || new Set();
+    const outside = hasOutsideClean(prop);
+    const info    = propMap[prop];
+
+    const cleanDone   = done.has(0);
+    const laundryDone = done.has(1);
+    const restockDone = done.has(2);
+    const checkedDone = done.has(3);
+    const outsideDone = done.has(4);
+
+    const checkBlocked = !cleanDone && !checkedDone;
+    const checkCounts  = cleanDone && checkedDone;
+
+    const total = outside ? 5 : 4;
+    const doneN = (cleanDone?1:0)+(laundryDone?1:0)+(restockDone?1:0)+(checkCounts?1:0)+(outside&&outsideDone?1:0);
+    const pct   = Math.round((doneN / total) * 100);
+
+    let rowCls = 'co-none';
+    if (pct === 100)   { rowCls = 'co-all';  cntDone++; }
+    else if (doneN>0)  { rowCls = 'co-part'; cntPart++; }
+    else               cntNone++;
+
+    const fillCls = pct===100 ? 'co-fill-full' : (doneN>0 ? 'co-fill-part' : 'co-fill-none');
+
+    const tdot = (isDone, blocked=false, na=false) => {
+      if (na)      return `<td class="co-task-cell"><span class="co-tdot co-tdot-na" title="N/A">—</span></td>`;
+      if (blocked) return `<td class="co-task-cell"><span class="co-tdot co-tdot-blocked" title="Waiting for clean">⏸</span></td>`;
+      if (isDone)  return `<td class="co-task-cell"><span class="co-tdot co-tdot-done" title="Done">●</span></td>`;
+      return         `<td class="co-task-cell"><span class="co-tdot co-tdot-todo" title="Not yet">○</span></td>`;
+    };
+
+    const guestStr = info.guests ? `${info.guests} guest${info.guests!==1?'s':''}` : '';
+
+    return `<tr class="${rowCls}">
+      <td>
+        <div class="co-prop-name">${esc(prop)}</div>
+        ${guestStr ? `<div class="co-guest-sub">${guestStr}</div>` : ''}
+      </td>
+      ${tdot(cleanDone)}
+      ${tdot(laundryDone)}
+      ${tdot(restockDone)}
+      ${tdot(checkCounts, checkBlocked)}
+      ${tdot(outsideDone, false, !outside)}
+      <td class="co-prog-cell">
+        <div class="co-prog-wrap">
+          <div class="co-prog-bg"><div class="co-prog-fill ${fillCls}" style="width:${pct}%"></div></div>
+          <span class="co-prog-lbl">${doneN}/${total}</span>
+        </div>
+      </td>
+    </tr>`;
+  }).join('');
+
+  summary.innerHTML =
+    `<span class="co-sum-dot" style="background:#646955"></span>${cntDone} ready &nbsp;` +
+    `<span class="co-sum-dot" style="background:#AF926A"></span>${cntPart} in progress &nbsp;` +
+    `<span class="co-sum-dot" style="background:#B98B73"></span>${cntNone} not started`;
+
+  container.innerHTML = `
+    <table class="co-table">
+      <thead>
+        <tr>
+          <th>Property</th>
+          <th class="co-th-task">🧹<br><span style="font-size:9px;font-weight:400;color:#bbb">Clean</span></th>
+          <th class="co-th-task">🚐<br><span style="font-size:9px;font-weight:400;color:#bbb">Laundry</span></th>
+          <th class="co-th-task">🛒<br><span style="font-size:9px;font-weight:400;color:#bbb">Restock</span></th>
+          <th class="co-th-task">✅<br><span style="font-size:9px;font-weight:400;color:#bbb">Check</span></th>
+          <th class="co-th-task">🌿<br><span style="font-size:9px;font-weight:400;color:#bbb">Outside</span></th>
+          <th class="co-th-prog">Progress</th>
+        </tr>
+      </thead>
+      <tbody>${rows}</tbody>
+    </table>`;
+}
+
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+</script>
+</body>
+</html>

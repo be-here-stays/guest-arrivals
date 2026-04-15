@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Be Here — Changeover Dashboard</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f5f4f0; color: #1a1a1a; min-height: 100vh; }
+
+    /* ── Header ── */
+    header {
+      background: #2d5a3d; color: #fff;
+      padding: 16px 28px; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    }
+    .hdr-left h1 { font-size: 17px; font-weight: 700; letter-spacing: -0.3px; }
+    .hdr-left .sub { font-size: 12px; opacity: 0.65; margin-top: 3px; }
+    .hdr-right { display: flex; align-items: center; gap: 12px; }
+    .refresh-btn {
+      padding: 7px 16px; background: rgba(255,255,255,0.15); border: 1.5px solid rgba(255,255,255,0.3);
+      border-radius: 8px; color: #fff; font-size: 13px; font-weight: 600; cursor: pointer;
+      transition: background 0.15s;
+    }
+    .refresh-btn:hover { background: rgba(255,255,255,0.25); }
+    .refresh-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+    .form-link {
+      padding: 7px 16px; background: #fff; color: #2d5a3d;
+      border-radius: 8px; font-size: 13px; font-weight: 700; text-decoration: none;
+      transition: background 0.15s;
+    }
+    .form-link:hover { background: #eef5f0; }
+    .last-refresh { font-size: 11px; opacity: 0.6; }
+
+    /* ── Summary bar ── */
+    .summary-bar {
+      background: #234a30; color: #fff; padding: 10px 28px;
+      display: flex; align-items: center; gap: 24px; font-size: 13px;
+    }
+    .summary-stat { display: flex; align-items: center; gap: 6px; }
+    .summary-stat .dot { width: 10px; height: 10px; border-radius: 50%; display: inline-block; }
+    .dot-g { background: #27ae60; }
+    .dot-a { background: #e08a00; }
+    .dot-r { background: #c0392b; }
+    .summary-stat strong { font-weight: 700; }
+
+    /* ── Legend ── */
+    .legend {
+      background: #fff; border-bottom: 1px solid #eee;
+      padding: 10px 28px; display: flex; align-items: center; gap: 24px; flex-wrap: wrap;
+    }
+    .legend-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: #aaa; margin-right: 6px; }
+    .legend-item { display: flex; align-items: center; gap: 6px; font-size: 12px; color: #555; }
+    .leg-dot { font-size: 16px; line-height: 1; }
+    .legend-tasks { display: flex; align-items: center; gap: 16px; margin-left: auto; flex-wrap: wrap; }
+    .legend-task { font-size: 12px; color: #666; display: flex; align-items: center; gap: 4px; }
+
+    /* ── Main content ── */
+    .content { padding: 24px 28px; }
+
+    /* Loading / empty states */
+    .state-msg {
+      text-align: center; padding: 60px 20px; color: #999; font-size: 15px;
+    }
+    .state-msg .icon { font-size: 40px; margin-bottom: 12px; }
+
+    /* ── Property table ── */
+    .prop-table { width: 100%; border-collapse: collapse; }
+    .prop-table thead th {
+      text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.5px; color: #aaa; padding: 0 12px 10px; border-bottom: 2px solid #eee;
+    }
+    .prop-table thead th.task-h { text-align: center; width: 72px; }
+    .prop-table thead th.prog-h { text-align: right; width: 160px; }
+    .prop-table tbody tr { border-bottom: 1px solid #f0f0f0; transition: background 0.1s; }
+    .prop-table tbody tr:hover { background: rgba(0,0,0,0.02); }
+    .prop-table tbody tr:last-child { border-bottom: none; }
+
+    .prop-table td { padding: 14px 12px; vertical-align: middle; }
+
+    /* Row left accent */
+    .prop-table tbody tr td:first-child { border-left: 4px solid transparent; padding-left: 20px; }
+    .prop-table tbody tr.all-done td:first-child { border-left-color: #27ae60; }
+    .prop-table tbody tr.part-done td:first-child { border-left-color: #e08a00; }
+    .prop-table tbody tr.none-done td:first-child { border-left-color: #c0392b; }
+
+    .prop-name { font-size: 15px; font-weight: 700; color: #1a1a1a; }
+
+    /* Task dots */
+    .task-cell { text-align: center; }
+    .tdot {
+      display: inline-block; width: 26px; height: 26px; border-radius: 50%;
+      line-height: 26px; text-align: center; font-size: 13px; font-weight: 700;
+    }
+    .tdot-done    { background: #27ae60; color: #fff; }
+    .tdot-todo    { background: #f0f0f0; color: #bbb; border: 2px solid #ddd; }
+    .tdot-blocked { background: #fff4cc; color: #b8860b; border: 2px solid #f0c040; font-size: 12px; }
+    .tdot-na      { background: transparent; color: #ccc; font-size: 16px; }
+
+    /* Progress */
+    .prog-cell { text-align: right; }
+    .prog-wrap { display: flex; align-items: center; gap: 10px; justify-content: flex-end; }
+    .prog-bar-bg {
+      flex: 1; max-width: 120px; height: 8px; background: #eee; border-radius: 4px; overflow: hidden;
+    }
+    .prog-bar-fill { height: 100%; border-radius: 4px; transition: width 0.4s; }
+    .prog-fill-full  { background: #27ae60; }
+    .prog-fill-part  { background: #e08a00; }
+    .prog-fill-empty { background: #eee; }
+    .prog-label { font-size: 12px; font-weight: 700; color: #888; white-space: nowrap; min-width: 36px; text-align: right; }
+
+    /* Responsive cards for mobile */
+    @media (max-width: 640px) {
+      header { padding: 14px 16px; }
+      .summary-bar { padding: 10px 16px; gap: 16px; flex-wrap: wrap; }
+      .legend { padding: 10px 16px; }
+      .content { padding: 16px; }
+      .prop-table thead { display: none; }
+      .prop-table tbody tr { display: block; margin-bottom: 12px; border-radius: 12px; background: #fff; border: none; box-shadow: 0 1px 4px rgba(0,0,0,0.08); padding: 14px 16px; }
+      .prop-table tbody tr td:first-child { border-left: 4px solid transparent; border-radius: 8px 0 0 8px; padding-left: 12px; }
+      .prop-table td { display: block; padding: 4px 0; }
+      .task-cell { text-align: left; display: flex; gap: 8px; margin: 6px 0; }
+      .prog-wrap { justify-content: flex-start; margin-top: 6px; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-left">
+    <h1>Be Here — Changeover Dashboard</h1>
+    <div class="sub" id="hdr-date">Loading…</div>
+  </div>
+  <div class="hdr-right">
+    <span class="last-refresh" id="last-refresh"></span>
+    <button class="refresh-btn" id="refresh-btn" onclick="load()">↺ Refresh</button>
+    <a href="changeover-form.html" class="form-link">+ Log Activity</a>
+  </div>
+</header>
+
+<div class="summary-bar" id="summary-bar" style="display:none">
+  <div class="summary-stat"><span class="dot dot-g"></span><strong id="sum-done">0</strong> Ready</div>
+  <div class="summary-stat"><span class="dot dot-a"></span><strong id="sum-part">0</strong> In progress</div>
+  <div class="summary-stat"><span class="dot dot-r"></span><strong id="sum-none">0</strong> Not started</div>
+  <div class="summary-stat" style="margin-left:auto; opacity:0.7">Auto-refresh every 60s</div>
+</div>
+
+<div class="legend">
+  <span class="legend-title">Key</span>
+  <div class="legend-item"><span class="leg-dot" style="color:#27ae60">●</span> Done</div>
+  <div class="legend-item"><span class="leg-dot" style="color:#ddd">○</span> Not yet</div>
+  <div class="legend-item"><span class="leg-dot" style="color:#f0c040">⏸</span> Waiting (clean first)</div>
+  <div class="legend-item"><span class="leg-dot" style="color:#ccc">—</span> Not applicable</div>
+  <div class="legend-tasks">
+    <span class="legend-task">🧹 Clean</span>
+    <span class="legend-task">🚐 Laundry</span>
+    <span class="legend-task">🛒 Restock</span>
+    <span class="legend-task">✅ Check</span>
+    <span class="legend-task">🌿 Outside</span>
+  </div>
+</div>
+
+<div class="content">
+  <div class="state-msg" id="state-msg">
+    <div class="icon">⏳</div>
+    Loading changeovers…
+  </div>
+  <table class="prop-table" id="prop-table" style="display:none">
+    <thead>
+      <tr>
+        <th>Property</th>
+        <th class="task-h">🧹<br><span style="font-size:9px;font-weight:400;color:#bbb">Clean</span></th>
+        <th class="task-h">🚐<br><span style="font-size:9px;font-weight:400;color:#bbb">Laundry</span></th>
+        <th class="task-h">🛒<br><span style="font-size:9px;font-weight:400;color:#bbb">Restock</span></th>
+        <th class="task-h">✅<br><span style="font-size:9px;font-weight:400;color:#bbb">Check</span></th>
+        <th class="task-h">🌿<br><span style="font-size:9px;font-weight:400;color:#bbb">Outside</span></th>
+        <th class="prog-h">Progress</th>
+      </tr>
+    </thead>
+    <tbody id="table-body"></tbody>
+  </table>
+</div>
+
+<script>
+// ── Config ───────────────────────────────────────────────────
+const API_TOKEN        = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NTg1MTIxMiwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTVUMDg6NTM6MTkuMzQxWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.AnJa58nVNbSv1Ydgf8BVmIBY4zoN4rOgl7IAKs51RtA';
+const LODGE_BOARD      = 1928673949;
+const LOG_BOARD        = 5094663022;
+const HOT_TUB_BOARD    = 1918769299;
+
+// Properties that have outside clean but NO hot tub
+const OUTSIDE_NO_HT    = new Set(['Green Haven', 'Serenity', 'Goose Landing']);
+// Properties with NO outside clean (and no hot tub)
+const NO_OUTSIDE       = new Set(['Essitone House']);
+
+// Activity index → meaning
+// 0 = House Cleaned, 1 = Laundry Dropped, 2 = Restocked, 3 = House Checked, 4 = Outside Clean
+
+// ── API ──────────────────────────────────────────────────────
+async function gql(query) {
+  const r = await fetch('https://api.monday.com/v2', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': API_TOKEN },
+    body: JSON.stringify({ query })
+  });
+  return r.json();
+}
+
+// ── Data loading ─────────────────────────────────────────────
+async function load() {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true; btn.textContent = '↺ Loading…';
+
+  try {
+    const today = new Date();
+    const todayStr = today.toISOString().split('T')[0];
+
+    // 1. Lodge Status — fetch all, filter CheckOut(3) or SameDay(4) in JS
+    const lodgeQ = `{
+      boards(ids: [${LODGE_BOARD}]) {
+        items_page(limit: 200) {
+          items {
+            name
+            column_values(ids: ["color_mkqs71ry"]) { id value text }
+          }
+        }
+      }
+    }`;
+
+    // 2. Changeover Log — ALL items (filter by date in JS)
+    const logQ = `{
+      boards(ids: [${LOG_BOARD}]) {
+        items_page(limit: 500) {
+          items {
+            name
+            created_at
+            column_values(ids: ["date_mm2e4wj5"]) { id value text }
+          }
+        }
+      }
+    }`;
+
+    // 3. Hot Tub Status — just property names
+    const htQ = `{
+      boards(ids: [${HOT_TUB_BOARD}]) {
+        items_page(limit: 100) { items { name } }
+      }
+    }`;
+
+    const [lodgeRes, logRes, htRes] = await Promise.all([gql(lodgeQ), gql(logQ), gql(htQ)]);
+
+    // Check for API-level errors
+    if (lodgeRes.errors) throw new Error('Lodge Status: ' + lodgeRes.errors[0].message);
+    if (logRes.errors)   throw new Error('Changeover Log: ' + logRes.errors[0].message);
+    if (htRes.errors)    throw new Error('Hot Tub Status: ' + htRes.errors[0].message);
+
+    // Filter changeovers: status index 3 (CheckOut) or 4 (SameDay)
+    const changeovers = (lodgeRes.data?.boards?.[0]?.items_page?.items || [])
+      .filter(i => {
+        const col = i.column_values?.[0];
+        if (!col?.value) return false;
+        try {
+          const idx = JSON.parse(col.value)?.index;
+          return idx === 3 || idx === 4;
+        } catch(_) { return false; }
+      })
+      .map(i => i.name).sort();
+
+    // Hot tub properties set
+    const hotTubProps = new Set((htRes.data?.boards?.[0]?.items_page?.items || []).map(i => i.name));
+
+    // Process log entries — filter to today
+    const logItems = logRes.data?.boards?.[0]?.items_page?.items || [];
+    // Map: property → { activityDone: Set<index>, activityTimes: Map<index, timestamp> }
+    const actLog = {};
+
+    // Activity name → index map
+    const ACT_MAP = {
+      'House Cleaned': 0, 'Laundry Dropped': 1,
+      'Restocked': 2, 'House Checked': 3, 'Outside Clean': 4
+    };
+
+    for (const item of logItems) {
+      // Filter by date
+      const dateCol = item.column_values.find(c => c.id === 'date_mm2e4wj5');
+      let dateVal = '';
+      if (dateCol?.value) {
+        try { dateVal = JSON.parse(dateCol.value)?.date || ''; } catch(_) {}
+      }
+      if (!dateVal) dateVal = dateCol?.text || '';
+      if (dateVal !== todayStr) continue;
+
+      // Parse property and activity from item name: "Property • Activity Label"
+      const parts   = item.name.split(' • ');
+      const prop    = parts[0]?.trim();
+      const actName = parts[1]?.trim();
+      const actIdx  = ACT_MAP[actName] ?? null;
+
+      if (!prop || actIdx === null) continue;
+
+      if (!actLog[prop]) actLog[prop] = { done: new Set(), times: {} };
+      actLog[prop].done.add(actIdx);
+      actLog[prop].times[actIdx] = item.created_at;
+    }
+
+    render({ changeovers, hotTubProps, actLog, todayStr });
+
+    document.getElementById('last-refresh').textContent =
+      'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+
+  } catch (err) {
+    console.error('Dashboard error:', err);
+    document.getElementById('state-msg').innerHTML =
+      `<div class="icon">⚠️</div><div>Error: ${err.message}</div>`;
+    document.getElementById('state-msg').style.display = '';
+    document.getElementById('prop-table').style.display = 'none';
+    document.getElementById('summary-bar').style.display = 'none';
+  } finally {
+    btn.disabled = false; btn.textContent = '↺ Refresh';
+  }
+}
+
+// ── Render ───────────────────────────────────────────────────
+function hasOutside(prop, hotTubProps) {
+  if (hotTubProps.has(prop)) return true;
+  if (OUTSIDE_NO_HT.has(prop)) return true;
+  return false;
+}
+
+function render({ changeovers, hotTubProps, actLog, todayStr }) {
+  const today = new Date();
+  document.getElementById('hdr-date').textContent =
+    today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+
+  const stateMsg = document.getElementById('state-msg');
+  const table    = document.getElementById('prop-table');
+  const tbody    = document.getElementById('table-body');
+
+  if (changeovers.length === 0) {
+    stateMsg.innerHTML = '<div class="icon">✓</div>No changeovers today';
+    stateMsg.style.display = '';
+    table.style.display = 'none';
+    document.getElementById('summary-bar').style.display = 'none';
+    return;
+  }
+
+  stateMsg.style.display = 'none';
+  table.style.display = '';
+  document.getElementById('summary-bar').style.display = '';
+
+  let cntDone = 0, cntPart = 0, cntNone = 0;
+
+  tbody.innerHTML = changeovers.map(prop => {
+    const log   = actLog[prop] || { done: new Set(), times: {} };
+    const done  = log.done;
+    const outside = hasOutside(prop, hotTubProps);
+
+    const cleanDone   = done.has(0);
+    const laundryDone = done.has(1);
+    const restockDone = done.has(2);
+    const checkedDone = done.has(3);
+    const outsideDone = done.has(4);
+
+    // Check blocked if clean not yet done
+    const checkBlocked = !cleanDone && !checkedDone;
+    const checkCounts  = cleanDone && checkedDone; // quality check only valid after clean
+
+    const totalTasks = outside ? 5 : 4;
+    const doneTasks  = (cleanDone ? 1 : 0) + (laundryDone ? 1 : 0) + (restockDone ? 1 : 0)
+                     + (checkCounts ? 1 : 0) + (outside && outsideDone ? 1 : 0);
+    const pct = Math.round((doneTasks / totalTasks) * 100);
+
+    let rowClass = 'none-done';
+    if (pct === 100) { rowClass = 'all-done'; cntDone++; }
+    else if (doneTasks > 0) { rowClass = 'part-done'; cntPart++; }
+    else cntNone++;
+
+    const td = (isDone, isBlocked = false, isNA = false) => {
+      let cls, label;
+      if (isNA)      { cls = 'tdot tdot-na';      label = '—'; }
+      else if (isBlocked) { cls = 'tdot tdot-blocked'; label = '⏸'; }
+      else if (isDone)    { cls = 'tdot tdot-done';    label = '●'; }
+      else                { cls = 'tdot tdot-todo';    label = '○'; }
+      return `<td class="task-cell"><span class="${cls}">${label}</span></td>`;
+    };
+
+    const fillCls = pct === 100 ? 'prog-fill-full' : (doneTasks > 0 ? 'prog-fill-part' : 'prog-fill-empty');
+
+    return `
+      <tr class="${rowClass}">
+        <td><span class="prop-name">${esc(prop)}</span></td>
+        ${td(cleanDone)}
+        ${td(laundryDone)}
+        ${td(restockDone)}
+        ${td(checkCounts, checkBlocked)}
+        ${td(outsideDone, false, !outside)}
+        <td class="prog-cell">
+          <div class="prog-wrap">
+            <div class="prog-bar-bg"><div class="prog-bar-fill ${fillCls}" style="width:${pct}%"></div></div>
+            <span class="prog-label">${doneTasks}/${totalTasks}</span>
+          </div>
+        </td>
+      </tr>`;
+  }).join('');
+
+  document.getElementById('sum-done').textContent = cntDone;
+  document.getElementById('sum-part').textContent = cntPart;
+  document.getElementById('sum-none').textContent = cntNone;
+}
+
+function esc(str) {
+  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
+
+// ── Auto-refresh + init ──────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  load();
+  setInterval(load, 60000);
+});
+</script>
+</body>
+</html>

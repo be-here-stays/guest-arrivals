@@ -1,0 +1,1190 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Be Here — Status Board</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    :root {
+      --green: #646955;
+      --green-dark: #272F2E;
+      --green-light: #eaede4;
+      --amber: #AF926A;
+      --red: #B98B73;
+      --blue: #0090ff;
+      --text: #1a1a1a;
+      --muted: #888;
+      --border: #e0ddd6;
+      --card: #ffffff;
+      --bg: #D5D0C4;
+    }
+
+    html,
+    body {
+      height: 100%;
+      overflow: hidden;
+      font-family: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+    }
+
+    /* Setup overlay removed — token embedded directly */
+
+    /* ── HEADER ── */
+    #header {
+      height: 58px;
+      background: var(--green-dark);
+      display: flex;
+      align-items: center;
+      padding: 0 24px;
+      gap: 20px;
+      flex-shrink: 0;
+    }
+
+    .header-logo {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .header-logo-sub {
+      font-size: 12px;
+      font-weight: 400;
+      color: rgba(255,255,255,0.55);
+      letter-spacing: 0.3px;
+    }
+
+    .header-spacer {
+      flex: 1;
+    }
+
+    #clock {
+      font-size: 22px;
+      font-weight: 300;
+      color: #fff;
+      letter-spacing: 1px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    #dateDisplay {
+      font-size: 13px;
+      color: rgba(255, 255, 255, 0.65);
+    }
+
+    .header-sep {
+      width: 1px;
+      height: 24px;
+      background: rgba(255, 255, 255, 0.2);
+    }
+
+    #refreshStatus {
+      font-size: 12px;
+      color: rgba(255, 255, 255, 0.6);
+      text-align: right;
+    }
+
+    #refreshStatus strong {
+      color: rgba(255, 255, 255, 0.9);
+    }
+
+    .icon-btn {
+      background: rgba(255, 255, 255, 0.12);
+      border: none;
+      color: #fff;
+      width: 32px;
+      height: 32px;
+      border-radius: 7px;
+      cursor: pointer;
+      font-size: 15px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      transition: background 0.15s;
+    }
+
+    .icon-btn:hover {
+      background: rgba(255, 255, 255, 0.22);
+    }
+
+    /* ── MAIN LAYOUT ── */
+    #main {
+      height: calc(100vh - 58px);
+      display: grid;
+      grid-template-columns: 1fr 1fr 1fr;
+      grid-template-rows: 1fr 190px;
+      gap: 14px;
+      padding: 14px;
+    }
+
+    /* ── PANELS ── */
+    .panel {
+      background: var(--card);
+      border-radius: 14px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+
+    .panel-header {
+      padding: 14px 20px 12px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+      flex-shrink: 0;
+    }
+
+    .panel-title {
+      font-size: 13px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+    }
+
+    .panel-date {
+      font-size: 16px;
+      font-weight: 700;
+      color: var(--text);
+    }
+
+    .panel-count {
+      font-size: 13px;
+      color: var(--muted);
+      margin-left: auto;
+    }
+
+    .panel-body {
+      flex: 1;
+      overflow-y: auto;
+      padding: 12px 16px;
+    }
+
+    .panel-body::-webkit-scrollbar {
+      width: 4px;
+    }
+
+    .panel-body::-webkit-scrollbar-thumb {
+      background: #ddd;
+      border-radius: 2px;
+    }
+
+    /* ── ARRIVAL ROWS ── */
+    .arrival-row {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 9px 12px;
+      border-radius: 9px;
+      margin-bottom: 5px;
+      border-left: 4px solid transparent;
+    }
+
+    .arrival-row.received {
+      background: #eaede4;
+      border-left-color: #646955;
+    }
+
+    .arrival-row.sent {
+      background: #f5ead8;
+      border-left-color: var(--amber);
+    }
+
+    .arrival-row.pending {
+      background: #f3e6df;
+      border-left-color: var(--red);
+    }
+
+    .arrival-row.notset {
+      background: #f8f8f8;
+      border-left-color: #ddd;
+    }
+
+    .arr-prop {
+      font-size: 14px;
+      font-weight: 700;
+      min-width: 130px;
+    }
+
+    .arr-guest {
+      font-size: 13px;
+      color: var(--muted);
+      flex: 1;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .arr-party {
+      font-size: 12px;
+      color: #666;
+      white-space: nowrap;
+    }
+
+    .arr-beds {
+      font-size: 12px;
+      color: var(--green);
+      font-weight: 600;
+      white-space: normal;
+      max-width: 240px;
+      text-align: right;
+      line-height: 1.4;
+    }
+
+    .arr-opts {
+      font-size: 11px;
+      color: #bbb;
+      font-style: italic;
+    }
+
+    .status-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      flex-shrink: 0;
+    }
+
+    .dot-received {
+      background: #646955;
+    }
+
+    .dot-sent {
+      background: var(--amber);
+    }
+
+    .dot-pending {
+      background: var(--red);
+    }
+
+    .dot-notset {
+      background: #ccc;
+    }
+
+    /* ── LAUNDRY PANEL ── */
+    .laundry-header-sub {
+      font-size: 11px;
+      color: var(--muted);
+      margin-left: auto;
+      text-align: right;
+      line-height: 1.4;
+    }
+
+    .laundry-section {
+      margin-bottom: 8px;
+    }
+
+    .laundry-section-label {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.7px;
+      color: var(--muted);
+      margin-bottom: 4px;
+    }
+
+    /* Past order — compact summary strip */
+    .laundry-past {
+      background: #f5f5f5;
+      border-radius: 8px;
+      padding: 7px 11px;
+      border-left: 3px solid #ccc;
+    }
+
+    .laundry-past-date {
+      font-size: 12px;
+      font-weight: 700;
+      color: #555;
+      margin-bottom: 2px;
+    }
+
+    .laundry-past-row {
+      font-size: 11px;
+      color: #999;
+      line-height: 1.5;
+    }
+
+    /* Current order — full grid */
+    .laundry-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 5px;
+      margin-bottom: 6px;
+    }
+
+    .laundry-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 5px 9px;
+      background: var(--green-light);
+      border-radius: 7px;
+      border-left: 3px solid var(--green);
+    }
+
+    .laundry-label {
+      font-size: 11px;
+      color: #444;
+      line-height: 1.3;
+    }
+
+    .laundry-value {
+      font-size: 20px;
+      font-weight: 700;
+      color: var(--green);
+      margin-left: 8px;
+      flex-shrink: 0;
+    }
+
+    .laundry-props {
+      font-size: 11px;
+      color: var(--muted);
+      padding: 5px 2px 0;
+      border-top: 1px solid var(--border);
+      line-height: 1.5;
+    }
+
+    /* Next order — compact strip */
+    .laundry-next {
+      background: #f7f7f7;
+      border-radius: 8px;
+      padding: 7px 11px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 8px;
+      border-left: 3px solid #ddd;
+    }
+
+    .laundry-next-label {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+    }
+
+    .laundry-next-detail {
+      font-size: 11px;
+      color: #666;
+      text-align: right;
+      line-height: 1.5;
+    }
+
+    .laundry-subheader {
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      margin: 6px 0 4px;
+      grid-column: 1 / -1;
+    }
+
+    .laundry-zero {
+      opacity: 0.35;
+    }
+
+    /* ── BOTTOM PANEL (chart) ── */
+    .chart-panel {
+      grid-column: 1 / -1;
+      background: var(--card);
+      border-radius: 14px;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
+      display: grid;
+      grid-template-columns: auto 1fr auto auto auto auto;
+      align-items: center;
+      padding: 0 24px;
+      gap: 0;
+    }
+
+    .chart-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--muted);
+      writing-mode: vertical-rl;
+      transform: rotate(180deg);
+      padding: 12px 0;
+    }
+
+    .chart-wrap {
+      height: 170px;
+      padding: 8px 16px;
+    }
+
+    .chart-wrap canvas {
+      height: 154px !important;
+    }
+
+    .week-stat {
+      text-align: center;
+      padding: 0 20px;
+      border-left: 1px solid var(--border);
+    }
+
+    .week-stat .ws-num {
+      font-size: 28px;
+      font-weight: 700;
+      letter-spacing: -1px;
+    }
+
+    .week-stat .ws-lbl {
+      font-size: 11px;
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.4px;
+      margin-top: 2px;
+    }
+
+    .ws-green {
+      color: #646955;
+    }
+
+    .ws-amber {
+      color: var(--amber);
+    }
+
+    .ws-red {
+      color: var(--red);
+    }
+
+    .ws-total {
+      color: var(--text);
+    }
+
+    /* ── EMPTY / LOADING ── */
+    .empty-state {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      height: 100%;
+      color: #bbb;
+      font-size: 14px;
+    }
+
+    /* ── STATUS LEGEND ── */
+    .legend {
+      display: flex;
+      gap: 14px;
+      padding: 8px 16px 10px;
+      flex-shrink: 0;
+      border-top: 1px solid var(--border);
+    }
+
+    .legend-item {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .leg-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+    }
+  </style>
+</head>
+
+<body>
+
+  <!-- No token entry needed — read-only key embedded below -->
+
+  <!-- HEADER -->
+  <div id="header">
+    <div class="header-logo">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 215.0001 45.6329" height="28" fill="#fff" aria-label="Be Here">
+        <path d="M0,1.1487H13.9805c7.4883,0,11.6309,3.5039,11.6309,9.4746,0,3.7246-1.9316,6.7676-5.1953,8.2598,4.293,1.2695,6.8164,4.7246,6.8164,9.4258,0,6.8164-4.6758,10.9082-12.5039,10.9082H0V1.1487ZM13.3496,16.709c3.3125,0,5.1465-1.7363,5.1465-4.7246,0-2.9395-1.8828-4.5781-5.1953-4.5781h-5.9883v9.3027h6.0371ZM14.0293,32.8418c3.6758,0,5.707-1.9316,5.707-5.2441s-2.0312-5.1465-5.707-5.1465h-6.7188v10.3906h6.7188Z"/>
+        <path d="M30.8574,20.7207c0-9.4258,6.7676-15.7363,16.4063-15.7363,9.4746,0,15.7852,6.3105,15.7852,15.7363v2.1777h-24.5508c.4883,4.4805,3.5039,7.2285,7.8457,7.2285,3.1641,0,5.4629-1.3672,6.5703-3.8418h9.3516c-1.7852,7.0566-7.7969,11.3496-15.9219,11.3496-9.6387,0-15.4863-6.3594-15.4863-16.8965v-.0371ZM55.3984,18.3242c-.6348-3.9883-3.5527-6.4629-8.1328-6.4629-4.4316,0-7.4473,2.5234-8.0332,6.4629h16.166Z"/>
+        <path d="M86.543,1.1487h7.6504v17.2363h18.2383V1.1487h7.6504V39.168h-7.6504v-13.916h-18.2383v13.916h-7.6504V1.1487Z"/>
+        <path d="M125.4688,20.7207c0-9.4258,6.7676-15.7363,16.4063-15.7363,9.4746,0,15.7852,6.3105,15.7852,15.7363v2.1777h-24.5508c.4883,4.4805,3.5039,7.2285,7.8457,7.2285,3.1641,0,5.4629-1.3672,6.5703-3.8418h9.3516c-1.7852,7.0566-7.7969,11.3496-15.9219,11.3496-9.6387,0-15.4863-6.3594-15.4863-16.8965v-.0371ZM150.0098,18.3242c-.6348-3.9883-3.5527-6.4629-8.1328-6.4629-4.4316,0-7.4473,2.5234-8.0332,6.4629h16.166Z"/>
+        <path d="M161.9297,5.3496h7.748v5.5117c1.6875-3.7246,5.0977-6.0234,9.6875-6.0234.5371,0,1.0254.0488,1.5137.0977v8.0332c-.5859-.0977-1.3672-.1465-2.2461-.1465-5.3164,0-9.0391,3.7246-9.0391,9.3516v17.0391h-7.6641V5.3496Z"/>
+        <path d="M183.1504,20.7207c0-9.4258,6.7676-15.7363,16.4063-15.7363,9.4746,0,15.7852,6.3105,15.7852,15.7363v2.1777h-24.5508c.4883,4.4805,3.5039,7.2285,7.8457,7.2285,3.1641,0,5.4629-1.3672,6.5703-3.8418h9.3516c-1.7852,7.0566-7.7969,11.3496-15.9219,11.3496-9.6387,0-15.4863-6.3594-15.4863-16.8965v-.0371ZM207.6914,18.3242c-.6348-3.9883-3.5527-6.4629-8.1328-6.4629-4.4316,0-7.4473,2.5234-8.0332,6.4629h16.166Z"/>
+        <path d="M75.298,35.1159c0,1.546-1.2,2.9954-2.928,2.9954-1.776,0-3.024-1.4494-3.024-2.9954s1.248-2.8987,3.024-2.8987c1.728,0,2.928,1.3527,2.928,2.8987Z"/>
+      </svg>
+      <span class="header-logo-sub">Arrivals Status</span>
+    </div>
+    <div id="dateDisplay"></div>
+    <div class="header-spacer"></div>
+    <div id="clock"></div>
+    <div class="header-sep"></div>
+    <div id="refreshStatus"><strong>—</strong><br>next refresh</div>
+    <button class="icon-btn" onclick="refreshNow()" title="Refresh now">↻</button>
+    <button class="icon-btn" onclick="toggleFullscreen()" title="Fullscreen" id="fsBtn">⛶</button>
+  </div>
+
+  <!-- MAIN -->
+  <div id="main">
+    <!-- Today panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Today</div>
+        <div class="panel-date" id="todayDate">—</div>
+        <div class="panel-count" id="todayCount"></div>
+      </div>
+      <div class="panel-body" id="todayBody">
+        <div class="empty-state">Loading…</div>
+      </div>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="leg-dot" style="background:#646955"></div>Form received
+        </div>
+        <div class="legend-item">
+          <div class="leg-dot" style="background:#AF926A"></div>Sent
+        </div>
+        <div class="legend-item">
+          <div class="leg-dot" style="background:#B98B73"></div>Pending
+        </div>
+      </div>
+    </div>
+
+    <!-- Tomorrow panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Tomorrow</div>
+        <div class="panel-date" id="tomorrowDate">—</div>
+        <div class="panel-count" id="tomorrowCount"></div>
+      </div>
+      <div class="panel-body" id="tomorrowBody">
+        <div class="empty-state">Loading…</div>
+      </div>
+      <div class="legend">
+        <div class="legend-item">
+          <div class="leg-dot" style="background:#646955"></div>Config confirmed
+        </div>
+        <div class="legend-item">
+          <div class="leg-dot" style="background:#AF926A"></div>Choice pending
+        </div>
+      </div>
+    </div>
+
+    <!-- Laundry Order panel -->
+    <div class="panel">
+      <div class="panel-header">
+        <div class="panel-title">Laundry Order</div>
+        <div class="panel-date" id="laundryDeliveryDate">—</div>
+        <div class="laundry-header-sub" id="laundryCoversDates"></div>
+      </div>
+      <div class="panel-body" id="laundryBody">
+        <div class="empty-state">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Chart panel -->
+    <div class="chart-panel">
+      <div class="chart-title">This Week</div>
+      <div class="chart-wrap"><canvas id="weekChart"></canvas></div>
+      <div class="week-stat">
+        <div class="ws-num ws-total" id="statTotal">—</div>
+        <div class="ws-lbl">This week</div>
+      </div>
+      <div class="week-stat">
+        <div class="ws-num ws-green" id="statReceived">—</div>
+        <div class="ws-lbl">Received</div>
+      </div>
+      <div class="week-stat">
+        <div class="ws-num ws-amber" id="statSent">—</div>
+        <div class="ws-lbl">Sent</div>
+      </div>
+      <div class="week-stat">
+        <div class="ws-num ws-red" id="statPending">—</div>
+        <div class="ws-lbl">Pending</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const BOARD_ID = '5094453064';
+    const PROP_BOARD = '5094466278';
+    const REFRESH_MINS = 20;
+
+    // ── READ-ONLY API TOKEN ──
+    // Paste the Be Here viewer account's Monday.com API token here.
+    // Use a dedicated Monday.com user with Viewer-only access to the two boards above.
+    const MONDAY_API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NTg1MTIxMiwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTVUMDg6NTM6MTkuMzQxWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.AnJa58nVNbSv1Ydgf8BVmIBY4zoN4rOgl7IAKs51RtA';
+
+    let apiToken = MONDAY_API_TOKEN;
+    let allItems = [];
+    let propConfigs = {};
+    let weekChart = null;
+    let refreshTimer = null;
+    let refreshCountdown = REFRESH_MINS * 60;
+    let countdownInterval = null;
+
+    // ── CLOCK ──
+    function updateClock() {
+      const now = new Date();
+      document.getElementById('clock').textContent =
+        now.toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+      document.getElementById('dateDisplay').textContent =
+        now.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+    }
+    setInterval(updateClock, 1000);
+    updateClock();
+
+    // ── FULLSCREEN ──
+    function toggleFullscreen() {
+      if (!document.fullscreenElement) {
+        document.documentElement.requestFullscreen();
+        document.getElementById('fsBtn').textContent = '⊡';
+      } else {
+        document.exitFullscreen();
+        document.getElementById('fsBtn').textContent = '⛶';
+      }
+    }
+
+    // ── AUTO-START ──
+    async function init() {
+      try {
+        await loadData();
+        startRefreshCycle();
+      } catch (e) {
+        console.error('Failed to load data:', e.message);
+      }
+    }
+
+    // ── DATA ──
+    async function mondayFetch(query) {
+      const r = await fetch('https://api.monday.com/v2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': apiToken, 'API-Version': '2024-01' },
+        body: JSON.stringify({ query })
+      });
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      const j = await r.json();
+      if (j.errors) throw new Error(j.errors[0].message);
+      return j.data;
+    }
+
+    async function loadData(token) {
+      if (token) apiToken = token;
+      let items = [], cursor = null;
+      do {
+        const cp = cursor ? `, cursor: "${cursor}"` : '';
+        const d = await mondayFetch(`{ boards(ids:[${BOARD_ID}]){ items_page(limit:500${cp}){ cursor items{ id name column_values(ids:["date_mm2adtwg","color_mm2aw8fx","text_mm2ahbrx","text_mm2ab56m","numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x"]){ id value } } } } }`);
+        const page = d.boards[0].items_page;
+        items = items.concat(page.items);
+        cursor = page.cursor;
+      } while (cursor);
+      allItems = items;
+
+      // Fetch property config including Bathrooms column (numeric_mm2drc46)
+      const pd = await mondayFetch(`{ boards(ids:[${PROP_BOARD}]){ items_page(limit:200){ items{ name column_values(ids:["text_mm2a2a78","long_text_mm2a30dy","numeric_mm2drc46"]){ id value } } } } }`);
+      propConfigs = {};
+      for (const it of pd.boards[0].items_page.items) {
+        const cv = {}; for (const c of it.column_values) cv[c.id] = c.value;
+        const p = v => { try { return JSON.parse(v); } catch { return null; } };
+        const opts = (p(cv['long_text_mm2a30dy'])?.text || '').split('|').map(s => s.trim()).filter(Boolean);
+        const bathrooms = parseInt(p(cv['numeric_mm2drc46'])) || 1;
+        propConfigs[it.name] = { fixedBeds: p(cv['text_mm2a2a78']) || '', bedOptions: opts, bathrooms };
+      }
+      renderAll();
+    }
+
+    function parseItem(item) {
+      const cv = {}; for (const c of item.column_values) cv[c.id] = c.value;
+      const p = v => { try { return JSON.parse(v); } catch { return null; } };
+      const dv = p(cv['date_mm2adtwg']);
+      const sv = p(cv['color_mm2aw8fx']);
+      return {
+        id: item.id,
+        name: item.name,
+        property: p(cv['text_mm2ahbrx']) || '',
+        arrivalDate: dv?.date || null,
+        formStatus: sv ? String(sv.index ?? 'none') : 'none',
+        bedConfig: p(cv['text_mm2ab56m']) || '',
+        adults: parseInt(p(cv['numeric_mm2a5s8r'])) || 0,
+        children: parseInt(p(cv['numeric_mm2add81'])) || 0,
+        pets: parseInt(p(cv['numeric_mm2ahz0x'])) || 0,
+      };
+    }
+
+    function formatBeds(str) {
+      if (!str) return '';
+      if (/fixed\s*[-–]\s*no choice needed/i.test(str.trim()) || str.trim().toLowerCase() === 'fixed') return 'Fixed beds';
+      return str;
+    }
+
+    function dedupe(arrivals) {
+      // One card per property, prefer highest status priority
+      const pri = { '1': 0, '0': 1, '2': 2, 'none': 3 };
+      const map = {};
+      for (const a of arrivals) {
+        if (!map[a.property] || pri[a.formStatus] < pri[map[a.property].formStatus]) map[a.property] = a;
+      }
+      return Object.values(map).sort((a, b) => a.property.localeCompare(b.property));
+    }
+
+    function statusClass(s) {
+      return { '0': 'sent', '1': 'received', '2': 'pending', 'none': 'notset' }[s] || 'notset';
+    }
+    function dotClass(s) {
+      return { '0': 'dot-sent', '1': 'dot-received', '2': 'dot-pending', 'none': 'dot-notset' }[s] || 'dot-notset';
+    }
+
+    function arrivalCard(a, showBeds = false) {
+      const cfg = propConfigs[a.property] || {};
+      const fixedBeds = a.bedConfig || cfg.fixedBeds || '';
+      const bedOptions = cfg.bedOptions || [];
+      const hasOptions = bedOptions.length > 0;
+      const confirmed = a.formStatus === '1';
+      const bedStr = formatBeds(fixedBeds);
+
+      const party = [];
+      if (a.adults) party.push(`${a.adults}A`);
+      if (a.children) party.push(`${a.children}C`);
+      if (a.pets) party.push(`${a.pets}P`);
+
+      return `<div class="arrival-row ${statusClass(a.formStatus)}">
+    <div class="status-dot ${dotClass(a.formStatus)}"></div>
+    <div class="arr-prop">${a.property}</div>
+    <div class="arr-guest">${a.name || '—'}</div>
+    ${party.length ? `<div class="arr-party">${party.join(' · ')}</div>` : ''}
+    ${showBeds && bedStr ? `<div class="arr-beds">${bedStr}${hasOptions && !confirmed ? ' <span class="arr-opts">(choice pending)</span>' : ''}</div>` : ''}
+  </div>`;
+    }
+
+    // Use local date components — never toISOString() which shifts to UTC and breaks BST
+    function localDateStr(d) {
+      return d.getFullYear() + '-' +
+        String(d.getMonth() + 1).padStart(2, '0') + '-' +
+        String(d.getDate()).padStart(2, '0');
+    }
+
+    // ── LAUNDRY ──
+
+    // Delivery schedule: Tue covers Wed+Thu, Thu covers Fri+Sat, Sat covers Sun+Mon+Tue
+    function buildDeliveryWindow(fromDate) {
+      const addD = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+      const dow = fromDate.getDay(); // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
+      let daysUntil, coverStart, coverLength;
+
+      if (dow <= 2) {         // Sun/Mon/Tue → Tue delivery
+        daysUntil = 2 - dow;
+        coverStart = addD(fromDate, daysUntil + 1); // Wed
+        coverLength = 2;                              // Wed, Thu
+      } else if (dow <= 4) { // Wed/Thu → Thu delivery
+        daysUntil = 4 - dow;
+        coverStart = addD(fromDate, daysUntil + 1); // Fri
+        coverLength = 2;                              // Fri, Sat
+      } else {                // Fri/Sat → Sat delivery
+        daysUntil = 6 - dow;
+        coverStart = addD(fromDate, daysUntil + 1); // Sun
+        coverLength = 3;                              // Sun, Mon, Tue
+      }
+
+      const deliveryDate = addD(fromDate, daysUntil);
+      const coveredDates = Array.from({ length: coverLength }, (_, i) => addD(coverStart, i));
+      const coveredKeys = coveredDates.map(d => localDateStr(d));
+      return { deliveryDate, coveredDates, coveredKeys };
+    }
+
+    // ── BED COUNTING ──
+
+    // Parse a freeform bed description string into counts per bed type.
+    // "N twins" = N individual single beds in twin configuration.
+    // Bare "twin" (no number) = 2 single beds (one twin room).
+    // Strips "optional …" clauses and sofa/cot items.
+    function parseBedString(str) {
+      if (!str) return { superKing: 0, king: 0, double: 0, single: 0 };
+      let s = str
+        .replace(/super[\s-]?king/gi, 'SUPERKING')
+        .replace(/\(?[+&]?\s*optional\b[^)]*\)?/gi, '') // strip "(+ optional ...)"
+        .replace(/\bsofa\s*bed\b/gi, '').replace(/\bsofa\b/gi, '')
+        .replace(/\bcot\b/gi, '').replace(/\bbunk\b/gi, '');
+
+      function numOf(pattern, text) {
+        let total = 0, m;
+        const re = new RegExp('(\\d+)\\s*' + pattern + 's?\\b', 'gi');
+        while ((m = re.exec(text)) !== null) total += parseInt(m[1]);
+        if (total === 0 && new RegExp('\\b' + pattern + 's?\\b', 'i').test(text)) total = 1;
+        return total;
+      }
+
+      const superKing = numOf('SUPERKING', s);
+      const noSK = s.replace(/\d*\s*SUPERKINGS?\b/gi, '');
+      const king = numOf('king', noSK);
+      const double_ = numOf('double', s);
+
+      // "N twins" = N single beds; bare "twin" = 2 single beds
+      let twinBeds = 0, m;
+      const tRe = /(\d+)\s*twins?\b/gi;
+      while ((m = tRe.exec(s)) !== null) twinBeds += parseInt(m[1]);
+      if (twinBeds === 0 && /\btwins?\b/i.test(s)) twinBeds = 2;
+
+      return { superKing, king, double: double_, single: numOf('single', s) + twinBeds };
+    }
+
+    // Return the effective bed counts for a single arrival.
+    // If the guest has made a choice (bedConfig set) → use that for the configurable part.
+    // If no choice yet → default to the all-singles option (most single beds) from bedOptions.
+    // Fixed beds (fixedBeds) are always added on top.
+    function getArrivalBedCounts(arrival) {
+      const cfg = propConfigs[arrival.property] || {};
+      const hasOptions = cfg.bedOptions && cfg.bedOptions.length > 0;
+      const fixed = parseBedString(cfg.fixedBeds || '');
+
+      if (!hasOptions) return fixed; // fixed-only property
+
+      let configurable = { superKing: 0, king: 0, double: 0, single: 0 };
+      if (arrival.bedConfig && arrival.bedConfig.trim()) {
+        configurable = parseBedString(arrival.bedConfig);
+      } else {
+        // Default to all-singles: pick the option with the most single beds
+        let bestSingle = -1;
+        for (const opt of cfg.bedOptions) {
+          const c = parseBedString(opt);
+          if (c.single > bestSingle) { bestSingle = c.single; configurable = c; }
+        }
+      }
+
+      return {
+        superKing: fixed.superKing + configurable.superKing,
+        king: fixed.king + configurable.king,
+        double: fixed.double + configurable.double,
+        single: fixed.single + configurable.single,
+      };
+    }
+
+    function calcLaundry(arrivals) {
+      let oxfordPillows = 0, standardPillows = 0,
+        bathTowels = 0, handTowels = 0, hotTubTowels = 0,
+        bathrobes = 0, teaTowels = 0, bathMats = 0;
+      // Duvet covers (by actual bed size)
+      let skDuvets = 0, kingDuvets = 0, doubleDuvets = 0, singleDuvets = 0;
+      // Sheets: superking beds use KING SIZE sheets — no superking sheets
+      let kingSheets = 0, doubleSheets = 0, singleSheets = 0;
+
+      for (const a of arrivals) {
+        const guests = (a.adults || 0) + (a.children || 0);
+        const adults = a.adults > 0 ? a.adults : guests;
+        const bathrooms = (propConfigs[a.property] || {}).bathrooms || 1;
+        const beds = getArrivalBedCounts(a);
+
+        oxfordPillows += guests;             // 1 oxford (front) per person
+        standardPillows += guests;             // 1 standard (back) per person
+        bathTowels += guests;             // 1 per person
+        handTowels += guests + bathrooms; // 1 per person + 1 per bathroom
+        hotTubTowels += guests;             // 1 per person
+        bathrobes += adults;             // 1 per adult
+        teaTowels += 2;                  // 2 per house (fixed)
+        bathMats += bathrooms;          // 1 per bathroom
+
+        // Duvet covers — by bed size
+        skDuvets += beds.superKing;
+        kingDuvets += beds.king;
+        doubleDuvets += beds.double;
+        singleDuvets += beds.single;
+
+        // Sheets — superking beds use king size sheets (no superking sheets)
+        kingSheets += beds.superKing + beds.king;
+        doubleSheets += beds.double;
+        singleSheets += beds.single;
+      }
+
+      // Backward-compat aliases used by summaryLine and propList
+      const pillowCases = oxfordPillows + standardPillows;
+      const superKingBeds = skDuvets;
+      const kingBeds = kingDuvets;
+      const doubleBeds = doubleDuvets;
+      const singleBeds = singleDuvets;
+
+      return {
+        oxfordPillows, standardPillows, pillowCases,
+        bathTowels, handTowels, hotTubTowels, bathrobes, teaTowels, bathMats,
+        skDuvets, kingDuvets, doubleDuvets, singleDuvets,
+        kingSheets, doubleSheets, singleSheets,
+        superKingBeds, kingBeds, doubleBeds, singleBeds
+      };
+    }
+
+    // Return the most recent delivery date on or before today.
+    // Delivery days: Tue(2), Thu(4), Sat(6).
+    function getLastDeliveryDate(today) {
+      const addD = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+      const dow = today.getDay();
+      if (dow === 0) return addD(today, -1); // Sun  → Sat
+      if (dow === 1) return addD(today, -2); // Mon  → Sat
+      if (dow === 2) return today;           // Tue  → today
+      if (dow === 3) return addD(today, -1); // Wed  → Tue
+      if (dow === 4) return today;           // Thu  → today
+      if (dow === 5) return addD(today, -1); // Fri  → Thu
+  /* Sat */      return today;           // Sat  → today
+    }
+
+    function winLabel(win) {
+      const delivery = win.deliveryDate.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+      const covers = win.coveredDates.map(d => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' })).join(' + ');
+      return { delivery, covers };
+    }
+
+    function renderLaundry(parsed) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const addD = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+
+      // Three windows:
+      //   past   = most recent delivery on/before today (already placed — shown as summary)
+      //   centre = NEXT upcoming delivery (what to prepare now — shown in full detail)
+      //   next   = the one after centre (provisional — shown as compact strip)
+      const past = buildDeliveryWindow(getLastDeliveryDate(today));
+      const centre = buildDeliveryWindow(addD(past.deliveryDate, 1));
+      const next = buildDeliveryWindow(addD(centre.deliveryDate, 1));
+
+      // Arrivals in each window
+      const pastArrivals = dedupe(parsed.filter(i => past.coveredKeys.includes(i.arrivalDate)));
+      const currentArrivals = dedupe(parsed.filter(i => centre.coveredKeys.includes(i.arrivalDate)));
+      const nextArrivals = dedupe(parsed.filter(i => next.coveredKeys.includes(i.arrivalDate)));
+
+      // Panel header shows the CENTRE (next upcoming) order
+      const centreL = winLabel(centre);
+      const isCentreToday = localDateStr(centre.deliveryDate) === localDateStr(today);
+      document.getElementById('laundryDeliveryDate').textContent = (isCentreToday ? 'Today — ' : '') + centreL.delivery;
+      document.getElementById('laundryCoversDates').textContent = 'covers ' + centreL.covers;
+
+      // ── Helper: compact summary line ──
+      function summaryLine(arrivals) {
+        if (!arrivals.length) return 'No arrivals this window';
+        const t = calcLaundry(arrivals);
+        // Duvets
+        const duvetParts = [];
+        if (t.skDuvets) duvetParts.push(`${t.skDuvets} s/king`);
+        if (t.kingDuvets) duvetParts.push(`${t.kingDuvets} king`);
+        if (t.doubleDuvets) duvetParts.push(`${t.doubleDuvets} dbl`);
+        if (t.singleDuvets) duvetParts.push(`${t.singleDuvets} single`);
+        const duvetStr = duvetParts.length ? duvetParts.join(' · ') + ' duvets  ·  ' : '';
+        // Sheets (king covers superking+king, no superking sheets)
+        const sheetParts = [];
+        if (t.kingSheets) sheetParts.push(`${t.kingSheets} king`);
+        if (t.doubleSheets) sheetParts.push(`${t.doubleSheets} dbl`);
+        if (t.singleSheets) sheetParts.push(`${t.singleSheets} single`);
+        const sheetStr = sheetParts.length ? sheetParts.join(' · ') + ' sheets  ·  ' : '';
+        return `${duvetStr}${sheetStr}${t.oxfordPillows} oxford · ${t.standardPillows} std pillow · ${t.bathTowels} bath · ${t.handTowels} hand · ${t.hotTubTowels} hot tub · ${t.bathrobes} robe · ${t.teaTowels} tea · ${t.bathMats} mat`;
+      }
+
+      // ── PAST — summary strip ──
+      const pastL = winLabel(past);
+      const pastIsToday = localDateStr(past.deliveryDate) === localDateStr(today);
+      const pastHTML = `
+    <div class="laundry-section">
+      <div class="laundry-section-label">Last order${pastIsToday ? ' — placed today' : ''}</div>
+      <div class="laundry-past">
+        <div class="laundry-past-date">${pastL.delivery}
+          <span style="font-weight:400;color:#bbb;font-size:11px"> · covers ${pastL.covers}</span>
+        </div>
+        <div class="laundry-past-row">${summaryLine(pastArrivals)}</div>
+      </div>
+    </div>`;
+
+      // ── CURRENT — full detail ──
+      const curTotals = calcLaundry(currentArrivals);
+
+      // Check whether any bed choice is still default (not yet confirmed by guest)
+      const hasUnconfirmed = currentArrivals.some(a => {
+        const cfg = propConfigs[a.property] || {};
+        return cfg.bedOptions && cfg.bedOptions.length > 0 && !a.bedConfig;
+      });
+
+      const DUVET_ITEMS = [
+        { label: 'Super King Duvets', value: curTotals.skDuvets },
+        { label: 'King Duvets', value: curTotals.kingDuvets },
+        { label: 'Double Duvets', value: curTotals.doubleDuvets },
+        { label: 'Single Duvets', value: curTotals.singleDuvets },
+      ];
+      // Sheets: superking beds use king size sheets — no superking sheets
+      const SHEET_ITEMS = [
+        { label: 'King Sheets', value: curTotals.kingSheets },
+        { label: 'Double Sheets', value: curTotals.doubleSheets },
+        { label: 'Single Sheets', value: curTotals.singleSheets },
+      ];
+      const TOWEL_ITEMS = [
+        { label: 'Oxford Pillow Cases', value: curTotals.oxfordPillows },
+        { label: 'Standard Pillow Cases', value: curTotals.standardPillows },
+        { label: 'Bath Towels', value: curTotals.bathTowels },
+        { label: 'Hand Towels', value: curTotals.handTowels },
+        { label: 'Hot Tub Towels', value: curTotals.hotTubTowels },
+        { label: 'Bathrobes', value: curTotals.bathrobes },
+        { label: 'Tea Towels', value: curTotals.teaTowels },
+        { label: 'Bath Mats', value: curTotals.bathMats },
+      ];
+
+      function renderItem(item) {
+        return `<div class="laundry-item ${item.value === 0 ? 'laundry-zero' : ''}">
+      <span class="laundry-label">${item.label}</span>
+      <span class="laundry-value">${item.value}</span>
+    </div>`;
+      }
+
+      const propList = currentArrivals.map(a => {
+        const g = (a.adults || 0) + (a.children || 0);
+        const b = (propConfigs[a.property] || {}).bathrooms || 1;
+        const beds = getArrivalBedCounts(a);
+        const cfg = propConfigs[a.property] || {};
+        const isDefault = cfg.bedOptions && cfg.bedOptions.length > 0 && !a.bedConfig;
+        const bedNote = [
+          beds.superKing ? `${beds.superKing}SK` : '',
+          beds.king ? `${beds.king}K` : '',
+          beds.double ? `${beds.double}D` : '',
+          beds.single ? `${beds.single}S` : '',
+        ].filter(Boolean).join('+');
+        return `${a.property} (${g}g/${b}bth${bedNote ? ' · ' + bedNote + (isDefault ? '*' : '') : ''})`;
+      }).join(', ');
+
+      const currentHTML = `
+    <div class="laundry-section">
+      <div class="laundry-section-label">Order now</div>
+      ${currentArrivals.length === 0
+          ? '<div style="padding:6px 0 8px;font-size:13px;color:#bbb;text-align:center;">No arrivals in this window</div>'
+          : `<div class="laundry-grid">
+            <div class="laundry-subheader">Duvets${hasUnconfirmed ? ' <span style="font-weight:400;color:#bbb">* default twin</span>' : ''}</div>
+            ${DUVET_ITEMS.map(renderItem).join('')}
+            <div class="laundry-subheader">Sheets <span style="font-weight:400;color:#bbb">(superking beds → king sheets)</span></div>
+            ${SHEET_ITEMS.map(renderItem).join('')}
+            <div class="laundry-subheader">Pillows &amp; towels</div>
+            ${TOWEL_ITEMS.map(renderItem).join('')}
+          </div>
+          ${propList ? `<div class="laundry-props">${propList}</div>` : ''}`
+        }
+    </div>`;
+
+      // ── NEXT — compact strip ──
+      const nextL = winLabel(next);
+      const nextHTML = `
+    <div class="laundry-next">
+      <div>
+        <div class="laundry-next-label">Next: ${nextL.delivery}</div>
+        <div style="font-size:11px;color:var(--muted)">covers ${nextL.covers}</div>
+      </div>
+      <div class="laundry-next-detail">${summaryLine(nextArrivals)}</div>
+    </div>`;
+
+      document.getElementById('laundryBody').innerHTML = pastHTML + currentHTML + nextHTML;
+    }
+
+    function renderAll() {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
+      const todayStr = localDateStr(today);
+      const tomorrowStr = localDateStr(tomorrow);
+
+      const parsed = allItems.map(parseItem);
+
+      // Today
+      const todayArr = dedupe(parsed.filter(i => i.arrivalDate === todayStr));
+      document.getElementById('todayDate').textContent = today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+      document.getElementById('todayCount').textContent = todayArr.length ? `${todayArr.length} propert${todayArr.length === 1 ? 'y' : 'ies'}` : '';
+      document.getElementById('todayBody').innerHTML = todayArr.length
+        ? todayArr.map(a => arrivalCard(a, false)).join('')
+        : '<div class="empty-state">No arrivals today</div>';
+
+      // Tomorrow
+      const tomorrowArr = dedupe(parsed.filter(i => i.arrivalDate === tomorrowStr));
+      document.getElementById('tomorrowDate').textContent = tomorrow.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+      document.getElementById('tomorrowCount').textContent = tomorrowArr.length ? `${tomorrowArr.length} propert${tomorrowArr.length === 1 ? 'y' : 'ies'}` : '';
+      document.getElementById('tomorrowBody').innerHTML = tomorrowArr.length
+        ? tomorrowArr.map(a => arrivalCard(a, true)).join('')
+        : '<div class="empty-state">No arrivals tomorrow</div>';
+
+      // Laundry order
+      renderLaundry(parsed);
+
+      // Weekly chart — next 7 days
+      const weekDates = Array.from({ length: 7 }, (_, i) => { const d = new Date(today); d.setDate(today.getDate() + i); return d; });
+      const weekKeys = weekDates.map(d => localDateStr(d));
+      const weekLabels = weekDates.map(d => d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric' }));
+
+      const wc = { '0': Array(7).fill(0), '1': Array(7).fill(0), '2': Array(7).fill(0), 'none': Array(7).fill(0) };
+      let wTotal = 0, wReceived = 0, wSent = 0, wPending = 0;
+      for (const i of parsed) {
+        const idx = weekKeys.indexOf(i.arrivalDate);
+        if (idx === -1) continue;
+        wc[i.formStatus][idx]++;
+        wTotal++;
+        if (i.formStatus === '1') wReceived++;
+        else if (i.formStatus === '0') wSent++;
+        else if (i.formStatus === '2') wPending++;
+      }
+
+      document.getElementById('statTotal').textContent = wTotal;
+      document.getElementById('statReceived').textContent = wReceived;
+      document.getElementById('statSent').textContent = wSent;
+      document.getElementById('statPending').textContent = wPending;
+
+      if (weekChart) weekChart.destroy();
+      weekChart = new Chart(document.getElementById('weekChart').getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: weekLabels,
+          datasets: [
+            { label: 'Received', data: wc['1'], backgroundColor: '#646955', borderRadius: 3 },
+            { label: 'Sent', data: wc['0'], backgroundColor: '#AF926A', borderRadius: 3 },
+            { label: 'Pending', data: wc['2'], backgroundColor: '#B98B73', borderRadius: 3 },
+            { label: 'Not set', data: wc['none'], backgroundColor: '#d4d4d4', borderRadius: 3 },
+          ]
+        },
+        options: {
+          responsive: true, maintainAspectRatio: false,
+          plugins: {
+            legend: { display: false },
+            tooltip: {
+              callbacks: {
+                footer: items => 'Total: ' + items.reduce((s, i) => s + i.parsed.y, 0)
+              }
+            }
+          },
+          scales: {
+            x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 }, color: '#888' } },
+            y: { stacked: true, grid: { color: '#f0f0f0' }, ticks: { precision: 0, font: { size: 11 }, color: '#888' } }
+          }
+        }
+      });
+
+      document.getElementById('refreshStatus').innerHTML = `<strong>${new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' })}</strong><br>last update`;
+    }
+
+    // ── REFRESH CYCLE ──
+    function startRefreshCycle() {
+      if (countdownInterval) clearInterval(countdownInterval);
+      if (refreshTimer) clearTimeout(refreshTimer);
+      refreshCountdown = REFRESH_MINS * 60;
+      countdownInterval = setInterval(() => {
+        refreshCountdown--;
+        const m = Math.floor(refreshCountdown / 60);
+        const s = refreshCountdown % 60;
+        document.getElementById('refreshStatus').innerHTML =
+          `<strong>${m}:${String(s).padStart(2, '0')}</strong><br>next refresh`;
+        if (refreshCountdown <= 0) refreshNow();
+      }, 1000);
+    }
+
+    async function refreshNow() {
+      if (!apiToken) return;
+      if (countdownInterval) clearInterval(countdownInterval);
+      document.getElementById('refreshStatus').innerHTML = '<strong>Refreshing…</strong>';
+      try {
+        await loadData();
+      } catch (e) {
+        document.getElementById('refreshStatus').innerHTML = '<strong>Error</strong><br>retry in 2 min';
+      }
+      startRefreshCycle();
+    }
+
+    // Kick off automatically — no token entry required
+    window.addEventListener('DOMContentLoaded', init);
+  </script>
+</body>
+
+</html>

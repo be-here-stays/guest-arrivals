@@ -1,0 +1,819 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+<title>Supplies Hub – Be Here Travel</title>
+<style>
+  :root {
+    --bg: #0f1117;
+    --surface: #1a1d27;
+    --surface2: #22263a;
+    --accent: #4f8ef7;
+    --accent2: #7c5cbf;
+    --success: #27ae60;
+    --warning: #f39c12;
+    --danger: #e74c3c;
+    --text: #e8eaf0;
+    --muted: #8892a4;
+    --border: #2c3148;
+    --critical: #e74c3c;
+    --high: #f39c12;
+    --medium: #f1c40f;
+    --low: #4f8ef7;
+    --radius: 12px;
+    --radius-sm: 8px;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; min-height: 100vh; max-width: 480px; margin: 0 auto; }
+
+  /* Header */
+  .header { background: var(--surface); border-bottom: 1px solid var(--border); padding: 14px 16px 12px; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 100; }
+  .header-logo { font-size: 13px; font-weight: 700; color: var(--accent); letter-spacing: .5px; text-transform: uppercase; }
+  .header-title { font-size: 16px; font-weight: 600; color: var(--text); }
+  .header-lodge { font-size: 12px; color: var(--muted); text-align: right; }
+
+  /* Nav */
+  .nav { display: flex; background: var(--surface); border-top: 1px solid var(--border); position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; z-index: 100; }
+  .nav-btn { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 3px; padding: 10px 8px 12px; border: none; background: none; color: var(--muted); font-size: 10px; font-weight: 500; cursor: pointer; transition: color .2s; letter-spacing: .3px; text-transform: uppercase; }
+  .nav-btn.active { color: var(--accent); }
+  .nav-btn svg { width: 22px; height: 22px; }
+
+  /* Main content */
+  .main { padding: 16px; padding-bottom: 80px; }
+
+  /* Cards */
+  .card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; margin-bottom: 10px; }
+  .card-title { font-size: 13px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+
+  /* Form elements */
+  .field { margin-bottom: 14px; }
+  .field label { display: block; font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: .4px; margin-bottom: 6px; }
+  .field select, .field input, .field textarea {
+    width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm);
+    color: var(--text); font-size: 15px; padding: 11px 12px; appearance: none; -webkit-appearance: none; outline: none;
+    transition: border-color .2s;
+  }
+  .field select:focus, .field input:focus, .field textarea:focus { border-color: var(--accent); }
+  .field textarea { resize: vertical; min-height: 70px; font-family: inherit; }
+  .field select { background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%238892a4' d='M6 8L1 3h10z'/%3E%3C/svg%3E"); background-repeat: no-repeat; background-position: right 12px center; padding-right: 32px; }
+  .field input[type="number"] { -moz-appearance: textfield; }
+  .field input[type="number"]::-webkit-inner-spin-button { -webkit-appearance: none; }
+
+  /* Buttons */
+  .btn { display: block; width: 100%; padding: 13px; border: none; border-radius: var(--radius-sm); font-size: 15px; font-weight: 600; cursor: pointer; text-align: center; transition: opacity .2s, transform .1s; letter-spacing: .3px; }
+  .btn:active { transform: scale(.98); opacity: .85; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-success { background: var(--success); color: #fff; }
+  .btn-danger { background: var(--danger); color: #fff; }
+  .btn-outline { background: transparent; border: 1px solid var(--border); color: var(--text); }
+  .btn-sm { padding: 8px 14px; font-size: 13px; width: auto; display: inline-block; }
+  .btn-add { background: var(--surface2); border: 1px dashed var(--border); color: var(--accent); margin-top: 4px; padding: 11px; border-radius: var(--radius-sm); font-size: 14px; font-weight: 600; cursor: pointer; width: 100%; text-align: center; transition: border-color .2s; }
+  .btn-add:hover { border-color: var(--accent); }
+
+  /* Item rows */
+  .item-row { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 8px; position: relative; }
+  .item-row-num { font-size: 11px; font-weight: 700; color: var(--accent); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px; }
+  .item-row-grid { display: grid; grid-template-columns: 1fr 72px; gap: 8px; margin-bottom: 8px; }
+  .item-remove { position: absolute; top: 10px; right: 10px; width: 24px; height: 24px; border-radius: 50%; background: var(--danger); border: none; color: #fff; font-size: 14px; line-height: 1; cursor: pointer; display: flex; align-items: center; justify-content: center; }
+
+  /* Priority badges */
+  .badge { display: inline-block; padding: 3px 8px; border-radius: 20px; font-size: 11px; font-weight: 700; letter-spacing: .4px; text-transform: uppercase; }
+  .badge-critical { background: rgba(231,76,60,.2); color: var(--critical); }
+  .badge-high { background: rgba(243,156,18,.2); color: var(--high); }
+  .badge-medium { background: rgba(241,196,15,.2); color: var(--medium); }
+  .badge-low { background: rgba(79,142,247,.2); color: var(--low); }
+  .badge-new { background: rgba(231,76,60,.15); color: var(--critical); }
+  .badge-progress { background: rgba(243,156,18,.15); color: var(--high); }
+  .badge-delivered { background: rgba(39,174,96,.15); color: var(--success); }
+
+  /* Dashboard lodge cards */
+  .lodge-card { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px 16px; margin-bottom: 8px; cursor: pointer; transition: border-color .2s; display: flex; align-items: center; justify-content: space-between; }
+  .lodge-card:hover { border-color: var(--accent); }
+  .lodge-card.has-critical { border-left: 3px solid var(--critical); }
+  .lodge-card.has-high { border-left: 3px solid var(--high); }
+  .lodge-card.ok { border-left: 3px solid var(--success); }
+  .lodge-name { font-size: 15px; font-weight: 600; color: var(--text); }
+  .lodge-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+  .lodge-count { text-align: right; }
+  .lodge-count-num { font-size: 22px; font-weight: 700; color: var(--accent); }
+  .lodge-count-label { font-size: 10px; color: var(--muted); text-transform: uppercase; }
+
+  /* Delivery window */
+  .window-card { background: rgba(79,142,247,.08); border: 1px solid rgba(79,142,247,.25); border-radius: var(--radius-sm); padding: 10px 12px; margin-bottom: 8px; }
+  .window-lodge { font-size: 14px; font-weight: 600; }
+  .window-time { font-size: 13px; color: var(--accent); margin-top: 2px; }
+  .window-duration { font-size: 11px; color: var(--muted); margin-top: 1px; }
+
+  /* Checklist items */
+  .check-item { background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px; margin-bottom: 6px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; transition: border-color .2s; }
+  .check-item.checked { opacity: .5; border-color: var(--success); }
+  .check-item input[type="checkbox"] { width: 20px; height: 20px; accent-color: var(--success); flex-shrink: 0; margin-top: 2px; cursor: pointer; }
+  .check-item-detail { flex: 1; }
+  .check-item-name { font-size: 14px; font-weight: 600; }
+  .check-item-meta { font-size: 12px; color: var(--muted); margin-top: 2px; }
+
+  /* Other warning */
+  .other-warning { background: rgba(243,156,18,.1); border: 1px solid rgba(243,156,18,.3); border-radius: var(--radius-sm); padding: 10px 12px; margin-top: 8px; font-size: 12px; color: var(--high); display: none; }
+  .other-warning.show { display: block; }
+
+  /* Toast */
+  .toast { position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius-sm); padding: 12px 20px; font-size: 14px; font-weight: 500; z-index: 999; transition: transform .3s ease; white-space: nowrap; box-shadow: 0 8px 32px rgba(0,0,0,.4); max-width: calc(100vw - 32px); }
+  .toast.show { transform: translateX(-50%) translateY(0); }
+  .toast.success { border-color: var(--success); color: var(--success); }
+  .toast.error { border-color: var(--danger); color: var(--danger); }
+
+  /* Mode toggle */
+  .mode-toggle { display: flex; background: var(--surface2); border-radius: var(--radius-sm); padding: 3px; margin-bottom: 16px; }
+  .mode-btn { flex: 1; padding: 9px; border: none; background: none; border-radius: 6px; font-size: 13px; font-weight: 600; color: var(--muted); cursor: pointer; transition: all .2s; }
+  .mode-btn.active { background: var(--accent); color: #fff; }
+
+  /* Search */
+  .search-wrap { position: relative; margin-bottom: 6px; }
+  .search-input { width: 100%; background: var(--surface2); border: 1px solid var(--border); border-radius: var(--radius-sm); color: var(--text); font-size: 14px; padding: 10px 12px 10px 36px; outline: none; }
+  .search-input:focus { border-color: var(--accent); }
+  .search-icon { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); color: var(--muted); }
+
+  /* Section headings */
+  .section-head { font-size: 12px; font-weight: 700; color: var(--muted); text-transform: uppercase; letter-spacing: .5px; margin: 16px 0 8px; }
+
+  /* Empty state */
+  .empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; }
+  .empty-icon { font-size: 40px; margin-bottom: 10px; }
+
+  /* Spinner */
+  .spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(255,255,255,.3); border-top-color: #fff; border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 8px; }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* Loading overlay */
+  .loading { text-align: center; padding: 30px; color: var(--muted); }
+  .loading .spinner { border-color: rgba(79,142,247,.3); border-top-color: var(--accent); width: 28px; height: 28px; margin: 0 auto 10px; display: block; }
+
+  select option { background: #1a1d27; }
+  input::placeholder { color: var(--muted); }
+</style>
+</head>
+<body>
+
+<!-- Header -->
+<div class="header">
+  <div>
+    <div class="header-logo">Be Here Travel</div>
+    <div class="header-title">Supplies Hub</div>
+  </div>
+  <div class="header-lodge" id="headerLodge"></div>
+</div>
+
+<!-- Main -->
+<div class="main" id="mainContent"></div>
+
+<!-- Bottom Nav -->
+<nav class="nav">
+  <button class="nav-btn active" onclick="showView('dashboard')" id="nav-dashboard">
+    <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+    Dashboard
+  </button>
+  <button class="nav-btn" onclick="showView('log')" id="nav-log">
+    <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></svg>
+    Log
+  </button>
+  <button class="nav-btn" onclick="showView('deliver')" id="nav-deliver">
+    <svg fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/></svg>
+    Deliver
+  </button>
+</nav>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+// ─── CONFIG ─────────────────────────────────────────────────────────────────
+// Replace these with your actual tokens before deploying
+const CONFIG = {
+  MONDAY_TOKEN: 'YOUR_MONDAY_API_TOKEN',
+  MONDAY_BOARD_ID: '1615688857',       // Supplies House
+  MONDAY_CATALOG_ID: '1623515367',     // Supply Items catalog
+  MONDAY_GROUP_REQUIRED: 'topics',
+  MONDAY_GROUP_CHARGEABLE: 'new_group64916__1',
+  GUESTY_CLIENT_ID: 'YOUR_GUESTY_CLIENT_ID',
+  GUESTY_CLIENT_SECRET: 'YOUR_GUESTY_CLIENT_SECRET',
+  GUESTY_TOKEN: null  // populated at runtime via OAuth
+};
+
+// ─── STATIC DATA ─────────────────────────────────────────────────────────────
+const LODGES = [
+  'Aintree','Ardross','Arlington Both','At Waters Edge','Badgers Sett',
+  'Beaver Brook','Berry Farm Barn','Boathouse','Cheltenham','Duck House',
+  'Egret','Epsom','Essitone House','Firefly','Foxes Den','Goodwood',
+  'Goose Landing','Green Haven','Grebe Lodge','Hideaway','Hill View',
+  'Homestead','Horseshoe Cottage','Island','Kingfisher','Lake House',
+  'Libelle','Little Horseshoe Lake','Malachite','Mallard','Maricor',
+  'Mayflower','Mirrors Edge','Newmarket','Pond','Rabbits Warren',
+  'Serendipity','Serenity','Squirrels Drey','Still Waters','Summer Lake',
+  'Swans Rest','The Atelier','The Barn','The Lookout','Tranquility',
+  'Waterlily','Willow','York'
+].sort();
+
+const SUPPLY_ITEMS = [
+  'Alcohol Beer/Ale/Cider','Alcohol Prosecco','Ant Trap',
+  'Barbecue Brush','Barbecue Cleaner','Battery AA','Battery AAA','Battery Box',
+  'Bin bags 20','Bin bags 50','Bulb Extractor Fan','Cake',
+  'Cleaner Kitchen Method','Cleaner Toilet Ecover','Coffee Pods','Coffee Tin Instant',
+  'Dishwasher Rinse Aid','Dishwasher Salt','Dishwasher Tablets','Dog Treats',
+  'Elemis bath and Shower Gel Small','Elemis bath and shower gel Large',
+  'Elemis Conditioner Large','Elemis Conditioner Small',
+  'Elemis hand and Body Wash Large','Elemis Hand and Body wash Small',
+  'Elemis Shampoo Large','Elemis Shampoo Small',
+  'Feedback Forms','Glass Flute','Glass Pint','Glass Short','Glass Tall','Glass Wine',
+  'Hand soap pouch Bayliss and Harding','Hob spray Tesco',
+  'Kitchen Rolls','Light bulb bayonet','Light bulb Screw','Matches','Milk',
+  'Napkins Tesco','Olive oil Olivio 500ml','Olive Oil Tesco 500ml','Olive oil Tesco',
+  'Pen','Peppercorns','Reed Diffuser','Rinse aid','Rock Salt',
+  'Salt Blocks','Sanitary Bags','Signage (Use Notes)',
+  'Sponges','Sugar','Sugar 1kg','Sugar cubes',
+  'Tea Bags','Tin Foil 30m','Tin foil 10m','Toilet roll 48 WGAC','Toilet Rolls','Toilet Roll WGAC',
+  'Washing Capsules 20','Washing Capsules 40','Washing powder 40 wash','Washing Up liquid Small',
+  'Washing Up Liquid Large','Other (see notes below)'
+];
+
+const STAFF = ['Adele','Barry','Fin','Jade','Jenny','Jo','Lucy','Martine','Meg','Mike','Nicky','Saul','Tash'];
+
+const PRIORITY_OPTS = [
+  { label: 'Critical', value: 0, cls: 'critical' },
+  { label: 'High',     value: 1, cls: 'high' },
+  { label: 'Medium',   value: 2, cls: 'medium' },
+  { label: 'Low',      value: 3, cls: 'low' }
+];
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let state = {
+  view: 'dashboard',
+  lodge: new URLSearchParams(location.search).get('lodge') || '',
+  pendingItems: [],
+  dashboardData: {},
+  deliveryWindows: [],
+  loading: false
+};
+
+// ─── MONDAY API ──────────────────────────────────────────────────────────────
+async function mondayQuery(query, variables = {}) {
+  const r = await fetch('https://api.monday.com/v2', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${CONFIG.MONDAY_TOKEN}`,
+      'Content-Type': 'application/json',
+      'API-Version': '2024-01'
+    },
+    body: JSON.stringify({ query, variables })
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+async function fetchPendingItems(lodge) {
+  const q = `query($boardId: ID!, $lodge: [CompareValue!]!, $group: [CompareValue!]!) {
+    boards(ids: [$boardId]) {
+      items_page(limit: 200, query_params: {
+        rules: [
+          {column_id: "text6__1", compare_value: $lodge, operator: any_of},
+          {column_id: "group", compare_value: $group, operator: any_of}
+        ]
+      }) {
+        items {
+          id name
+          column_values(ids: ["text60__1","text5__1","numbers_MjiukVMp","priority6__1","date4","dropdown8__1","text__1"]) {
+            id text value
+          }
+        }
+      }
+    }
+  }`;
+  const data = await mondayQuery(q, {
+    boardId: CONFIG.MONDAY_BOARD_ID,
+    lodge: [lodge],
+    group: [CONFIG.MONDAY_GROUP_REQUIRED]
+  });
+  return data.boards[0].items_page.items || [];
+}
+
+async function fetchAllPending() {
+  const q = `query($boardId: ID!, $group: [CompareValue!]!) {
+    boards(ids: [$boardId]) {
+      items_page(limit: 500, query_params: {
+        rules: [{column_id: "group", compare_value: $group, operator: any_of}]
+      }) {
+        items {
+          id name
+          column_values(ids: ["text6__1","numbers_MjiukVMp","priority6__1","date4"]) {
+            id text value
+          }
+        }
+      }
+    }
+  }`;
+  const data = await mondayQuery(q, {
+    boardId: CONFIG.MONDAY_BOARD_ID,
+    group: [CONFIG.MONDAY_GROUP_REQUIRED]
+  });
+  return data.boards[0].items_page.items || [];
+}
+
+async function createRequirement(lodge, item, qty, priority, staff, notes, isOther) {
+  const colVals = JSON.stringify({
+    text6__1:          lodge,
+    text60__1:         isOther ? 'Other' : item,
+    text5__1:          isOther ? item : '',
+    numbers_MjiukVMp:  qty,
+    priority6__1:      { index: priority },
+    status:            { index: 0 },
+    date4:             { date: new Date().toISOString().split('T')[0] },
+    dropdown8__1:      { labels: [staff] },
+    text__1:           notes
+  });
+  const q = `mutation($boardId: ID!, $groupId: String!, $name: String!, $vals: JSON!) {
+    create_item(board_id: $boardId, group_id: $groupId, item_name: $name, column_values: $vals) { id }
+  }`;
+  return mondayQuery(q, {
+    boardId: CONFIG.MONDAY_BOARD_ID,
+    groupId: CONFIG.MONDAY_GROUP_REQUIRED,
+    name: `${lodge} – ${isOther ? item : item}`,
+    vals: colVals
+  });
+}
+
+async function markDelivered(itemIds) {
+  const mutations = itemIds.map((id, i) => `
+    m${i}a: change_column_value(board_id: ${CONFIG.MONDAY_BOARD_ID}, item_id: ${id}, column_id: "status", value: "{\"index\": 1}") { id }
+    m${i}b: move_item_to_group(item_id: ${id}, group_id: "${CONFIG.MONDAY_GROUP_CHARGEABLE}") { id }
+  `).join('\n');
+  return mondayQuery(`mutation { ${mutations} }`);
+}
+
+// ─── GUESTY API ──────────────────────────────────────────────────────────────
+async function getGuestyToken() {
+  if (CONFIG.GUESTY_TOKEN) return CONFIG.GUESTY_TOKEN;
+  const r = await fetch('https://auth.guesty.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      grant_type: 'client_credentials',
+      scope: 'open-api:public',
+      client_id: CONFIG.GUESTY_CLIENT_ID,
+      client_secret: CONFIG.GUESTY_CLIENT_SECRET
+    })
+  });
+  const j = await r.json();
+  CONFIG.GUESTY_TOKEN = j.access_token;
+  return CONFIG.GUESTY_TOKEN;
+}
+
+async function fetchDeliveryWindows() {
+  // Returns gaps between check-out and next check-in for each listing today+7 days
+  try {
+    const token = await getGuestyToken();
+    const today = new Date();
+    const end = new Date(today); end.setDate(end.getDate() + 7);
+    const fmt = d => d.toISOString().split('T')[0];
+    const r = await fetch(
+      `https://open-api.guesty.com/v1/reservations?checkIn[$gte]=${fmt(today)}&checkIn[$lte]=${fmt(end)}&status=confirmed&limit=100&fields=listing checkIn checkOut`,
+      { headers: { 'Authorization': `Bearer ${token}`, 'accept': 'application/json' } }
+    );
+    const j = await r.json();
+    return buildWindows(j.results || []);
+  } catch(e) {
+    console.warn('Guesty unavailable:', e.message);
+    return [];
+  }
+}
+
+function buildWindows(reservations) {
+  // Group by listing, find gaps > 1hr between consecutive reservations
+  const byListing = {};
+  reservations.forEach(r => {
+    const name = r.listing?.nickname || r.listing?.title || 'Unknown';
+    if (!byListing[name]) byListing[name] = [];
+    byListing[name].push({ in: new Date(r.checkIn), out: new Date(r.checkOut) });
+  });
+  const windows = [];
+  Object.entries(byListing).forEach(([lodge, stays]) => {
+    stays.sort((a, b) => a.out - b.out);
+    for (let i = 0; i < stays.length - 1; i++) {
+      const gap = (stays[i+1].in - stays[i].out) / 60000; // minutes
+      if (gap >= 60) {
+        windows.push({
+          lodge,
+          checkOut: stays[i].out,
+          nextCheckIn: stays[i+1].in,
+          minutes: Math.round(gap)
+        });
+      }
+    }
+  });
+  return windows.sort((a, b) => a.checkOut - b.checkOut);
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function colVal(item, id) {
+  return item.column_values?.find(c => c.id === id)?.text || '';
+}
+function priorityFromIndex(idx) {
+  const map = { '0': { label: 'Critical', cls: 'critical' }, '1': { label: 'High', cls: 'high' }, '2': { label: 'Medium', cls: 'medium' }, '3': { label: 'Low', cls: 'low' } };
+  return map[idx] || { label: '', cls: '' };
+}
+function fmtDate(d) {
+  if (!d) return '';
+  return new Date(d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short' });
+}
+function fmtTime(d) {
+  return new Date(d).toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
+}
+function toast(msg, type = 'success') {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.className = `toast ${type} show`;
+  setTimeout(() => { el.className = 'toast'; }, 3000);
+}
+function setLoading(yes) { state.loading = yes; }
+
+// ─── VIEWS ───────────────────────────────────────────────────────────────────
+
+// Dashboard
+async function renderDashboard() {
+  const el = document.getElementById('mainContent');
+  el.innerHTML = `<div class="loading"><div class="spinner"></div><div>Loading...</div></div>`;
+
+  let items = [], windows = [];
+  try {
+    if (CONFIG.MONDAY_TOKEN !== 'YOUR_MONDAY_API_TOKEN') {
+      [items, windows] = await Promise.all([fetchAllPending(), fetchDeliveryWindows()]);
+    }
+  } catch(e) { toast('Could not load live data — showing demo mode', 'error'); }
+
+  // Group by lodge
+  const byLodge = {};
+  items.forEach(item => {
+    const lodge = colVal(item, 'text6__1');
+    if (!lodge) return;
+    if (!byLodge[lodge]) byLodge[lodge] = [];
+    byLodge[lodge].push(item);
+  });
+
+  const hasData = Object.keys(byLodge).length > 0;
+
+  const html = `
+    ${windows.length ? `
+      <div class="section-head">Delivery Windows — Next 7 Days</div>
+      ${windows.slice(0, 5).map(w => `
+        <div class="window-card">
+          <div class="window-lodge">${w.lodge}</div>
+          <div class="window-time">🚪 ${fmtDate(w.checkOut)} ${fmtTime(w.checkOut)} → ${fmtTime(w.nextCheckIn)}</div>
+          <div class="window-duration">${w.minutes} min window available</div>
+        </div>
+      `).join('')}
+    ` : CONFIG.GUESTY_CLIENT_ID === 'YOUR_GUESTY_CLIENT_ID' ? `
+      <div class="window-card" style="opacity:.5">
+        <div class="window-lodge" style="color:var(--muted)">Delivery windows</div>
+        <div class="window-time" style="color:var(--muted)">Add Guesty credentials to see windows</div>
+      </div>
+    ` : ''}
+
+    <div class="section-head">Outstanding Requirements${hasData ? ` — ${items.length} items` : ''}</div>
+
+    ${hasData ? Object.entries(byLodge).sort((a, b) => {
+      const maxP = arr => Math.min(...arr.map(item => {
+        const v = colVal(item, 'priority6__1');
+        return v === 'Critical' ? 0 : v === 'High' ? 1 : v === 'Medium' ? 2 : 3;
+      }));
+      return maxP(a[1]) - maxP(b[1]);
+    }).map(([lodge, lodgeItems]) => {
+      const hasCrit = lodgeItems.some(i => colVal(i, 'priority6__1') === 'Critical');
+      const hasHigh = lodgeItems.some(i => colVal(i, 'priority6__1') === 'High');
+      const cls = hasCrit ? 'has-critical' : hasHigh ? 'has-high' : 'ok';
+      return `
+        <div class="lodge-card ${cls}" onclick="goDeliver('${lodge}')">
+          <div>
+            <div class="lodge-name">${lodge}</div>
+            <div class="lodge-meta">${lodgeItems.map(i => {
+              const sup = colVal(i, 'text60__1') || colVal(i, 'text5__1') || i.name;
+              return sup;
+            }).slice(0,3).join(', ')}${lodgeItems.length > 3 ? '…' : ''}</div>
+          </div>
+          <div class="lodge-count">
+            <div class="lodge-count-num">${lodgeItems.length}</div>
+            <div class="lodge-count-label">item${lodgeItems.length !== 1 ? 's' : ''}</div>
+          </div>
+        </div>
+      `;
+    }).join('') : `
+      <div class="empty">
+        <div class="empty-icon">✅</div>
+        ${CONFIG.MONDAY_TOKEN === 'YOUR_MONDAY_API_TOKEN' ? 'Add your Monday.com API token in CONFIG to see live data.' : 'No outstanding requirements. All lodges are stocked up!'}
+      </div>
+    `}
+  `;
+  el.innerHTML = html;
+}
+
+// Log requirement form
+function renderLog() {
+  const el = document.getElementById('mainContent');
+  let itemCount = 1;
+
+  const lodgeOpts = LODGES.map(l =>
+    `<option value="${l}" ${state.lodge === l ? 'selected' : ''}>${l}</option>`
+  ).join('');
+  const staffOpts = STAFF.map(s => `<option value="${s}">${s}</option>`).join('');
+
+  el.innerHTML = `
+    <div class="field">
+      <label>Lodge</label>
+      <select id="logLodge" onchange="state.lodge=this.value;document.getElementById('headerLodge').textContent=this.value">
+        <option value="">Select lodge…</option>
+        ${lodgeOpts}
+      </select>
+    </div>
+
+    <div class="field">
+      <label>Reported by</label>
+      <select id="logStaff">
+        <option value="">Select staff member…</option>
+        ${staffOpts}
+      </select>
+    </div>
+
+    <div class="section-head">Items Required</div>
+    <div id="itemRows">${buildItemRow(1)}</div>
+    <button class="btn-add" onclick="addItemRow()">+ Add another item</button>
+
+    <div class="field" style="margin-top:16px">
+      <label>Additional notes (optional)</label>
+      <textarea id="logNotes" placeholder="Any extra context…"></textarea>
+    </div>
+
+    <button class="btn btn-primary" style="margin-top:4px" onclick="submitLog()">
+      Submit Requirements
+    </button>
+  `;
+
+  // Pre-fill lodge from URL param
+  if (state.lodge) document.getElementById('logLodge').value = state.lodge;
+}
+
+function buildItemRow(num) {
+  const itemOpts = SUPPLY_ITEMS.map(s =>
+    `<option value="${s}">${s}</option>`
+  ).join('');
+  const prioOpts = PRIORITY_OPTS.map(p =>
+    `<option value="${p.value}">${p.label}</option>`
+  ).join('');
+  return `
+    <div class="item-row" id="row-${num}">
+      <div class="item-row-num">Item ${num}</div>
+      ${num > 1 ? `<button class="item-remove" onclick="removeRow(${num})">×</button>` : ''}
+      <div class="item-row-grid">
+        <div>
+          <label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Supply Item</label>
+          <select id="item-${num}" onchange="checkOther(${num})" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;padding:10px 28px 10px 10px;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27%3E%3Cpath fill=%27%238892a4%27 d=%27M6 8L1 3h10z%27/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 10px center;outline:none">
+            <option value="">Select item…</option>
+            ${itemOpts}
+          </select>
+        </div>
+        <div>
+          <label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Qty</label>
+          <input type="number" id="qty-${num}" value="1" min="1" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:15px;padding:10px;outline:none;text-align:center">
+        </div>
+      </div>
+      <div>
+        <label style="font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px;display:block;margin-bottom:4px">Priority</label>
+        <select id="prio-${num}" style="width:100%;background:var(--bg);border:1px solid var(--border);border-radius:var(--radius-sm);color:var(--text);font-size:14px;padding:10px 28px 10px 10px;appearance:none;-webkit-appearance:none;background-image:url('data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2712%27 height=%2712%27 viewBox=%270 0 12 12%27%3E%3Cpath fill=%27%238892a4%27 d=%27M6 8L1 3h10z%27/%3E%3C/svg%3E');background-repeat:no-repeat;background-position:right 10px center;outline:none">
+          ${prioOpts}
+        </select>
+      </div>
+      <div class="other-warning" id="other-${num}">
+        ⚠️ Please check the list above — "Other" should only be used if the item genuinely isn't there. If you use Other, describe it clearly in the notes below.
+      </div>
+    </div>
+  `;
+}
+
+let rowCounter = 1;
+function addItemRow() {
+  rowCounter++;
+  document.getElementById('itemRows').insertAdjacentHTML('beforeend', buildItemRow(rowCounter));
+}
+function removeRow(num) {
+  document.getElementById(`row-${num}`)?.remove();
+}
+function checkOther(num) {
+  const val = document.getElementById(`item-${num}`)?.value;
+  const warn = document.getElementById(`other-${num}`);
+  if (warn) warn.className = `other-warning ${val === 'Other (see notes below)' ? 'show' : ''}`;
+}
+
+async function submitLog() {
+  const lodge = document.getElementById('logLodge').value;
+  const staff = document.getElementById('logStaff').value;
+  const notes = document.getElementById('logNotes').value;
+
+  if (!lodge) { toast('Please select a lodge', 'error'); return; }
+  if (!staff) { toast('Please select your name', 'error'); return; }
+
+  const rows = document.querySelectorAll('.item-row');
+  const items = [];
+  let valid = true;
+  rows.forEach(row => {
+    const num = row.id.replace('row-', '');
+    const item = document.getElementById(`item-${num}`)?.value;
+    const qty  = parseInt(document.getElementById(`qty-${num}`)?.value) || 1;
+    const prio = parseInt(document.getElementById(`prio-${num}`)?.value);
+    if (!item) { valid = false; return; }
+    items.push({ item, qty, prio, isOther: item === 'Other (see notes below)' });
+  });
+
+  if (!valid || items.length === 0) { toast('Please select at least one item', 'error'); return; }
+
+  const btn = document.querySelector('.btn-primary');
+  btn.innerHTML = '<span class="spinner"></span>Submitting…';
+  btn.disabled = true;
+
+  try {
+    if (CONFIG.MONDAY_TOKEN !== 'YOUR_MONDAY_API_TOKEN') {
+      await Promise.all(items.map(i =>
+        createRequirement(lodge, i.item, i.qty, i.prio, staff, notes, i.isOther)
+      ));
+    }
+    toast(`✅ ${items.length} requirement${items.length > 1 ? 's' : ''} logged for ${lodge}`);
+    setTimeout(() => showView('dashboard'), 1200);
+  } catch(e) {
+    toast('Failed to submit — check your API token', 'error');
+    btn.innerHTML = 'Submit Requirements';
+    btn.disabled = false;
+  }
+}
+
+// Delivery view
+async function renderDeliver() {
+  const el = document.getElementById('mainContent');
+
+  const lodgeOpts = LODGES.map(l =>
+    `<option value="${l}" ${state.lodge === l ? 'selected' : ''}>${l}</option>`
+  ).join('');
+
+  el.innerHTML = `
+    <div class="field">
+      <label>Lodge</label>
+      <select id="deliverLodge" onchange="loadDeliverItems(this.value)">
+        <option value="">Select lodge to deliver to…</option>
+        ${lodgeOpts}
+      </select>
+    </div>
+    <div id="deliverContent">
+      <div class="empty"><div class="empty-icon">🏠</div>Select a lodge to see requirements</div>
+    </div>
+  `;
+
+  if (state.lodge) {
+    document.getElementById('deliverLodge').value = state.lodge;
+    await loadDeliverItems(state.lodge);
+  }
+}
+
+async function loadDeliverItems(lodge) {
+  state.lodge = lodge;
+  document.getElementById('headerLodge').textContent = lodge;
+  const el = document.getElementById('deliverContent');
+  if (!lodge) { el.innerHTML = ''; return; }
+
+  el.innerHTML = `<div class="loading"><div class="spinner"></div><div>Loading requirements…</div></div>`;
+
+  let items = [];
+  try {
+    if (CONFIG.MONDAY_TOKEN !== 'YOUR_MONDAY_API_TOKEN') {
+      items = await fetchPendingItems(lodge);
+    } else {
+      // Demo items
+      items = [
+        { id: '1', name: 'Demo item', column_values: [
+          { id: 'text60__1', text: 'Tea Bags' }, { id: 'numbers_MjiukVMp', text: '2' },
+          { id: 'priority6__1', text: 'High' }, { id: 'date4', text: '2026-04-15' }, { id: 'text__1', text: '' }
+        ]},
+        { id: '2', name: 'Demo item 2', column_values: [
+          { id: 'text60__1', text: 'Coffee Pods' }, { id: 'numbers_MjiukVMp', text: '1' },
+          { id: 'priority6__1', text: 'Medium' }, { id: 'date4', text: '2026-04-14' }, { id: 'text__1', text: '' }
+        ]}
+      ];
+    }
+  } catch(e) { toast('Could not load items', 'error'); }
+
+  state.pendingItems = items;
+
+  if (items.length === 0) {
+    el.innerHTML = `<div class="empty"><div class="empty-icon">✅</div>No outstanding requirements for ${lodge}</div>`;
+    return;
+  }
+
+  el.innerHTML = `
+    <div class="section-head">${items.length} item${items.length !== 1 ? 's' : ''} required</div>
+    <div id="checkList">
+      ${items.map(item => {
+        const supply = colVal(item, 'text60__1') || colVal(item, 'text5__1') || item.name;
+        const other  = colVal(item, 'text5__1');
+        const qty    = colVal(item, 'numbers_MjiukVMp');
+        const prioTxt = colVal(item, 'priority6__1');
+        const dt     = colVal(item, 'date4');
+        const notes  = colVal(item, 'text__1');
+        const prio   = prioTxt === 'Critical' ? 'critical' : prioTxt === 'High' ? 'high' : prioTxt === 'Medium' ? 'medium' : 'low';
+        return `
+          <div class="check-item" id="ci-${item.id}" onclick="toggleCheck('${item.id}')">
+            <input type="checkbox" id="chk-${item.id}" onclick="event.stopPropagation();toggleCheck('${item.id}')">
+            <div class="check-item-detail">
+              <div class="check-item-name">${supply}${other && supply !== other ? ` — ${other}` : ''}</div>
+              <div class="check-item-meta">
+                Qty: <strong>${qty || 1}</strong>
+                &nbsp;·&nbsp;<span class="badge badge-${prio}">${prioTxt || 'Low'}</span>
+                &nbsp;·&nbsp;${fmtDate(dt)}
+                ${notes ? `<br><span style="color:var(--muted);font-style:italic">${notes}</span>` : ''}
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('')}
+    </div>
+    <div style="margin-top:16px;display:flex;gap:8px">
+      <button class="btn btn-outline btn-sm" onclick="checkAll()">Select All</button>
+      <button class="btn btn-outline btn-sm" onclick="uncheckAll()">Clear</button>
+    </div>
+    <button class="btn btn-success" style="margin-top:12px" onclick="confirmDelivery()">
+      ✅ Confirm Delivery
+    </button>
+  `;
+}
+
+function toggleCheck(id) {
+  const chk = document.getElementById(`chk-${id}`);
+  const row = document.getElementById(`ci-${id}`);
+  chk.checked = !chk.checked;
+  row.classList.toggle('checked', chk.checked);
+}
+function checkAll() {
+  state.pendingItems.forEach(i => {
+    const chk = document.getElementById(`chk-${i.id}`);
+    const row = document.getElementById(`ci-${i.id}`);
+    if (chk) { chk.checked = true; row.classList.add('checked'); }
+  });
+}
+function uncheckAll() {
+  state.pendingItems.forEach(i => {
+    const chk = document.getElementById(`chk-${i.id}`);
+    const row = document.getElementById(`ci-${i.id}`);
+    if (chk) { chk.checked = false; row.classList.remove('checked'); }
+  });
+}
+
+async function confirmDelivery() {
+  const checked = state.pendingItems.filter(i => {
+    const chk = document.getElementById(`chk-${i.id}`);
+    return chk?.checked;
+  });
+  if (checked.length === 0) { toast('Select at least one item to mark delivered', 'error'); return; }
+
+  const btn = document.querySelector('.btn-success');
+  btn.innerHTML = '<span class="spinner"></span>Confirming…';
+  btn.disabled = true;
+
+  try {
+    if (CONFIG.MONDAY_TOKEN !== 'YOUR_MONDAY_API_TOKEN') {
+      await markDelivered(checked.map(i => i.id));
+    }
+    toast(`✅ ${checked.length} item${checked.length > 1 ? 's' : ''} marked delivered & chargeable`);
+    setTimeout(() => { state.lodge = document.getElementById('deliverLodge').value; loadDeliverItems(state.lodge); }, 1200);
+  } catch(e) {
+    toast('Failed to update — check API token', 'error');
+    btn.innerHTML = '✅ Confirm Delivery';
+    btn.disabled = false;
+  }
+}
+
+// ─── ROUTING ──────────────────────────────────────────────────────────────────
+function goDeliver(lodge) {
+  state.lodge = lodge;
+  showView('deliver');
+}
+
+function showView(v) {
+  state.view = v;
+  document.getElementById('headerLodge').textContent = state.lodge || '';
+  ['dashboard','log','deliver'].forEach(n => {
+    document.getElementById(`nav-${n}`).className = `nav-btn${v === n ? ' active' : ''}`;
+  });
+  if (v === 'dashboard') renderDashboard();
+  else if (v === 'log')   renderLog();
+  else if (v === 'deliver') renderDeliver();
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+showView('dashboard');
+</script>
+</body>
+</html>

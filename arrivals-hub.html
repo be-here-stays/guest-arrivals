@@ -3,8 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Be Here — Arrivals Hub</title>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+  <title>Be Here — Operations Hub</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -26,47 +25,23 @@
     header { background: var(--dark); color: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
     .header-logo svg { display: block; width: 130px; height: auto; }
     .header-sub { font-size: 11px; color: var(--cream); opacity: 0.6; margin-top: 4px; }
-    header .subtitle { font-size: 13px; opacity: 0.65; margin-top: 2px; color: var(--cream); }
     .header-right { display: flex; align-items: center; gap: 12px; }
 
-    /* API bar */
     .api-bar { background: #1e2522; padding: 10px 32px; display: flex; align-items: center; gap: 12px; }
     .api-bar label { font-size: 12px; color: rgba(255,255,255,0.7); white-space: nowrap; }
-    .api-bar input { flex: 1; max-width: 340px; padding: 6px 10px; border: 1px solid rgba(255,255,255,0.2); border-radius: 6px; background: rgba(255,255,255,0.1); color: #fff; font-size: 12px; font-family: monospace; }
-    .api-bar input::placeholder { color: rgba(255,255,255,0.4); }
-    .api-bar input:focus { outline: none; border-color: rgba(255,255,255,0.5); }
     .load-btn { padding: 6px 16px; background: var(--cream); color: var(--dark); border: none; border-radius: 6px; font-size: 12px; font-weight: 600; cursor: pointer; white-space: nowrap; font-family: inherit; }
     .load-btn:hover { background: #f3e3c3cc; }
     .load-btn:disabled { opacity: 0.5; cursor: not-allowed; }
     .api-status { font-size: 12px; color: rgba(255,255,255,0.8); }
 
-    /* Tabs */
     .tabs { background: var(--surface); border-bottom: 2px solid var(--border); padding: 0 32px; display: flex; gap: 0; }
     .tab { padding: 14px 20px; font-size: 14px; font-weight: 500; color: var(--sage-mid); cursor: pointer; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.15s; }
     .tab:hover { color: var(--sage); }
     .tab.active { color: var(--dark); border-bottom-color: var(--gold); font-weight: 700; }
 
-    /* Content */
     .content { padding: 28px 32px; display: none; }
     .content.active { display: block; }
 
-    /* Stat cards */
-    .stat-row { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
-    .stat-card { background: var(--surface); border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(39,47,46,0.08); }
-    .stat-card .label { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--sage-mid); margin-bottom: 8px; }
-    .stat-card .value { font-size: 32px; font-weight: 700; color: var(--text); letter-spacing: -1px; }
-    .stat-card .sub { font-size: 13px; color: var(--sage-mid); margin-top: 4px; }
-    .stat-card.green .value { color: var(--sage); }
-    .stat-card.orange .value { color: #a86c00; }
-    .stat-card.red .value { color: #8B2020; }
-
-    /* Charts */
-    .chart-row { display: grid; grid-template-columns: 2fr 1fr; gap: 16px; margin-bottom: 24px; }
-    .chart-card { background: var(--surface); border-radius: 12px; padding: 20px 24px; box-shadow: 0 1px 3px rgba(39,47,46,0.08); }
-    .chart-card h3 { font-size: 13px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; color: var(--sage-mid); margin-bottom: 16px; }
-    .chart-card canvas { max-height: 260px; }
-
-    /* Laundry tab */
     .laundry-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 20px; }
     .laundry-header h2 { font-size: 20px; font-weight: 600; color: var(--text); }
     .laundry-header .date-info { font-size: 14px; color: var(--sage-mid); }
@@ -100,14 +75,11 @@
     .bed-total .count { font-size: 24px; font-weight: 700; color: var(--sage); }
     .bed-total .type { font-size: 12px; color: var(--text); margin-top: 2px; }
 
-    /* Empty state */
     .empty { text-align: center; padding: 60px 20px; color: var(--sage-mid); }
     .empty p { font-size: 15px; }
-
-    /* Loading */
     .loading { text-align: center; padding: 40px; color: var(--sage-mid); font-size: 14px; }
 
-    /* ── Changeovers tab ── */
+    /* Changeovers */
     .co-header { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; margin-bottom: 16px; flex-wrap: wrap; }
     .co-title { font-size: 20px; font-weight: 700; color: var(--text); }
     .co-subtitle { font-size: 13px; color: var(--sage-mid); margin-top: 3px; }
@@ -117,7 +89,6 @@
     .co-refresh-btn:hover { border-color: var(--dark); color: var(--dark); }
     .co-log-btn { padding: 7px 14px; background: var(--dark); color: var(--cream); border-radius: 8px; font-size: 13px; font-weight: 700; text-decoration: none; }
     .co-log-btn:hover { background: var(--sage); }
-
     .co-legend { display: flex; align-items: center; gap: 16px; flex-wrap: wrap; background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 10px 16px; margin-bottom: 20px; font-size: 12px; }
     .co-legend-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--sage-mid); }
     .co-key-item { display: flex; align-items: center; gap: 5px; color: var(--text); }
@@ -127,7 +98,6 @@
     .co-blocked { color: var(--gold); }
     .co-tasks-key { display: flex; gap: 12px; margin-left: auto; color: var(--sage-mid); font-size: 12px; }
     .co-tasks-key span { white-space: nowrap; }
-
     .co-table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(39,47,46,0.08); }
     .co-table thead th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--sage-mid); padding: 12px 14px 10px; border-bottom: 2px solid var(--border); }
     .co-table thead th.co-th-task { text-align: center; width: 64px; }
@@ -137,9 +107,9 @@
     .co-table tbody tr:hover { background: #f7f5f0; }
     .co-table td { padding: 13px 14px; vertical-align: middle; }
     .co-table tbody tr td:first-child { border-left: 4px solid transparent; padding-left: 20px; }
-    .co-table tbody tr.co-all   td:first-child { border-left-color: var(--sage); }
-    .co-table tbody tr.co-part  td:first-child { border-left-color: var(--gold); }
-    .co-table tbody tr.co-none  td:first-child { border-left-color: #B98B73; }
+    .co-table tbody tr.co-all td:first-child { border-left-color: var(--sage); }
+    .co-table tbody tr.co-part td:first-child { border-left-color: var(--gold); }
+    .co-table tbody tr.co-none td:first-child { border-left-color: #B98B73; }
     .co-prop-name { font-size: 15px; font-weight: 700; }
     .co-guest-sub { font-size: 12px; color: var(--sage-mid); margin-top: 2px; }
     .co-task-cell { text-align: center; }
@@ -158,6 +128,122 @@
     .co-prog-lbl { font-size: 12px; font-weight: 700; color: var(--sage-mid); min-width: 32px; text-align: right; }
     .co-empty { text-align: center; padding: 50px 20px; color: var(--sage-mid); font-size: 15px; }
     .co-sum-dot { display: inline-block; width: 9px; height: 9px; border-radius: 50%; margin-right: 4px; }
+
+    /* Bed Config */
+    .bc-alert { background: #fdf0ec; border: 1.5px solid #B98B73; border-radius: 10px; padding: 14px 20px; margin-bottom: 20px; font-size: 14px; color: #6b2a10; }
+    .bc-alert.bc-alert-ok { background: #eaede4; border-color: var(--sage); color: #2d3b25; }
+    .bc-summary-row { display: flex; gap: 12px; margin-bottom: 24px; flex-wrap: wrap; }
+    .bc-stat { background: var(--surface); border-radius: 10px; padding: 16px 20px; flex: 1; min-width: 100px; box-shadow: 0 1px 3px rgba(39,47,46,0.07); }
+    .bc-stat-num { font-size: 28px; font-weight: 700; letter-spacing: -1px; color: var(--text); }
+    .bc-stat-lbl { font-size: 11px; color: var(--sage-mid); margin-top: 2px; text-transform: uppercase; letter-spacing: 0.4px; }
+    .bc-stat-urgent .bc-stat-num { color: #8B2020; }
+    .bc-stat-ok .bc-stat-num { color: var(--sage); }
+    .bc-table { width: 100%; border-collapse: collapse; background: var(--surface); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(39,47,46,0.08); }
+    .bc-table thead th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; color: var(--sage-mid); padding: 12px 16px 10px; border-bottom: 2px solid var(--border); }
+    .bc-table tbody tr { border-bottom: 1px solid #eae8e2; }
+    .bc-table tbody tr:last-child { border-bottom: none; }
+    .bc-table tbody tr td:first-child { border-left: 4px solid transparent; }
+    tr.bc-urgent td:first-child { border-left-color: #B98B73; }
+    tr.bc-confirmed td:first-child { border-left-color: var(--sage); }
+    tr.bc-fixed td:first-child { border-left-color: var(--border); }
+    .bc-table td { padding: 12px 16px; vertical-align: top; }
+    .bc-date { font-size: 12px; color: var(--sage-mid); white-space: nowrap; width: 90px; }
+    .bc-prop strong { font-size: 14px; }
+    .bc-guest { font-size: 12px; color: var(--sage-mid); margin-top: 2px; }
+    .bc-party { font-size: 13px; color: var(--text); white-space: nowrap; }
+    .bc-badge { display: inline-block; font-size: 12px; font-weight: 600; padding: 3px 10px; border-radius: 10px; }
+    .bc-badge-urgent { background: #fdf0ec; color: #7a2a10; }
+    .bc-badge-ok { background: #eaede4; color: var(--sage); }
+    .bc-badge-fixed { background: var(--bg); color: var(--sage-mid); }
+    .bc-opts { font-size: 11px; color: #aaa; margin-top: 4px; }
+
+    /* ═══════════════════════════════
+       SUPPLIES TAB
+    ═══════════════════════════════ */
+    .sup-subnav { display: flex; background: var(--bg); border-radius: 10px; padding: 3px; margin-bottom: 24px; gap: 2px; }
+    .sup-subnav-btn { flex: 1; padding: 9px 12px; border: none; background: none; border-radius: 8px; font-size: 13px; font-weight: 600; color: var(--sage-mid); cursor: pointer; font-family: inherit; transition: all .15s; }
+    .sup-subnav-btn:hover { color: var(--dark); }
+    .sup-subnav-btn.active { background: var(--surface); color: var(--dark); box-shadow: 0 1px 3px rgba(39,47,46,.1); }
+
+    .sup-stat-row { display: grid; grid-template-columns: repeat(3,1fr); gap: 14px; margin-bottom: 22px; }
+    .sup-stat { background: var(--surface); border-radius: 10px; padding: 16px 20px; box-shadow: 0 1px 3px rgba(39,47,46,.07); }
+    .sup-stat-num { font-size: 30px; font-weight: 700; letter-spacing: -1px; color: var(--text); }
+    .sup-stat-lbl { font-size: 11px; color: var(--sage-mid); text-transform: uppercase; letter-spacing: .4px; margin-top: 2px; }
+    .sup-stat-red .sup-stat-num { color: #8B2020; }
+    .sup-stat-amber .sup-stat-num { color: #a86c00; }
+    .sup-stat-green .sup-stat-num { color: var(--sage); }
+
+    .sup-section-head { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--sage-mid); margin: 18px 0 8px; }
+
+    .sup-lodge-card { background: var(--surface); border-radius: 10px; padding: 14px 18px; box-shadow: 0 1px 3px rgba(39,47,46,.07); margin-bottom: 8px; display: flex; align-items: center; justify-content: space-between; cursor: pointer; border-left: 4px solid var(--border); transition: all .15s; }
+    .sup-lodge-card:hover { box-shadow: 0 2px 8px rgba(39,47,46,.12); }
+    .sup-lodge-card.critical { border-left-color: #8B2020; }
+    .sup-lodge-card.high { border-left-color: #a86c00; }
+    .sup-lodge-card.ok { border-left-color: var(--sage); }
+    .sup-lodge-name { font-size: 14px; font-weight: 700; color: var(--text); }
+    .sup-lodge-preview { font-size: 12px; color: var(--sage-mid); margin-top: 2px; }
+    .sup-lodge-arrival { font-size: 11px; color: #a86c00; font-weight: 600; margin-top: 4px; }
+    .sup-lodge-tags { display: flex; gap: 6px; margin-top: 5px; flex-wrap: wrap; }
+    .sup-lodge-tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 7px; border-radius: 8px; text-transform: uppercase; letter-spacing: .3px; }
+    .sup-lodge-tag-critical { background: #fdf0ec; color: #8B2020; }
+    .sup-lodge-tag-overdue  { background: #fdf5e8; color: #a86c00; }
+    .sup-banner { border-radius: 10px; padding: 12px 16px; margin-bottom: 10px; font-size: 13px; }
+    .sup-banner-critical { background: #fdf0ec; border: 1.5px solid #c0563a; color: #8B2020; }
+    .sup-banner-overdue  { background: #fdf5e8; border: 1.5px solid #c8a060; color: #a86c00; }
+    .sup-lodge-count { text-align: right; flex-shrink: 0; margin-left: 12px; }
+    .sup-lodge-count-num { font-size: 26px; font-weight: 700; color: var(--text); letter-spacing: -1px; }
+    .sup-lodge-count-lbl { font-size: 10px; color: var(--sage-mid); text-transform: uppercase; }
+
+    .sup-badge { display: inline-block; padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; letter-spacing: .3px; text-transform: uppercase; }
+    .sup-badge-critical { background: #fdf0ec; color: #8B2020; }
+    .sup-badge-high { background: #fdf5e8; color: #a86c00; }
+    .sup-badge-medium { background: #f5f2d0; color: #7a6b00; }
+    .sup-badge-low { background: #eaede4; color: var(--sage); }
+
+    .sup-form-wrap { max-width: 720px; }
+    .sup-field { margin-bottom: 14px; }
+    .sup-field label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--sage-mid); margin-bottom: 6px; }
+    .sup-field select, .sup-field input, .sup-field textarea {
+      width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 8px;
+      background: var(--surface); color: var(--text); font-size: 14px; font-family: inherit;
+      outline: none; transition: border-color .15s;
+    }
+    .sup-field select:focus, .sup-field input:focus, .sup-field textarea:focus { border-color: var(--gold); }
+    .sup-field textarea { resize: vertical; min-height: 60px; }
+
+    .sup-item-row { background: var(--bg); border: 1.5px solid var(--border); border-radius: 10px; padding: 14px; margin-bottom: 8px; position: relative; }
+    .sup-item-num { font-size: 11px; font-weight: 700; color: var(--sage-mid); text-transform: uppercase; letter-spacing: .5px; margin-bottom: 10px; }
+    .sup-item-grid { display: grid; grid-template-columns: 1fr 80px; gap: 10px; margin-bottom: 8px; }
+    .sup-item-remove { position: absolute; top: 12px; right: 12px; width: 22px; height: 22px; border-radius: 50%; background: #8B2020; border: none; color: #fff; font-size: 14px; cursor: pointer; display: flex; align-items: center; justify-content: center; line-height: 1; }
+    .sup-other-warn { background: #fdf5e8; border: 1.5px solid #c8a060; border-radius: 8px; padding: 8px 12px; font-size: 12px; color: #7a4a10; margin-top: 8px; display: none; }
+    .sup-other-warn.show { display: block; }
+
+    .sup-btn { display: block; width: 100%; padding: 11px 16px; border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; transition: opacity .15s; }
+    .sup-btn:hover { opacity: .88; }
+    .sup-btn:disabled { opacity: .5; cursor: not-allowed; }
+    .sup-btn-primary { background: var(--dark); color: var(--cream); }
+    .sup-btn-success { background: var(--sage); color: #fff; }
+    .sup-btn-outline { background: transparent; border: 1.5px solid var(--border); color: var(--sage); display: inline-block; width: auto; padding: 7px 14px; font-size: 13px; cursor: pointer; font-family: inherit; border-radius: 8px; }
+    .sup-btn-outline:hover { border-color: var(--sage); }
+    .sup-btn-add { background: var(--surface); border: 1.5px dashed var(--sage-mid); color: var(--sage); width: 100%; padding: 10px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; text-align: center; font-family: inherit; transition: border-color .15s; margin-top: 4px; }
+    .sup-btn-add:hover { border-color: var(--sage); }
+
+    .sup-check-item { background: var(--surface); border: 1.5px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 6px; display: flex; align-items: flex-start; gap: 12px; cursor: pointer; transition: border-color .15s; }
+    .sup-check-item:hover { border-color: var(--sage-mid); }
+    .sup-check-item.checked { opacity: .5; border-color: var(--sage); }
+    .sup-check-item input[type="checkbox"] { width: 18px; height: 18px; accent-color: var(--sage); flex-shrink: 0; margin-top: 2px; cursor: pointer; }
+    .sup-check-item-name { font-size: 14px; font-weight: 600; color: var(--text); }
+    .sup-check-item-meta { font-size: 12px; color: var(--sage-mid); margin-top: 3px; }
+
+    .sup-empty { text-align: center; padding: 48px 20px; color: var(--sage-mid); font-size: 14px; }
+
+    .sup-spinner { display: inline-block; width: 18px; height: 18px; border: 2px solid rgba(100,105,85,.25); border-top-color: var(--sage); border-radius: 50%; animation: supSpin .7s linear infinite; vertical-align: middle; margin-right: 6px; }
+    @keyframes supSpin { to { transform: rotate(360deg); } }
+
+    .sup-toast { position: fixed; bottom: 28px; left: 50%; transform: translateX(-50%) translateY(80px); background: var(--dark); color: var(--cream); border-radius: 10px; padding: 12px 22px; font-size: 13px; font-weight: 600; z-index: 9999; transition: transform .3s ease; white-space: nowrap; box-shadow: 0 8px 24px rgba(39,47,46,.3); pointer-events: none; }
+    .sup-toast.show { transform: translateX(-50%) translateY(0); }
+    .sup-toast.success { background: var(--sage); }
+    .sup-toast.error { background: #8B2020; }
   </style>
 </head>
 <body>
@@ -182,7 +268,7 @@
       <path d="M205.7931,32.652c-1.728,3.4302-4.895,5.411-8.639,5.411-5.567,0-9.647-4.5414-9.647-10.822,0-7.0536,5.04-12.1264,10.991-12.1264,4.511,0,7.391,2.8505,7.391,7.0053,0,.8213-.096,1.8842-.24,2.5606l-14.446-.1933c-.048.1933-.048.9663-.048,1.1595,0,5.4593,3.168,9.3726,7.535,9.3726,2.208,0,4.415-.8696,6.143-2.947l.96.5797ZM202.0501,22.9895c.24-3.7683-1.536-6.1839-4.416-6.1839-2.64,0-5.471,2.319-6.239,6.2323,0,0,10.847-.0484,10.655-.0484Z" style="fill:#fff;"/>
       <path d="M215.0001,35.1159c0,1.546-1.199,2.9954-2.927,2.9954-1.776,0-3.024-1.4494-3.024-2.9954s1.248-2.8987,3.024-2.8987c1.728,0,2.927,1.3527,2.927,2.8987Z" style="fill:#fff;"/>
     </svg>
-    <div class="header-sub">Arrivals Hub · Live from Monday.com</div>
+    <div class="header-sub">Operations Hub · Live from Monday.com</div>
   </div>
   <div class="header-right">
     <span id="lastLoaded" style="font-size:12px;opacity:0.55;color:#F3E3C3;"></span>
@@ -195,20 +281,14 @@
 </div>
 
 <div class="tabs">
-  <div class="tab active" onclick="switchTab('overview', this)">📊 Arrivals Overview</div>
+  <div class="tab active" onclick="switchTab('changeovers', this)">🏠 Changeovers</div>
   <div class="tab" onclick="switchTab('laundry', this)">🛏 Laundry Planner</div>
-  <div class="tab" onclick="switchTab('changeovers', this)">🏠 Changeovers</div>
-</div>
-
-<!-- OVERVIEW TAB -->
-<div class="content active" id="tab-overview">
-  <div id="overviewContent">
-    <div class="empty"><p>Loading…</p></div>
-  </div>
+  <div class="tab" onclick="switchTab('overview', this)">📋 Bed Configs (7 days)</div>
+  <div class="tab" onclick="switchTab('supplies', this)">📦 Supplies</div>
 </div>
 
 <!-- CHANGEOVERS TAB -->
-<div class="content" id="tab-changeovers">
+<div class="content active" id="tab-changeovers">
   <div class="co-header">
     <div>
       <h2 class="co-title">Today's Changeovers</h2>
@@ -230,9 +310,12 @@
       <span>🧹 Clean</span><span>🚐 Laundry</span><span>🛒 Restock</span><span>✅ Check</span><span>🌿 Outside</span>
     </span>
   </div>
-  <div id="changeoversContent">
-    <div class="empty"><p>Loading…</p></div>
-  </div>
+  <div id="changeoversContent"><div class="empty"><p>Loading…</p></div></div>
+</div>
+
+<!-- BED CONFIGS TAB -->
+<div class="content" id="tab-overview">
+  <div id="overviewContent"><div class="empty"><p>Loading…</p></div></div>
 </div>
 
 <!-- LAUNDRY TAB -->
@@ -248,39 +331,44 @@
       <button onclick="changeDay(1)">▶</button>
     </div>
   </div>
-  <div id="laundryContent">
-    <div class="empty"><p>Loading…</p></div>
-  </div>
+  <div id="laundryContent"><div class="empty"><p>Loading…</p></div></div>
 </div>
 
+<!-- SUPPLIES TAB -->
+<div class="content" id="tab-supplies">
+  <div class="sup-subnav">
+    <button class="sup-subnav-btn active" id="supnav-dashboard" onclick="showSuppliesView('dashboard')">📋 Overview</button>
+    <button class="sup-subnav-btn" id="supnav-log" onclick="showSuppliesView('log')">✏️ Log Needs</button>
+    <button class="sup-subnav-btn" id="supnav-deliver" onclick="showSuppliesView('deliver')">✅ Deliver</button>
+  </div>
+  <div id="suppliesContent"><div class="sup-empty">Loading…</div></div>
+</div>
+
+<div class="sup-toast" id="supToast"></div>
+
 <script>
-const BOARD_ID = '5094453064';
+const BOARD_ID           = '5094453064';
 const PROP_CONFIG_BOARD_ID = '5094466278';
 
-// ── READ-ONLY API TOKEN ──
-// Paste the Be Here viewer account's Monday.com API token here.
-// Use a dedicated Monday.com user with Viewer-only access to the two boards above.
+// This token already has write:me scope — it will work for supplies mutations too.
+// If you want to restrict the arrivals viewer to read-only, create a separate
+// SUP_WRITE_TOKEN here pointing to a member-level token with access to board 1615688857.
 const MONDAY_API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NTg1MTIxMiwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTVUMDg6NTM6MTkuMzQxWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.AnJa58nVNbSv1Ydgf8BVmIBY4zoN4rOgl7IAKs51RtA';
-const STATUS = { '0': 'Sent', '1': 'Received', '2': 'Pending', 'none': 'Not Set' };
-const STATUS_CLASS = { '0': 'form-sent', '1': 'form-received', '2': 'form-pending', 'none': '' };
-const BADGE_CLASS = { '0': 'status-sent', '1': 'status-received', '2': 'status-pending', 'none': 'status-none' };
-const DAYS = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
-const DAYS_SHORT = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
+const SUP_WRITE_TOKEN  = MONDAY_API_TOKEN; // override here if needed
 
-let allItems = [];
+const STATUS       = { '0': 'Sent', '1': 'Received', '2': 'Pending', 'none': 'Not Set' };
+const STATUS_CLASS = { '0': 'form-sent', '1': 'form-received', '2': 'form-pending', 'none': '' };
+const BADGE_CLASS  = { '0': 'status-sent', '1': 'status-received', '2': 'status-pending', 'none': 'status-none' };
+const DAYS         = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+let allItems    = [];
 let propConfigs = {};
 let currentDate = null;
-let dowChart = null;
-let statusChart = null;
 
 function formatBeds(str) {
   if (!str) return 'Not specified';
-  // Strip "Fixed - no choice needed" and similar placeholder text
-  if (/fixed\s*[-–]\s*no choice needed/i.test(str) || str.trim().toLowerCase() === 'fixed') {
+  if (/fixed\s*[-–]\s*no choice needed/i.test(str) || str.trim().toLowerCase() === 'fixed')
     return 'Fixed (see property notes)';
-  }
-  // If it already reads like a bed description, prefix with Fixed:
-  // e.g. "1 King", "2 Kings & 1 Superking", "3 Kings & 2 Singles"
   return str;
 }
 
@@ -289,8 +377,10 @@ function switchTab(tab, el) {
   document.querySelectorAll('.content').forEach(c => c.classList.remove('active'));
   el.classList.add('active');
   document.getElementById('tab-' + tab).classList.add('active');
-  if (tab === 'laundry' && allItems.length) renderLaundry();
-  if (tab === 'changeovers') renderChangeovers();
+  if (tab === 'laundry'     && allItems.length) renderLaundry();
+  if (tab === 'changeovers')                    renderChangeovers();
+  if (tab === 'overview'    && allItems.length) renderOverview();
+  if (tab === 'supplies')                       showSuppliesView(supView || 'dashboard');
 }
 
 function changeDay(delta) {
@@ -344,19 +434,18 @@ async function fetchPropConfigs(token) {
 
 async function loadAll() {
   const status = document.getElementById('apiStatus');
-  const btn = document.getElementById('loadBtn');
+  const btn    = document.getElementById('loadBtn');
   btn.disabled = true;
   status.textContent = 'Loading…';
-  document.getElementById('overviewContent').innerHTML = '<div class="loading">Loading data from Monday…</div>';
   try {
     [allItems, propConfigs] = await Promise.all([fetchAllItems(MONDAY_API_TOKEN), fetchPropConfigs(MONDAY_API_TOKEN)]);
-    const today = new Date(); today.setHours(0,0,0,0);
+    const today    = new Date(); today.setHours(0,0,0,0);
     const tomorrow = new Date(today); tomorrow.setDate(tomorrow.getDate() + 1);
-    currentDate = tomorrow.toISOString().split('T')[0];
+    currentDate    = tomorrow.toISOString().split('T')[0];
     status.textContent = `✓ ${allItems.length} bookings loaded · ${new Date().toLocaleTimeString()}`;
     document.getElementById('lastLoaded').textContent = 'Updated ' + new Date().toLocaleTimeString();
     btn.disabled = false;
-    renderOverview();
+    renderChangeovers();
     renderLaundry();
   } catch(e) {
     status.textContent = 'Error: ' + e.message;
@@ -368,295 +457,151 @@ function parseItem(item) {
   const cv = {};
   for (const c of item.column_values) cv[c.id] = c.value;
   const p = v => { try { return JSON.parse(v); } catch { return null; } };
-  const dateVal = p(cv['date_mm2adtwg']);
-  const statusVal = p(cv['color_mm2aw8fx']);
-  const bedConfigVal = p(cv['text_mm2ab56m']);
+  const dateVal    = p(cv['date_mm2adtwg']);
+  const statusVal  = p(cv['color_mm2aw8fx']);
+  const bedCfgVal  = p(cv['text_mm2ab56m']);
   return {
-    id: item.id,
-    name: item.name,
-    property: p(cv['text_mm2ahbrx']) || '',
+    id: item.id, name: item.name,
+    property:    p(cv['text_mm2ahbrx']) || '',
     arrivalDate: dateVal?.date || null,
-    formStatus: statusVal ? String(statusVal.index ?? 'none') : 'none',
-    bedConfig: bedConfigVal || '',
-    adults: parseInt(p(cv['numeric_mm2a5s8r'])) || 0,
-    children: parseInt(p(cv['numeric_mm2add81'])) || 0,
-    pets: parseInt(p(cv['numeric_mm2ahz0x'])) || 0,
+    formStatus:  statusVal ? String(statusVal.index ?? 'none') : 'none',
+    bedConfig:   bedCfgVal || '',
+    adults:      parseInt(p(cv['numeric_mm2a5s8r'])) || 0,
+    children:    parseInt(p(cv['numeric_mm2add81'])) || 0,
+    pets:        parseInt(p(cv['numeric_mm2ahz0x'])) || 0,
   };
 }
 
+function localDateStr(d) {
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
 function renderOverview() {
-  const today = new Date(); today.setHours(0,0,0,0);
-  const todayStr = today.toISOString().split('T')[0];
-
-  const parsed = allItems.map(parseItem);
-  const future = parsed.filter(i => i.arrivalDate && i.arrivalDate > todayStr);
-
-  // Status counts
-  const statusCounts = { '0':0, '1':0, '2':0, 'none':0 };
-  for (const i of parsed) statusCounts[i.formStatus] = (statusCounts[i.formStatus]||0) + 1;
-
-  // This week: build 7 labels starting from today
-  const weekDates = [];
-  for (let i = 0; i < 7; i++) {
-    const d = new Date(today); d.setDate(today.getDate() + i);
-    weekDates.push(d);
-  }
-  const weekLabels = weekDates.map(d => d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' }));
-  const weekKeys = weekDates.map(d => d.toISOString().split('T')[0]);
-
-  const dowCounts = {};
-  for (const s of ['0','1','2','none']) dowCounts[s] = Array(7).fill(0);
+  const today  = new Date(); today.setHours(0,0,0,0);
+  const in7    = new Date(today); in7.setDate(today.getDate() + 7);
+  const todayStr = localDateStr(today), in7Str = localDateStr(in7);
+  const parsed   = allItems.map(parseItem).filter(i => i.arrivalDate && i.arrivalDate >= todayStr && i.arrivalDate <= in7Str);
+  const byProp   = {};
+  const prio     = { '1':0, '0':1, '2':2, 'none':3 };
   for (const i of parsed) {
-    if (!i.arrivalDate) continue;
-    const idx = weekKeys.indexOf(i.arrivalDate);
-    if (idx === -1) continue;
-    dowCounts[i.formStatus][idx]++;
+    if (!i.property) continue;
+    if (!byProp[i.property] || prio[i.formStatus] < prio[byProp[i.property].formStatus]) byProp[i.property] = i;
   }
-
-  const received = statusCounts['1'];
-  const sent = statusCounts['0'];
-  const pending = statusCounts['2'];
-  const total = future.length;
-  const pct = total > 0 ? Math.round(received/total*100) : 0;
-
-  document.getElementById('overviewContent').innerHTML = `
-    <div class="stat-row">
-      <div class="stat-card">
-        <div class="label">Future Bookings</div>
-        <div class="value">${total.toLocaleString()}</div>
-        <div class="sub">arrivals scheduled</div>
-      </div>
-      <div class="stat-card green">
-        <div class="label">Form Received</div>
-        <div class="value">${received}</div>
-        <div class="sub">${pct}% completion rate</div>
-      </div>
-      <div class="stat-card orange">
-        <div class="label">Form Sent</div>
-        <div class="value">${sent}</div>
-        <div class="sub">awaiting response</div>
-      </div>
-      <div class="stat-card red">
-        <div class="label">Form Pending</div>
-        <div class="value">${pending}</div>
-        <div class="sub">not yet sent</div>
-      </div>
-    </div>
-    <div class="chart-row">
-      <div class="chart-card">
-        <h3>Arrivals This Week</h3>
-        <canvas id="dowChart"></canvas>
-      </div>
-      <div class="chart-card">
-        <h3>Form Status</h3>
-        <canvas id="statusChart"></canvas>
-      </div>
-    </div>`;
-
-  // This Week Chart
-  if (dowChart) dowChart.destroy();
-  const dowCtx = document.getElementById('dowChart').getContext('2d');
-  dowChart = new Chart(dowCtx, {
-    type: 'bar',
-    data: {
-      labels: weekLabels,
-      datasets: [
-        { label: 'Form Received', data: dowCounts['1'], backgroundColor: '#646955', borderRadius: 4 },
-        { label: 'Form Sent', data: dowCounts['0'], backgroundColor: '#AF926A', borderRadius: 4 },
-        { label: 'Pending', data: dowCounts['2'], backgroundColor: '#B98B73', borderRadius: 4 },
-        { label: 'Not Set', data: dowCounts['none'], backgroundColor: '#D5D0C4', borderRadius: 4 },
-      ]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: true,
-      plugins: {
-        legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 12 } },
-        tooltip: {
-          callbacks: {
-            footer: (items) => {
-              const total = items.reduce((s,i) => s + i.parsed.y, 0);
-              return 'Total: ' + total;
-            }
-          }
-        }
-      },
-      scales: {
-        x: { stacked: true, grid: { display: false }, ticks: { font: { size: 11 } } },
-        y: { stacked: true, grid: { color: '#f0f0f0' }, ticks: { precision: 0 } }
-      }
+  const arrivals = Object.values(byProp).sort((a,b) => a.arrivalDate !== b.arrivalDate ? a.arrivalDate.localeCompare(b.arrivalDate) : a.property.localeCompare(b.property));
+  let needConfig = 0, confirmedCount = 0, fixedCount = 0;
+  const rows = arrivals.map(a => {
+    const cfg = propConfigs[a.property] || {};
+    const hasOpts = cfg.bedOptions && cfg.bedOptions.length > 0;
+    const confirmed = !!(a.bedConfig && a.bedConfig.trim());
+    const isFixed   = !hasOpts;
+    const party = [];
+    if (a.adults)   party.push(`${a.adults} adult${a.adults>1?'s':''}`);
+    if (a.children) party.push(`${a.children} child${a.children>1?'ren':''}`);
+    if (a.pets)     party.push(`🐾 ${a.pets} pet${a.pets>1?'s':''}`);
+    const d = new Date(a.arrivalDate + 'T12:00:00');
+    const dateLabel = d.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+    let rowCls, statusHtml;
+    if (isFixed) {
+      fixedCount++;
+      const fixedDesc = (cfg.fixedBeds && !/fixed\s*[-–]/i.test(cfg.fixedBeds)) ? cfg.fixedBeds : 'Fixed';
+      rowCls = 'bc-fixed';
+      statusHtml = `<span class="bc-badge bc-badge-fixed">${esc(fixedDesc)}</span>`;
+    } else if (confirmed) {
+      confirmedCount++;
+      rowCls = 'bc-confirmed';
+      statusHtml = `<span class="bc-badge bc-badge-ok">✓ ${esc(a.bedConfig)}</span>`;
+    } else {
+      needConfig++;
+      rowCls = 'bc-urgent';
+      statusHtml = `<span class="bc-badge bc-badge-urgent">⚠ Config needed</span><div class="bc-opts">Options: ${cfg.bedOptions.map(esc).join(' / ')}</div>`;
     }
-  });
-
-  // Status Chart
-  if (statusChart) statusChart.destroy();
-  const sCtx = document.getElementById('statusChart').getContext('2d');
-  statusChart = new Chart(sCtx, {
-    type: 'doughnut',
-    data: {
-      labels: ['Received','Sent','Pending','Not Set'],
-      datasets: [{ data: [received, sent, pending, statusCounts['none']], backgroundColor: ['#646955','#AF926A','#B98B73','#D5D0C4'], borderWidth: 2, borderColor: '#fff' }]
-    },
-    options: {
-      responsive: true, maintainAspectRatio: true,
-      plugins: { legend: { position: 'bottom', labels: { font: { size: 11 }, padding: 12 } } }
-    }
-  });
+    return `<tr class="${rowCls}"><td class="bc-date">${dateLabel}</td><td class="bc-prop"><strong>${esc(a.property)}</strong>${a.name ? `<div class="bc-guest">${esc(a.name)}</div>` : ''}</td><td class="bc-party">${party.join(' · ') || '—'}</td><td>${statusHtml}</td></tr>`;
+  }).join('');
+  const alertHtml = needConfig > 0
+    ? `<div class="bc-alert">⚠ <strong>${needConfig} propert${needConfig===1?'y':'ies'}</strong> arriving in the next 7 days ${needConfig===1?'has':'have'} no bed configuration confirmed</div>`
+    : arrivals.length > 0 ? `<div class="bc-alert bc-alert-ok">✓ All bed configurations confirmed for the next 7 days</div>` : '';
+  document.getElementById('overviewContent').innerHTML = arrivals.length === 0
+    ? `<div class="empty"><p>No arrivals in the next 7 days</p></div>`
+    : `${alertHtml}<div class="bc-summary-row"><div class="bc-stat bc-stat-urgent"><div class="bc-stat-num">${needConfig}</div><div class="bc-stat-lbl">Need config</div></div><div class="bc-stat bc-stat-ok"><div class="bc-stat-num">${confirmedCount}</div><div class="bc-stat-lbl">Confirmed</div></div><div class="bc-stat"><div class="bc-stat-num">${fixedCount}</div><div class="bc-stat-lbl">Fixed beds</div></div><div class="bc-stat"><div class="bc-stat-num">${arrivals.length}</div><div class="bc-stat-lbl">Arriving in 7 days</div></div></div><table class="bc-table"><thead><tr><th>Date</th><th>Property</th><th>Party</th><th>Bed Config</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function renderLaundry() {
   if (!allItems.length || !currentDate) return;
-  const parsed = allItems.map(parseItem);
+  const parsed      = allItems.map(parseItem);
   const dayArrivals = parsed.filter(i => i.arrivalDate === currentDate);
-
-  // Deduplicate by property (take highest priority: received > sent > pending > none)
   const byProp = {};
-  const priority = { '1':0, '0':1, '2':2, 'none':3 };
+  const prio   = { '1':0, '0':1, '2':2, 'none':3 };
   for (const i of dayArrivals) {
-    if (!byProp[i.property] || priority[i.formStatus] < priority[byProp[i.property].formStatus]) {
-      byProp[i.property] = i;
-    }
+    if (!byProp[i.property] || prio[i.formStatus] < prio[byProp[i.property].formStatus]) byProp[i.property] = i;
   }
   const arrivals = Object.values(byProp).sort((a,b) => a.property.localeCompare(b.property));
-
   const d = new Date(currentDate + 'T12:00:00');
   const dayName = DAYS[d.getDay()];
   const dateStr = d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
   document.getElementById('laundryDateLabel').textContent = d.toLocaleDateString('en-GB', { day:'numeric', month:'short', year:'numeric' });
-
-  if (arrivals.length === 0) {
-    document.getElementById('laundryContent').innerHTML = `<div class="empty"><p>No arrivals on ${dateStr}</p></div>`;
-    return;
-  }
-
-  // Bed totals
+  if (arrivals.length === 0) { document.getElementById('laundryContent').innerHTML = `<div class="empty"><p>No arrivals on ${dateStr}</p></div>`; return; }
   const bedTotals = { Superking:0, King:0, Double:0, Single:0 };
   function countBeds(str) {
     if (!str || str.toLowerCase().includes('fixed') || str.toLowerCase().includes('no choice')) return;
     const s = str.toLowerCase();
     const m = t => { const r = new RegExp('(\\d+)\\s*' + t, 'i'); const x = s.match(r); return x ? parseInt(x[1]) : (s.includes(t.toLowerCase()) ? 1 : 0); };
     bedTotals.Superking += m('superking');
-    bedTotals.King += m('king') - m('superking'); // avoid double counting
-    if (bedTotals.King < 0) bedTotals.King = 0;
+    bedTotals.King += m('king') - m('superking'); if (bedTotals.King < 0) bedTotals.King = 0;
     bedTotals.Double += m('double');
     bedTotals.Single += (str.match(/(\d+)\s*single/gi)||[]).reduce((a,x)=>a+parseInt(x),0) || (s.includes('single')?1:0);
   }
-
   let cards = '';
   for (const a of arrivals) {
     const cfg = propConfigs[a.property] || {};
     const fixedBeds = a.bedConfig || cfg.fixedBeds || 'Unknown';
     const bedOptions = cfg.bedOptions || [];
     const hasOptions = bedOptions.length > 0;
-    const confirmed = a.formStatus === '1' && a.bedConfig;
+    const confirmed  = a.formStatus === '1' && a.bedConfig;
     countBeds(fixedBeds);
-
     const partyParts = [];
-    if (a.adults) partyParts.push(`👤 ${a.adults} adult${a.adults>1?'s':''}`);
+    if (a.adults)   partyParts.push(`👤 ${a.adults} adult${a.adults>1?'s':''}`);
     if (a.children) partyParts.push(`🧒 ${a.children}`);
-    if (a.pets) partyParts.push(`🐾 ${a.pets}`);
-
-    cards += `
-      <div class="property-card ${STATUS_CLASS[a.formStatus]}">
-        <div class="prop-name">${a.property}</div>
-        <div class="guest-name">${a.name || '—'}</div>
-        ${partyParts.length ? `<div class="party">${partyParts.map(p=>`<span>${p}</span>`).join('')}</div>` : ''}
-        <div class="beds-label">${confirmed ? 'Confirmed Beds' : (hasOptions ? 'Fixed Beds (choice pending)' : 'Fixed Beds')}</div>
-        <div class="beds">${formatBeds(fixedBeds)}</div>
-        ${hasOptions && !confirmed ? `<div class="bed-options">Guest chooses from: ${bedOptions.join(' · ')}</div>` : ''}
-        <span class="status-badge ${BADGE_CLASS[a.formStatus]}">${STATUS[a.formStatus]}</span>
-      </div>`;
+    if (a.pets)     partyParts.push(`🐾 ${a.pets}`);
+    cards += `<div class="property-card ${STATUS_CLASS[a.formStatus]}"><div class="prop-name">${a.property}</div><div class="guest-name">${a.name || '—'}</div>${partyParts.length ? `<div class="party">${partyParts.map(p=>`<span>${p}</span>`).join('')}</div>` : ''}<div class="beds-label">${confirmed ? 'Confirmed Beds' : (hasOptions ? 'Fixed Beds (choice pending)' : 'Fixed Beds')}</div><div class="beds">${formatBeds(fixedBeds)}</div>${hasOptions && !confirmed ? `<div class="bed-options">Guest chooses from: ${bedOptions.join(' · ')}</div>` : ''}<span class="status-badge ${BADGE_CLASS[a.formStatus]}">${STATUS[a.formStatus]}</span></div>`;
   }
-
-  // Bed summary
   const totalCounts = Object.entries(bedTotals).filter(([,v])=>v>0);
-  const bedSummaryHtml = totalCounts.length > 0 ? totalCounts.map(([t,c])=>
-    `<div class="bed-total"><div class="count">${c}</div><div class="type">${t}</div></div>`
-  ).join('') : '<p style="color:#aaa;font-size:13px">Unable to calculate — check bed configs</p>';
-
-  document.getElementById('laundryContent').innerHTML = `
-    <div style="margin-bottom:16px;font-size:14px;color:#666;">${dateStr} · <strong>${arrivals.length}</strong> propert${arrivals.length===1?'y':'ies'} arriving</div>
-    <div class="laundry-grid">${cards}</div>
-    <div class="beds-summary">
-      <h3>Bed Totals for ${dayName}</h3>
-      <div class="bed-totals">${bedSummaryHtml}</div>
-      <p style="font-size:11px;color:#bbb;margin-top:12px;">* Fixed beds only. Properties with pending bed choice options are shown above — totals will update once forms are received.</p>
-    </div>`;
+  const bedSummaryHtml = totalCounts.length > 0 ? totalCounts.map(([t,c])=>`<div class="bed-total"><div class="count">${c}</div><div class="type">${t}</div></div>`).join('') : '<p style="color:#aaa;font-size:13px">Unable to calculate — check bed configs</p>';
+  document.getElementById('laundryContent').innerHTML = `<div style="margin-bottom:16px;font-size:14px;color:#666;">${dateStr} · <strong>${arrivals.length}</strong> propert${arrivals.length===1?'y':'ies'} arriving</div><div class="laundry-grid">${cards}</div><div class="beds-summary"><h3>Bed Totals for ${dayName}</h3><div class="bed-totals">${bedSummaryHtml}</div><p style="font-size:11px;color:#bbb;margin-top:12px;">* Fixed beds only. Totals update once forms received.</p></div>`;
 }
 
-// Auto-load on open — no token entry required
 window.addEventListener('DOMContentLoaded', loadAll);
 
 // ════════════════════════════════════════════════════════════
-// CHANGEOVERS TAB
+// CHANGEOVERS
 // ════════════════════════════════════════════════════════════
 const LOG_BOARD  = 5094663022;
-
-// Properties with NO outside clean (internal changeover only)
 const NO_OUTSIDE = new Set(['Essitone House']);
-
-// Activity name → index (matches changeover-form.html)
-const ACT_MAP = {
-  'House Cleaned': 0, 'Laundry Dropped': 1,
-  'Restocked': 2, 'House Checked': 3, 'Outside Clean': 4
-};
+const ACT_MAP    = { 'House Cleaned': 0, 'Laundry Dropped': 1, 'Restocked': 2, 'House Checked': 3, 'Outside Clean': 4 };
 
 async function fetchChangeoverLog(todayStr) {
-  const data = await mondayQuery(MONDAY_API_TOKEN, `{
-    boards(ids: [${LOG_BOARD}]) {
-      items_page(limit: 500) {
-        items { name created_at }
-      }
-    }
-  }`);
-  const items = data?.boards?.[0]?.items_page?.items || [];
-  // Use created_at as the date — items are always created on the day they're logged
-  return items.filter(item => item.created_at?.split('T')[0] === todayStr);
-}
-
-function hasOutsideClean(prop) {
-  // Outside clean shown for all properties — staff know if it applies.
-  // Suppressed only for known internal-only properties.
-  return !NO_OUTSIDE.has(prop);
+  const data = await mondayQuery(MONDAY_API_TOKEN, `{ boards(ids: [${LOG_BOARD}]) { items_page(limit: 500) { items { name created_at } } } }`);
+  return (data?.boards?.[0]?.items_page?.items || []).filter(item => item.created_at?.split('T')[0] === todayStr);
 }
 
 async function renderChangeovers() {
   const container = document.getElementById('changeoversContent');
   const subtitle  = document.getElementById('co-subtitle');
   const summary   = document.getElementById('co-summary');
-
   container.innerHTML = '<div class="loading">Loading sign-off data…</div>';
   summary.textContent = '';
-
-  const todayStr = new Date().toISOString().split('T')[0];
+  const todayStr   = new Date().toISOString().split('T')[0];
   const todayLabel = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
   subtitle.textContent = todayLabel;
-
-  if (!allItems.length) {
-    container.innerHTML = '<div class="co-empty">Arrivals data not loaded — hit Refresh at the top first.</div>';
-    return;
-  }
-
-  // Today's arrivals straight from Guesty (via Guest Arrivals board)
+  if (!allItems.length) { container.innerHTML = '<div class="co-empty">Arrivals data not loaded — hit Refresh at the top first.</div>'; return; }
   const todayArrivals = allItems.map(parseItem).filter(i => i.arrivalDate === todayStr);
-
-  // De-duplicate by property and collect guest info per property
   const propMap = {};
   for (const a of todayArrivals) {
     if (!a.property) continue;
-    if (!propMap[a.property]) propMap[a.property] = { guests: 0, bookings: 0 };
+    if (!propMap[a.property]) propMap[a.property] = { guests: 0 };
     propMap[a.property].guests += (a.adults || 0) + (a.children || 0);
-    propMap[a.property].bookings++;
   }
-
-  // Fetch sign-off log
   let logItems = [];
-  try {
-    logItems = await fetchChangeoverLog(todayStr);
-  } catch(err) {
-    console.warn('Changeover Log fetch failed:', err);
-  }
-
-  // Build activity log: property → Set of activity indices done today
+  try { logItems = await fetchChangeoverLog(todayStr); } catch(e) { console.warn(e); }
   const actLog = {};
   for (const item of logItems) {
     const parts = item.name.split(' • ');
@@ -666,102 +611,308 @@ async function renderChangeovers() {
     if (!actLog[prop]) actLog[prop] = new Set();
     actLog[prop].add(act);
   }
-
-  // Merge: include any property from the log that isn't already in propMap
-  for (const prop of Object.keys(actLog)) {
-    if (!propMap[prop]) propMap[prop] = { guests: 0, bookings: 0 };
-  }
+  for (const prop of Object.keys(actLog)) if (!propMap[prop]) propMap[prop] = { guests: 0 };
   const properties = Object.keys(propMap).sort();
-
-  // Update subtitle with data counts for transparency
   subtitle.textContent = `${todayLabel} · ${properties.length} propert${properties.length!==1?'ies':'y'} · ${logItems.length} sign-off${logItems.length!==1?'s':''} logged`;
-
-  if (properties.length === 0) {
-    container.innerHTML = '<div class="co-empty">No arrivals or changeovers today.</div>';
-    return;
-  }
-
-  // Render
+  if (properties.length === 0) { container.innerHTML = '<div class="co-empty">No arrivals or changeovers today.</div>'; return; }
   let cntDone = 0, cntPart = 0, cntNone = 0;
-
   const rows = properties.map(prop => {
     const done    = actLog[prop] || new Set();
-    const outside = hasOutsideClean(prop);
+    const outside = !NO_OUTSIDE.has(prop);
     const info    = propMap[prop];
-
-    const cleanDone   = done.has(0);
-    const laundryDone = done.has(1);
-    const restockDone = done.has(2);
-    const checkedDone = done.has(3);
-    const outsideDone = done.has(4);
-
+    const cleanDone=done.has(0), laundryDone=done.has(1), restockDone=done.has(2), checkedDone=done.has(3), outsideDone=done.has(4);
     const checkBlocked = !cleanDone && !checkedDone;
     const checkCounts  = cleanDone && checkedDone;
-
     const total = outside ? 5 : 4;
     const doneN = (cleanDone?1:0)+(laundryDone?1:0)+(restockDone?1:0)+(checkCounts?1:0)+(outside&&outsideDone?1:0);
     const pct   = Math.round((doneN / total) * 100);
-
     let rowCls = 'co-none';
-    if (pct === 100)   { rowCls = 'co-all';  cntDone++; }
-    else if (doneN>0)  { rowCls = 'co-part'; cntPart++; }
-    else               cntNone++;
-
-    const fillCls = pct===100 ? 'co-fill-full' : (doneN>0 ? 'co-fill-part' : 'co-fill-none');
-
+    if (pct === 100) { rowCls = 'co-all'; cntDone++; } else if (doneN>0) { rowCls = 'co-part'; cntPart++; } else cntNone++;
+    const fillCls = pct===100 ? 'co-fill-full' : doneN>0 ? 'co-fill-part' : 'co-fill-none';
     const tdot = (isDone, blocked=false, na=false) => {
-      if (na)      return `<td class="co-task-cell"><span class="co-tdot co-tdot-na" title="N/A">—</span></td>`;
-      if (blocked) return `<td class="co-task-cell"><span class="co-tdot co-tdot-blocked" title="Waiting for clean">⏸</span></td>`;
-      if (isDone)  return `<td class="co-task-cell"><span class="co-tdot co-tdot-done" title="Done">●</span></td>`;
-      return         `<td class="co-task-cell"><span class="co-tdot co-tdot-todo" title="Not yet">○</span></td>`;
+      if (na)      return `<td class="co-task-cell"><span class="co-tdot co-tdot-na">—</span></td>`;
+      if (blocked) return `<td class="co-task-cell"><span class="co-tdot co-tdot-blocked">⏸</span></td>`;
+      if (isDone)  return `<td class="co-task-cell"><span class="co-tdot co-tdot-done">●</span></td>`;
+      return         `<td class="co-task-cell"><span class="co-tdot co-tdot-todo">○</span></td>`;
     };
-
     const guestStr = info.guests ? `${info.guests} guest${info.guests!==1?'s':''}` : '';
-
-    return `<tr class="${rowCls}">
-      <td>
-        <div class="co-prop-name">${esc(prop)}</div>
-        ${guestStr ? `<div class="co-guest-sub">${guestStr}</div>` : ''}
-      </td>
-      ${tdot(cleanDone)}
-      ${tdot(laundryDone)}
-      ${tdot(restockDone)}
-      ${tdot(checkCounts, checkBlocked)}
-      ${tdot(outsideDone, false, !outside)}
-      <td class="co-prog-cell">
-        <div class="co-prog-wrap">
-          <div class="co-prog-bg"><div class="co-prog-fill ${fillCls}" style="width:${pct}%"></div></div>
-          <span class="co-prog-lbl">${doneN}/${total}</span>
-        </div>
-      </td>
-    </tr>`;
+    return `<tr class="${rowCls}"><td><div class="co-prop-name">${esc(prop)}</div>${guestStr ? `<div class="co-guest-sub">${guestStr}</div>` : ''}</td>${tdot(cleanDone)}${tdot(laundryDone)}${tdot(restockDone)}${tdot(checkCounts, checkBlocked)}${tdot(outsideDone, false, !outside)}<td class="co-prog-cell"><div class="co-prog-wrap"><div class="co-prog-bg"><div class="co-prog-fill ${fillCls}" style="width:${pct}%"></div></div><span class="co-prog-lbl">${doneN}/${total}</span></div></td></tr>`;
   }).join('');
-
-  summary.innerHTML =
-    `<span class="co-sum-dot" style="background:#646955"></span>${cntDone} ready &nbsp;` +
-    `<span class="co-sum-dot" style="background:#AF926A"></span>${cntPart} in progress &nbsp;` +
-    `<span class="co-sum-dot" style="background:#B98B73"></span>${cntNone} not started`;
-
-  container.innerHTML = `
-    <table class="co-table">
-      <thead>
-        <tr>
-          <th>Property</th>
-          <th class="co-th-task">🧹<br><span style="font-size:9px;font-weight:400;color:#bbb">Clean</span></th>
-          <th class="co-th-task">🚐<br><span style="font-size:9px;font-weight:400;color:#bbb">Laundry</span></th>
-          <th class="co-th-task">🛒<br><span style="font-size:9px;font-weight:400;color:#bbb">Restock</span></th>
-          <th class="co-th-task">✅<br><span style="font-size:9px;font-weight:400;color:#bbb">Check</span></th>
-          <th class="co-th-task">🌿<br><span style="font-size:9px;font-weight:400;color:#bbb">Outside</span></th>
-          <th class="co-th-prog">Progress</th>
-        </tr>
-      </thead>
-      <tbody>${rows}</tbody>
-    </table>`;
+  summary.innerHTML = `<span class="co-sum-dot" style="background:#646955"></span>${cntDone} ready &nbsp;<span class="co-sum-dot" style="background:#AF926A"></span>${cntPart} in progress &nbsp;<span class="co-sum-dot" style="background:#B98B73"></span>${cntNone} not started`;
+  container.innerHTML = `<table class="co-table"><thead><tr><th>Property</th><th class="co-th-task">🧹<br><span style="font-size:9px;font-weight:400;color:#bbb">Clean</span></th><th class="co-th-task">🚐<br><span style="font-size:9px;font-weight:400;color:#bbb">Laundry</span></th><th class="co-th-task">🛒<br><span style="font-size:9px;font-weight:400;color:#bbb">Restock</span></th><th class="co-th-task">✅<br><span style="font-size:9px;font-weight:400;color:#bbb">Check</span></th><th class="co-th-task">🌿<br><span style="font-size:9px;font-weight:400;color:#bbb">Outside</span></th><th class="co-th-prog">Progress</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 
 function esc(s) {
-  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  if (!s) return '';
+  return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 }
+
+// ════════════════════════════════════════════════════════════
+// SUPPLIES
+// ════════════════════════════════════════════════════════════
+const SUP_BOARD_ID         = 1615688857;
+const SUP_GROUP_REQUIRED   = 'topics';
+const SUP_GROUP_CHARGEABLE = 'new_group64916__1';
+
+const LODGES = ['Aintree','Ardross','Arlington Both','At Waters Edge','Badgers Sett','Beaver Brook','Berry Farm Barn','Boathouse','Cheltenham','Duck House','Egret','Epsom','Essitone House','Firefly','Foxes Den','Goodwood','Goose Landing','Green Haven','Grebe Lodge','Hideaway','Hill View','Homestead','Horseshoe Cottage','Island','Kingfisher','Lake House','Libelle','Little Horseshoe Lake','Malachite','Mallard','Maricor','Mayflower','Mirrors Edge','Newmarket','Pond','Rabbits Warren','Serendipity','Serenity','Squirrels Drey','Still Waters','Summer Lake','Swans Rest','The Atelier','The Barn','The Lookout','Tranquility','Waterlily','Willow','York'].sort();
+
+const SUPPLY_ITEMS = ['Alcohol Beer/Ale/Cider','Alcohol Prosecco','Ant Trap','Barbecue Brush','Barbecue Cleaner','Battery AA','Battery AAA','Battery Box','Bin bags 20','Bin bags 50','Bulb Extractor Fan','Cake','Cleaner Kitchen Method','Cleaner Toilet Ecover','Coffee Pods','Coffee Tin Instant','Dishwasher Rinse Aid','Dishwasher Salt','Dishwasher Tablets','Dog Treats','Elemis bath and Shower Gel Small','Elemis bath and shower gel Large','Elemis Conditioner Large','Elemis Conditioner Small','Elemis hand and Body Wash Large','Elemis Hand and Body wash Small','Elemis Shampoo Large','Elemis Shampoo Small','Feedback Forms','Glass Flute','Glass Pint','Glass Short','Glass Tall','Glass Wine','Hand soap pouch Bayliss and Harding','Hob spray Tesco','Kitchen Rolls','Light bulb bayonet','Light bulb Screw','Matches','Milk','Napkins Tesco','Olive oil Olivio 500ml','Olive Oil Tesco 500ml','Olive oil Tesco','Pen','Peppercorns','Reed Diffuser','Rinse aid','Rock Salt','Salt Blocks','Sanitary Bags','Signage (Use Notes)','Sponges','Sugar','Sugar 1kg','Sugar cubes','Tea Bags','Tin Foil 30m','Tin foil 10m','Toilet roll 48 WGAC','Toilet Rolls','Toilet Roll WGAC','Washing Capsules 20','Washing Capsules 40','Washing powder 40 wash','Washing Up liquid Small','Washing Up Liquid Large','Other (see notes below)'];
+
+const STAFF         = ['Adele','Barry','Fin','Jade','Jenny','Jo','Lucy','Martine','Meg','Mike','Nicky','Saul','Tash'];
+const PRIORITY_OPTS = [{ label:'Critical',value:0 },{ label:'High',value:1 },{ label:'Medium',value:2 },{ label:'Low',value:3 }];
+
+let supView         = 'dashboard';
+let supLodge        = new URLSearchParams(location.search).get('lodge') || '';
+let supPendingItems = [];
+let supRowCounter   = 1;
+
+async function mondayPost(query, variables) {
+  const resp = await fetch('https://api.monday.com/v2', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': SUP_WRITE_TOKEN, 'API-Version': '2024-01' },
+    body: JSON.stringify({ query, variables: variables || {} })
+  });
+  if (!resp.ok) throw new Error('HTTP ' + resp.status);
+  const json = await resp.json();
+  if (json.errors) throw new Error(json.errors[0].message);
+  return json.data;
+}
+
+async function supFetchAllPending() {
+  const data = await mondayPost(`{ boards(ids: [${SUP_BOARD_ID}]) { groups(ids: ["${SUP_GROUP_REQUIRED}"]) { items_page(limit: 500) { items { id name column_values(ids: ["text6__1","text60__1","text5__1","numbers_MjiukVMp","priority6__1","date4","text__1"]) { id text value } } } } } }`);
+  return data?.boards?.[0]?.groups?.[0]?.items_page?.items || [];
+}
+
+async function supFetchLodgePending(lodge) {
+  const all = await supFetchAllPending();
+  return all.filter(i => supColVal(i, 'text6__1') === lodge);
+}
+
+async function supCreateItem(lodge, item, qty, priority, staff, notes, isOther) {
+  const colVals = JSON.stringify({ text6__1: lodge, text60__1: isOther ? 'Other' : item, text5__1: isOther ? item : '', numbers_MjiukVMp: qty, priority6__1: { index: priority }, status: { index: 0 }, date4: { date: new Date().toISOString().split('T')[0] }, dropdown8__1: { labels: [staff] }, text__1: notes });
+  return mondayPost(`mutation($boardId: ID!, $groupId: String!, $name: String!, $vals: JSON!) { create_item(board_id: $boardId, group_id: $groupId, item_name: $name, column_values: $vals) { id } }`, { boardId: String(SUP_BOARD_ID), groupId: SUP_GROUP_REQUIRED, name: `${lodge} – ${item}`, vals: colVals });
+}
+
+async function supMarkDelivered(itemIds) {
+  const mutations = itemIds.map((id, i) => `m${i}a: change_column_value(board_id: ${SUP_BOARD_ID}, item_id: ${id}, column_id: "status", value: "{\\"index\\": 1}") { id } m${i}b: move_item_to_group(item_id: ${id}, group_id: "${SUP_GROUP_CHARGEABLE}") { id }`).join('\n');
+  return mondayPost(`mutation { ${mutations} }`);
+}
+
+function supColVal(item, id) { return item.column_values?.find(c => c.id === id)?.text || ''; }
+
+function supPriorityBadge(txt) {
+  const c = txt === 'Critical' ? 'critical' : txt === 'High' ? 'high' : txt === 'Medium' ? 'medium' : 'low';
+  return `<span class="sup-badge sup-badge-${c}">${esc(txt || 'Low')}</span>`;
+}
+
+function supFmtDate(str) {
+  if (!str) return '';
+  return new Date(str + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+}
+
+function supToast(msg, type) {
+  const el = document.getElementById('supToast');
+  el.textContent = msg;
+  el.className   = 'sup-toast ' + (type || 'success') + ' show';
+  setTimeout(() => { el.className = 'sup-toast'; }, 3200);
+}
+
+function showSuppliesView(v) {
+  supView = v;
+  ['dashboard','log','deliver'].forEach(n => {
+    const b = document.getElementById('supnav-' + n);
+    if (b) b.className = 'sup-subnav-btn' + (v === n ? ' active' : '');
+  });
+  if (v === 'dashboard') supRenderDashboard();
+  else if (v === 'log')  supRenderLog();
+  else                   supRenderDeliver();
+}
+
+// ── Overview ──────────────────────────────────────────────
+async function supRenderDashboard() {
+  const el = document.getElementById('suppliesContent');
+  el.innerHTML = '<div style="padding:32px;text-align:center;color:var(--sage-mid)"><span class="sup-spinner"></span> Loading supplies…</div>';
+  let items = [];
+  try { items = await supFetchAllPending(); }
+  catch(e) { el.innerHTML = `<div class="sup-empty">⚠️ Could not load supplies data.<br><small style="color:var(--sage-mid)">${e.message}</small><br><br>Confirm the API token has access to the Supplies House board (${SUP_BOARD_ID}).</div>`; return; }
+
+  const byLodge = {};
+  items.forEach(item => { const l = supColVal(item,'text6__1'); if (l) { if (!byLodge[l]) byLodge[l]=[]; byLodge[l].push(item); } });
+
+  const prioRank      = txt => txt==='Critical'?0:txt==='High'?1:txt==='Medium'?2:3;
+  const lodgeMaxPrio  = arr => arr.length ? Math.min(...arr.map(i => prioRank(supColVal(i,'priority6__1')))) : 3;
+  const OVERDUE_MS    = 7 * 86400000;
+  const isOverdue     = item => { const d = supColVal(item,'date4'); return d ? (Date.now()-new Date(d+'T00:00:00').getTime()) > OVERDUE_MS : false; };
+  const daysOld       = item => { const d = supColVal(item,'date4'); return d ? Math.max(0,Math.floor((Date.now()-new Date(d+'T00:00:00').getTime())/86400000)) : 0; };
+  const lodgeOverdue  = lodge => byLodge[lodge].filter(isOverdue).length;
+  const lodgeCrit     = lodge => byLodge[lodge].filter(i => supColVal(i,'priority6__1')==='Critical').length;
+
+  const critItems   = items.filter(i => supColVal(i,'priority6__1')==='Critical');
+  const critCount   = critItems.length;
+  const overdueItems = items.filter(isOverdue);
+  const overdueCount = overdueItems.length;
+  const lodgeCount  = Object.keys(byLodge).length;
+
+  // Cross-ref arrivals for urgency
+  const upcoming = {};
+  if (allItems.length) {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const in7   = new Date(today); in7.setDate(today.getDate()+7);
+    const ts = localDateStr(today), te = localDateStr(in7);
+    allItems.map(parseItem).forEach(a => {
+      if (a.property && a.arrivalDate >= ts && a.arrivalDate <= te)
+        if (!upcoming[a.property] || a.arrivalDate < upcoming[a.property]) upcoming[a.property] = a.arrivalDate;
+    });
+  }
+
+  const urgentLodges = Object.entries(byLodge).filter(([l]) => upcoming[l])
+    .sort((a,b) => (upcoming[a[0]]||'').localeCompare(upcoming[b[0]]||'') || lodgeMaxPrio(a[1])-lodgeMaxPrio(b[1]));
+
+  // Sort: highest priority first, then overdue count DESC, then total items DESC
+  const allSorted = Object.entries(byLodge).sort((a,b) => {
+    const pA = lodgeMaxPrio(a[1]), pB = lodgeMaxPrio(b[1]);
+    if (pA !== pB) return pA - pB;
+    const oA = lodgeOverdue(a[0]), oB = lodgeOverdue(b[0]);
+    if (oA !== oB) return oB - oA;
+    return b[1].length - a[1].length;
+  });
+
+  const card = ([lodge, lodgeItems], showArr) => {
+    const maxP = lodgeMaxPrio(lodgeItems);
+    const cls  = maxP===0?'critical':maxP===1?'high':'ok';
+    const preview = lodgeItems.map(i => supColVal(i,'text60__1')||i.name).slice(0,3).join(', ') + (lodgeItems.length>3?'…':'');
+    const safeL = lodge.replace(/\\/g,'\\\\').replace(/'/g,"\\'");
+    let arrHtml = '';
+    if (showArr && upcoming[lodge]) {
+      const arrD = new Date(upcoming[lodge]+'T12:00:00');
+      arrHtml = `<div class="sup-lodge-arrival">📅 Arrival ${arrD.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})} — deliver before then</div>`;
+    }
+    const lCrit = lodgeCrit(lodge), lOver = lodgeOverdue(lodge);
+    const tags = [];
+    if (lCrit > 0) tags.push(`<span class="sup-lodge-tag sup-lodge-tag-critical">🚨 ${lCrit} Critical</span>`);
+    if (lOver > 0) tags.push(`<span class="sup-lodge-tag sup-lodge-tag-overdue">⚠️ ${lOver} Overdue</span>`);
+    const tagsHtml = tags.length ? `<div class="sup-lodge-tags">${tags.join('')}</div>` : '';
+    return `<div class="sup-lodge-card ${cls}" onclick="supGoDeliver('${safeL}')"><div style="min-width:0"><div class="sup-lodge-name">${esc(lodge)}</div><div class="sup-lodge-preview">${esc(preview)}</div>${arrHtml}${tagsHtml}</div><div class="sup-lodge-count"><div class="sup-lodge-count-num">${lodgeItems.length}</div><div class="sup-lodge-count-lbl">item${lodgeItems.length>1?'s':''}</div></div></div>`;
+  };
+
+  // Stat row
+  let html = `<div class="sup-stat-row"><div class="sup-stat ${critCount>0?'sup-stat-red':''}"><div class="sup-stat-num">${critCount}</div><div class="sup-stat-lbl">Critical</div></div><div class="sup-stat ${overdueCount>0?'sup-stat-amber':''}"><div class="sup-stat-num">${overdueCount}</div><div class="sup-stat-lbl">Overdue</div></div><div class="sup-stat ${urgentLodges.length>0?'sup-stat-amber':'sup-stat-green'}"><div class="sup-stat-num">${urgentLodges.length}</div><div class="sup-stat-lbl">Pre-arrival</div></div></div>`;
+
+  // Critical banner
+  if (critCount > 0) {
+    const cLodges = [...new Set(critItems.map(i => supColVal(i,'text6__1')).filter(Boolean))];
+    html += `<div class="sup-banner sup-banner-critical">🚨 <strong>${critCount} Critical item${critCount>1?'s':''}</strong> outstanding across ${cLodges.length} lodge${cLodges.length>1?'s':''} — ${cLodges.slice(0,3).map(esc).join(', ')}${cLodges.length>3?` &amp; ${cLodges.length-3} more`:''}</div>`;
+  }
+
+  // Overdue banner
+  if (overdueCount > 0) {
+    const oLodges = [...new Set(overdueItems.map(i => supColVal(i,'text6__1')).filter(Boolean))];
+    html += `<div class="sup-banner sup-banner-overdue">⚠️ <strong>${overdueCount} item${overdueCount>1?'s':''} overdue</strong> (outstanding &gt;7 days) across ${oLodges.length} lodge${oLodges.length>1?'s':''}</div>`;
+  }
+
+  if (urgentLodges.length) {
+    html += `<div class="sup-section-head">⚡ Arrival Due — Deliver Soon</div>` + urgentLodges.map(e=>card(e,true)).join('');
+  }
+  html += lodgeCount
+    ? `<div class="sup-section-head">All Outstanding — ${lodgeCount} lodge${lodgeCount>1?'s':''}, ${items.length} item${items.length>1?'s':''}</div>` + allSorted.map(e=>card(e,false)).join('')
+    : `<div class="sup-empty">✅ No outstanding supply requirements — all lodges are stocked up.</div>`;
+
+  el.innerHTML = html;
+}
+
+// ── Log ───────────────────────────────────────────────────
+function supRenderLog() {
+  supRowCounter = 1;
+  const el = document.getElementById('suppliesContent');
+  const lodgeOpts = LODGES.map(l => `<option value="${l}" ${supLodge===l?'selected':''}>${l}</option>`).join('');
+  const staffOpts = STAFF.map(s => `<option value="${s}">${s}</option>`).join('');
+  el.innerHTML = `<div class="sup-form-wrap"><div class="sup-field"><label>Lodge</label><select id="supLogLodge"><option value="">Select lodge…</option>${lodgeOpts}</select></div><div class="sup-field"><label>Reported by</label><select id="supLogStaff"><option value="">Select name…</option>${staffOpts}</select></div><div class="sup-section-head" style="margin-top:4px">Items Required</div><div id="supItemRows">${supBuildItemRow(1)}</div><button class="sup-btn-add" onclick="supAddRow()">+ Add another item</button><div class="sup-field" style="margin-top:16px"><label>Additional notes (optional)</label><textarea id="supLogNotes" placeholder="Any extra context…"></textarea></div><button class="sup-btn sup-btn-primary" id="supSubmitBtn" onclick="supSubmitLog()" style="margin-top:4px">Submit Requirements</button></div>`;
+}
+
+function supBuildItemRow(num) {
+  const itemOpts = SUPPLY_ITEMS.map(s => `<option value="${s}">${s}</option>`).join('');
+  const prioOpts = PRIORITY_OPTS.map(p => `<option value="${p.value}">${p.label}</option>`).join('');
+  return `<div class="sup-item-row" id="suprow-${num}"><div class="sup-item-num">Item ${num}</div>${num>1?`<button class="sup-item-remove" onclick="supRemoveRow(${num})">×</button>`:''}<div class="sup-item-grid"><div class="sup-field" style="margin:0"><label>Supply Item</label><select id="supitem-${num}" onchange="supCheckOther(${num})"><option value="">Select item…</option>${itemOpts}</select></div><div class="sup-field" style="margin:0"><label>Qty</label><input type="number" id="supqty-${num}" value="1" min="1" style="text-align:center"></div></div><div class="sup-field" style="margin-bottom:0"><label>Priority</label><select id="supprio-${num}">${prioOpts}</select></div><div class="sup-other-warn" id="supother-${num}">⚠️ Please check the list above — "Other" should only be used if the item genuinely isn't listed. Describe it clearly in notes.</div></div>`;
+}
+
+function supAddRow()     { supRowCounter++; document.getElementById('supItemRows').insertAdjacentHTML('beforeend', supBuildItemRow(supRowCounter)); }
+function supRemoveRow(n) { document.getElementById('suprow-'+n)?.remove(); }
+function supCheckOther(n) {
+  const val = document.getElementById('supitem-'+n)?.value;
+  const w   = document.getElementById('supother-'+n);
+  if (w) w.className = 'sup-other-warn' + (val==='Other (see notes below)'?' show':'');
+}
+
+async function supSubmitLog() {
+  const lodge = document.getElementById('supLogLodge').value;
+  const staff = document.getElementById('supLogStaff').value;
+  const notes = document.getElementById('supLogNotes').value;
+  if (!lodge) { supToast('Please select a lodge','error'); return; }
+  if (!staff) { supToast('Please select your name','error'); return; }
+  const rows = document.querySelectorAll('.sup-item-row');
+  const items = []; let valid = true;
+  rows.forEach(row => {
+    const num  = row.id.replace('suprow-','');
+    const item = document.getElementById('supitem-'+num)?.value;
+    if (!item) { valid=false; return; }
+    items.push({ item, qty: parseInt(document.getElementById('supqty-'+num)?.value)||1, prio: parseInt(document.getElementById('supprio-'+num)?.value), isOther: item==='Other (see notes below)' });
+  });
+  if (!valid || items.length===0) { supToast('Please select at least one item','error'); return; }
+  const btn = document.getElementById('supSubmitBtn');
+  btn.innerHTML = '<span class="sup-spinner"></span>Submitting…'; btn.disabled = true;
+  try {
+    await Promise.all(items.map(i => supCreateItem(lodge,i.item,i.qty,i.prio,staff,notes,i.isOther)));
+    supToast('✅ ' + items.length + ' requirement' + (items.length>1?'s':'') + ' logged for ' + lodge);
+    supLodge = lodge;
+    setTimeout(() => showSuppliesView('dashboard'), 1300);
+  } catch(e) {
+    supToast('Failed: ' + e.message, 'error');
+    btn.innerHTML = 'Submit Requirements'; btn.disabled = false;
+  }
+}
+
+// ── Deliver ───────────────────────────────────────────────
+function supRenderDeliver() {
+  const el = document.getElementById('suppliesContent');
+  const lodgeOpts = LODGES.map(l => `<option value="${l}" ${supLodge===l?'selected':''}>${l}</option>`).join('');
+  el.innerHTML = `<div class="sup-form-wrap"><div class="sup-field"><label>Lodge</label><select id="supDeliverLodge" onchange="supLoadLodgeItems(this.value)"><option value="">Select lodge to deliver to…</option>${lodgeOpts}</select></div><div id="supDeliverContent"><div class="sup-empty">Select a lodge to see outstanding requirements</div></div></div>`;
+  if (supLodge) { document.getElementById('supDeliverLodge').value = supLodge; supLoadLodgeItems(supLodge); }
+}
+
+async function supLoadLodgeItems(lodge) {
+  supLodge = lodge;
+  const el = document.getElementById('supDeliverContent');
+  if (!lodge) { el.innerHTML = ''; return; }
+  el.innerHTML = '<div style="padding:20px;text-align:center;color:var(--sage-mid)"><span class="sup-spinner"></span> Loading…</div>';
+  try { supPendingItems = await supFetchLodgePending(lodge); }
+  catch(e) { el.innerHTML = `<div class="sup-empty">⚠️ ${e.message}</div>`; return; }
+  if (supPendingItems.length===0) { el.innerHTML = `<div class="sup-empty">✅ No outstanding requirements for ${esc(lodge)}</div>`; return; }
+  el.innerHTML = `<div class="sup-section-head">${supPendingItems.length} item${supPendingItems.length!==1?'s':''} required for ${esc(lodge)}</div><div id="supCheckList">${supPendingItems.map(item => {
+    const supply=supColVal(item,'text60__1')||item.name, other=supColVal(item,'text5__1'), qty=supColVal(item,'numbers_MjiukVMp'), prioTxt=supColVal(item,'priority6__1'), dt=supColVal(item,'date4'), notes=supColVal(item,'text__1');
+    return `<div class="sup-check-item" id="supci-${item.id}" onclick="supToggle('${item.id}')"><input type="checkbox" id="supchk-${item.id}" onclick="event.stopPropagation();supToggle('${item.id}')"><div><div class="sup-check-item-name">${esc(supply)}${other&&supply!==other?` — ${esc(other)}`:''}</div><div class="sup-check-item-meta">Qty: <strong>${qty||1}</strong> &nbsp;·&nbsp; ${supPriorityBadge(prioTxt)} &nbsp;·&nbsp; ${supFmtDate(dt)}${notes?`<br><em>${esc(notes)}</em>`:''}</div></div></div>`;
+  }).join('')}</div><div style="margin-top:14px;display:flex;gap:8px"><button class="sup-btn-outline" onclick="supCheckAll()">Select All</button><button class="sup-btn-outline" onclick="supUncheckAll()">Clear</button></div><button class="sup-btn sup-btn-success" id="supConfirmBtn" onclick="supConfirmDelivery()" style="margin-top:10px">✅ Confirm Delivery</button>`;
+}
+
+function supToggle(id) { const c=document.getElementById('supchk-'+id), r=document.getElementById('supci-'+id); if(c&&r){c.checked=!c.checked;r.classList.toggle('checked',c.checked);} }
+function supCheckAll()   { supPendingItems.forEach(i=>{const c=document.getElementById('supchk-'+i.id),r=document.getElementById('supci-'+i.id);if(c){c.checked=true;r?.classList.add('checked');}}); }
+function supUncheckAll() { supPendingItems.forEach(i=>{const c=document.getElementById('supchk-'+i.id),r=document.getElementById('supci-'+i.id);if(c){c.checked=false;r?.classList.remove('checked');}}); }
+
+async function supConfirmDelivery() {
+  const checked = supPendingItems.filter(i => document.getElementById('supchk-'+i.id)?.checked);
+  if (!checked.length) { supToast('Select at least one item','error'); return; }
+  const btn = document.getElementById('supConfirmBtn');
+  btn.innerHTML = '<span class="sup-spinner"></span>Confirming…'; btn.disabled = true;
+  try {
+    await supMarkDelivered(checked.map(i=>i.id));
+    supToast('✅ ' + checked.length + ' item' + (checked.length>1?'s':'') + ' marked delivered & chargeable');
+    setTimeout(() => supLoadLodgeItems(supLodge), 1400);
+  } catch(e) {
+    supToast('Failed: ' + e.message, 'error');
+    btn.innerHTML = '✅ Confirm Delivery'; btn.disabled = false;
+  }
+}
+
+function supGoDeliver(lodge) { supLodge = lodge; showSuppliesView('deliver'); }
 </script>
 </body>
 </html>

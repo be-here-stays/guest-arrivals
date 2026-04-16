@@ -767,24 +767,24 @@
 
     // ── LAUNDRY ──
 
-    // Delivery schedule: Tue covers Wed+Thu, Thu covers Fri+Sat, Sat covers Sun+Mon+Tue
+    // Order schedule: Tue order covers Thu+Fri, Thu order covers Sat+Sun+Mon, Sat order covers Tue+Wed
     function buildDeliveryWindow(fromDate) {
       const addD = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
       const dow = fromDate.getDay(); // 0=Sun,1=Mon,2=Tue,3=Wed,4=Thu,5=Fri,6=Sat
       let daysUntil, coverStart, coverLength;
 
-      if (dow <= 2) {         // Sun/Mon/Tue → Tue delivery
+      if (dow <= 2) {         // Sun/Mon/Tue → Tue order
         daysUntil = 2 - dow;
-        coverStart = addD(fromDate, daysUntil + 1); // Wed
-        coverLength = 2;                              // Wed, Thu
-      } else if (dow <= 4) { // Wed/Thu → Thu delivery
+        coverStart = addD(fromDate, daysUntil + 2); // Thu
+        coverLength = 2;                              // Thu, Fri
+      } else if (dow <= 4) { // Wed/Thu → Thu order
         daysUntil = 4 - dow;
-        coverStart = addD(fromDate, daysUntil + 1); // Fri
-        coverLength = 2;                              // Fri, Sat
-      } else {                // Fri/Sat → Sat delivery
+        coverStart = addD(fromDate, daysUntil + 2); // Sat
+        coverLength = 3;                              // Sat, Sun, Mon
+      } else {                // Fri/Sat → Sat order
         daysUntil = 6 - dow;
-        coverStart = addD(fromDate, daysUntil + 1); // Sun
-        coverLength = 3;                              // Sun, Mon, Tue
+        coverStart = addD(fromDate, daysUntil + 3); // Tue
+        coverLength = 2;                              // Tue, Wed
       }
 
       const deliveryDate = addD(fromDate, daysUntil);

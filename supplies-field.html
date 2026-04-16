@@ -150,6 +150,22 @@
     .btn-log-home { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px 16px; background: var(--dark); color: var(--cream); border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(39,47,46,.18); }
     .btn-log-home:hover { background: var(--sage); }
 
+    /* ── Log queue ── */
+    .log-queue { margin-bottom: 16px; }
+    .log-queue-title { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--sage-mid); margin-bottom: 8px; }
+    .log-q-item { display: flex; align-items: center; gap: 10px; background: var(--bg); border-radius: 8px; padding: 9px 12px; margin-bottom: 6px; }
+    .log-q-body { flex: 1; min-width: 0; }
+    .log-q-name { font-size: 13px; font-weight: 600; color: var(--dark); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .log-q-meta { font-size: 11px; color: var(--sage-mid); margin-top: 2px; }
+    .log-q-remove { background: none; border: none; cursor: pointer; font-size: 16px; color: var(--sage-mid); padding: 2px 4px; line-height: 1; flex-shrink: 0; }
+    .log-q-remove:hover { color: #8B2020; }
+    .btn-add { width: 100%; padding: 11px; border: 1.5px solid var(--dark); border-radius: 8px; background: transparent; color: var(--dark); font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 4px; }
+    .btn-add:hover { background: var(--bg); }
+    .btn-submit-all { width: 100%; padding: 13px; border: none; border-radius: 8px; background: var(--sage); color: #fff; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; margin-top: 10px; display: none; }
+    .btn-submit-all.visible { display: block; }
+    .btn-submit-all:hover { background: var(--dark); }
+    .btn-submit-all:disabled { opacity: .5; cursor: not-allowed; }
+
     /* ── Misc ── */
     .empty { text-align: center; padding: 48px 20px; color: var(--sage-mid); font-size: 14px; }
     .loading { text-align: center; padding: 40px 20px; color: var(--sage-mid); font-size: 14px; }
@@ -244,6 +260,7 @@ let byLodge        = {};          // lodge → items[] (sorted)
 let currentLodge   = '';
 let pendingItems   = [];          // items shown in detail view
 let logOpen        = false;
+let logQueue       = []; // items staged before final submit
 
 // URL param pre-selection
 const urlLodge = new URLSearchParams(location.search).get('lodge') || '';
@@ -692,11 +709,16 @@ function showView(v) {
 }
 
 function showLogView(preselectedLodge) {
+  logQueue = [];
   const lodgeOpts = LODGES.map(l => `<option value="${l}" ${l===preselectedLodge?'selected':''}>${l}</option>`).join('');
   const staffOpts = STAFF.map(s => `<option value="${s}">${s}</option>`).join('');
   const itemOpts  = SUPPLY_ITEMS.map(i => `<option value="${i}">${i}</option>`).join('');
   document.getElementById('view-log').innerHTML = `
-    <div class="sh" style="margin-top:0">Log a shortage</div>
+    <div class="sh" style="margin-top:0">Log shortages</div>
+    <div id="logQueueWrap" class="log-queue" style="display:none">
+      <div class="log-queue-title">Items to log</div>
+      <div id="logQueueList"></div>
+    </div>
     <div class="deliver-zone" style="margin-top:0">
       <div class="fld"><label>Lodge</label>
         <select id="slLodge"><option value="">Select lodge…</option>${lodgeOpts}</select>
@@ -722,11 +744,62 @@ function showLogView(preselectedLodge) {
       <div class="fld"><label>Notes (optional)</label>
         <textarea id="slNotes" placeholder="Any extra detail…"></textarea>
       </div>
-      <button class="btn-submit" id="slSubmitBtn" onclick="submitStandaloneLog()">Submit Shortage</button>
+      <button class="btn-add" onclick="slAddToQueue()">+ Add to list</button>
+      <button class="btn-submit-all" id="slSubmitBtn" onclick="submitStandaloneLog()">Submit all</button>
     </div>`;
   setHdrTitle('Log a Shortage');
   document.getElementById('backBtn').classList.add('visible');
   showView('log');
+}
+
+function slAddToQueue() {
+  const lodge = document.getElementById('slLodge').value;
+  const item  = document.getElementById('slItem').value;
+  const qty   = parseInt(document.getElementById('slQty').value) || 1;
+  const prio  = parseInt(document.getElementById('slPrio').value);
+  const staff = document.getElementById('slStaff').value;
+  const notes = document.getElementById('slNotes').value || '';
+  if (!lodge) { showToast('Select a lodge', 'err'); return; }
+  if (!item)  { showToast('Select an item', 'err'); return; }
+  if (!staff) { showToast('Select your name', 'err'); return; }
+  logQueue.push({ lodge, item, qty, prio, staff, notes });
+  renderLogQueue();
+  // Reset item/qty/notes, keep lodge + staff
+  document.getElementById('slItem').value  = '';
+  document.getElementById('slQty').value   = '1';
+  document.getElementById('slPrio').value  = '2';
+  document.getElementById('slNotes').value = '';
+  const w = document.getElementById('slOtherWarn');
+  if (w) w.className = 'other-warn';
+  showToast('Added to list', 'ok');
+}
+
+function renderLogQueue() {
+  const wrap = document.getElementById('logQueueWrap');
+  const list = document.getElementById('logQueueList');
+  const btn  = document.getElementById('slSubmitBtn');
+  if (!logQueue.length) {
+    wrap.style.display = 'none';
+    btn.classList.remove('visible');
+    return;
+  }
+  wrap.style.display = 'block';
+  btn.classList.add('visible');
+  const prioLabels = ['Critical','High','Medium','Low'];
+  list.innerHTML = logQueue.map((e, i) => `
+    <div class="log-q-item">
+      <div class="log-q-body">
+        <div class="log-q-name">${esc(e.lodge)} — ${esc(e.item)}</div>
+        <div class="log-q-meta">${prioLabels[e.prio]} · ×${e.qty}${e.notes ? ' · ' + esc(e.notes) : ''}</div>
+      </div>
+      <button class="log-q-remove" onclick="slRemoveFromQueue(${i})" title="Remove">×</button>
+    </div>`).join('');
+  btn.textContent = `Submit ${logQueue.length} item${logQueue.length > 1 ? 's' : ''}`;
+}
+
+function slRemoveFromQueue(idx) {
+  logQueue.splice(idx, 1);
+  renderLogQueue();
 }
 
 function slCheckOther() {
@@ -736,47 +809,51 @@ function slCheckOther() {
 }
 
 async function submitStandaloneLog() {
-  const lodge = document.getElementById('slLodge').value;
-  const item  = document.getElementById('slItem').value;
-  const qty   = parseInt(document.getElementById('slQty').value) || 1;
-  const prio  = parseInt(document.getElementById('slPrio').value);
-  const staff = document.getElementById('slStaff').value;
-  const notes = document.getElementById('slNotes').value;
-  if (!lodge) { showToast('Select a lodge', 'err'); return; }
-  if (!item)  { showToast('Select an item', 'err'); return; }
-  if (!staff) { showToast('Select your name', 'err'); return; }
+  if (!logQueue.length) { showToast('Add at least one item first', 'err'); return; }
   const btn = document.getElementById('slSubmitBtn');
   btn.textContent = 'Submitting…'; btn.disabled = true;
+  const dateStr     = localDate(new Date());
+  const prioLabels  = ['Critical','High','Medium','Low'];
   try {
-    const isOther = item === 'Other (see notes below)';
-    const dateStr = localDate(new Date());
-    const colVals = JSON.stringify({
-      text6__1:          lodge,
-      text60__1:         isOther ? 'Other' : item,
-      text5__1:          isOther ? notes : '',
-      numbers_MjiukVMp:  qty,
-      priority6__1:      { index: prio },
-      status:            { index: 0 },
-      date4:             { date: dateStr },
-      dropdown8__1:      { labels: [staff] },
-      text__1:           notes
+    await Promise.all(logQueue.map(e => {
+      const isOther = e.item === 'Other (see notes below)';
+      const colVals = JSON.stringify({
+        text6__1:         e.lodge,
+        text60__1:        isOther ? 'Other' : e.item,
+        text5__1:         isOther ? e.notes : '',
+        numbers_MjiukVMp: e.qty,
+        priority6__1:     { index: e.prio },
+        status:           { index: 0 },
+        date4:            { date: dateStr },
+        dropdown8__1:     { labels: [e.staff] },
+        text__1:          e.notes
+      });
+      return mq(
+        `mutation($b:ID!,$g:String!,$n:String!,$v:JSON!){create_item(board_id:$b,group_id:$g,item_name:$n,column_values:$v){id}}`,
+        { b: String(SUPPLIES_BOARD), g: SUP_GROUP, n: `${e.lodge} – ${e.item}`, v: colVals }
+      );
+    }));
+    const count = logQueue.length;
+    showToast(`✅ ${count} shortage${count > 1 ? 's' : ''} logged`, 'ok');
+    // Update local state so items appear immediately on home
+    logQueue.forEach(e => {
+      if (!byLodge[e.lodge]) byLodge[e.lodge] = [];
+      byLodge[e.lodge].push({ id: 'tmp_' + Date.now(), name: `${e.lodge} – ${e.item}`, column_values: [
+        { id:'text6__1',         text: e.lodge },
+        { id:'text60__1',        text: e.item },
+        { id:'text5__1',         text: '' },
+        { id:'numbers_MjiukVMp', text: String(e.qty) },
+        { id:'priority6__1',     text: prioLabels[e.prio] || 'Medium' },
+        { id:'date4',            text: dateStr },
+        { id:'text__1',          text: e.notes }
+      ]});
     });
-    await mq(
-      `mutation($b:ID!,$g:String!,$n:String!,$v:JSON!){create_item(board_id:$b,group_id:$g,item_name:$n,column_values:$v){id}}`,
-      { b: String(SUPPLIES_BOARD), g: SUP_GROUP, n: `${lodge} – ${item}`, v: colVals }
-    );
-    showToast('✅ Shortage logged for ' + lodge, 'ok');
-    // Add to local state so it shows immediately on home
-    if (!byLodge[lodge]) byLodge[lodge] = [];
-    byLodge[lodge].push({ id: 'tmp_' + Date.now(), name: `${lodge} – ${item}`, column_values: [
-      { id:'text6__1', text:lodge }, { id:'text60__1', text:item }, { id:'text5__1', text:notes },
-      { id:'numbers_MjiukVMp', text:String(qty) }, { id:'priority6__1', text:['Critical','High','Medium','Low'][prio]||'Medium' },
-      { id:'date4', text:dateStr }, { id:'text__1', text:notes }
-    ]});
+    logQueue = [];
     setTimeout(() => { goHome(); renderHome(); }, 1200);
   } catch(e) {
     showToast('Failed: ' + e.message, 'err');
-    btn.textContent = 'Submit Shortage'; btn.disabled = false;
+    btn.textContent = `Submit ${logQueue.length} item${logQueue.length > 1 ? 's' : ''}`;
+    btn.disabled = false;
   }
 }
 

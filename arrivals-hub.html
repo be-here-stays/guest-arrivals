@@ -658,8 +658,20 @@ const LODGES = ['Aintree','Ardross','Arlington Both','At Waters Edge','Badgers S
 
 const SUPPLY_ITEMS = ['Alcohol Beer/Ale/Cider','Alcohol Prosecco','Ant Trap','Barbecue Brush','Barbecue Cleaner','Battery AA','Battery AAA','Battery Box','Bin bags 20','Bin bags 50','Bulb Extractor Fan','Cake','Cleaner Kitchen Method','Cleaner Toilet Ecover','Coffee Pods','Coffee Tin Instant','Dishwasher Rinse Aid','Dishwasher Salt','Dishwasher Tablets','Dog Treats','Elemis bath and Shower Gel Small','Elemis bath and shower gel Large','Elemis Conditioner Large','Elemis Conditioner Small','Elemis hand and Body Wash Large','Elemis Hand and Body wash Small','Elemis Shampoo Large','Elemis Shampoo Small','Feedback Forms','Glass Flute','Glass Pint','Glass Short','Glass Tall','Glass Wine','Hand soap pouch Bayliss and Harding','Hob spray Tesco','Kitchen Rolls','Light bulb bayonet','Light bulb Screw','Matches','Milk','Napkins Tesco','Olive oil Olivio 500ml','Olive Oil Tesco 500ml','Olive oil Tesco','Pen','Peppercorns','Reed Diffuser','Rinse aid','Rock Salt','Salt Blocks','Sanitary Bags','Signage (Use Notes)','Sponges','Sugar','Sugar 1kg','Sugar cubes','Tea Bags','Tin Foil 30m','Tin foil 10m','Toilet roll 48 WGAC','Toilet Rolls','Toilet Roll WGAC','Washing Capsules 20','Washing Capsules 40','Washing powder 40 wash','Washing Up liquid Small','Washing Up Liquid Large','Other (see notes below)'];
 
-const STAFF         = ['Adele','Barry','Fin','Jade','Jenny','Jo','Lucy','Martine','Meg','Mike','Nicky','Saul','Tash'];
+let STAFF           = []; // loaded dynamically from Monday.com users
 const PRIORITY_OPTS = [{ label:'Critical',value:0 },{ label:'High',value:1 },{ label:'Medium',value:2 },{ label:'Low',value:3 }];
+
+async function fetchStaff() {
+  try {
+    const data = await mondayPost('{ users { id name } }');
+    STAFF = (data?.users || [])
+      .map(u => u.name)
+      .sort((a, b) => a.localeCompare(b));
+  } catch(e) {
+    // fallback if API call fails
+    STAFF = ['Adele','Barry','Jenny','Jo','Lucy','Meg','Mike','Nicky','Saul','Tash'];
+  }
+}
 
 let supView         = 'dashboard';
 let supLodge        = new URLSearchParams(location.search).get('lodge') || '';
@@ -723,6 +735,7 @@ function showSuppliesView(v) {
     const b = document.getElementById('supnav-' + n);
     if (b) b.className = 'sup-subnav-btn' + (v === n ? ' active' : '');
   });
+  if (!STAFF.length) fetchStaff(); // fetch once on first use
   if (v === 'dashboard') supRenderDashboard();
   else if (v === 'log')  supRenderLog();
   else                   supRenderDeliver();

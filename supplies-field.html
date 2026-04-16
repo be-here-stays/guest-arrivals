@@ -147,8 +147,10 @@
     .btn-submit:disabled { opacity: .5; cursor: not-allowed; }
 
     /* ── Home log button ── */
-    .btn-log-home { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px 16px; background: var(--dark); color: var(--cream); border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(39,47,46,.18); }
+    .btn-log-home { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px 16px; background: var(--dark); color: var(--cream); border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(39,47,46,.18); }
     .btn-log-home:hover { background: var(--sage); }
+    .btn-take-home { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px 16px; background: transparent; color: var(--dark); border: 1.5px solid var(--dark); border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; margin-bottom: 20px; }
+    .btn-take-home:hover { background: rgba(39,47,46,.06); }
 
     /* ── Log queue ── */
     .log-queue { margin-bottom: 16px; }
@@ -222,6 +224,7 @@
 
 <!-- LOG VIEW (standalone, from home) -->
 <div class="view hidden" id="view-log"></div>
+<div class="view hidden" id="view-stock"></div>
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
@@ -232,6 +235,9 @@ const MONDAY_TOKEN      = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NTg1MTIxMiwiYWFpIjox
 const ARRIVALS_BOARD    = 5094453064;
 const SUPPLIES_BOARD    = 1615688857;
 const SUP_GROUP         = 'topics';
+const STOCK_BOARD       = 5094763973;
+const STOCK_COL_STOCK   = 'numeric_mm2fmsjb';
+const STOCK_COL_REORDER = 'numeric_mm2f8xtv';
 const CHARGEABLE_GROUP  = 'new_group64916__1';
 const OVERDUE_DAYS      = 7;   // flag items older than this many days
 
@@ -328,7 +334,134 @@ async function createItem(lodge, item, qty, prio, staff, notes, isOther) {
 
 async function markDelivered(ids) {
   const m = ids.map((id,i) => `m${i}a:change_column_value(board_id:${SUPPLIES_BOARD},item_id:${id},column_id:"status",value:"{\\"index\\":1}"){id} m${i}b:move_item_to_group(item_id:${id},group_id:"${CHARGEABLE_GROUP}"){id}`).join('\n');
-  return mq(`mutation{${m}}`);
+  await mq(`mutation{${m}}`);
+  // Auto-deduct from stock warehouse for each delivered item
+  try { await deductStockForDeliveries(ids); } catch(e) { console.warn('Stock deduct failed:', e.message); }
+}
+
+async function deductStockForDeliveries(deliveredIds) {
+  // Get item names + quantities for the delivered items
+  const toDeduct = deliveredIds.map(id => {
+    const item = pendingItems.find(i => i.id === id);
+    if (!item) return null;
+    const name = cv(item,'text60__1') || item.name.split(' – ')[1] || '';
+    const qty  = parseFloat(cv(item,'numbers_MjiukVMp')) || 1;
+    return { name, qty };
+  }).filter(Boolean);
+  if (!toDeduct.length) return;
+
+  // Fetch current stock items and match by name
+  const data = await mq(`{ boards(ids:[${STOCK_BOARD}]) { items_page(limit:500) { items { id name column_values(ids:["${STOCK_COL_STOCK}"]) { id text } } } } }`);
+  const stockItems = data?.boards?.[0]?.items_page?.items || [];
+
+  // For each delivered item, find a matching stock entry and deduct
+  const mutations = [];
+  toDeduct.forEach(({ name, qty }) => {
+    const match = stockItems.find(s => s.name.toLowerCase().trim() === name.toLowerCase().trim());
+    if (!match) return;
+    const current = parseFloat(match.column_values.find(c => c.id === STOCK_COL_STOCK)?.text) || 0;
+    const newQty  = Math.max(0, current - qty);
+    mutations.push(`d_${match.id}:change_column_value(board_id:${STOCK_BOARD},item_id:${match.id},column_id:"${STOCK_COL_STOCK}",value:"${newQty}"){id}`);
+  });
+  if (!mutations.length) return;
+  await mq(`mutation{${mutations.join('\n')}}`);
+}
+
+// ─── TAKE STOCK VIEW ─────────────────────────────────────────────────────────
+let stockItems = []; // cached from last fetch
+
+async function showTakeStockView() {
+  setHdrTitle('Take from Stock');
+  document.getElementById('backBtn').classList.add('visible');
+  document.getElementById('view-stock').innerHTML = '<div class="loading"><span class="spin"></span>Loading stock items…</div>';
+  showView('stock');
+  try {
+    const data = await mq(`{ boards(ids:[${STOCK_BOARD}]) { items_page(limit:500) { items { id name column_values(ids:["${STOCK_COL_STOCK}","${STOCK_COL_REORDER}"]) { id text } } } } }`);
+    stockItems = (data?.boards?.[0]?.items_page?.items || [])
+      .map(i => ({
+        id:      i.id,
+        name:    i.name,
+        stock:   parseFloat(i.column_values.find(c=>c.id===STOCK_COL_STOCK)?.text)  || 0,
+        reorder: parseFloat(i.column_values.find(c=>c.id===STOCK_COL_REORDER)?.text) || 0
+      }))
+      .sort((a,b) => a.name.localeCompare(b.name));
+    renderTakeStock();
+  } catch(e) {
+    document.getElementById('view-stock').innerHTML = `<div class="empty">⚠️ Could not load stock.<br><small style="color:var(--sage-mid)">${e.message}</small></div>`;
+  }
+}
+
+function renderTakeStock() {
+  const staffOpts = STAFF.map(s => `<option value="${s}">${s}</option>`).join('');
+  const itemOpts  = stockItems.map(i => {
+    const status = i.stock <= 0 ? ' ⛔' : i.stock <= i.reorder ? ' ⚠️' : '';
+    return `<option value="${i.id}">${esc(i.name)}${status} (${i.stock} in stock)</option>`;
+  }).join('');
+  document.getElementById('view-stock').innerHTML = `
+    <div class="sh" style="margin-top:0">Take from stock</div>
+    <div class="deliver-zone" style="margin-top:0">
+      <div class="fld">
+        <label>Item</label>
+        <select id="tsItem"><option value="">Select item…</option>${itemOpts}</select>
+      </div>
+      <div class="fld-row">
+        <div class="fld">
+          <label>Qty</label>
+          <input type="number" id="tsQty" value="1" min="1">
+        </div>
+        <div class="fld">
+          <label>Purpose</label>
+          <select id="tsPurpose">
+            <option value="Van stock">Van stock</option>
+            <option value="Cleaning bag">Cleaning bag</option>
+            <option value="Direct from store">Direct from store</option>
+            <option value="Other">Other</option>
+          </select>
+        </div>
+      </div>
+      <div class="fld">
+        <label>Your name</label>
+        <select id="tsStaff"><option value="">Select…</option>${staffOpts}</select>
+      </div>
+      <div class="fld">
+        <label>Notes (optional)</label>
+        <textarea id="tsNotes" placeholder="Any extra detail…"></textarea>
+      </div>
+      <button class="btn-submit" id="tsSubmitBtn" onclick="submitTakeStock()">Take from stock</button>
+    </div>`;
+}
+
+async function submitTakeStock() {
+  const itemId  = document.getElementById('tsItem').value;
+  const qty     = parseInt(document.getElementById('tsQty').value) || 1;
+  const purpose = document.getElementById('tsPurpose').value;
+  const staff   = document.getElementById('tsStaff').value;
+  const notes   = document.getElementById('tsNotes').value || '';
+  if (!itemId) { showToast('Select an item', 'err'); return; }
+  if (!staff)  { showToast('Select your name', 'err'); return; }
+  const stockItem = stockItems.find(i => i.id === itemId);
+  if (!stockItem) return;
+  if (qty > stockItem.stock) {
+    showToast(`Only ${stockItem.stock} in stock — adjust qty`, 'err');
+    return;
+  }
+  const btn = document.getElementById('tsSubmitBtn');
+  btn.textContent = 'Saving…'; btn.disabled = true;
+  try {
+    const newStock = Math.max(0, stockItem.stock - qty);
+    await mq(`mutation($b:ID!,$i:ID!,$c:String!,$v:String!){change_column_value(board_id:$b,item_id:$i,column_id:$c,value:$v){id}}`,
+      { b: String(STOCK_BOARD), i: itemId, c: STOCK_COL_STOCK, v: String(newStock) });
+    showToast(`✅ ${qty}× ${stockItem.name} taken`, 'ok');
+    stockItem.stock = newStock;
+    // Reset form for another take
+    document.getElementById('tsItem').value  = '';
+    document.getElementById('tsQty').value   = '1';
+    document.getElementById('tsNotes').value = '';
+    btn.textContent = 'Take from stock'; btn.disabled = false;
+  } catch(e) {
+    showToast('Failed: ' + e.message, 'err');
+    btn.textContent = 'Take from stock'; btn.disabled = false;
+  }
 }
 
 // ─── DATA PROCESSING ─────────────────────────────────────────────────────────
@@ -391,6 +524,7 @@ function renderHome() {
 
   // Prominent log button always at the very top
   html += `<button class="btn-log-home" onclick="showLogView('')">📋 Log a shortage</button>`;
+  html += `<button class="btn-take-home" onclick="showTakeStockView()">🏪 Take from stock</button>`;
 
   if (critTotal > 0) {
     html += `<div class="crit-banner"><div><div class="crit-banner-num">${critTotal}</div><div class="crit-banner-lbl">Critical item${critTotal>1?'s':''} outstanding</div></div></div>`;
@@ -703,9 +837,10 @@ function setHdrTitle(t) { document.getElementById('hdrTitle').textContent = t; }
 function setHdrSub(t)   { document.getElementById('hdrSub').textContent   = t; }
 
 function showView(v) {
-  document.getElementById('view-home').classList.toggle('hidden', v!=='home');
+  document.getElementById('view-home').classList.toggle('hidden',   v!=='home');
   document.getElementById('view-detail').classList.toggle('hidden', v!=='detail');
-  document.getElementById('view-log').classList.toggle('hidden', v!=='log');
+  document.getElementById('view-log').classList.toggle('hidden',    v!=='log');
+  document.getElementById('view-stock').classList.toggle('hidden',  v!=='stock');
 }
 
 function showLogView(preselectedLodge) {

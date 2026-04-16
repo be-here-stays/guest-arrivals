@@ -1,0 +1,581 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Be Here — Stock Warehouse</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #D5D0C4;
+      --dark:     #272F2E;
+      --sage:     #646955;
+      --sage-mid: #989782;
+      --gold:     #AF926A;
+      --cream:    #F3E3C3;
+      --surface:  #fff;
+      --border:   #e0ddd6;
+      --text:     #272F2E;
+      --red:      #8B2020;
+      --red-bg:   #fdf0ec;
+      --red-bdr:  #c0563a;
+      --amber:    #a86c00;
+      --amber-bg: #fdf5e8;
+      --amber-bdr:#c8a060;
+      --green:    #2d6a4f;
+      --green-bg: #edf7f2;
+      --green-bdr:#52b788;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── Header ── */
+    header { background: var(--dark); color: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
+    .hdr-left { display: flex; align-items: center; gap: 20px; }
+    .hdr-logo svg { display: block; width: 110px; height: auto; }
+    .hdr-title { font-size: 18px; font-weight: 700; color: #fff; }
+    .hdr-sub   { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 2px; }
+    .hdr-right { display: flex; align-items: center; gap: 10px; }
+    .btn-refresh { padding: 7px 14px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 7px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .btn-refresh:hover { background: rgba(255,255,255,0.2); }
+    .btn-add-item { padding: 7px 16px; background: var(--cream); border: none; border-radius: 7px; color: var(--dark); font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .btn-add-item:hover { background: #e8d4ae; }
+
+    /* ── API bar ── */
+    .api-bar { background: #1e2522; padding: 10px 32px; display: flex; align-items: center; gap: 12px; }
+    .api-status { font-size: 12px; color: rgba(255,255,255,0.7); }
+
+    /* ── Filters ── */
+    .filters { background: var(--surface); border-bottom: 2px solid var(--border); padding: 12px 32px; display: flex; align-items: center; gap: 24px; flex-wrap: wrap; }
+    .filter-group { display: flex; align-items: center; gap: 6px; }
+    .filter-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--sage-mid); }
+    .filter-btn { padding: 5px 12px; border: 1.5px solid var(--border); border-radius: 20px; background: transparent; font-size: 12px; font-weight: 600; color: var(--sage-mid); cursor: pointer; font-family: inherit; transition: all .15s; }
+    .filter-btn:hover { border-color: var(--dark); color: var(--dark); }
+    .filter-btn.active { background: var(--dark); border-color: var(--dark); color: #fff; }
+    .filter-sep { width: 1px; height: 20px; background: var(--border); }
+
+    /* ── Main content ── */
+    .content { padding: 24px 32px; max-width: 1200px; }
+
+    /* ── Stats row ── */
+    .stats-row { display: flex; gap: 12px; margin-bottom: 20px; }
+    .stat-card { background: var(--surface); border-radius: 10px; padding: 14px 20px; flex: 1; box-shadow: 0 1px 3px rgba(39,47,46,.07); }
+    .stat-val  { font-size: 28px; font-weight: 700; color: var(--dark); }
+    .stat-lbl  { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--sage-mid); margin-top: 2px; }
+    .stat-card.warn .stat-val { color: var(--amber); }
+    .stat-card.danger .stat-val { color: var(--red); }
+
+    /* ── Alert banner ── */
+    .alert-banner { border-radius: 10px; padding: 12px 16px; margin-bottom: 16px; font-size: 13px; border: 1.5px solid; }
+    .alert-banner.critical { background: var(--red-bg); border-color: var(--red-bdr); color: var(--red); }
+    .alert-banner.low { background: var(--amber-bg); border-color: var(--amber-bdr); color: var(--amber); }
+    .alert-title { font-weight: 700; margin-bottom: 4px; }
+    .alert-items { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 6px; }
+    .alert-pill  { display: inline-block; font-size: 11px; font-weight: 600; padding: 2px 9px; border-radius: 10px; }
+    .alert-pill.out  { background: var(--red-bg); border: 1px solid var(--red-bdr); color: var(--red); }
+    .alert-pill.low  { background: var(--amber-bg); border: 1px solid var(--amber-bdr); color: var(--amber); }
+
+    /* ── Stock table ── */
+    .table-wrap { background: var(--surface); border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(39,47,46,.08); }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { text-align: left; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--sage-mid); padding: 12px 16px 10px; border-bottom: 2px solid var(--border); white-space: nowrap; }
+    thead th.th-right { text-align: right; }
+    tbody tr { border-bottom: 1px solid #eae8e2; transition: background .1s; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f7f5f0; }
+    td { padding: 12px 16px; vertical-align: middle; }
+    td.td-right { text-align: right; }
+    .item-name  { font-size: 14px; font-weight: 600; color: var(--dark); }
+    .item-notes { font-size: 11px; color: var(--sage-mid); margin-top: 2px; }
+
+    /* ── Stock level cell ── */
+    .stock-cell { display: flex; align-items: center; gap: 10px; }
+    .stock-num  { font-size: 22px; font-weight: 700; min-width: 36px; }
+    .stock-num.ok     { color: var(--green); }
+    .stock-num.low    { color: var(--amber); }
+    .stock-num.out    { color: var(--red); }
+    .stock-bar-wrap { flex: 1; min-width: 60px; }
+    .stock-bar-bg   { height: 6px; background: var(--border); border-radius: 3px; overflow: hidden; }
+    .stock-bar-fill { height: 100%; border-radius: 3px; transition: width .3s; }
+    .stock-bar-fill.ok  { background: var(--green); }
+    .stock-bar-fill.low { background: var(--amber); }
+    .stock-bar-fill.out { background: var(--red); }
+    .stock-reorder { font-size: 10px; color: var(--sage-mid); margin-top: 3px; }
+
+    /* ── Tags ── */
+    .tag { display: inline-block; font-size: 10px; font-weight: 700; padding: 2px 8px; border-radius: 8px; text-transform: uppercase; letter-spacing: .3px; }
+    .tag-hub    { background: #e8f0f5; color: #1a4a6b; }
+    .tag-horse  { background: #f0ebe8; color: #6b3a1a; }
+    .tag-both   { background: #f0f0e8; color: #4a4a1a; }
+    .tag-guest  { background: #edf7f2; color: var(--green); }
+    .tag-clean  { background: #f5edf7; color: #6b1a6b; }
+    .tag-both-c { background: #f0f0e8; color: #4a4a1a; }
+
+    /* ── Action buttons ── */
+    .action-btns { display: flex; gap: 6px; justify-content: flex-end; }
+    .btn-stock  { padding: 5px 10px; border-radius: 6px; font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; border: none; transition: background .15s; }
+    .btn-stock-add  { background: var(--dark); color: #fff; }
+    .btn-stock-add:hover  { background: var(--sage); }
+    .btn-stock-take { background: transparent; border: 1.5px solid var(--border) !important; color: var(--sage); }
+    .btn-stock-take:hover { background: var(--bg); }
+
+    /* ── Empty / loading ── */
+    .empty { text-align: center; padding: 60px 20px; color: var(--sage-mid); font-size: 14px; }
+    .spin { display: inline-block; width: 22px; height: 22px; border: 2px solid rgba(100,105,85,.2); border-top-color: var(--sage); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Modal ── */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(39,47,46,.5); z-index: 100; display: flex; align-items: center; justify-content: center; padding: 20px; }
+    .modal-overlay.hidden { display: none; }
+    .modal { background: var(--surface); border-radius: 14px; padding: 24px; width: 100%; max-width: 400px; box-shadow: 0 8px 32px rgba(39,47,46,.25); }
+    .modal-title { font-size: 16px; font-weight: 700; color: var(--dark); margin-bottom: 4px; }
+    .modal-sub   { font-size: 13px; color: var(--sage-mid); margin-bottom: 20px; }
+    .modal-fld   { margin-bottom: 14px; }
+    .modal-fld label { display: block; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--sage-mid); margin-bottom: 5px; }
+    .modal-fld input, .modal-fld select, .modal-fld textarea { width: 100%; padding: 9px 12px; border: 1.5px solid var(--border); border-radius: 8px; background: var(--surface); color: var(--text); font-size: 14px; font-family: inherit; outline: none; }
+    .modal-fld input:focus, .modal-fld select:focus { border-color: var(--gold); }
+    .modal-fld textarea { resize: vertical; min-height: 56px; }
+    .modal-btns { display: flex; gap: 8px; margin-top: 20px; }
+    .btn-modal-cancel { flex: 1; padding: 10px; border: 1.5px solid var(--border); border-radius: 8px; background: transparent; font-size: 14px; font-weight: 600; cursor: pointer; font-family: inherit; color: var(--sage); }
+    .btn-modal-cancel:hover { background: var(--bg); }
+    .btn-modal-ok { flex: 2; padding: 10px; border: none; border-radius: 8px; background: var(--dark); color: var(--cream); font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+    .btn-modal-ok:hover { background: var(--sage); }
+    .btn-modal-ok:disabled { opacity: .5; cursor: not-allowed; }
+    .btn-modal-ok.danger { background: var(--red); }
+    .btn-modal-ok.danger:hover { background: #6b1818; }
+
+    /* ── New item modal extras ── */
+    .fld-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-left">
+    <div class="hdr-logo">
+      <svg viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <text x="0" y="44" font-family="Instrument Sans, sans-serif" font-weight="700" font-size="42" fill="#F3E3C3">Be Here.</text>
+      </svg>
+    </div>
+    <div>
+      <div class="hdr-title">Stock Warehouse</div>
+      <div class="hdr-sub" id="hdrSub">Loading…</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <button class="btn-refresh" onclick="loadStock()">↺ Refresh</button>
+    <button class="btn-add-item" onclick="openNewItemModal()">+ New item</button>
+  </div>
+</header>
+
+<div class="api-bar">
+  <span class="api-status" id="apiStatus">Connecting…</span>
+</div>
+
+<div class="filters">
+  <div class="filter-group">
+    <span class="filter-label">Location</span>
+    <button class="filter-btn active" onclick="setFilter('loc','All',this)">All</button>
+    <button class="filter-btn" onclick="setFilter('loc','The Hub',this)">The Hub</button>
+    <button class="filter-btn" onclick="setFilter('loc','Little Horseshoe',this)">Little Horseshoe</button>
+  </div>
+  <div class="filter-sep"></div>
+  <div class="filter-group">
+    <span class="filter-label">Category</span>
+    <button class="filter-btn active" onclick="setFilter('cat','All',this)">All</button>
+    <button class="filter-btn" onclick="setFilter('cat','Guest',this)">Guest</button>
+    <button class="filter-btn" onclick="setFilter('cat','Cleaning',this)">Cleaning</button>
+    <button class="filter-btn" onclick="setFilter('cat','Both',this)">Both</button>
+  </div>
+  <div class="filter-sep"></div>
+  <div class="filter-group">
+    <span class="filter-label">Status</span>
+    <button class="filter-btn active" onclick="setFilter('status','All',this)">All</button>
+    <button class="filter-btn" onclick="setFilter('status','low',this)">Low / Out</button>
+  </div>
+</div>
+
+<div class="content">
+  <div class="stats-row" id="statsRow" style="display:none">
+    <div class="stat-card"><div class="stat-val" id="statTotal">–</div><div class="stat-lbl">Items tracked</div></div>
+    <div class="stat-card warn"><div class="stat-val" id="statLow">–</div><div class="stat-lbl">Low stock</div></div>
+    <div class="stat-card danger"><div class="stat-val" id="statOut">–</div><div class="stat-lbl">Out of stock</div></div>
+  </div>
+  <div id="alertsWrap"></div>
+  <div id="tableWrap">
+    <div class="empty"><span class="spin"></span>Loading stock data…</div>
+  </div>
+</div>
+
+<!-- Adjust stock modal -->
+<div class="modal-overlay hidden" id="adjustModal">
+  <div class="modal">
+    <div class="modal-title" id="adjustTitle">Adjust Stock</div>
+    <div class="modal-sub" id="adjustSub"></div>
+    <div class="modal-fld">
+      <label id="adjustQtyLabel">Quantity to add</label>
+      <input type="number" id="adjustQty" min="1" value="1">
+    </div>
+    <div class="modal-fld">
+      <label>Reason / notes (optional)</label>
+      <textarea id="adjustNotes" placeholder="e.g. Delivery received, staff withdrawal…"></textarea>
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeModal()">Cancel</button>
+      <button class="btn-modal-ok" id="adjustOkBtn" onclick="confirmAdjust()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<!-- New stock item modal -->
+<div class="modal-overlay hidden" id="newItemModal">
+  <div class="modal">
+    <div class="modal-title">Add new stock item</div>
+    <div class="modal-sub">This will create a new item on the Stock Warehouse board in Monday.</div>
+    <div class="modal-fld">
+      <label>Item name</label>
+      <input type="text" id="niName" placeholder="e.g. Toilet Rolls">
+    </div>
+    <div class="fld-row">
+      <div class="modal-fld">
+        <label>Current stock</label>
+        <input type="number" id="niStock" min="0" value="0">
+      </div>
+      <div class="modal-fld">
+        <label>Reorder level</label>
+        <input type="number" id="niReorder" min="0" value="10">
+      </div>
+    </div>
+    <div class="fld-row">
+      <div class="modal-fld">
+        <label>Location</label>
+        <select id="niLocation">
+          <option value="The Hub">The Hub</option>
+          <option value="Little Horseshoe">Little Horseshoe</option>
+          <option value="Both">Both</option>
+        </select>
+      </div>
+      <div class="modal-fld">
+        <label>Category</label>
+        <select id="niCategory">
+          <option value="Guest">Guest</option>
+          <option value="Cleaning">Cleaning</option>
+          <option value="Both">Both</option>
+        </select>
+      </div>
+    </div>
+    <div class="modal-fld">
+      <label>Notes (optional)</label>
+      <input type="text" id="niNotes" placeholder="e.g. supplier, pack size">
+    </div>
+    <div class="modal-btns">
+      <button class="btn-modal-cancel" onclick="closeNewItemModal()">Cancel</button>
+      <button class="btn-modal-ok" id="niOkBtn" onclick="confirmNewItem()">Create item</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const MONDAY_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NTg1MTIxMiwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTVUMDg6NTM6MTkuMzQxWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.AnJa58nVNbSv1Ydgf8BVmIBY4zoN4rOgl7IAKs51RtA';
+const STOCK_BOARD  = 5094763973;
+const COL = {
+  stock:    'numeric_mm2fmsjb',
+  reorder:  'numeric_mm2f8xtv',
+  location: 'color_mm2f8rh0',
+  category: 'color_mm2fx0zz',
+  notes:    'text_mm2frxg5'
+};
+
+// Location → Monday status index mapping (matches board setup)
+const LOC_INDEX  = { 'The Hub': 0, 'Little Horseshoe': 1, 'Both': 2 };
+const CAT_INDEX  = { 'Guest': 0, 'Cleaning': 1, 'Both': 2 };
+
+// ─── STATE ───────────────────────────────────────────────────────────────────
+let allItems   = [];
+let filterLoc  = 'All';
+let filterCat  = 'All';
+let filterStatus = 'All';
+let adjustItemId    = null;
+let adjustMode      = 'add'; // 'add' or 'take'
+let adjustCurrentStock = 0;
+
+// ─── INIT ────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', loadStock);
+
+// ─── API ─────────────────────────────────────────────────────────────────────
+async function mq(query, variables) {
+  const resp = await fetch('https://api.monday.com/v2', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': MONDAY_TOKEN, 'API-Version': '2024-01' },
+    body: JSON.stringify({ query, variables: variables || {} })
+  });
+  const json = await resp.json();
+  if (json.errors) throw new Error(json.errors[0].message);
+  return json.data;
+}
+
+// ─── LOAD ────────────────────────────────────────────────────────────────────
+async function loadStock() {
+  document.getElementById('apiStatus').textContent = 'Loading…';
+  document.getElementById('tableWrap').innerHTML = '<div class="empty"><span class="spin"></span>Loading stock data…</div>';
+  document.getElementById('statsRow').style.display = 'none';
+  try {
+    const data = await mq(`{
+      boards(ids: [${STOCK_BOARD}]) {
+        items_page(limit: 500) {
+          items {
+            id name
+            column_values(ids: ["${COL.stock}","${COL.reorder}","${COL.location}","${COL.category}","${COL.notes}"]) {
+              id text value
+            }
+          }
+        }
+      }
+    }`);
+    allItems = (data?.boards?.[0]?.items_page?.items || []).map(parseItem);
+    allItems.sort((a, b) => {
+      // Out of stock first, then low, then by name
+      const rankA = a.stock <= 0 ? 0 : a.stock <= a.reorder ? 1 : 2;
+      const rankB = b.stock <= 0 ? 0 : b.stock <= b.reorder ? 1 : 2;
+      if (rankA !== rankB) return rankA - rankB;
+      return a.name.localeCompare(b.name);
+    });
+    document.getElementById('apiStatus').textContent = `✓ ${allItems.length} items loaded · ${new Date().toLocaleTimeString()}`;
+    document.getElementById('hdrSub').textContent = `${allItems.length} items tracked · updated ${new Date().toLocaleTimeString()}`;
+    document.getElementById('statsRow').style.display = 'flex';
+    render();
+  } catch(e) {
+    document.getElementById('apiStatus').textContent = '⚠️ Error: ' + e.message;
+    document.getElementById('tableWrap').innerHTML = `<div class="empty">⚠️ Could not load stock data.<br><small style="color:var(--sage-mid)">${e.message}</small></div>`;
+  }
+}
+
+function parseItem(item) {
+  const cv = {};
+  for (const c of item.column_values) cv[c.id] = c;
+  return {
+    id:       item.id,
+    name:     item.name,
+    stock:    parseFloat(cv[COL.stock]?.text)  || 0,
+    reorder:  parseFloat(cv[COL.reorder]?.text) || 0,
+    location: cv[COL.location]?.text || '',
+    category: cv[COL.category]?.text || '',
+    notes:    cv[COL.notes]?.text    || ''
+  };
+}
+
+// ─── FILTERS ─────────────────────────────────────────────────────────────────
+function setFilter(type, val, btn) {
+  if (type === 'loc')    filterLoc    = val;
+  if (type === 'cat')    filterCat    = val;
+  if (type === 'status') filterStatus = val;
+  // Update button states within same group
+  btn.closest('.filter-group').querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  render();
+}
+
+function filteredItems() {
+  return allItems.filter(i => {
+    if (filterLoc !== 'All' && i.location !== filterLoc && !(i.location === 'Both')) {
+      if (filterLoc !== i.location) return false;
+    }
+    if (filterCat !== 'All' && i.category !== filterCat && i.category !== 'Both') return false;
+    if (filterStatus === 'low' && i.stock > i.reorder && i.stock > 0) return false;
+    return true;
+  });
+}
+
+// ─── RENDER ──────────────────────────────────────────────────────────────────
+function render() {
+  const items = filteredItems();
+
+  // Stats
+  const outCount  = allItems.filter(i => i.stock <= 0).length;
+  const lowCount  = allItems.filter(i => i.stock > 0 && i.stock <= i.reorder).length;
+  document.getElementById('statTotal').textContent = allItems.length;
+  document.getElementById('statLow').textContent   = lowCount;
+  document.getElementById('statOut').textContent   = outCount;
+
+  // Alerts
+  const alertsWrap = document.getElementById('alertsWrap');
+  let alertHtml = '';
+  const outItems  = allItems.filter(i => i.stock <= 0);
+  const lowItems  = allItems.filter(i => i.stock > 0 && i.stock <= i.reorder);
+  if (outItems.length) {
+    alertHtml += `<div class="alert-banner critical">
+      <div class="alert-title">⛔ Out of stock (${outItems.length})</div>
+      <div class="alert-items">${outItems.map(i => `<span class="alert-pill out">${esc(i.name)}</span>`).join('')}</div>
+    </div>`;
+  }
+  if (lowItems.length) {
+    alertHtml += `<div class="alert-banner low">
+      <div class="alert-title">⚠️ Low stock — at or below reorder level (${lowItems.length})</div>
+      <div class="alert-items">${lowItems.map(i => `<span class="alert-pill low">${esc(i.name)} (${i.stock} left)</span>`).join('')}</div>
+    </div>`;
+  }
+  alertsWrap.innerHTML = alertHtml;
+
+  // Table
+  if (!items.length) {
+    document.getElementById('tableWrap').innerHTML = '<div class="empty">No items match the current filters.</div>';
+    return;
+  }
+
+  let html = `<div class="table-wrap"><table>
+    <thead><tr>
+      <th>Item</th>
+      <th>Stock level</th>
+      <th class="th-right">Reorder at</th>
+      <th>Location</th>
+      <th>Category</th>
+      <th class="th-right">Actions</th>
+    </tr></thead>
+    <tbody>`;
+
+  for (const item of items) {
+    const status    = item.stock <= 0 ? 'out' : item.stock <= item.reorder ? 'low' : 'ok';
+    const maxBar    = Math.max(item.reorder * 2, item.stock, 1);
+    const barPct    = Math.min(100, Math.round((item.stock / maxBar) * 100));
+    const locTag    = locTagHtml(item.location);
+    const catTag    = catTagHtml(item.category);
+
+    html += `<tr>
+      <td>
+        <div class="item-name">${esc(item.name)}</div>
+        ${item.notes ? `<div class="item-notes">${esc(item.notes)}</div>` : ''}
+      </td>
+      <td>
+        <div class="stock-cell">
+          <div class="stock-num ${status}">${item.stock}</div>
+          <div class="stock-bar-wrap">
+            <div class="stock-bar-bg"><div class="stock-bar-fill ${status}" style="width:${barPct}%"></div></div>
+            <div class="stock-reorder">reorder at ${item.reorder}</div>
+          </div>
+        </div>
+      </td>
+      <td class="td-right" style="color:var(--sage-mid);font-size:13px">${item.reorder}</td>
+      <td>${locTag}</td>
+      <td>${catTag}</td>
+      <td class="td-right">
+        <div class="action-btns">
+          <button class="btn-stock btn-stock-add" onclick="openAdjust('${item.id}','add',${item.stock},'${esc(item.name).replace(/'/g,"\\'")}')">+ Add</button>
+          <button class="btn-stock btn-stock-take" onclick="openAdjust('${item.id}','take',${item.stock},'${esc(item.name).replace(/'/g,"\\'")}')">− Take</button>
+        </div>
+      </td>
+    </tr>`;
+  }
+
+  html += `</tbody></table></div>`;
+  document.getElementById('tableWrap').innerHTML = html;
+}
+
+function locTagHtml(loc) {
+  if (!loc) return '<span style="color:var(--sage-mid);font-size:12px">—</span>';
+  const cls = loc === 'The Hub' ? 'tag-hub' : loc === 'Little Horseshoe' ? 'tag-horse' : 'tag-both';
+  return `<span class="tag ${cls}">${esc(loc)}</span>`;
+}
+function catTagHtml(cat) {
+  if (!cat) return '<span style="color:var(--sage-mid);font-size:12px">—</span>';
+  const cls = cat === 'Guest' ? 'tag-guest' : cat === 'Cleaning' ? 'tag-clean' : 'tag-both-c';
+  return `<span class="tag ${cls}">${esc(cat)}</span>`;
+}
+
+// ─── ADJUST STOCK MODAL ───────────────────────────────────────────────────────
+function openAdjust(id, mode, currentStock, name) {
+  adjustItemId        = id;
+  adjustMode          = mode;
+  adjustCurrentStock  = currentStock;
+  document.getElementById('adjustTitle').textContent = mode === 'add' ? 'Add stock' : 'Take from stock';
+  document.getElementById('adjustSub').textContent   = `${name} · Currently ${currentStock} in stock`;
+  document.getElementById('adjustQtyLabel').textContent = mode === 'add' ? 'Quantity to add' : 'Quantity to take';
+  document.getElementById('adjustQty').value   = '1';
+  document.getElementById('adjustNotes').value = '';
+  const okBtn = document.getElementById('adjustOkBtn');
+  okBtn.textContent = mode === 'add' ? 'Add stock' : 'Take stock';
+  okBtn.className   = mode === 'add' ? 'btn-modal-ok' : 'btn-modal-ok danger';
+  document.getElementById('adjustModal').classList.remove('hidden');
+}
+
+function closeModal() {
+  document.getElementById('adjustModal').classList.add('hidden');
+}
+
+async function confirmAdjust() {
+  const qty = parseInt(document.getElementById('adjustQty').value) || 0;
+  if (qty <= 0) { alert('Enter a quantity greater than 0'); return; }
+  if (adjustMode === 'take' && qty > adjustCurrentStock) {
+    if (!confirm(`You're taking ${qty} but only ${adjustCurrentStock} in stock. Continue?`)) return;
+  }
+  const newStock = adjustMode === 'add'
+    ? adjustCurrentStock + qty
+    : Math.max(0, adjustCurrentStock - qty);
+  const btn = document.getElementById('adjustOkBtn');
+  btn.textContent = 'Saving…'; btn.disabled = true;
+  try {
+    await mq(`mutation($b:ID!,$i:ID!,$c:String!,$v:String!){change_column_value(board_id:$b,item_id:$i,column_id:$c,value:$v){id}}`,
+      { b: String(STOCK_BOARD), i: adjustItemId, c: COL.stock, v: String(newStock) });
+    // Update local state
+    const item = allItems.find(i => i.id === adjustItemId);
+    if (item) item.stock = newStock;
+    closeModal();
+    render();
+  } catch(e) {
+    alert('Failed to update stock: ' + e.message);
+    btn.textContent = adjustMode === 'add' ? 'Add stock' : 'Take stock';
+    btn.disabled = false;
+  }
+}
+
+// ─── NEW ITEM MODAL ───────────────────────────────────────────────────────────
+function openNewItemModal() {
+  document.getElementById('niName').value    = '';
+  document.getElementById('niStock').value   = '0';
+  document.getElementById('niReorder').value = '10';
+  document.getElementById('niNotes').value   = '';
+  document.getElementById('newItemModal').classList.remove('hidden');
+}
+function closeNewItemModal() {
+  document.getElementById('newItemModal').classList.add('hidden');
+}
+
+async function confirmNewItem() {
+  const name    = document.getElementById('niName').value.trim();
+  const stock   = parseInt(document.getElementById('niStock').value)   || 0;
+  const reorder = parseInt(document.getElementById('niReorder').value) || 0;
+  const loc     = document.getElementById('niLocation').value;
+  const cat     = document.getElementById('niCategory').value;
+  const notes   = document.getElementById('niNotes').value.trim();
+  if (!name) { alert('Enter an item name'); return; }
+  const btn = document.getElementById('niOkBtn');
+  btn.textContent = 'Creating…'; btn.disabled = true;
+  try {
+    const colVals = JSON.stringify({
+      [COL.stock]:    stock,
+      [COL.reorder]:  reorder,
+      [COL.location]: { index: LOC_INDEX[loc] ?? 0 },
+      [COL.category]: { index: CAT_INDEX[cat] ?? 0 },
+      [COL.notes]:    notes
+    });
+    await mq(`mutation($b:ID!,$n:String!,$v:JSON!){create_item(board_id:$b,item_name:$n,column_values:$v){id}}`,
+      { b: String(STOCK_BOARD), n: name, v: colVals });
+    closeNewItemModal();
+    loadStock(); // full reload to get the new item
+  } catch(e) {
+    alert('Failed to create item: ' + e.message);
+    btn.textContent = 'Create item'; btn.disabled = false;
+  }
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+
+// Close modals on overlay click
+document.getElementById('adjustModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
+document.getElementById('newItemModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeNewItemModal(); });
+</script>
+</body>
+</html>

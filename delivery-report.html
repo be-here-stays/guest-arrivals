@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Be Here — Delivery Report</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:       #D5D0C4;
+      --dark:     #272F2E;
+      --sage:     #646955;
+      --sage-mid: #989782;
+      --gold:     #AF926A;
+      --cream:    #F3E3C3;
+      --surface:  #fff;
+      --border:   #e0ddd6;
+      --text:     #272F2E;
+      --red:      #8B2020;
+      --red-bg:   #fdf0ec;
+      --red-bdr:  #c0563a;
+      --amber:    #a86c00;
+      --amber-bg: #fdf5e8;
+      --green:    #2d6a4f;
+      --green-bg: #edf7f2;
+      --green-bdr:#52b788;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Instrument Sans', -apple-system, BlinkMacSystemFont, sans-serif; background: var(--bg); color: var(--text); min-height: 100vh; }
+
+    /* ── Header ── */
+    header { background: var(--dark); color: #fff; padding: 16px 32px; display: flex; align-items: center; justify-content: space-between; }
+    .hdr-left { display: flex; align-items: center; gap: 20px; }
+    .hdr-logo svg { display: block; width: 110px; height: auto; }
+    .hdr-title { font-size: 18px; font-weight: 700; color: #fff; }
+    .hdr-sub   { font-size: 11px; color: rgba(255,255,255,0.55); margin-top: 2px; }
+    .hdr-right { display: flex; gap: 8px; }
+    .btn-hdr { padding: 7px 14px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 7px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
+    .btn-hdr:hover { background: rgba(255,255,255,0.2); }
+    .btn-hdr.primary { background: var(--cream); color: var(--dark); border-color: transparent; }
+    .btn-hdr.primary:hover { background: #e8d4ae; }
+
+    /* ── Filter bar ── */
+    .filter-bar { background: var(--surface); border-bottom: 2px solid var(--border); padding: 16px 32px; display: flex; align-items: flex-end; gap: 20px; flex-wrap: wrap; }
+    .fld { display: flex; flex-direction: column; gap: 5px; }
+    .fld label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--sage-mid); }
+    .fld input[type="date"], .fld select { padding: 8px 12px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-family: inherit; color: var(--dark); background: var(--surface); outline: none; min-width: 140px; }
+    .fld input[type="date"]:focus, .fld select:focus { border-color: var(--gold); }
+    .fld input[type="number"] { padding: 8px 10px; border: 1.5px solid var(--border); border-radius: 8px; font-size: 13px; font-family: inherit; color: var(--dark); background: var(--surface); outline: none; width: 80px; }
+    .fld input[type="number"]:focus { border-color: var(--gold); }
+    .fld-suffix { display: flex; align-items: center; gap: 0; }
+    .fld-suffix input { border-radius: 8px 0 0 8px; }
+    .fld-suffix span { padding: 8px 10px; border: 1.5px solid var(--border); border-left: none; border-radius: 0 8px 8px 0; font-size: 13px; color: var(--sage-mid); background: var(--bg); white-space: nowrap; }
+    .filter-sep { width: 1px; height: 40px; background: var(--border); align-self: flex-end; }
+    .btn-generate { padding: 9px 24px; background: var(--dark); color: var(--cream); border: none; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; align-self: flex-end; white-space: nowrap; }
+    .btn-generate:hover { background: var(--sage); }
+    .btn-generate:disabled { opacity: .5; cursor: not-allowed; }
+
+    /* ── Content ── */
+    .content { padding: 28px 32px; max-width: 1100px; }
+
+    /* ── Empty / loading ── */
+    .empty { text-align: center; padding: 60px 20px; color: var(--sage-mid); font-size: 14px; }
+    .spin { display: inline-block; width: 22px; height: 22px; border: 2px solid rgba(100,105,85,.2); border-top-color: var(--sage); border-radius: 50%; animation: spin .7s linear infinite; vertical-align: middle; margin-right: 8px; }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ── Report header ── */
+    .report-meta { background: var(--surface); border-radius: 10px; padding: 14px 20px; margin-bottom: 20px; display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; box-shadow: 0 1px 3px rgba(39,47,46,.07); }
+    .report-title { font-size: 15px; font-weight: 700; color: var(--dark); }
+    .report-sub { font-size: 12px; color: var(--sage-mid); margin-top: 3px; }
+    .report-actions { display: flex; gap: 8px; }
+    .btn-export { padding: 7px 14px; border: 1.5px solid var(--border); border-radius: 7px; background: transparent; font-size: 12px; font-weight: 600; color: var(--sage); cursor: pointer; font-family: inherit; }
+    .btn-export:hover { background: var(--bg); }
+    .btn-print { padding: 7px 14px; border: none; border-radius: 7px; background: var(--dark); font-size: 12px; font-weight: 600; color: #fff; cursor: pointer; font-family: inherit; }
+    .btn-print:hover { background: var(--sage); }
+
+    /* ── Summary stats ── */
+    .summary-row { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+    .sum-card { background: var(--surface); border-radius: 10px; padding: 14px 20px; flex: 1; min-width: 130px; box-shadow: 0 1px 3px rgba(39,47,46,.07); }
+    .sum-val { font-size: 22px; font-weight: 700; color: var(--dark); }
+    .sum-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--sage-mid); margin-top: 3px; }
+    .sum-card.accent .sum-val { color: var(--gold); font-size: 24px; }
+
+    /* ── Lodge section ── */
+    .lodge-section { margin-bottom: 24px; }
+    .lodge-header { display: flex; align-items: center; justify-content: space-between; padding: 10px 16px; background: var(--dark); color: #fff; border-radius: 10px 10px 0 0; }
+    .lodge-name { font-size: 14px; font-weight: 700; }
+    .lodge-count { font-size: 12px; color: rgba(255,255,255,0.6); }
+    .table-wrap { background: var(--surface); border-radius: 0 0 10px 10px; overflow: hidden; box-shadow: 0 2px 6px rgba(39,47,46,.08); }
+    table { width: 100%; border-collapse: collapse; }
+    thead th { text-align: left; font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--sage-mid); padding: 10px 14px 8px; border-bottom: 2px solid var(--border); white-space: nowrap; }
+    thead th.th-right { text-align: right; }
+    tbody tr { border-bottom: 1px solid #eae8e2; }
+    tbody tr:last-child { border-bottom: none; }
+    tbody tr:hover { background: #f7f5f0; }
+    td { padding: 10px 14px; font-size: 13px; vertical-align: middle; }
+    td.td-right { text-align: right; }
+    .item-name { font-weight: 600; color: var(--dark); }
+    .item-date { color: var(--sage-mid); font-size: 12px; }
+    .no-price { color: var(--amber); font-size: 11px; font-weight: 600; }
+
+    /* ── Subtotal row ── */
+    .subtotal-row td { background: #f2f0eb; font-weight: 700; font-size: 13px; border-top: 2px solid var(--border); }
+    .subtotal-row td:first-child { color: var(--sage); font-size: 11px; text-transform: uppercase; letter-spacing: .4px; }
+
+    /* ── Grand total ── */
+    .grand-total { background: var(--surface); border-radius: 10px; padding: 16px 20px; margin-top: 8px; box-shadow: 0 2px 6px rgba(39,47,46,.08); }
+    .gt-row { display: flex; justify-content: space-between; align-items: center; padding: 5px 0; font-size: 13px; }
+    .gt-row.gt-main { border-top: 2px solid var(--border); margin-top: 6px; padding-top: 10px; }
+    .gt-label { color: var(--sage-mid); font-weight: 600; }
+    .gt-val { font-weight: 700; color: var(--dark); font-size: 14px; }
+    .gt-row.gt-main .gt-label { color: var(--dark); font-size: 15px; font-weight: 700; }
+    .gt-row.gt-main .gt-val { font-size: 18px; color: var(--dark); }
+
+    /* ── No price warning ── */
+    .warn-banner { background: var(--amber-bg); border: 1.5px solid #c8a060; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: var(--amber); }
+    .warn-banner strong { display: block; margin-bottom: 4px; }
+
+    /* ── Print styles ── */
+    @media print {
+      body { background: #fff; }
+      header, .filter-bar, .report-actions, .btn-export, .btn-print { display: none !important; }
+      .content { padding: 0; max-width: 100%; }
+      .lodge-section { break-inside: avoid; margin-bottom: 16px; }
+      .lodge-header { background: #272F2E !important; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      .grand-total { break-inside: avoid; }
+      .summary-row { display: none; }
+    }
+
+    /* ── Toast ── */
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--dark); color: #fff; padding: 10px 22px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 999; opacity: 0; transition: opacity .3s; pointer-events: none; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-left">
+    <div class="hdr-logo">
+      <svg viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <text x="0" y="44" font-family="Instrument Sans, sans-serif" font-weight="700" font-size="42" fill="#F3E3C3">Be Here.</text>
+      </svg>
+    </div>
+    <div>
+      <div class="hdr-title">Delivery Report</div>
+      <div class="hdr-sub" id="hdrSub">Select a date range and generate a report</div>
+    </div>
+  </div>
+  <div class="hdr-right">
+    <button class="btn-hdr" onclick="window.print()">🖨 Print</button>
+  </div>
+</header>
+
+<div class="filter-bar">
+  <div class="fld">
+    <label>From</label>
+    <input type="date" id="dateFrom">
+  </div>
+  <div class="fld">
+    <label>To</label>
+    <input type="date" id="dateTo">
+  </div>
+  <div class="fld">
+    <label>Lodge</label>
+    <select id="lodgeFilter">
+      <option value="All">All lodges</option>
+    </select>
+  </div>
+  <div class="filter-sep"></div>
+  <div class="fld">
+    <label>VAT rate</label>
+    <div class="fld-suffix">
+      <input type="number" id="vatRate" value="20" min="0" max="100" step="1">
+      <span>%</span>
+    </div>
+  </div>
+  <div class="fld">
+    <label>Handling markup</label>
+    <div class="fld-suffix">
+      <input type="number" id="markupRate" value="10" min="0" max="100" step="1">
+      <span>%</span>
+    </div>
+  </div>
+  <div class="filter-sep"></div>
+  <button class="btn-generate" id="genBtn" onclick="generateReport()">Generate report</button>
+</div>
+
+<div class="content">
+  <div id="reportArea">
+    <div class="empty" style="padding:80px 20px">
+      Select a date range above and press <strong>Generate report</strong>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ─── CONFIG ──────────────────────────────────────────────────────────────────
+const MONDAY_TOKEN   = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NTg1MTIxMiwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTVUMDg6NTM6MTkuMzQxWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.AnJa58nVNbSv1Ydgf8BVmIBY4zoN4rOgl7IAKs51RtA';
+const SUPPLIES_BOARD = 1615688857;
+const STOCK_BOARD    = 5094763973;
+
+const SUP_COL = {
+  lodge:  'text6__1',
+  item:   'text60__1',
+  qty:    'numbers_MjiukVMp',
+  date:   'date4',
+  status: 'status'
+};
+const STOCK_COL_PRICE = 'numeric_mm2gtnxc';
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  // Default to current month
+  const now   = new Date();
+  const y     = now.getFullYear();
+  const m     = String(now.getMonth() + 1).padStart(2, '0');
+  document.getElementById('dateFrom').value = `${y}-${m}-01`;
+  document.getElementById('dateTo').value   = now.toISOString().split('T')[0];
+  loadLodges();
+});
+
+// ─── API ──────────────────────────────────────────────────────────────────────
+async function mq(query) {
+  const resp = await fetch('https://api.monday.com/v2', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': MONDAY_TOKEN, 'API-Version': '2024-01' },
+    body:    JSON.stringify({ query })
+  });
+  const json = await resp.json();
+  if (json.errors) throw new Error(json.errors[0].message);
+  return json.data;
+}
+
+// ─── LOAD LODGES ─────────────────────────────────────────────────────────────
+async function loadLodges() {
+  try {
+    // Fetch lodge names from Supplies House board lodge column — guaranteed to match delivery data
+    const data = await mq(`{
+      boards(ids:[${SUPPLIES_BOARD}]) {
+        items_page(limit:500) {
+          items {
+            column_values(ids:["${SUP_COL.lodge}"]) { text }
+          }
+        }
+      }
+    }`);
+    const lodges = [...new Set(
+      (data?.boards?.[0]?.items_page?.items || [])
+        .map(i => i.column_values[0]?.text?.trim())
+        .filter(Boolean)
+    )].sort((a, b) => a.localeCompare(b));
+    const sel = document.getElementById('lodgeFilter');
+    for (const l of lodges) {
+      const opt = document.createElement('option');
+      opt.value = opt.textContent = l;
+      sel.appendChild(opt);
+    }
+  } catch(e) {
+    // Lodge list will just stay as "All" if this fails — not critical
+  }
+}
+
+// ─── GENERATE REPORT ─────────────────────────────────────────────────────────
+async function generateReport() {
+  const dateFrom   = document.getElementById('dateFrom').value;
+  const dateTo     = document.getElementById('dateTo').value;
+  const lodgeSel   = document.getElementById('lodgeFilter').value;
+  const vatRate    = parseFloat(document.getElementById('vatRate').value)    / 100 || 0.20;
+  const markupRate = parseFloat(document.getElementById('markupRate').value) / 100 || 0.10;
+
+  if (!dateFrom || !dateTo) { showToast('Please select both a From and To date'); return; }
+  if (dateFrom > dateTo)    { showToast('From date must be before To date'); return; }
+
+  const btn = document.getElementById('genBtn');
+  btn.textContent = 'Loading…'; btn.disabled = true;
+  document.getElementById('reportArea').innerHTML = '<div class="empty"><span class="spin"></span>Fetching deliveries…</div>';
+
+  try {
+    // 1. Fetch Stock Warehouse prices (name → price map)
+    const stockData = await mq(`{
+      boards(ids:[${STOCK_BOARD}]) {
+        items_page(limit:500) {
+          items {
+            name
+            column_values(ids:["${STOCK_COL_PRICE}"]) { id text }
+          }
+        }
+      }
+    }`);
+    const priceMap = {};
+    for (const item of (stockData?.boards?.[0]?.items_page?.items || [])) {
+      const price = parseFloat(item.column_values[0]?.text) || 0;
+      priceMap[item.name.trim().toLowerCase()] = price;
+    }
+
+    // 2. Fetch all delivered items from Supplies House
+    document.getElementById('reportArea').innerHTML = '<div class="empty"><span class="spin"></span>Fetching delivery records…</div>';
+    const supData = await mq(`{
+      boards(ids:[${SUPPLIES_BOARD}]) {
+        items_page(limit:500) {
+          items {
+            id name
+            column_values(ids:["${SUP_COL.lodge}","${SUP_COL.item}","${SUP_COL.qty}","${SUP_COL.date}","${SUP_COL.status}"]) {
+              id text value
+            }
+          }
+        }
+      }
+    }`);
+
+    const rawItems = supData?.boards?.[0]?.items_page?.items || [];
+
+    // 3. Filter: delivered (status index=1) + date range + lodge
+    const deliveries = [];
+    for (const item of rawItems) {
+      const cv = {};
+      for (const c of item.column_values) cv[c.id] = c;
+
+      // Check delivered status (index 1)
+      let statusIndex = null;
+      try { statusIndex = JSON.parse(cv[SUP_COL.status]?.value || 'null')?.index; } catch(e) {}
+      if (statusIndex !== 1) continue;
+
+      // Date filter
+      const itemDate = cv[SUP_COL.date]?.text || '';
+      if (!itemDate) continue;
+      if (itemDate < dateFrom || itemDate > dateTo) continue;
+
+      // Lodge filter
+      const lodge = cv[SUP_COL.lodge]?.text?.trim() || 'Unknown';
+      if (lodgeSel !== 'All' && lodge.toLowerCase() !== lodgeSel.toLowerCase()) continue;
+
+      const itemName = cv[SUP_COL.item]?.text?.trim() || item.name;
+      const qty      = parseFloat(cv[SUP_COL.qty]?.text) || 1;
+      const price    = priceMap[itemName.toLowerCase()] || 0;
+
+      deliveries.push({ lodge, itemName, qty, date: itemDate, price });
+    }
+
+    // 4. Render report
+    renderReport(deliveries, dateFrom, dateTo, lodgeSel, vatRate, markupRate, priceMap);
+
+  } catch(e) {
+    document.getElementById('reportArea').innerHTML = `<div class="empty">⚠️ Error: ${esc(e.message)}</div>`;
+  }
+
+  btn.textContent = 'Generate report'; btn.disabled = false;
+  document.getElementById('hdrSub').textContent = `Last generated ${new Date().toLocaleTimeString()}`;
+}
+
+// ─── RENDER REPORT ───────────────────────────────────────────────────────────
+function renderReport(deliveries, dateFrom, dateTo, lodgeSel, vatRate, markupRate, priceMap) {
+  const area = document.getElementById('reportArea');
+
+  if (!deliveries.length) {
+    area.innerHTML = `<div class="empty">No deliveries found for the selected period and lodge.</div>`;
+    return;
+  }
+
+  // Group by lodge
+  const byLodge = {};
+  for (const d of deliveries) {
+    if (!byLodge[d.lodge]) byLodge[d.lodge] = [];
+    byLodge[d.lodge].push(d);
+  }
+  const lodgeNames = Object.keys(byLodge).sort((a, b) => a.localeCompare(b));
+
+  // Find items with no price
+  const noPriceItems = [...new Set(deliveries.filter(d => d.price === 0).map(d => d.itemName))].sort();
+
+  // Totals across all lodges
+  let grandNet = 0, grandHandling = 0, grandVat = 0, grandTotal = 0;
+
+  // Date display
+  const fmtDate = d => {
+    const [y,m,day] = d.split('-');
+    return `${day}/${m}/${y}`;
+  };
+  const periodLabel = dateFrom === dateTo
+    ? fmtDate(dateFrom)
+    : `${fmtDate(dateFrom)} – ${fmtDate(dateTo)}`;
+
+  let html = '';
+
+  // Warning for unpriced items
+  if (noPriceItems.length) {
+    html += `<div class="warn-banner">
+      <strong>⚠ Items with no unit price set (excluded from cost calculations)</strong>
+      ${noPriceItems.map(n => `<span style="margin-right:8px">· ${esc(n)}</span>`).join('')}
+    </div>`;
+  }
+
+  // Report meta bar
+  html += `<div class="report-meta">
+    <div>
+      <div class="report-title">Delivery Report — ${esc(lodgeSel === 'All' ? 'All Lodges' : lodgeSel)}</div>
+      <div class="report-sub">Period: ${periodLabel} · ${deliveries.length} delivery line${deliveries.length === 1 ? '' : 's'} · ${lodgeNames.length} lodge${lodgeNames.length === 1 ? '' : 's'}</div>
+    </div>
+    <div class="report-actions">
+      <button class="btn-export" onclick="exportCSV()">↓ Export CSV</button>
+      <button class="btn-print" onclick="window.print()">🖨 Print</button>
+    </div>
+  </div>`;
+
+  // Per-lodge sections
+  const lodgeSections = [];
+  for (const lodge of lodgeNames) {
+    const rows = byLodge[lodge].sort((a, b) => a.date.localeCompare(b.date) || a.itemName.localeCompare(b.itemName));
+    let lodgeNet = 0;
+
+    let tableRows = '';
+    for (const row of rows) {
+      const net      = row.qty * row.price;
+      const handling = net * markupRate;
+      const vatAmt   = (net + handling) * vatRate;
+      const total    = net + handling + vatAmt;
+      lodgeNet += net;
+      grandNet += net;
+
+      const priceDisplay = row.price > 0
+        ? `£${row.price.toFixed(2)}`
+        : `<span class="no-price">No price</span>`;
+      const netDisplay      = row.price > 0 ? `£${net.toFixed(2)}`      : '—';
+      const handlingDisplay = row.price > 0 ? `£${handling.toFixed(2)}` : '—';
+      const vatDisplay      = row.price > 0 ? `£${vatAmt.toFixed(2)}`   : '—';
+      const totalDisplay    = row.price > 0 ? `£${total.toFixed(2)}`    : '—';
+
+      if (row.price > 0) {
+        grandHandling += handling;
+        grandVat      += vatAmt;
+        grandTotal    += total;
+      }
+
+      tableRows += `<tr>
+        <td><div class="item-name">${esc(row.itemName)}</div></td>
+        <td><span class="item-date">${fmtDate(row.date)}</span></td>
+        <td class="td-right">${row.qty}</td>
+        <td class="td-right">${priceDisplay}</td>
+        <td class="td-right">${netDisplay}</td>
+        <td class="td-right" style="color:var(--sage)">${handlingDisplay}</td>
+        <td class="td-right" style="color:var(--sage)">${vatDisplay}</td>
+        <td class="td-right" style="font-weight:700">${totalDisplay}</td>
+      </tr>`;
+    }
+
+    // Subtotals for this lodge
+    const lodgeHandling = lodgeNet * markupRate;
+    const lodgeVat      = (lodgeNet + lodgeHandling) * vatRate;
+    const lodgeTotal    = lodgeNet + lodgeHandling + lodgeVat;
+
+    const hasAnyPrice = rows.some(r => r.price > 0);
+
+    const section = `<div class="lodge-section" data-lodge="${esc(lodge)}">
+      <div class="lodge-header">
+        <div class="lodge-name">${esc(lodge)}</div>
+        <div class="lodge-count">${rows.length} item${rows.length === 1 ? '' : 's'}</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Item</th>
+            <th>Date</th>
+            <th class="th-right">Qty</th>
+            <th class="th-right">Unit price</th>
+            <th class="th-right">Net</th>
+            <th class="th-right">Handling (${Math.round(markupRate*100)}%)</th>
+            <th class="th-right">VAT (${Math.round(vatRate*100)}%)</th>
+            <th class="th-right">Total</th>
+          </tr></thead>
+          <tbody>
+            ${tableRows}
+            <tr class="subtotal-row">
+              <td colspan="4">Lodge subtotal</td>
+              <td class="td-right">${hasAnyPrice ? '£'+lodgeNet.toFixed(2) : '—'}</td>
+              <td class="td-right">${hasAnyPrice ? '£'+lodgeHandling.toFixed(2) : '—'}</td>
+              <td class="td-right">${hasAnyPrice ? '£'+lodgeVat.toFixed(2) : '—'}</td>
+              <td class="td-right">${hasAnyPrice ? '£'+lodgeTotal.toFixed(2) : '—'}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+    lodgeSections.push({ lodge, section, lodgeNet, lodgeHandling, lodgeVat, lodgeTotal });
+  }
+
+  // Summary stats row
+  html += `<div class="summary-row">
+    <div class="sum-card"><div class="sum-val">${deliveries.length}</div><div class="sum-lbl">Delivery lines</div></div>
+    <div class="sum-card"><div class="sum-val">${lodgeNames.length}</div><div class="sum-lbl">Lodges</div></div>
+    <div class="sum-card"><div class="sum-val">£${grandNet.toFixed(2)}</div><div class="sum-lbl">Net goods</div></div>
+    <div class="sum-card"><div class="sum-val">£${grandHandling.toFixed(2)}</div><div class="sum-lbl">Handling (${Math.round(markupRate*100)}%)</div></div>
+    <div class="sum-card"><div class="sum-val">£${grandVat.toFixed(2)}</div><div class="sum-lbl">VAT (${Math.round(vatRate*100)}%)</div></div>
+    <div class="sum-card accent"><div class="sum-val">£${grandTotal.toFixed(2)}</div><div class="sum-lbl">Grand total</div></div>
+  </div>`;
+
+  // Lodge sections
+  for (const { section } of lodgeSections) html += section;
+
+  // Grand total block
+  html += `<div class="grand-total">
+    <div class="gt-row"><span class="gt-label">Net goods value</span><span class="gt-val">£${grandNet.toFixed(2)}</span></div>
+    <div class="gt-row"><span class="gt-label">Handling charge (${Math.round(markupRate*100)}%)</span><span class="gt-val">£${grandHandling.toFixed(2)}</span></div>
+    <div class="gt-row"><span class="gt-label">VAT @ ${Math.round(vatRate*100)}% (on net + handling)</span><span class="gt-val">£${grandVat.toFixed(2)}</span></div>
+    <div class="gt-row gt-main"><span class="gt-label">Grand total</span><span class="gt-val">£${grandTotal.toFixed(2)}</span></div>
+  </div>`;
+
+  area.innerHTML = html;
+
+  // Store for CSV export
+  window._reportData = { deliveries, dateFrom, dateTo, lodgeSel, vatRate, markupRate, lodgeSections, periodLabel };
+}
+
+// ─── EXPORT CSV ──────────────────────────────────────────────────────────────
+function exportCSV() {
+  if (!window._reportData) return;
+  const { deliveries, vatRate, markupRate, lodgeSel, periodLabel } = window._reportData;
+
+  const vatPct      = Math.round(vatRate * 100);
+  const markupPct   = Math.round(markupRate * 100);
+  const fmtDate = d => { const [y,m,day] = d.split('-'); return `${day}/${m}/${y}`; };
+
+  const rows = [
+    [`Be Here — Delivery Report`],
+    [`Period: ${periodLabel}`, `Lodge: ${lodgeSel === 'All' ? 'All lodges' : lodgeSel}`],
+    [`VAT rate: ${vatPct}%`, `Handling markup: ${markupPct}%`],
+    [],
+    ['Lodge', 'Item', 'Date', 'Qty', 'Unit Price (£)', `Net (£)`, `Handling ${markupPct}% (£)`, `VAT ${vatPct}% (£)`, 'Total (£)']
+  ];
+
+  let grandNet = 0, grandHandling = 0, grandVat = 0, grandTotal = 0;
+
+  const sorted = [...deliveries].sort((a, b) => a.lodge.localeCompare(b.lodge) || a.date.localeCompare(b.date));
+  let lastLodge = null;
+  let lodgeNet = 0, lodgeHandling = 0, lodgeVat = 0, lodgeTotal = 0;
+  let lodgeStart = rows.length;
+
+  for (let i = 0; i < sorted.length; i++) {
+    const d = sorted[i];
+    if (d.lodge !== lastLodge) {
+      // Subtotal for previous lodge
+      if (lastLodge !== null) {
+        rows.push(['', '', '', '', `${lastLodge} subtotal`, lodgeNet.toFixed(2), lodgeHandling.toFixed(2), lodgeVat.toFixed(2), lodgeTotal.toFixed(2)]);
+        rows.push([]);
+      }
+      lastLodge = d.lodge;
+      lodgeNet = lodgeHandling = lodgeVat = lodgeTotal = 0;
+    }
+    const net      = d.qty * d.price;
+    const handling = net * markupRate;
+    const vatAmt   = (net + handling) * vatRate;
+    const total    = net + handling + vatAmt;
+    lodgeNet += net; lodgeHandling += handling; lodgeVat += vatAmt; lodgeTotal += total;
+    grandNet += net; grandHandling += handling; grandVat += vatAmt; grandTotal += total;
+    rows.push([
+      d.lodge, d.itemName, fmtDate(d.date), d.qty,
+      d.price > 0 ? d.price.toFixed(2) : '',
+      d.price > 0 ? net.toFixed(2) : '',
+      d.price > 0 ? handling.toFixed(2) : '',
+      d.price > 0 ? vatAmt.toFixed(2) : '',
+      d.price > 0 ? total.toFixed(2) : ''
+    ]);
+  }
+  // Last lodge subtotal
+  if (lastLodge !== null) {
+    rows.push(['', '', '', '', `${lastLodge} subtotal`, lodgeNet.toFixed(2), lodgeHandling.toFixed(2), lodgeVat.toFixed(2), lodgeTotal.toFixed(2)]);
+  }
+  rows.push([]);
+  rows.push(['', '', '', '', 'GRAND TOTAL', grandNet.toFixed(2), grandHandling.toFixed(2), grandVat.toFixed(2), grandTotal.toFixed(2)]);
+
+  const csv = rows.map(r => r.map(cell => {
+    const s = String(cell ?? '');
+    return s.includes(',') || s.includes('"') || s.includes('\n') ? `"${s.replace(/"/g,'""')}"` : s;
+  }).join(',')).join('\r\n');
+
+  const blob = new Blob(['\uFEFF' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url  = URL.createObjectURL(blob);
+  const a    = document.createElement('a');
+  a.href = url; a.download = `delivery-report-${window._reportData.dateFrom}-to-${window._reportData.dateTo}.csv`;
+  a.click(); URL.revokeObjectURL(url);
+}
+
+// ─── HELPERS ─────────────────────────────────────────────────────────────────
+function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
+
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.style.opacity = '1';
+  clearTimeout(t._to); t._to = setTimeout(() => { t.style.opacity = '0'; }, 3500);
+}
+</script>
+</body>
+</html>

@@ -222,6 +222,7 @@ if ('serviceWorker' in navigator) {
 }
 
 // Clock
+let _clockTimer = null;
 function tick() {
   const n = new Date();
   const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
@@ -229,7 +230,28 @@ function tick() {
   document.getElementById('hdrDate').textContent = days[n.getDay()] + ' ' + n.getDate() + ' ' + months[n.getMonth()];
   document.getElementById('hdrTime').textContent = n.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
 }
-tick(); setInterval(tick, 30000);
+function startClock() {
+  if (_clockTimer) clearInterval(_clockTimer);
+  tick();
+  _clockTimer = setInterval(tick, 30000);
+}
+startClock();
+
+// Handle bfcache restore (browser back/forward navigation)
+// Without this, mobile Safari can restore a frozen page snapshot and then
+// also re-run scripts, causing duplicate intervals and overwritten content.
+window.addEventListener('pageshow', e => {
+  if (e.persisted) {
+    startClock();
+    ['stArr','stNext','stSup','stOut','stLow'].forEach(id => {
+      document.getElementById(id).innerHTML = '<span class="spin"></span>';
+    });
+    loadStats();
+  }
+});
+window.addEventListener('pagehide', () => {
+  if (_clockTimer) { clearInterval(_clockTimer); _clockTimer = null; }
+});
 
 function go(p) { location.href = p; }
 

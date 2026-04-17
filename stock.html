@@ -202,6 +202,7 @@
     <div class="stat-card"><div class="stat-val" id="statTotal">–</div><div class="stat-lbl">Items tracked</div></div>
     <div class="stat-card warn"><div class="stat-val" id="statLow">–</div><div class="stat-lbl">Low stock</div></div>
     <div class="stat-card danger"><div class="stat-val" id="statOut">–</div><div class="stat-lbl">Out of stock</div></div>
+    <div class="stat-card"><div class="stat-val" id="statValue">–</div><div class="stat-lbl">Total stock value</div></div>
   </div>
   <div id="alertsWrap"></div>
   <div id="tableWrap">
@@ -250,6 +251,15 @@
     </div>
     <div class="fld-row">
       <div class="modal-fld">
+        <label>Unit price (£)</label>
+        <input type="number" id="niPrice" min="0" step="0.01" value="0" placeholder="0.00">
+      </div>
+      <div class="modal-fld" style="display:flex;align-items:flex-end;padding-bottom:0">
+        <span style="font-size:11px;color:var(--sage-mid);padding-bottom:10px">Used for stock valuation</span>
+      </div>
+    </div>
+    <div class="fld-row">
+      <div class="modal-fld">
         <label>Location</label>
         <select id="niLocation">
           <option value="The Hub">The Hub</option>
@@ -286,7 +296,8 @@ const COL = {
   reorder:  'numeric_mm2f8xtv',
   location: 'color_mm2f8rh0',
   category: 'color_mm2fx0zz',
-  notes:    'text_mm2frxg5'
+  notes:    'text_mm2frxg5',
+  price:    'numeric_mm2gtnxc'
 };
 
 // Location → Monday status index mapping (matches board setup)
@@ -328,7 +339,7 @@ async function loadStock() {
         items_page(limit: 500) {
           items {
             id name
-            column_values(ids: ["${COL.stock}","${COL.reorder}","${COL.location}","${COL.category}","${COL.notes}"]) {
+            column_values(ids: ["${COL.stock}","${COL.reorder}","${COL.location}","${COL.category}","${COL.notes}","${COL.price}"]) {
               id text value
             }
           }
@@ -359,11 +370,12 @@ function parseItem(item) {
   return {
     id:       item.id,
     name:     item.name,
-    stock:    parseFloat(cv[COL.stock]?.text)  || 0,
-    reorder:  parseFloat(cv[COL.reorder]?.text) || 0,
+    stock:    parseFloat(cv[COL.stock]?.text)   || 0,
+    reorder:  parseFloat(cv[COL.reorder]?.text)  || 0,
     location: cv[COL.location]?.text || '',
     category: cv[COL.category]?.text || '',
-    notes:    cv[COL.notes]?.text    || ''
+    notes:    cv[COL.notes]?.text    || '',
+    price:    parseFloat(cv[COL.price]?.text)    || 0
   };
 }
 
@@ -394,11 +406,13 @@ function render() {
   const items = filteredItems();
 
   // Stats
-  const outCount  = allItems.filter(i => i.stock <= 0).length;
-  const lowCount  = allItems.filter(i => i.stock > 0 && i.stock <= i.reorder).length;
+  const outCount   = allItems.filter(i => i.stock <= 0).length;
+  const lowCount   = allItems.filter(i => i.stock > 0 && i.stock <= i.reorder).length;
+  const totalValue = allItems.reduce((sum, i) => sum + (i.stock * i.price), 0);
   document.getElementById('statTotal').textContent = allItems.length;
   document.getElementById('statLow').textContent   = lowCount;
   document.getElementById('statOut').textContent   = outCount;
+  document.getElementById('statValue').textContent = totalValue > 0 ? '£' + totalValue.toFixed(2) : '—';
 
   // Alerts
   const alertsWrap = document.getElementById('alertsWrap');
@@ -430,6 +444,8 @@ function render() {
       <th>Item</th>
       <th>Stock level</th>
       <th class="th-right">Reorder at</th>
+      <th class="th-right">Unit price</th>
+      <th class="th-right">Stock value</th>
       <th>Location</th>
       <th>Category</th>
       <th class="th-right">Actions</th>
@@ -458,6 +474,8 @@ function render() {
         </div>
       </td>
       <td class="td-right" style="color:var(--sage-mid);font-size:13px">${item.reorder}</td>
+      <td class="td-right" style="font-size:13px;color:var(--sage-mid)">${item.price > 0 ? '£' + item.price.toFixed(2) : '—'}</td>
+      <td class="td-right" style="font-size:13px;font-weight:600;color:var(--dark)">${item.price > 0 && item.stock > 0 ? '£' + (item.price * item.stock).toFixed(2) : '—'}</td>
       <td>${locTag}</td>
       <td>${catTag}</td>
       <td class="td-right">
@@ -544,8 +562,9 @@ function closeNewItemModal() {
 
 async function confirmNewItem() {
   const name    = document.getElementById('niName').value.trim();
-  const stock   = parseInt(document.getElementById('niStock').value)   || 0;
-  const reorder = parseInt(document.getElementById('niReorder').value) || 0;
+  const stock   = parseInt(document.getElementById('niStock').value)      || 0;
+  const reorder = parseInt(document.getElementById('niReorder').value)    || 0;
+  const price   = parseFloat(document.getElementById('niPrice').value)    || 0;
   const loc     = document.getElementById('niLocation').value;
   const cat     = document.getElementById('niCategory').value;
   const notes   = document.getElementById('niNotes').value.trim();
@@ -556,6 +575,7 @@ async function confirmNewItem() {
     const colVals = JSON.stringify({
       [COL.stock]:    stock,
       [COL.reorder]:  reorder,
+      [COL.price]:    price,
       [COL.location]: { index: LOC_INDEX[loc] ?? 0 },
       [COL.category]: { index: CAT_INDEX[cat] ?? 0 },
       [COL.notes]:    notes

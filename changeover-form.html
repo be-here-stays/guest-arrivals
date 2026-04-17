@@ -133,6 +133,20 @@
       opacity: 0.7;
     }
     .dashboard-link:hover { opacity: 1; text-decoration: underline; }
+
+    /* Delivery confirmation panel */
+    .delivery-panel { margin-top: 4px; }
+    .delivery-loading { font-size: 13px; color: var(--sage-mid); padding: 8px 0; }
+    .delivery-none { font-size: 13px; color: var(--sage-mid); padding: 8px 0; font-style: italic; }
+    .delivery-item { display: flex; align-items: center; gap: 12px; background: var(--surface); border-radius: 12px; padding: 14px 16px; margin-bottom: 8px; cursor: pointer; border: 2px solid transparent; -webkit-tap-highlight-color: transparent; transition: all .15s; }
+    .delivery-item.checked { background: #eaede4; border-color: var(--sage); }
+    .delivery-chk { width: 22px; height: 22px; border: 2px solid var(--border); border-radius: 6px; background: var(--surface); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 14px; }
+    .delivery-item.checked .delivery-chk { background: var(--sage); border-color: var(--sage); color: #fff; }
+    .delivery-item-body { flex: 1; }
+    .delivery-item-name { font-size: 15px; font-weight: 600; color: var(--dark); }
+    .delivery-item-meta { font-size: 12px; color: var(--sage-mid); margin-top: 2px; }
+    .delivery-hint { font-size: 12px; color: var(--sage-mid); margin-bottom: 10px; }
+    .delivery-select-all { font-size: 13px; color: var(--sage); font-weight: 600; cursor: pointer; text-decoration: underline; }
   </style>
 </head>
 <body>
@@ -206,6 +220,14 @@
     </div>
   </div>
 
+  <!-- Delivery confirmation (shown when Restocked is selected) -->
+  <div class="field" id="delivery-field" style="display:none">
+    <label>Items delivered <span style="font-weight:400;text-transform:none;letter-spacing:0;font-size:11px;color:var(--sage-mid)">— tick what you actually restocked</span></label>
+    <div class="delivery-hint">Only items logged as needed for this property are shown.</div>
+    <span class="delivery-select-all" onclick="selectAllDelivery()">Select all</span>
+    <div id="delivery-list"><div class="delivery-loading">Select a property first…</div></div>
+  </div>
+
   <!-- Name -->
   <div class="field">
     <label>Your name</label>
@@ -219,11 +241,17 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NTg1MTIxMiwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTVUMDg6NTM6MTkuMzQxWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.AnJa58nVNbSv1Ydgf8BVmIBY4zoN4rOgl7IAKs51RtA';
-const LOG_BOARD = 5094663022;
-const COL_PROP = 'text_mm2e9pw8';
-const COL_DATE = 'date_mm2e4wj5';
-const COL_BY   = 'text_mm2eqykb';
+const API_TOKEN      = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NTg1MTIxMiwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTVUMDg6NTM6MTkuMzQxWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.AnJa58nVNbSv1Ydgf8BVmIBY4zoN4rOgl7IAKs51RtA';
+const LOG_BOARD      = 5094663022;
+const COL_PROP       = 'text_mm2e9pw8';
+const COL_DATE       = 'date_mm2e4wj5';
+const COL_BY         = 'text_mm2eqykb';
+const SUPPLIES_BOARD = 1615688857;
+const SUP_GROUP      = 'topics';
+const CHARGEABLE_GROUP = 'new_group64916__1';
+const RESTOCKED_IDX  = 2; // index of "Restocked" in ACTIVITIES
+
+let supplyItems = []; // outstanding items for current property
 
 const ACTIVITIES = [
   { label: 'House Cleaned',   icon: '🧹' },
@@ -282,6 +310,7 @@ function pickProp(name) {
   propInput.style.display = 'none';
   propPillName.textContent = name;
   propPill.style.display = 'flex';
+  if (selAct === RESTOCKED_IDX) loadSupplyItems(name);
 }
 
 function resetProperty() {
@@ -298,7 +327,73 @@ function selectAct(idx) {
   selAct = idx;
   document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('sel'));
   document.querySelector(`.act-btn[data-idx="${idx}"]`).classList.add('sel');
+  toggleDeliveryPanel();
 }
+
+function toggleDeliveryPanel() {
+  const show = selAct === RESTOCKED_IDX;
+  document.getElementById('delivery-field').style.display = show ? 'block' : 'none';
+  if (show && selProperty) loadSupplyItems(selProperty);
+}
+
+async function loadSupplyItems(property) {
+  const list = document.getElementById('delivery-list');
+  list.innerHTML = '<div class="delivery-loading">Loading items for ' + property + '…</div>';
+  try {
+    const resp = await fetch('https://api.monday.com/v2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': API_TOKEN, 'API-Version': '2024-01' },
+      body: JSON.stringify({ query: `{ boards(ids:[${SUPPLIES_BOARD}]) { groups(ids:["${SUP_GROUP}"]) { items_page(limit:500) { items { id name column_values(ids:["text6__1","text60__1","numbers_MjiukVMp","priority6__1","text__1"]) { id text } } } } } }` })
+    });
+    const json = await resp.json();
+    const allItems = json.data?.boards?.[0]?.groups?.[0]?.items_page?.items || [];
+    supplyItems = allItems.filter(i => {
+      const lodge = i.column_values.find(c=>c.id==='text6__1')?.text || '';
+      return lodge.toLowerCase().trim() === property.toLowerCase().trim();
+    });
+    renderDeliveryList();
+  } catch(e) {
+    list.innerHTML = '<div class="delivery-loading">⚠️ Could not load items: ' + e.message + '</div>';
+  }
+}
+
+function renderDeliveryList() {
+  const list = document.getElementById('delivery-list');
+  if (!supplyItems.length) {
+    list.innerHTML = '<div class="delivery-none">No outstanding supply requests for this property.</div>';
+    return;
+  }
+  list.innerHTML = supplyItems.map((item, i) => {
+    const name  = item.column_values.find(c=>c.id==='text60__1')?.text || item.name;
+    const qty   = item.column_values.find(c=>c.id==='numbers_MjiukVMp')?.text || '1';
+    const prio  = item.column_values.find(c=>c.id==='priority6__1')?.text || '';
+    const notes = item.column_values.find(c=>c.id==='text__1')?.text || '';
+    return `<div class="delivery-item" id="di-${i}" onclick="toggleDeliveryItem(${i})">
+      <div class="delivery-chk" id="dc-${i}"></div>
+      <div class="delivery-item-body">
+        <div class="delivery-item-name">${esc(name)}</div>
+        <div class="delivery-item-meta">${prio ? prio + ' · ' : ''}×${qty}${notes ? ' · ' + esc(notes) : ''}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function toggleDeliveryItem(i) {
+  const row = document.getElementById('di-'+i);
+  const chk = document.getElementById('dc-'+i);
+  const checked = row.classList.toggle('checked');
+  chk.textContent = checked ? '✓' : '';
+}
+
+function selectAllDelivery() {
+  supplyItems.forEach((_, i) => {
+    document.getElementById('di-'+i)?.classList.add('checked');
+    const chk = document.getElementById('dc-'+i);
+    if (chk) chk.textContent = '✓';
+  });
+}
+
+function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : ''; }
 
 // ── Submit ───────────────────────────────────────────────────
 async function submitLog() {
@@ -333,9 +428,35 @@ async function submitLog() {
     });
     const json = await res.json();
     if (json.errors) throw new Error(json.errors[0].message);
-    toast(`✓ ${actLabel} logged for ${selProperty}`, 'ok');
+
+    // If Restocked, also mark checked supply items as delivered
+    if (selAct === RESTOCKED_IDX && supplyItems.length) {
+      const checkedIds = supplyItems
+        .filter((_, i) => document.getElementById('di-'+i)?.classList.contains('checked'))
+        .map(i => i.id);
+      if (checkedIds.length) {
+        const mutations = checkedIds.map((id, i) =>
+          `m${i}a:change_column_value(board_id:${SUPPLIES_BOARD},item_id:${id},column_id:"status",value:"{\\"index\\":1}"){id} ` +
+          `m${i}b:move_item_to_group(item_id:${id},group_id:"${CHARGEABLE_GROUP}"){id}`
+        ).join('\n');
+        await fetch('https://api.monday.com/v2', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', 'Authorization': API_TOKEN, 'API-Version': '2024-01' },
+          body: JSON.stringify({ query: `mutation{${mutations}}` })
+        });
+        toast(`✓ ${actLabel} logged · ${checkedIds.length} item${checkedIds.length>1?'s':''} marked delivered`, 'ok');
+      } else {
+        toast(`✓ ${actLabel} logged for ${selProperty}`, 'ok');
+      }
+    } else {
+      toast(`✓ ${actLabel} logged for ${selProperty}`, 'ok');
+    }
+
     selAct = null;
+    supplyItems = [];
     document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('sel'));
+    document.getElementById('delivery-field').style.display = 'none';
+    document.getElementById('delivery-list').innerHTML = '<div class="delivery-loading">Select a property first…</div>';
   } catch (err) {
     toast('Error: ' + err.message, 'err');
   } finally {

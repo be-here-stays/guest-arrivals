@@ -149,8 +149,36 @@
     /* ── Home log button ── */
     .btn-log-home { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px 16px; background: var(--dark); color: var(--cream); border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; margin-bottom: 12px; box-shadow: 0 2px 8px rgba(39,47,46,.18); }
     .btn-log-home:hover { background: var(--sage); }
-    .btn-take-home { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px 16px; background: transparent; color: var(--dark); border: 1.5px solid var(--dark); border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; margin-bottom: 20px; }
+    .btn-take-home { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px 16px; background: transparent; color: var(--dark); border: 1.5px solid var(--dark); border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; margin-bottom: 12px; }
     .btn-take-home:hover { background: rgba(39,47,46,.06); }
+    .btn-run-home { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; padding: 14px 16px; background: var(--sage); color: #fff; border: none; border-radius: 12px; font-size: 15px; font-weight: 700; cursor: pointer; font-family: inherit; margin-bottom: 20px; box-shadow: 0 2px 8px rgba(100,105,85,.25); }
+    .btn-run-home:hover { background: var(--dark); }
+
+    /* ── Run builder ── */
+    .run-section-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: .6px; color: var(--sage-mid); margin: 14px 0 6px; }
+    .run-lodge-row { display: flex; align-items: center; gap: 12px; background: var(--surface); border-radius: 10px; padding: 12px 14px; margin-bottom: 6px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+    .run-lodge-row.checked { background: #eaede4; border: 1.5px solid var(--sage); }
+    .run-lodge-chk { width: 20px; height: 20px; border: 2px solid var(--border); border-radius: 5px; background: var(--surface); flex-shrink: 0; display: flex; align-items: center; justify-content: center; font-size: 13px; }
+    .run-lodge-row.checked .run-lodge-chk { background: var(--sage); border-color: var(--sage); color: #fff; }
+    .run-lodge-name { flex: 1; font-size: 14px; font-weight: 600; color: var(--dark); }
+    .run-lodge-count { font-size: 12px; color: var(--sage-mid); }
+    .run-lodge-count.has-items { color: var(--sage); font-weight: 700; }
+    .basket-item { background: var(--surface); border-radius: 10px; padding: 13px 14px; margin-bottom: 8px; }
+    .basket-item-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+    .basket-item-name { font-size: 14px; font-weight: 600; color: var(--dark); flex: 1; }
+    .basket-stock { font-size: 11px; font-weight: 700; padding: 2px 7px; border-radius: 8px; }
+    .basket-stock.ok    { background: #edf7f2; color: #2d6a4f; }
+    .basket-stock.low   { background: #fdf5e8; color: #a86c00; }
+    .basket-stock.out   { background: #fdf0ec; color: #8B2020; }
+    .basket-lodges { font-size: 11px; color: var(--sage-mid); margin-top: 4px; margin-bottom: 8px; }
+    .basket-qty-row { display: flex; align-items: center; gap: 10px; margin-top: 8px; }
+    .basket-qty-lbl { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--sage-mid); }
+    .qty-stepper { display: flex; align-items: center; gap: 0; border: 1.5px solid var(--border); border-radius: 8px; overflow: hidden; }
+    .qty-stepper button { width: 36px; height: 36px; border: none; background: var(--bg); font-size: 18px; font-weight: 700; cursor: pointer; font-family: inherit; color: var(--dark); }
+    .qty-stepper button:active { background: var(--border); }
+    .qty-stepper input { width: 48px; height: 36px; border: none; border-left: 1.5px solid var(--border); border-right: 1.5px solid var(--border); text-align: center; font-size: 15px; font-weight: 700; font-family: inherit; color: var(--dark); background: var(--surface); }
+    .basket-extra-add { width: 100%; padding: 11px; border: 1.5px dashed var(--sage-mid); border-radius: 10px; background: transparent; font-size: 14px; font-weight: 600; color: var(--sage); cursor: pointer; font-family: inherit; margin-top: 8px; }
+    .basket-extra-add:hover { border-color: var(--sage); }
 
     /* ── Log queue ── */
     .log-queue { margin-bottom: 16px; }
@@ -225,6 +253,7 @@
 <!-- LOG VIEW (standalone, from home) -->
 <div class="view hidden" id="view-log"></div>
 <div class="view hidden" id="view-stock"></div>
+<div class="view hidden" id="view-run"></div>
 
 <!-- Toast -->
 <div class="toast" id="toast"></div>
@@ -238,12 +267,15 @@ const SUP_GROUP         = 'topics';
 const STOCK_BOARD       = 5094763973;
 const STOCK_COL_STOCK   = 'numeric_mm2fmsjb';
 const STOCK_COL_REORDER = 'numeric_mm2f8xtv';
+const STOCK_COL_PRICE   = 'numeric_mm2gtnxc';
 const CHARGEABLE_GROUP  = 'new_group64916__1';
 const OVERDUE_DAYS      = 7;   // flag items older than this many days
 
 const LODGES = ['Aintree','Ardross','Arlington Both','At Waters Edge','Badgers Sett','Beaver Brook','Berry Farm Barn','Boathouse','Cheltenham','Duck House','Egret','Epsom','Essitone House','Firefly','Foxes Den','Goodwood','Goose Landing','Green Haven','Grebe Lodge','Hideaway','Hill View','Homestead','Horseshoe Cottage','Island','Kingfisher','Lake House','Libelle','Little Horseshoe Lake','Malachite','Mallard','Maricor','Mayflower','Mirrors Edge','Newmarket','Pond','Rabbits Warren','Serendipity','Serenity','Squirrels Drey','Still Waters','Summer Lake','Swans Rest','The Atelier','The Barn','The Lookout','Tranquility','Waterlily','Willow','York'].sort();
 
-const SUPPLY_ITEMS = ['Alcohol Beer/Ale/Cider','Alcohol Prosecco','Ant Trap','Barbecue Brush','Barbecue Cleaner','Battery AA','Battery AAA','Battery Box','Bin bags 20','Bin bags 50','Bulb Extractor Fan','Cake','Cleaner Kitchen Method','Cleaner Toilet Ecover','Coffee Pods','Coffee Tin Instant','Dishwasher Rinse Aid','Dishwasher Salt','Dishwasher Tablets','Dog Treats','Elemis bath and Shower Gel Small','Elemis bath and shower gel Large','Elemis Conditioner Large','Elemis Conditioner Small','Elemis hand and Body Wash Large','Elemis Hand and Body wash Small','Elemis Shampoo Large','Elemis Shampoo Small','Feedback Forms','Glass Flute','Glass Pint','Glass Short','Glass Tall','Glass Wine','Hand soap pouch Bayliss and Harding','Hob spray Tesco','Kitchen Rolls','Light bulb bayonet','Light bulb Screw','Matches','Milk','Napkins Tesco','Olive oil Olivio 500ml','Olive Oil Tesco 500ml','Olive oil Tesco','Pen','Peppercorns','Reed Diffuser','Rinse aid','Rock Salt','Salt Blocks','Sanitary Bags','Signage (Use Notes)','Sponges','Sugar','Sugar 1kg','Sugar cubes','Tea Bags','Tin Foil 30m','Tin foil 10m','Toilet roll 48 WGAC','Toilet Rolls','Toilet Roll WGAC','Washing Capsules 20','Washing Capsules 40','Washing powder 40 wash','Washing Up liquid Small','Washing Up Liquid Large','Other (see notes below)'];
+// SUPPLY_ITEMS is no longer hardcoded — loaded from the Stock Warehouse board
+// Fallback list used only if the board can't be reached
+const SUPPLY_ITEMS_FALLBACK = ['Alcohol Beer/Ale/Cider','Alcohol Prosecco','Ant Trap','Barbecue Brush','Barbecue Cleaner','Battery AA','Battery AAA','Battery Box','Bin bags 20','Bin bags 50','Bulb Extractor Fan','Cake','Cleaner Kitchen Method','Cleaner Toilet Ecover','Coffee Pods','Coffee Tin Instant','Dishwasher Rinse Aid','Dishwasher Salt','Dishwasher Tablets','Dog Treats','Elemis bath and Shower Gel Small','Elemis bath and shower gel Large','Elemis Conditioner Large','Elemis Conditioner Small','Elemis hand and Body Wash Large','Elemis Hand and Body wash Small','Elemis Shampoo Large','Elemis Shampoo Small','Feedback Forms','Glass Flute','Glass Pint','Glass Short','Glass Tall','Glass Wine','Hand soap pouch Bayliss and Harding','Hob spray Tesco','Kitchen Rolls','Light bulb bayonet','Light bulb Screw','Matches','Milk','Napkins Tesco','Olive oil Olivio 500ml','Olive Oil Tesco 500ml','Olive oil Tesco','Pen','Peppercorns','Reed Diffuser','Rinse aid','Rock Salt','Salt Blocks','Sanitary Bags','Signage (Use Notes)','Sponges','Sugar','Sugar 1kg','Sugar cubes','Tea Bags','Tin Foil 30m','Tin foil 10m','Toilet roll 48 WGAC','Toilet Rolls','Toilet Roll WGAC','Washing Capsules 20','Washing Capsules 40','Washing powder 40 wash','Washing Up liquid Small','Washing Up Liquid Large','Other (see notes below)'];
 
 let STAFF = []; // loaded dynamically from Monday.com users
 
@@ -282,7 +314,7 @@ async function loadData() {
   document.getElementById('refreshBtn').disabled = true;
 
   try {
-    const [arrivals, supplies] = await Promise.all([fetchArrivals(), fetchSupplies(), fetchStaff()]);
+    const [arrivals, supplies] = await Promise.all([fetchArrivals(), fetchSupplies(), fetchStaff(), fetchStockItems()]);
     processArrivals(arrivals);
     processSupplies(supplies);
     if (urlLodge && byLodge[urlLodge]) {
@@ -350,14 +382,14 @@ async function deductStockForDeliveries(deliveredIds) {
   }).filter(Boolean);
   if (!toDeduct.length) return;
 
-  // Fetch current stock items and match by name
+  // Fetch current stock levels fresh before deducting
   const data = await mq(`{ boards(ids:[${STOCK_BOARD}]) { items_page(limit:500) { items { id name column_values(ids:["${STOCK_COL_STOCK}"]) { id text } } } } }`);
-  const stockItems = data?.boards?.[0]?.items_page?.items || [];
+  const liveStock = data?.boards?.[0]?.items_page?.items || [];
 
   // For each delivered item, find a matching stock entry and deduct
   const mutations = [];
   toDeduct.forEach(({ name, qty }) => {
-    const match = stockItems.find(s => s.name.toLowerCase().trim() === name.toLowerCase().trim());
+    const match = liveStock.find(s => s.name.toLowerCase().trim() === name.toLowerCase().trim());
     if (!match) return;
     const current = parseFloat(match.column_values.find(c => c.id === STOCK_COL_STOCK)?.text) || 0;
     const newQty  = Math.max(0, current - qty);
@@ -368,16 +400,12 @@ async function deductStockForDeliveries(deliveredIds) {
 }
 
 // ─── TAKE STOCK VIEW ─────────────────────────────────────────────────────────
-let stockItems = []; // cached from last fetch
+let stockItems = []; // { id, name, stock, reorder } — loaded from Stock Warehouse, drives all item dropdowns
 
-async function showTakeStockView() {
-  setHdrTitle('Take from Stock');
-  document.getElementById('backBtn').classList.add('visible');
-  document.getElementById('view-stock').innerHTML = '<div class="loading"><span class="spin"></span>Loading stock items…</div>';
-  showView('stock');
+async function fetchStockItems() {
   try {
     const data = await mq(`{ boards(ids:[${STOCK_BOARD}]) { items_page(limit:500) { items { id name column_values(ids:["${STOCK_COL_STOCK}","${STOCK_COL_REORDER}"]) { id text } } } } }`);
-    stockItems = (data?.boards?.[0]?.items_page?.items || [])
+    const items = (data?.boards?.[0]?.items_page?.items || [])
       .map(i => ({
         id:      i.id,
         name:    i.name,
@@ -385,10 +413,20 @@ async function showTakeStockView() {
         reorder: parseFloat(i.column_values.find(c=>c.id===STOCK_COL_REORDER)?.text) || 0
       }))
       .sort((a,b) => a.name.localeCompare(b.name));
-    renderTakeStock();
+    if (items.length) stockItems = items;
+    else stockItems = SUPPLY_ITEMS_FALLBACK.map(n => ({ id: null, name: n, stock: 0, reorder: 0 }));
   } catch(e) {
-    document.getElementById('view-stock').innerHTML = `<div class="empty">⚠️ Could not load stock.<br><small style="color:var(--sage-mid)">${e.message}</small></div>`;
+    stockItems = SUPPLY_ITEMS_FALLBACK.map(n => ({ id: null, name: n, stock: 0, reorder: 0 }));
   }
+}
+
+async function showTakeStockView() {
+  setHdrTitle('Take from Stock');
+  document.getElementById('backBtn').classList.add('visible');
+  showView('stock');
+  // Refresh stock levels in case they've changed since page load
+  await fetchStockItems();
+  renderTakeStock();
 }
 
 function renderTakeStock() {
@@ -524,6 +562,7 @@ function renderHome() {
 
   // Prominent log button always at the very top
   html += `<button class="btn-log-home" onclick="showLogView('')">📋 Log a shortage</button>`;
+  html += `<button class="btn-run-home"  onclick="showRunView()">🚐 Build my run</button>`;
   html += `<button class="btn-take-home" onclick="showTakeStockView()">🏪 Take from stock</button>`;
 
   if (critTotal > 0) {
@@ -705,7 +744,7 @@ function itemRow(item) {
 }
 
 function buildLogForm() {
-  const itemOpts  = SUPPLY_ITEMS.map(s=>`<option value="${s}">${s}</option>`).join('');
+  const itemOpts  = stockItems.map(s=>`<option value="${s.name}">${esc(s.name)}</option>`).join('');
   const staffOpts = STAFF.map(s=>`<option value="${s}">${s}</option>`).join('');
   return `
     <div class="fld">
@@ -841,13 +880,14 @@ function showView(v) {
   document.getElementById('view-detail').classList.toggle('hidden', v!=='detail');
   document.getElementById('view-log').classList.toggle('hidden',    v!=='log');
   document.getElementById('view-stock').classList.toggle('hidden',  v!=='stock');
+  document.getElementById('view-run').classList.toggle('hidden',    v!=='run');
 }
 
 function showLogView(preselectedLodge) {
   logQueue = [];
   const lodgeOpts = LODGES.map(l => `<option value="${l}" ${l===preselectedLodge?'selected':''}>${l}</option>`).join('');
   const staffOpts = STAFF.map(s => `<option value="${s}">${s}</option>`).join('');
-  const itemOpts  = SUPPLY_ITEMS.map(i => `<option value="${i}">${i}</option>`).join('');
+  const itemOpts  = stockItems.map(s=>`<option value="${s.name}">${esc(s.name)}</option>`).join('');
   document.getElementById('view-log').innerHTML = `
     <div class="sh" style="margin-top:0">Log shortages</div>
     <div id="logQueueWrap" class="log-queue" style="display:none">
@@ -989,6 +1029,259 @@ async function submitStandaloneLog() {
     showToast('Failed: ' + e.message, 'err');
     btn.textContent = `Submit ${logQueue.length} item${logQueue.length > 1 ? 's' : ''}`;
     btn.disabled = false;
+  }
+}
+
+// ─── RUN BUILDER ─────────────────────────────────────────────────────────────
+let runSelectedLodges = new Set();
+let runBasket         = []; // { itemName, totalQty, adjustedQty, lodgeBreakdown:[{lodge,qty,itemIds}], stockId, stockQty, stockReorder }
+let runExtras         = []; // { stockId, itemName, qty }
+
+function showRunView() {
+  runSelectedLodges = new Set();
+  runBasket   = [];
+  runExtras   = [];
+  setHdrTitle('Build My Run');
+  document.getElementById('backBtn').classList.add('visible');
+  renderRunLodgeSelect();
+  showView('run');
+}
+
+function renderRunLodgeSelect() {
+  const lodgesWithItems  = LODGES.filter(l => byLodge[l] && byLodge[l].length > 0);
+  const lodgesWithout    = LODGES.filter(l => !byLodge[l] || byLodge[l].length === 0);
+
+  const rowHtml = (lodge) => {
+    const count   = (byLodge[lodge] || []).length;
+    const checked = runSelectedLodges.has(lodge);
+    return `<div class="run-lodge-row${checked?' checked':''}" onclick="toggleRunLodge('${lodge.replace(/'/g,"\\'")}')">
+      <div class="run-lodge-chk">${checked ? '✓' : ''}</div>
+      <div class="run-lodge-name">${esc(lodge)}</div>
+      ${count ? `<div class="run-lodge-count has-items">${count} item${count>1?'s':''} needed</div>` : ''}
+    </div>`;
+  };
+
+  let html = `<div class="sh" style="margin-top:0">Select lodges for this run</div>
+    <div class="sh-note" style="margin-bottom:12px">Tap to select the lodges you're visiting</div>`;
+
+  if (lodgesWithItems.length) {
+    html += `<div class="run-section-lbl">🔴 Lodges with requests (${lodgesWithItems.length})</div>`;
+    html += lodgesWithItems.map(rowHtml).join('');
+  }
+  if (lodgesWithout.length) {
+    html += `<div class="run-section-lbl">Other lodges</div>`;
+    html += lodgesWithout.map(rowHtml).join('');
+  }
+
+  html += `<button class="btn-submit" style="margin-top:16px" onclick="buildRunBasket()">Build basket →</button>`;
+  document.getElementById('view-run').innerHTML = html;
+}
+
+function toggleRunLodge(lodge) {
+  if (runSelectedLodges.has(lodge)) runSelectedLodges.delete(lodge);
+  else runSelectedLodges.add(lodge);
+  renderRunLodgeSelect();
+}
+
+async function buildRunBasket() {
+  if (!runSelectedLodges.size) { showToast('Select at least one lodge', 'err'); return; }
+
+  document.getElementById('view-run').innerHTML = '<div class="loading"><span class="spin"></span>Building basket…</div>';
+
+  // Refresh stock levels from warehouse
+  await fetchStockItems();
+
+  // Aggregate supply requests across selected lodges by item name
+  const itemMap = {}; // itemName → { totalQty, lodgeBreakdown[], stockId, stockQty, stockReorder }
+  for (const lodge of runSelectedLodges) {
+    const items = byLodge[lodge] || [];
+    for (const item of items) {
+      const name = cv(item,'text60__1') || item.name.split(' – ')[1] || item.name;
+      const qty  = parseFloat(cv(item,'numbers_MjiukVMp')) || 1;
+      if (!itemMap[name]) {
+        const stockMatch = stockItems.find(s => s.name.toLowerCase().trim() === name.toLowerCase().trim());
+        itemMap[name] = { totalQty: 0, lodgeBreakdown: [], stockId: stockMatch?.id, stockQty: stockMatch?.stock ?? null, stockReorder: stockMatch?.reorder ?? 0 };
+      }
+      itemMap[name].totalQty += qty;
+      const existing = itemMap[name].lodgeBreakdown.find(b => b.lodge === lodge);
+      if (existing) { existing.qty += qty; existing.itemIds.push(item.id); }
+      else itemMap[name].lodgeBreakdown.push({ lodge, qty, itemIds: [item.id] });
+    }
+  }
+
+  runBasket = Object.entries(itemMap).map(([name, d], i) => ({
+    idx: i, itemName: name, totalQty: d.totalQty, adjustedQty: d.totalQty,
+    lodgeBreakdown: d.lodgeBreakdown, stockId: d.stockId, stockQty: d.stockQty, stockReorder: d.stockReorder
+  }));
+  runExtras = [];
+
+  renderRunBasket();
+}
+
+function renderRunBasket() {
+  const lodgeList = [...runSelectedLodges].join(', ');
+  let html = `<div class="sh" style="margin-top:0">Your basket</div>
+    <div class="sh-note" style="margin-bottom:12px">Run: ${esc(lodgeList)}</div>`;
+
+  if (!runBasket.length && !runExtras.length) {
+    html += `<div class="empty" style="padding:24px 0">No outstanding requests for selected lodges.<br><small>Use the button below to add items manually.</small></div>`;
+  }
+
+  // Requested items
+  runBasket.forEach((item, i) => {
+    const stockStatus = item.stockQty === null ? '' : item.stockQty <= 0 ? 'out' : item.stockQty <= item.stockReorder ? 'low' : 'ok';
+    const stockBadge  = item.stockQty === null ? '' :
+      `<span class="basket-stock ${stockStatus}">${item.stockQty <= 0 ? '⛔ Out of stock' : `${item.stockQty} in stock`}</span>`;
+    const lodgeDetail = item.lodgeBreakdown.map(b => `${esc(b.lodge)} ×${b.qty}`).join(' · ');
+
+    html += `<div class="basket-item">
+      <div class="basket-item-head">
+        <div class="basket-item-name">${esc(item.itemName)}</div>
+        ${stockBadge}
+      </div>
+      <div class="basket-lodges">${lodgeDetail}</div>
+      <div class="basket-qty-row">
+        <span class="basket-qty-lbl">Taking</span>
+        <div class="qty-stepper">
+          <button onclick="adjustBasketQty(${i},-1)">−</button>
+          <input type="number" id="bqty-${i}" value="${item.adjustedQty}" min="0" onchange="setBasketQty(${i},this.value)">
+          <button onclick="adjustBasketQty(${i},+1)">+</button>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  // Extras
+  runExtras.forEach((extra, i) => {
+    html += `<div class="basket-item" style="border:1.5px dashed var(--sage-mid)">
+      <div class="basket-item-head">
+        <div class="basket-item-name">${esc(extra.itemName)} <span style="font-size:11px;color:var(--sage-mid);font-weight:400">(extra)</span></div>
+        <button class="log-q-remove" onclick="removeExtra(${i})">×</button>
+      </div>
+      <div class="basket-qty-row">
+        <span class="basket-qty-lbl">Taking</span>
+        <div class="qty-stepper">
+          <button onclick="adjustExtraQty(${i},-1)">−</button>
+          <input type="number" id="eqty-${i}" value="${extra.qty}" min="1" onchange="setExtraQty(${i},this.value)">
+          <button onclick="adjustExtraQty(${i},+1)">+</button>
+        </div>
+      </div>
+    </div>`;
+  });
+
+  html += `<button class="basket-extra-add" onclick="showAddExtraPanel()">+ Add an extra item</button>`;
+
+  // Extra add panel (hidden by default)
+  const extraItemOpts = stockItems.map(s => {
+    const status = s.stock <= 0 ? ' ⛔' : s.stock <= s.reorder ? ' ⚠️' : '';
+    return `<option value="${s.id}|${esc(s.name)}">${esc(s.name)}${status} (${s.stock})</option>`;
+  }).join('');
+  html += `<div id="extraPanel" style="display:none;background:var(--surface);border-radius:10px;padding:14px;margin-top:6px">
+    <div class="fld"><label>Item</label>
+      <select id="extraItem"><option value="">Select item…</option>${extraItemOpts}</select>
+    </div>
+    <div class="fld"><label>Qty</label><input type="number" id="extraQty" value="1" min="1"></div>
+    <button class="btn-add" onclick="confirmAddExtra()">Add to basket</button>
+  </div>`;
+
+  const totalItems = runBasket.reduce((s,i)=>s+i.adjustedQty,0) + runExtras.reduce((s,e)=>s+e.qty,0);
+  html += `<button class="btn-submit" style="margin-top:16px;background:var(--sage)" id="runConfirmBtn"
+    onclick="confirmRun()">✓ Confirm — taking ${totalItems} item${totalItems!==1?'s':''}</button>`;
+  html += `<button class="btn-take-home" style="margin-top:8px" onclick="renderRunLodgeSelect()">← Change lodges</button>`;
+
+  document.getElementById('view-run').innerHTML = html;
+}
+
+function adjustBasketQty(idx, delta) {
+  const input = document.getElementById('bqty-'+idx);
+  if (!input) return;
+  const newVal = Math.max(0, (runBasket[idx].adjustedQty || 0) + delta);
+  runBasket[idx].adjustedQty = newVal;
+  input.value = newVal;
+  updateRunConfirmBtn();
+}
+function setBasketQty(idx, val) {
+  runBasket[idx].adjustedQty = Math.max(0, parseInt(val) || 0);
+  updateRunConfirmBtn();
+}
+function adjustExtraQty(idx, delta) {
+  const input = document.getElementById('eqty-'+idx);
+  if (!input) return;
+  const newVal = Math.max(1, (runExtras[idx].qty || 1) + delta);
+  runExtras[idx].qty = newVal;
+  input.value = newVal;
+  updateRunConfirmBtn();
+}
+function setExtraQty(idx, val) {
+  runExtras[idx].qty = Math.max(1, parseInt(val) || 1);
+  updateRunConfirmBtn();
+}
+function removeExtra(idx) {
+  runExtras.splice(idx, 1);
+  renderRunBasket();
+}
+function updateRunConfirmBtn() {
+  const btn = document.getElementById('runConfirmBtn');
+  if (!btn) return;
+  const total = runBasket.reduce((s,i)=>s+i.adjustedQty,0) + runExtras.reduce((s,e)=>s+e.qty,0);
+  btn.textContent = `✓ Confirm — taking ${total} item${total!==1?'s':''}`;
+}
+function showAddExtraPanel() {
+  const p = document.getElementById('extraPanel');
+  if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+function confirmAddExtra() {
+  const sel = document.getElementById('extraItem')?.value;
+  const qty = parseInt(document.getElementById('extraQty')?.value) || 1;
+  if (!sel) { showToast('Select an item', 'err'); return; }
+  const [stockId, ...nameParts] = sel.split('|');
+  const itemName = nameParts.join('|');
+  // Don't duplicate if already in basket
+  const existing = runExtras.find(e => e.stockId === stockId);
+  if (existing) { existing.qty += qty; }
+  else runExtras.push({ stockId, itemName, qty });
+  renderRunBasket();
+}
+
+async function confirmRun() {
+  const toDeduct = [
+    ...runBasket.filter(i => i.adjustedQty > 0 && i.stockId).map(i => ({ stockId: i.stockId, qty: i.adjustedQty })),
+    ...runExtras.filter(e => e.qty > 0 && e.stockId).map(e => ({ stockId: e.stockId, qty: e.qty }))
+  ];
+
+  if (!toDeduct.length) { showToast('Nothing to take', 'err'); return; }
+
+  const btn = document.getElementById('runConfirmBtn');
+  btn.textContent = 'Confirming…'; btn.disabled = true;
+
+  try {
+    // Fetch current stock levels for all items being deducted
+    const ids = [...new Set(toDeduct.map(d => d.stockId))];
+    const sd  = await mq(`{ boards(ids:[${STOCK_BOARD}]) { items_page(limit:500) { items { id name column_values(ids:["${STOCK_COL_STOCK}"]) { id text } } } } }`);
+    const currentLevels = {};
+    (sd?.boards?.[0]?.items_page?.items || []).forEach(i => {
+      currentLevels[i.id] = parseFloat(i.column_values.find(c=>c.id===STOCK_COL_STOCK)?.text) || 0;
+    });
+
+    // Aggregate deductions per stock item
+    const deductMap = {};
+    toDeduct.forEach(({ stockId, qty }) => {
+      deductMap[stockId] = (deductMap[stockId] || 0) + qty;
+    });
+
+    const mutations = Object.entries(deductMap).map(([stockId, qty], i) => {
+      const newQty = Math.max(0, (currentLevels[stockId] || 0) - qty);
+      return `u${i}:change_column_value(board_id:${STOCK_BOARD},item_id:${stockId},column_id:"${STOCK_COL_STOCK}",value:"${newQty}"){id}`;
+    });
+
+    await mq(`mutation{${mutations.join('\n')}}`);
+
+    const total = toDeduct.reduce((s, d) => s + d.qty, 0);
+    showToast(`✅ ${total} item${total!==1?'s':''} taken — stock updated`, 'ok');
+    setTimeout(() => { goHome(); renderHome(); }, 1400);
+  } catch(e) {
+    showToast('Failed: ' + e.message, 'err');
+    btn.textContent = 'Confirm'; btn.disabled = false;
   }
 }
 

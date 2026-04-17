@@ -40,6 +40,8 @@
     .hdr-right { display: flex; align-items: center; gap: 10px; }
     .btn-refresh { padding: 7px 14px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 7px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .btn-refresh:hover { background: rgba(255,255,255,0.2); }
+    .hdr-hub { color: rgba(255,255,255,.6); font-size: 12px; font-weight: 600; text-decoration: none; padding: 5px 10px; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; white-space: nowrap; }
+    .hdr-hub:hover { background: rgba(255,255,255,.1); color: #fff; }
     .btn-add-item { padding: 7px 16px; background: var(--cream); border: none; border-radius: 7px; color: var(--dark); font-size: 12px; font-weight: 700; cursor: pointer; font-family: inherit; }
     .btn-add-item:hover { background: #e8d4ae; }
 
@@ -210,9 +212,31 @@
 
     /* Toast */
     #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%); background: var(--dark); color: #fff; padding: 10px 22px; border-radius: 8px; font-size: 13px; font-weight: 600; z-index: 999; opacity: 0; transition: opacity .3s; pointer-events: none; }
+    /* PIN gate */
+    .pin-overlay { position:fixed; inset:0; background:#272F2E; z-index:9999; display:flex; align-items:center; justify-content:center; padding:24px; }
+    .pin-modal { background:#fff; border-radius:18px; padding:28px 24px 24px; width:100%; max-width:320px; box-shadow:0 12px 40px rgba(39,47,46,.4); text-align:center; }
+    .pin-modal h2 { font-size:18px; font-weight:700; color:#272F2E; margin-bottom:6px; }
+    .pin-modal p { font-size:13px; color:#646955; margin-bottom:20px; }
+    .pin-input { width:100%; padding:14px; font-size:22px; font-weight:700; text-align:center; letter-spacing:8px; border:2px solid #e0ddd6; border-radius:10px; font-family:inherit; color:#272F2E; outline:none; margin-bottom:8px; }
+    .pin-input:focus { border-color:#272F2E; }
+    .pin-error { font-size:12px; color:#8B2020; min-height:18px; margin-bottom:10px; }
+    .btn-pin { width:100%; padding:13px; background:#272F2E; color:#F3E3C3; border:none; border-radius:10px; font-size:15px; font-weight:700; cursor:pointer; font-family:inherit; }
+    .btn-pin:hover { background:#646955; }
+    .pin-back { display:block; margin-top:12px; font-size:13px; color:#989782; cursor:pointer; text-decoration:underline; }
   </style>
 </head>
 <body>
+
+<div class="pin-overlay" id="pinOverlay">
+  <div class="pin-modal">
+    <h2>🔒 Management Access</h2>
+    <p>Enter your PIN to continue</p>
+    <input class="pin-input" id="pinInput" type="password" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+    <div class="pin-error" id="pinError"></div>
+    <button class="btn-pin" onclick="checkPin()">Unlock</button>
+    <a class="pin-back" href="hub.html">← Back to Hub</a>
+  </div>
+</div>
 
 <header>
   <div class="hdr-left">
@@ -227,6 +251,7 @@
     </div>
   </div>
   <div class="hdr-right">
+    <a href="hub.html" class="hdr-hub">‹ Hub</a>
     <button class="btn-stocktake" id="stockTakeBtn" onclick="startStockTake()">📋 Stock Take</button>
     <button class="btn-refresh" id="refreshBtn" onclick="loadStock()">↺ Refresh</button>
     <button class="btn-add-item" id="newItemBtn" onclick="openNewItemModal()">+ New item</button>
@@ -951,6 +976,30 @@ function esc(s) { return s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;'
 document.getElementById('adjustModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeModal(); });
 document.getElementById('newItemModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeNewItemModal(); });
 document.getElementById('discModal').addEventListener('click', e => { if (e.target === e.currentTarget) closeDiscModal(); });
+
+// PIN gate
+const PIN_HASH = 'df8d602b7bcaf41725409b83af2a3df79722be244d9f33b5f128b81a269b955e';
+async function hashPin(p) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(p));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function checkPin() {
+  const val = document.getElementById('pinInput').value.trim();
+  if (await hashPin(val) === PIN_HASH) {
+    sessionStorage.setItem('bh-mgmt','1');
+    document.getElementById('pinOverlay').style.display='none';
+  } else {
+    document.getElementById('pinError').textContent='Incorrect PIN — try again';
+    document.getElementById('pinInput').value='';
+    document.getElementById('pinInput').focus();
+  }
+}
+document.addEventListener('keydown', e => { if (document.getElementById('pinOverlay').style.display!=='none' && e.key==='Enter') checkPin(); });
+if (sessionStorage.getItem('bh-mgmt')==='1') {
+  document.getElementById('pinOverlay').style.display='none';
+} else {
+  setTimeout(()=>document.getElementById('pinInput').focus(),100);
+}
 </script>
 </body>
 </html>

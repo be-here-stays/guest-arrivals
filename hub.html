@@ -80,6 +80,10 @@
     .b-desktop { background:var(--green-bg); color:var(--green); }
     .b-both    { background:#f0f0e8; color:var(--sage); }
 
+    /* Maintenance 3-col grid */
+    .cards-3 { grid-template-columns:1fr 1fr; }
+    @media (min-width:680px) { .cards-3 { grid-template-columns:repeat(3,1fr); } }
+
     /* Desktop layout */
     @media (min-width:680px) {
       .header { padding:20px 40px; }
@@ -196,6 +200,31 @@
         <div class="card-icon">📊</div>
         <div class="card-name">Delivery Report <span style="font-size:11px;opacity:.5">🔒</span></div>
         <div class="card-desc">Cost by lodge — net, VAT &amp; handling. CSV export.</div>
+        <span class="card-badge b-desktop">💻 Desktop</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Maintenance — full width row -->
+  <div style="grid-column:1/-1">
+    <div class="section-label">🔧 Maintenance</div>
+    <div class="cards cards-3">
+      <a href="window-cleaning.html" class="tool-card">
+        <div class="card-icon">🪟</div>
+        <div class="card-name">Window Cleaning</div>
+        <div class="card-desc">Track last clean per property, log completed cleans with time taken. 6–8 week schedule.</div>
+        <span class="card-badge b-both">📱💻 Any</span>
+      </a>
+      <a href="jet-washing.html" class="tool-card">
+        <div class="card-icon">💦</div>
+        <div class="card-name">Jet Washing</div>
+        <div class="card-desc">Track when paths and decking were last jet washed. Ad hoc — log as and when done.</div>
+        <span class="card-badge b-both">📱💻 Any</span>
+      </a>
+      <a href="pat-testing.html" class="tool-card">
+        <div class="card-icon">⚡</div>
+        <div class="card-name">PAT Testing</div>
+        <div class="card-desc">Portable appliance testing status per property. Log completions and track next due dates.</div>
         <span class="card-badge b-desktop">💻 Desktop</span>
       </a>
     </div>

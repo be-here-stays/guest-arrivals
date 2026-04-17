@@ -40,7 +40,7 @@
     /* Stats */
     .stats-wrap { padding:16px 20px 0; overflow-x:auto; -webkit-overflow-scrolling:touch; }
     .stats-row { display:flex; gap:10px; min-width:max-content; padding-bottom:2px; }
-    .stat-card { background:var(--surface); border-radius:10px; padding:12px 16px; min-width:110px; box-shadow:0 1px 3px rgba(39,47,46,.07); cursor:pointer; transition:transform .15s; }
+    .stat-card { background:var(--surface); border-radius:10px; padding:12px 16px; min-width:110px; box-shadow:0 1px 3px rgba(39,47,46,.07); cursor:pointer; transition:transform .15s; text-decoration:none; color:inherit; display:block; }
     .stat-card:hover { transform:translateY(-1px); }
     .stat-val { font-size:28px; font-weight:700; color:var(--dark); line-height:1.1; }
     .stat-lbl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--sage-mid); margin-top:3px; }
@@ -106,26 +106,26 @@
 
 <div class="stats-wrap">
   <div class="stats-row">
-    <div class="stat-card" onclick="go('arrivals-hub.html')">
+    <a href="arrivals-hub.html" class="stat-card">
       <div class="stat-val" id="stArr"><span class="spin"></span></div>
       <div class="stat-lbl">Arrivals today</div>
-    </div>
-    <div class="stat-card" onclick="go('arrivals-hub.html')">
-      <div class="stat-val" id="stDep"><span class="spin"></span></div>
-      <div class="stat-lbl">Departures today</div>
-    </div>
-    <div class="stat-card warn" onclick="go('supplies-field.html')">
+    </a>
+    <a href="arrivals-hub.html" class="stat-card">
+      <div class="stat-val" id="stNext"><span class="spin"></span></div>
+      <div class="stat-lbl">Arriving this week</div>
+    </a>
+    <a href="supplies-field.html" class="stat-card warn">
       <div class="stat-val" id="stSup"><span class="spin"></span></div>
       <div class="stat-lbl">Pending requests</div>
-    </div>
-    <div class="stat-card danger" onclick="go('stock.html')">
+    </a>
+    <a href="stock.html" class="stat-card danger">
       <div class="stat-val" id="stOut"><span class="spin"></span></div>
       <div class="stat-lbl">Out of stock</div>
-    </div>
-    <div class="stat-card warn" onclick="go('stock.html')">
+    </a>
+    <a href="stock.html" class="stat-card warn">
       <div class="stat-val" id="stLow"><span class="spin"></span></div>
       <div class="stat-lbl">Low stock</div>
-    </div>
+    </a>
   </div>
 </div>
 
@@ -237,18 +237,24 @@ async function mq(q) {
 async function loadStats() {
   const today = new Date().toISOString().split('T')[0];
 
-  // Arrivals & departures
+  // Arrivals today + this week
   try {
-    const d = await mq(`{ boards(ids:[5094453064]) { items_page(limit:500) { items { column_values(ids:["date4","date6"]) { id text } } } } }`);
-    let arr=0, dep=0;
+    const in7 = new Date(); in7.setDate(in7.getDate() + 7);
+    const in7Str = in7.toISOString().split('T')[0];
+    const d = await mq(`{ boards(ids:[5094453064]) { items_page(limit:500) { items { column_values(ids:["date_mm2adtwg","text_mm2ahbrx"]) { id value text } } } } }`);
+    const arrProps = new Set(), weekProps = new Set();
     for (const g of d?.boards?.[0]?.items_page?.items || []) {
-      const cv = {}; for (const c of g.column_values) cv[c.id] = c.text;
-      if (cv['date4'] === today) arr++;
-      if (cv['date6'] === today) dep++;
+      const cv = {}; for (const c of g.column_values) cv[c.id] = c;
+      let dateVal = null;
+      try { dateVal = JSON.parse(cv['date_mm2adtwg']?.value || 'null')?.date; } catch {}
+      const prop = cv['text_mm2ahbrx']?.text?.trim();
+      if (!dateVal || !prop) continue;
+      if (dateVal === today) arrProps.add(prop);
+      if (dateVal >= today && dateVal <= in7Str) weekProps.add(prop);
     }
-    document.getElementById('stArr').textContent = arr;
-    document.getElementById('stDep').textContent = dep;
-  } catch { document.getElementById('stArr').textContent = document.getElementById('stDep').textContent = '—'; }
+    document.getElementById('stArr').textContent  = arrProps.size;
+    document.getElementById('stNext').textContent = weekProps.size;
+  } catch { document.getElementById('stArr').textContent = document.getElementById('stNext').textContent = '—'; }
 
   // Pending supply requests
   try {

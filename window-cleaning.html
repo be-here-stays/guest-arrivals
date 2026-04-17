@@ -193,10 +193,13 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const TOKEN    = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
-const BOARD_ID = 1987064628;
-const DUE_DAYS = 42;      // 6 weeks
-const OVERDUE_DAYS = 56;  // 8 weeks
+const TOKEN        = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const BOARD_ID     = 1987064628;  // Windows & Balustrades
+const LOC_BOARD_ID = 1928673949;  // Lodge Status — master property list (Guesty IDs)
+const GUESTY_COL   = 'text_mktq3qh';   // Guesty ID column on Lodge Status
+const MAINT_GUESTY = 'text_mm2gq5rd';  // Guesty ID column on Windows board
+const DUE_DAYS     = 42;          // 6 weeks
+const OVERDUE_DAYS = 56;          // 8 weeks
 
 let _items = [];
 let _activeItem = null;
@@ -248,43 +251,54 @@ async function loadAll() {
   ['stOverdue','stDue','stOk','stNever'].forEach(id => document.getElementById(id).textContent = '—');
 
   try {
-    const d = await mq(`{
-      boards(ids:[${BOARD_ID}]) {
-        items_page(limit:500) {
-          items {
-            id name
-            column_values(ids:["status","date4","text_mktp76yg"]) { id text value }
-          }
-        }
-      }
-    }`);
+    // Fetch Lodge Status (master — has Guesty IDs) and Windows board in parallel
+    const [locData, maintData] = await Promise.all([
+      mq(`{ boards(ids:[${LOC_BOARD_ID}]) { items_page(limit:100) { items { id name column_values(ids:["${GUESTY_COL}"]) { id text } } } } }`),
+      mq(`{ boards(ids:[${BOARD_ID}]) { items_page(limit:500) { items { id name column_values(ids:["date4","text_mktp76yg","${MAINT_GUESTY}"]) { id text value } } } } }`)
+    ]);
 
-    const raw = d?.boards?.[0]?.items_page?.items || [];
-    _items = raw
-      .filter(item => {
-        const cv = {}; item.column_values.forEach(c => cv[c.id] = c);
-        return cv['status']?.text !== 'Not in Use';
-      })
-      .map(item => {
-        const cv = {}; item.column_values.forEach(c => cv[c.id] = c);
-        const dateStr = (() => { try { return JSON.parse(cv['date4']?.value||'null')?.date||null; } catch { return null; } })();
-        return {
+    // Build maintenance lookup keyed by Guesty ID
+    const maintMap = new Map();
+    for (const item of maintData?.boards?.[0]?.items_page?.items || []) {
+      const cv = {}; item.column_values.forEach(c => cv[c.id] = c);
+      const dateStr = (() => { try { return JSON.parse(cv['date4']?.value||'null')?.date||null; } catch { return null; } })();
+      const guestyId = cv[MAINT_GUESTY]?.text?.trim();
+      if (guestyId) {
+        maintMap.set(guestyId, {
           id: item.id,
-          name: item.name,
           dateStr,
-          days: daysSince(dateStr),
-          status: getCleanStatus(dateStr),
           balustrade: cv['text_mktp76yg']?.text?.trim().toUpperCase() === 'Y',
-        };
-      });
+        });
+      }
+    }
 
-    // Sort: never → overdue (oldest first) → due (oldest first) → ok
+    // Build display list from Lodge Status, excluding placeholder entries
+    const locItems = (locData?.boards?.[0]?.items_page?.items || [])
+      .filter(item => !item.name.match(/^Item \d+$/i));
+
+    _items = locItems.map(locItem => {
+      const locName  = locItem.name;
+      const guestyId = locItem.column_values[0]?.text?.trim();
+      const maint    = guestyId ? maintMap.get(guestyId) : null;
+
+      const dateStr = maint?.dateStr || null;
+      return {
+        id:         maint?.id   || null,   // null = no record in Windows board yet
+        name:       locName,
+        dateStr,
+        days:       daysSince(dateStr),
+        status:     getCleanStatus(dateStr),
+        balustrade: maint?.balustrade || false,
+        noRecord:   !maint,
+      };
+    });
+
+    // Sort: never/noRecord → overdue (oldest first) → due → ok
     const order = { never:0, overdue:1, due:2, ok:3 };
     _items.sort((a, b) => {
       const od = order[a.status] - order[b.status];
       if (od !== 0) return od;
-      const da = a.days ?? 99999, db = b.days ?? 99999;
-      return db - da; // oldest first within same category
+      return (b.days ?? 99999) - (a.days ?? 99999);
     });
 
     // Stats
@@ -310,10 +324,10 @@ async function loadAll() {
 
 function renderList() {
   const groups = [
-    { key:'never',   label:'Never Cleaned',  items:[] },
-    { key:'overdue', label:'Overdue',         items:[] },
+    { key:'never',   label:'Never Cleaned',               items:[] },
+    { key:'overdue', label:'Overdue',                      items:[] },
     { key:'due',     label:'Due for Cleaning (6–8 weeks)', items:[] },
-    { key:'ok',      label:'Up to Date',      items:[] },
+    { key:'ok',      label:'Up to Date',                   items:[] },
   ];
   _items.forEach(i => groups.find(g => g.key === i.status).items.push(i));
 
@@ -322,6 +336,9 @@ function renderList() {
     if (!g.items.length) return;
     html += `<div class="sec-lbl">${g.label}</div>`;
     g.items.forEach(i => {
+      const logBtn = i.id
+        ? `<button class="log-btn" onclick="openModal(${JSON.stringify(i.name)})">Log Clean</button>`
+        : `<button class="log-btn" style="opacity:.4;cursor:default" title="Not yet in Windows board">No record</button>`;
       html += `
         <div class="prop-row ${i.status}">
           <div class="prop-info">
@@ -332,7 +349,7 @@ function renderList() {
               ${i.balustrade ? '<span class="tag tag-bal">🏛 Balustrades</span>' : ''}
             </div>
           </div>
-          <button class="log-btn" onclick="openModal('${i.id}')">Log Clean</button>
+          ${logBtn}
         </div>`;
     });
   });
@@ -340,9 +357,9 @@ function renderList() {
   document.getElementById('mainContent').innerHTML = html || '<div class="empty">No properties found.</div>';
 }
 
-function openModal(itemId) {
-  const item = _items.find(i => i.id === itemId);
-  if (!item) return;
+function openModal(propName) {
+  const item = _items.find(i => i.name === propName);
+  if (!item || !item.id) return;
   _activeItem = item;
   document.getElementById('modalTitle').textContent = 'Log Window Clean';
   document.getElementById('modalSub').textContent = item.name + (item.balustrade ? ' · includes balustrades' : '');
@@ -375,7 +392,6 @@ async function submitLog() {
   document.getElementById('modalErr').textContent = '';
 
   try {
-    // Build note text
     const timeParts = [];
     if (hrs)  timeParts.push(`${hrs} hr${hrs > 1 ? 's' : ''}`);
     if (mins) timeParts.push(`${mins} min${mins > 1 ? 's' : ''}`);
@@ -384,11 +400,8 @@ async function submitLog() {
     if (_activeItem.balustrade) noteBody += ` Balustrades: ${bal ? 'Yes' : 'No'}.`;
     if (notes) noteBody += ` Notes: ${notes}`;
 
-    // Update date4 + status on Monday
-    const colVals = JSON.stringify({ date4: { date }, status: { label: 'Clean' } });
+    const colVals = JSON.stringify({ date4:{ date }, status:{ label:'Clean' } });
     await mq(`mutation { change_multiple_column_values(item_id:${_activeItem.id}, board_id:${BOARD_ID}, column_values:${JSON.stringify(colVals)}) { id } }`);
-
-    // Log update/comment
     await mq(`mutation { create_update(item_id:${_activeItem.id}, body:${JSON.stringify(noteBody)}) { id } }`);
 
     closeModal();
@@ -409,9 +422,7 @@ function showToast(msg, type='') {
   _toastTimer = setTimeout(() => { t.className = 'toast'; }, 3000);
 }
 
-document.addEventListener('keydown', e => {
-  if (e.key === 'Escape') closeModal();
-});
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeModal(); });
 
 loadAll();
 </script>

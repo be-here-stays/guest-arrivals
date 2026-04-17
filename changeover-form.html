@@ -28,6 +28,8 @@
     .header-logo { flex-shrink: 0; }
     .header-logo svg { display: block; width: 120px; height: auto; }
     .header-sub { font-size: 11px; color: var(--cream); opacity: 0.65; margin-top: 4px; letter-spacing: 0.3px; }
+    .hdr-hub { color: rgba(255,255,255,.6); font-size: 12px; font-weight: 600; text-decoration: none; padding: 5px 10px; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; margin-left: auto; white-space: nowrap; }
+    .hdr-hub:hover { background: rgba(255,255,255,.1); color: #fff; }
 
     .form-wrap { padding: 20px 16px 40px; max-width: 500px; margin: 0 auto; }
 
@@ -174,6 +176,7 @@
       </svg>
       <div class="header-sub">Changeover Sign-off</div>
     </div>
+    <a href="hub.html" class="hdr-hub">‹ Hub</a>
   </div>
 </header>
 
@@ -241,7 +244,7 @@
 <div class="toast" id="toast"></div>
 
 <script>
-const API_TOKEN      = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NTg1MTIxMiwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTVUMDg6NTM6MTkuMzQxWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.AnJa58nVNbSv1Ydgf8BVmIBY4zoN4rOgl7IAKs51RtA';
+const API_TOKEN      = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuNjg4WiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.fyLxWY57EDyoVcnCCSwRrF5Z5xIrV4j4cG1zVzqaGm0';
 const LOG_BOARD      = 5094663022;
 const COL_PROP       = 'text_mm2e9pw8';
 const COL_DATE       = 'date_mm2e4wj5';

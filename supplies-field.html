@@ -29,6 +29,8 @@
     .hdr { background: var(--dark); color: #fff; padding: 14px 20px; display: flex; align-items: center; gap: 12px; position: sticky; top: 0; z-index: 100; }
     .hdr-back { background: none; border: none; color: rgba(255,255,255,.7); font-size: 22px; cursor: pointer; padding: 0 6px 0 0; line-height: 1; display: none; }
     .hdr-back.visible { display: block; }
+    .hdr-hub { color: rgba(255,255,255,.6); font-size: 12px; font-weight: 600; text-decoration: none; padding: 5px 10px; border: 1px solid rgba(255,255,255,.2); border-radius: 6px; margin-right: 8px; white-space: nowrap; }
+    .hdr-hub:hover { background: rgba(255,255,255,.1); color: #fff; }
     .hdr-logo { width: 80px; flex-shrink: 0; }
     .hdr-logo svg { display: block; width: 100%; height: auto; }
     .hdr-title { flex: 1; }
@@ -214,6 +216,7 @@
 
 <!-- Header -->
 <div class="hdr">
+  <a href="hub.html" class="hdr-hub">‹ Hub</a>
   <button class="hdr-back" id="backBtn" onclick="goHome()">‹</button>
   <div class="hdr-logo">
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 215.0001 45.6329" aria-label="Be Here">
@@ -260,7 +263,7 @@
 
 <script>
 // ─── CONFIG ─────────────────────────────────────────────────────────────────
-const MONDAY_TOKEN      = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NTg1MTIxMiwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTVUMDg6NTM6MTkuMzQxWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.AnJa58nVNbSv1Ydgf8BVmIBY4zoN4rOgl7IAKs51RtA';
+const MONDAY_TOKEN      = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuNjg4WiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.fyLxWY57EDyoVcnCCSwRrF5Z5xIrV4j4cG1zVzqaGm0';
 const ARRIVALS_BOARD    = 5094453064;
 const SUPPLIES_BOARD    = 1615688857;
 const SUP_GROUP         = 'topics';

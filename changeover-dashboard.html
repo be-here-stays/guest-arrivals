@@ -182,7 +182,7 @@
 
 <script>
 // ── Config ───────────────────────────────────────────────────
-const API_TOKEN        = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NTg1MTIxMiwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTVUMDg6NTM6MTkuMzQxWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.AnJa58nVNbSv1Ydgf8BVmIBY4zoN4rOgl7IAKs51RtA';
+const API_TOKEN        = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuNjg4WiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.fyLxWY57EDyoVcnCCSwRrF5Z5xIrV4j4cG1zVzqaGm0';
 const LODGE_BOARD      = 1928673949;
 const LOG_BOARD        = 5094663022;
 const HOT_TUB_BOARD    = 1918769299;
@@ -253,14 +253,14 @@ async function load() {
     if (logRes.errors)   throw new Error('Changeover Log: ' + logRes.errors[0].message);
     if (htRes.errors)    throw new Error('Hot Tub Status: ' + htRes.errors[0].message);
 
-    // Filter changeovers: status index 3 (CheckOut) or 4 (SameDay)
+    // Filter changeovers: status index 1 (CheckOut) or 0 (SameDay)
     const changeovers = (lodgeRes.data?.boards?.[0]?.items_page?.items || [])
       .filter(i => {
         const col = i.column_values?.[0];
         if (!col?.value) return false;
         try {
           const idx = JSON.parse(col.value)?.index;
-          return idx === 3 || idx === 4;
+          return idx === 1 || idx === 0;
         } catch(_) { return false; }
       })
       .map(i => i.name).sort();

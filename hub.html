@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Be Here">
+  <meta name="theme-color" content="#272F2E">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icon-192.png">
+  <title>Be Here Stays</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+      --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+      --red:#8B2020; --red-bg:#fdf0ec; --amber:#a86c00; --amber-bg:#fdf5e8;
+      --green:#2d6a4f; --green-bg:#edf7f2; --green-bdr:#52b788;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:env(safe-area-inset-bottom); }
+
+    /* Header */
+    .header { background:var(--dark); color:#fff; padding:18px 24px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; }
+    .logo svg { display:block; width:96px; height:auto; }
+    .hdr-right { text-align:right; }
+    .hdr-date { font-size:13px; font-weight:600; color:rgba(255,255,255,.7); }
+    .hdr-time { font-size:11px; color:rgba(255,255,255,.4); margin-top:2px; }
+
+    /* Install banner */
+    .install-banner { background:var(--gold); color:var(--dark); padding:10px 20px; font-size:13px; font-weight:600; display:none; align-items:center; gap:10px; flex-wrap:wrap; }
+    .install-banner.show { display:flex; }
+    .install-msg { flex:1; min-width:180px; }
+    .btn-install { padding:6px 14px; background:var(--dark); color:var(--cream); border:none; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; white-space:nowrap; }
+    .btn-dismiss { background:none; border:none; font-size:20px; cursor:pointer; opacity:.6; padding:0 2px; line-height:1; }
+
+    /* Stats */
+    .stats-wrap { padding:16px 20px 0; overflow-x:auto; -webkit-overflow-scrolling:touch; }
+    .stats-row { display:flex; gap:10px; min-width:max-content; padding-bottom:2px; }
+    .stat-card { background:var(--surface); border-radius:10px; padding:12px 16px; min-width:110px; box-shadow:0 1px 3px rgba(39,47,46,.07); cursor:pointer; transition:transform .15s; }
+    .stat-card:hover { transform:translateY(-1px); }
+    .stat-val { font-size:28px; font-weight:700; color:var(--dark); line-height:1.1; }
+    .stat-lbl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.4px; color:var(--sage-mid); margin-top:3px; }
+    .stat-card.warn .stat-val { color:var(--amber); }
+    .stat-card.danger .stat-val { color:var(--red); }
+    .spin { display:inline-block; width:18px; height:18px; border:2px solid rgba(100,105,85,.15); border-top-color:var(--sage-mid); border-radius:50%; animation:spin .7s linear infinite; vertical-align:middle; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* Sections */
+    .page-body { padding:0 20px 32px; }
+    .section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--sage-mid); margin:22px 0 10px; display:flex; align-items:center; gap:8px; }
+    .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+
+    /* Tool cards */
+    .cards { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .tool-card { background:var(--surface); border-radius:14px; padding:16px; text-decoration:none; color:var(--dark); box-shadow:0 1px 4px rgba(39,47,46,.08); display:flex; flex-direction:column; gap:6px; border:1.5px solid transparent; transition:transform .15s, box-shadow .15s; }
+    .tool-card:hover  { transform:translateY(-2px); box-shadow:0 4px 12px rgba(39,47,46,.12); }
+    .tool-card:active { transform:scale(.97); }
+    .tool-card.featured { border-color:var(--gold); background:linear-gradient(140deg,#fff 75%,#fdf5e8); }
+    .card-icon { font-size:26px; line-height:1; }
+    .card-name { font-size:14px; font-weight:700; color:var(--dark); }
+    .card-desc { font-size:12px; color:var(--sage); line-height:1.4; flex:1; }
+    .card-badge { display:inline-block; font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.3px; padding:2px 8px; border-radius:5px; margin-top:4px; }
+    .b-mobile  { background:var(--amber-bg); color:var(--amber); }
+    .b-desktop { background:var(--green-bg); color:var(--green); }
+    .b-both    { background:#f0f0e8; color:var(--sage); }
+
+    /* Desktop layout */
+    @media (min-width:680px) {
+      .header { padding:20px 40px; }
+      .stats-wrap { padding:20px 40px 0; overflow-x:visible; }
+      .stats-row { min-width:0; flex-wrap:wrap; }
+      .stat-card { flex:1; }
+      .page-body { padding:0 40px 40px; display:grid; grid-template-columns:1fr 1fr; gap:0 48px; }
+      .section-label { margin-top:24px; }
+      .cards { grid-template-columns:1fr 1fr; }
+    }
+    @media (min-width:960px) {
+      .stats-row { gap:14px; }
+      .stat-val { font-size:32px; }
+    }
+  </style>
+</head>
+<body>
+
+<div class="header">
+  <div class="logo">
+    <svg viewBox="0 0 200 60" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <text x="0" y="44" font-family="Instrument Sans,sans-serif" font-weight="700" font-size="42" fill="#F3E3C3">Be Here.</text>
+    </svg>
+  </div>
+  <div class="hdr-right">
+    <div class="hdr-date" id="hdrDate"></div>
+    <div class="hdr-time" id="hdrTime"></div>
+  </div>
+</div>
+
+<div class="install-banner" id="installBanner">
+  <span class="install-msg" id="installMsg">Add Be Here to your home screen for one-tap access.</span>
+  <button class="btn-install" id="installBtn" onclick="triggerInstall()">Add to home screen</button>
+  <button class="btn-dismiss" onclick="dismissInstall()">✕</button>
+</div>
+
+<div class="stats-wrap">
+  <div class="stats-row">
+    <div class="stat-card" onclick="go('arrivals-hub.html')">
+      <div class="stat-val" id="stArr"><span class="spin"></span></div>
+      <div class="stat-lbl">Arrivals today</div>
+    </div>
+    <div class="stat-card" onclick="go('arrivals-hub.html')">
+      <div class="stat-val" id="stDep"><span class="spin"></span></div>
+      <div class="stat-lbl">Departures today</div>
+    </div>
+    <div class="stat-card warn" onclick="go('supplies-field.html')">
+      <div class="stat-val" id="stSup"><span class="spin"></span></div>
+      <div class="stat-lbl">Pending requests</div>
+    </div>
+    <div class="stat-card danger" onclick="go('stock.html')">
+      <div class="stat-val" id="stOut"><span class="spin"></span></div>
+      <div class="stat-lbl">Out of stock</div>
+    </div>
+    <div class="stat-card warn" onclick="go('stock.html')">
+      <div class="stat-val" id="stLow"><span class="spin"></span></div>
+      <div class="stat-lbl">Low stock</div>
+    </div>
+  </div>
+</div>
+
+<div class="page-body">
+
+  <!-- In-property (mobile) -->
+  <div>
+    <div class="section-label">📱 In the property</div>
+    <div class="cards">
+      <a href="supplies-field.html" class="tool-card featured">
+        <div class="card-icon">📦</div>
+        <div class="card-name">Field Log</div>
+        <div class="card-desc">Log shortages, confirm deliveries, take stock, build your van run.</div>
+        <span class="card-badge b-mobile">📱 Mobile</span>
+      </a>
+      <a href="changeover-form.html" class="tool-card featured">
+        <div class="card-icon">✅</div>
+        <div class="card-name">Changeover</div>
+        <div class="card-desc">Log completed changeovers and confirm restocking on the spot.</div>
+        <span class="card-badge b-mobile">📱 Mobile</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Management (desktop) -->
+  <div>
+    <div class="section-label">💻 Management</div>
+    <div class="cards">
+      <a href="arrivals-hub.html" class="tool-card">
+        <div class="card-icon">🏡</div>
+        <div class="card-name">Arrivals Hub</div>
+        <div class="card-desc">Guest arrivals, upcoming stays, and supply overview.</div>
+        <span class="card-badge b-desktop">💻 Desktop</span>
+      </a>
+      <a href="stock.html" class="tool-card">
+        <div class="card-icon">🏪</div>
+        <div class="card-name">Stock Warehouse</div>
+        <div class="card-desc">Manage stock, run a stock take, and track valuations.</div>
+        <span class="card-badge b-both">📱💻 Any</span>
+      </a>
+      <a href="delivery-report.html" class="tool-card">
+        <div class="card-icon">📊</div>
+        <div class="card-name">Delivery Report</div>
+        <div class="card-desc">Cost by lodge — net, VAT &amp; handling. CSV export.</div>
+        <span class="card-badge b-desktop">💻 Desktop</span>
+      </a>
+    </div>
+  </div>
+
+</div>
+
+<script>
+// Service worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/guest-arrivals/sw.js', { scope: '/guest-arrivals/' }).catch(() => {});
+}
+
+// Clock
+function tick() {
+  const n = new Date();
+  const days = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+  document.getElementById('hdrDate').textContent = days[n.getDay()] + ' ' + n.getDate() + ' ' + months[n.getMonth()];
+  document.getElementById('hdrTime').textContent = n.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+}
+tick(); setInterval(tick, 30000);
+
+function go(p) { location.href = p; }
+
+// PWA install (Android/Chrome)
+let deferredPrompt;
+window.addEventListener('beforeinstallprompt', e => {
+  e.preventDefault(); deferredPrompt = e;
+  if (!sessionStorage.getItem('install-dismissed')) {
+    document.getElementById('installBanner').classList.add('show');
+  }
+});
+function triggerInstall() {
+  if (!deferredPrompt) return;
+  deferredPrompt.prompt();
+  deferredPrompt.userChoice.then(() => { deferredPrompt = null; dismissInstall(); });
+}
+window.addEventListener('appinstalled', dismissInstall);
+
+// iOS manual prompt
+if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !window.navigator.standalone && !sessionStorage.getItem('install-dismissed')) {
+  document.getElementById('installMsg').textContent = 'Install as an app: tap the Share button (□↑) then "Add to Home Screen".';
+  document.getElementById('installBtn').style.display = 'none';
+  document.getElementById('installBanner').classList.add('show');
+}
+
+function dismissInstall() {
+  document.getElementById('installBanner').classList.remove('show');
+  sessionStorage.setItem('install-dismissed', '1');
+}
+
+// Monday API
+const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NTg1MTIxMiwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTVUMDg6NTM6MTkuMzQxWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.AnJa58nVNbSv1Ydgf8BVmIBY4zoN4rOgl7IAKs51RtA';
+async function mq(q) {
+  const r = await fetch('https://api.monday.com/v2', {
+    method:'POST', headers:{'Content-Type':'application/json','Authorization':TOKEN,'API-Version':'2024-01'},
+    body: JSON.stringify({query:q})
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+async function loadStats() {
+  const today = new Date().toISOString().split('T')[0];
+
+  // Arrivals & departures
+  try {
+    const d = await mq(`{ boards(ids:[5094453064]) { items_page(limit:500) { items { column_values(ids:["date4","date6"]) { id text } } } } }`);
+    let arr=0, dep=0;
+    for (const g of d?.boards?.[0]?.items_page?.items || []) {
+      const cv = {}; for (const c of g.column_values) cv[c.id] = c.text;
+      if (cv['date4'] === today) arr++;
+      if (cv['date6'] === today) dep++;
+    }
+    document.getElementById('stArr').textContent = arr;
+    document.getElementById('stDep').textContent = dep;
+  } catch { document.getElementById('stArr').textContent = document.getElementById('stDep').textContent = '—'; }
+
+  // Pending supply requests
+  try {
+    const d = await mq(`{ boards(ids:[1615688857]) { items_page(limit:500) { items { column_values(ids:["status"]) { value } } } } }`);
+    const pending = (d?.boards?.[0]?.items_page?.items || []).filter(i => {
+      try { return JSON.parse(i.column_values[0]?.value||'null')?.index === 0; } catch { return false; }
+    }).length;
+    document.getElementById('stSup').textContent = pending;
+  } catch { document.getElementById('stSup').textContent = '—'; }
+
+  // Stock levels
+  try {
+    const d = await mq(`{ boards(ids:[5094763973]) { items_page(limit:500) { items { column_values(ids:["numeric_mm2fmsjb","numeric_mm2f8xtv"]) { id text } } } } }`);
+    let out=0, low=0;
+    for (const s of d?.boards?.[0]?.items_page?.items || []) {
+      const cv = {}; for (const c of s.column_values) cv[c.id] = parseFloat(c.text)||0;
+      const qty = cv['numeric_mm2fmsjb']||0, reorder = cv['numeric_mm2f8xtv']||0;
+      if (qty <= 0) out++; else if (qty <= reorder) low++;
+    }
+    document.getElementById('stOut').textContent = out;
+    document.getElementById('stLow').textContent = low;
+  } catch { document.getElementById('stOut').textContent = document.getElementById('stLow').textContent = '—'; }
+}
+
+loadStats();
+</script>
+</body>
+</html>

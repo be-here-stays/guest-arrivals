@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Be Here — Stock Warehouse</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -165,6 +165,19 @@
     .btn-st-cancel:hover { background: var(--bg); }
     .btn-stocktake { padding: 7px 14px; background: rgba(255,255,255,0.1); border: 1px solid rgba(255,255,255,0.2); border-radius: 7px; color: #fff; font-size: 12px; font-weight: 600; cursor: pointer; font-family: inherit; }
     .btn-stocktake:hover { background: rgba(255,255,255,0.2); }
+
+    /* Mobile responsive */
+    body { padding-bottom: env(safe-area-inset-bottom); }
+    header { padding-top: max(16px, env(safe-area-inset-top)); }
+    @media (max-width: 679px) {
+      header { padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); }
+      .api-bar { padding: 8px 16px; }
+      .filters { padding: 10px 16px; gap: 12px; }
+      .content { padding: 16px; }
+      .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      #tableWrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      table { min-width: 540px; }
+    }
 
     /* Stock Take table */
     .st-expected { font-size: 20px; font-weight: 700; color: var(--sage-mid); min-width: 36px; }

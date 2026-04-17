@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Be Here — Delivery Report</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -117,6 +117,18 @@
     /* ── No price warning ── */
     .warn-banner { background: var(--amber-bg); border: 1.5px solid #c8a060; border-radius: 8px; padding: 10px 14px; margin-bottom: 16px; font-size: 12px; color: var(--amber); }
     .warn-banner strong { display: block; margin-bottom: 4px; }
+
+    /* ── Mobile responsive ── */
+    body { padding-bottom: env(safe-area-inset-bottom); }
+    header { padding-top: max(16px, env(safe-area-inset-top)); }
+    @media (max-width: 679px) {
+      header { padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); }
+      .filter-bar { padding: 12px 16px; gap: 12px; }
+      .content { padding: 16px; }
+      .table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      table { min-width: 500px; }
+      .report-actions { padding: 10px 16px; }
+    }
 
     /* ── Print styles ── */
     @media print {

@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>Be Here — Operations Hub</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -224,6 +224,44 @@
     .sup-toast.show { transform: translateX(-50%) translateY(0); }
     .sup-toast.success { background: var(--sage); }
     .sup-toast.error { background: #8B2020; }
+    /* PIN gate */
+    /* ═══════════════════════════════
+       MOBILE RESPONSIVE
+    ═══════════════════════════════ */
+    body { padding-bottom: env(safe-area-inset-bottom); }
+    header { padding-top: max(16px, env(safe-area-inset-top)); }
+
+    @media (max-width: 679px) {
+      header { padding: 10px 16px; padding-top: max(10px, env(safe-area-inset-top)); }
+      .header-logo svg { width: 100px; }
+      .header-sub { font-size: 10px; }
+      .api-bar { padding: 8px 16px; }
+      /* Scrollable tabs — no side padding, tabs don't wrap */
+      .tabs { padding: 0 16px; overflow-x: auto; -webkit-overflow-scrolling: touch; scrollbar-width: none; flex-wrap: nowrap; }
+      .tabs::-webkit-scrollbar { display: none; }
+      .tab { padding: 12px 14px; font-size: 13px; white-space: nowrap; flex-shrink: 0; }
+      /* Content area */
+      .content { padding: 16px; }
+      /* Changeover table: horizontal scroll */
+      #changeoversContent { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      .co-legend { gap: 8px; font-size: 11px; padding: 8px 12px; }
+      .co-tasks-key { margin-left: 0; width: 100%; }
+      .co-table { min-width: 560px; }
+      .co-table thead th.co-th-prog { width: 90px; }
+      .co-prog-bg { max-width: 55px; }
+      /* Bed configs table */
+      #overviewContent { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+      /* Laundry header stacks on small screens */
+      .laundry-header { flex-direction: column; align-items: flex-start; gap: 12px; }
+      /* Bed config stat row */
+      .bc-summary-row { gap: 8px; }
+      .bc-stat { padding: 12px 14px; }
+      /* Supplies stats */
+      .sup-stat-row { gap: 8px; }
+      .sup-stat { padding: 12px 14px; }
+      .sup-stat-num { font-size: 24px; }
+    }
+
     /* PIN gate */
     .pin-overlay { position:fixed; inset:0; background:#272F2E; z-index:9999; display:flex; align-items:center; justify-content:center; padding:24px; }
     .pin-modal { background:#fff; border-radius:18px; padding:28px 24px 24px; width:100%; max-width:320px; box-shadow:0 12px 40px rgba(39,47,46,.4); text-align:center; }

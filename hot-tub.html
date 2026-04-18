@@ -1,0 +1,852 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Hot Tub Log — Be Here</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+      --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+      --red:#8B2020; --red-bg:#fdf0ec; --amber:#a86c00; --amber-bg:#fdf5e8;
+      --green:#2d6a4f; --green-bg:#edf7f2; --green-bdr:#52b788;
+      --blue:#1a5276; --blue-bg:#eaf4fb;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:48px; }
+
+    /* ── Header ─────────────────────────────────────── */
+    header { background:var(--dark); color:#fff; padding:18px 24px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; }
+    .header-logo svg { display:block; width:110px; height:auto; }
+    .hdr-back { color:rgba(255,255,255,.65); text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; }
+
+    /* ── Container ──────────────────────────────────── */
+    .container { max-width:620px; margin:0 auto; padding:20px 16px; }
+
+    /* ── Cards ──────────────────────────────────────── */
+    .card { background:var(--surface); border-radius:14px; padding:20px; margin-bottom:14px; box-shadow:0 1px 4px rgba(39,47,46,.08); }
+    .card-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--sage); margin-bottom:16px; display:flex; align-items:center; gap:6px; }
+    .card-title-note { font-weight:400; text-transform:none; letter-spacing:0; font-size:11px; color:var(--sage-mid); }
+
+    /* ── Visit type buttons ─────────────────────────── */
+    .vt-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+    .vt-btn { padding:13px 6px; border:2px solid var(--border); border-radius:11px; background:var(--surface); font-family:inherit; font-size:12px; font-weight:700; color:var(--sage-mid); cursor:pointer; text-align:center; transition:all .15s; line-height:1.4; }
+    .vt-btn span { display:block; font-size:18px; margin-bottom:3px; }
+    .vt-btn:hover { border-color:var(--sage); color:var(--sage); }
+    .vt-btn.active.full  { border-color:#2d6a4f; background:#edf7f2; color:#1e5c3a; }
+    .vt-btn.active.mid-stay { border-color:#1a5276; background:#eaf4fb; color:#1a5276; }
+    .vt-btn.active.mid-vac  { border-color:var(--gold); background:#fdf5e8; color:#7a5c35; }
+
+    /* ── Field ──────────────────────────────────────── */
+    .field { margin-bottom:14px; }
+    .field:last-child { margin-bottom:0; }
+    .field label { display:block; font-size:12px; font-weight:600; color:var(--sage); margin-bottom:5px; }
+    .req { color:var(--red); }
+    .hint { font-weight:400; color:var(--sage-mid); margin-left:5px; }
+    .field input[type=number], .field input[type=text], .field input[type=datetime-local],
+    .field select, .field textarea {
+      width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:9px;
+      font-family:inherit; font-size:15px; color:var(--dark); background:#fff; outline:none;
+      transition:border-color .15s, background .15s;
+      -webkit-appearance:none; appearance:none;
+    }
+    .field input:focus, .field select:focus, .field textarea:focus { border-color:var(--dark); }
+    .field textarea { min-height:80px; resize:vertical; font-size:14px; }
+    .field-row   { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+    .field-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:10px; }
+
+    /* ── Range indicator ────────────────────────────── */
+    .range-row { display:flex; align-items:center; gap:6px; margin-top:5px; min-height:16px; }
+    .rdot { width:8px; height:8px; border-radius:50%; background:transparent; flex-shrink:0; transition:background .2s; }
+    .rdot.good { background:var(--green); }
+    .rdot.warn { background:var(--amber); }
+    .rdot.bad  { background:var(--red); }
+    .rtxt { font-size:11px; font-weight:600; color:transparent; transition:color .2s; }
+    .rtxt.good { color:var(--green); }
+    .rtxt.warn { color:var(--amber); }
+    .rtxt.bad  { color:var(--red); }
+    input.good { border-color:var(--green-bdr) !important; background:#f7fdf9 !important; }
+    input.warn { border-color:#d4a017 !important; background:#fdf9f0 !important; }
+    input.bad  { border-color:var(--red) !important; background:#fdf0ec !important; }
+
+    /* ── Current status card ────────────────────────── */
+    #statusCard { background:linear-gradient(140deg,#272F2E,#3a4a3a); border-radius:14px; padding:16px 20px; margin-bottom:14px; display:none; }
+    #statusCard.show { display:block; }
+    .sc-top { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:10px; }
+    .sc-name { font-size:15px; font-weight:700; color:#fff; }
+    .sc-sub  { font-size:11px; color:rgba(255,255,255,.5); margin-top:2px; }
+    .sc-badge { display:inline-block; padding:3px 10px; border-radius:20px; font-size:11px; font-weight:700; flex-shrink:0; }
+    .sc-badge.clean   { background:#00c875; color:#fff; }
+    .sc-badge.dirty   { background:#df2f4a; color:#fff; }
+    .sc-badge.midstay { background:#007eb5; color:#fff; }
+    .sc-badge.notuseд { background:#888; color:#fff; }
+    .sc-readings { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
+    .sc-reading { text-align:center; }
+    .sc-val { font-size:18px; font-weight:700; color:#fff; }
+    .sc-lbl { font-size:10px; color:rgba(255,255,255,.45); margin-top:1px; }
+    .sc-val.ph-good   { color:#52b788; }
+    .sc-val.ph-warn   { color:#f0b429; }
+    .sc-val.ph-bad    { color:#fc8181; }
+    .sc-val.brom-good { color:#52b788; }
+    .sc-val.brom-warn { color:#f0b429; }
+    .sc-val.brom-bad  { color:#fc8181; }
+    .sc-val.tds-warn  { color:#f0b429; }
+    .sc-val.tds-bad   { color:#fc8181; }
+
+    /* ── Water change selector ──────────────────────── */
+    .wc-row { display:flex; gap:8px; }
+    .wc-btn { flex:1; padding:10px 6px; border:2px solid var(--border); border-radius:9px; background:var(--surface); font-family:inherit; font-size:13px; font-weight:600; color:var(--sage-mid); cursor:pointer; text-align:center; transition:all .15s; }
+    .wc-btn.active { border-color:var(--dark); background:var(--dark); color:#fff; }
+
+    /* ── Flag toggle ────────────────────────────────── */
+    .flag-row { display:flex; align-items:center; justify-content:space-between; padding:14px 16px; background:var(--amber-bg); border:1.5px solid #e2c06a; border-radius:11px; cursor:pointer; transition:background .15s; margin-top:12px; user-select:none; }
+    .flag-row.on { background:#fff8e1; border-color:#c9980a; }
+    .flag-text .flag-lbl { font-size:14px; font-weight:700; color:var(--amber); }
+    .flag-text .flag-sub { font-size:11px; color:var(--amber); opacity:.75; margin-top:2px; }
+    .toggle-pill { width:46px; height:26px; border-radius:13px; background:#ccc; position:relative; transition:.2s; flex-shrink:0; }
+    .toggle-pill.on { background:#c9980a; }
+    .toggle-pill::after { content:''; position:absolute; width:22px; height:22px; background:#fff; border-radius:50%; top:2px; left:2px; transition:.2s; box-shadow:0 1px 3px rgba(0,0,0,.2); }
+    .toggle-pill.on::after { left:22px; }
+
+    /* ── Chemicals grid ─────────────────────────────── */
+    .chem-group-title { font-size:11px; font-weight:700; color:var(--sage-mid); text-transform:uppercase; letter-spacing:.4px; margin:14px 0 8px; padding-top:14px; border-top:1px solid var(--border); }
+    .chem-group-title:first-child { margin-top:0; padding-top:0; border-top:none; }
+    .chem-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+    .chem-item label { display:block; font-size:11px; font-weight:600; color:var(--sage); margin-bottom:4px; }
+    .chem-item input { width:100%; padding:9px 10px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; color:var(--dark); text-align:center; background:#fff; outline:none; -webkit-appearance:none; }
+    .chem-item input:focus { border-color:var(--dark); }
+
+    /* ── Task checkboxes ────────────────────────────── */
+    .task-grid { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .task-item { display:flex; align-items:center; gap:9px; padding:10px 12px; border:1.5px solid var(--border); border-radius:9px; cursor:pointer; transition:all .15s; user-select:none; }
+    .task-item.on { border-color:var(--green-bdr); background:var(--green-bg); }
+    .task-item input[type=checkbox] { width:17px; height:17px; accent-color:var(--green); cursor:pointer; flex-shrink:0; }
+    .task-item span { font-size:13px; font-weight:500; }
+
+    /* ── Timer ──────────────────────────────────────── */
+    .timer-display { font-size:32px; font-weight:700; text-align:center; color:var(--dark); font-variant-numeric:tabular-nums; letter-spacing:2px; margin-bottom:10px; }
+    .timer-btns { display:flex; gap:8px; }
+    .tbtn { flex:1; padding:10px; border:1.5px solid var(--border); border-radius:8px; background:#fff; font-family:inherit; font-size:13px; font-weight:600; cursor:pointer; transition:all .15s; }
+    .tbtn:hover { border-color:var(--dark); }
+    .tbtn.start { border-color:var(--green-bdr); background:var(--green-bg); color:var(--green); }
+    .tbtn.danger { border-color:#c0392b; background:var(--red-bg); color:var(--red); }
+    .divider { height:1px; background:var(--border); margin:16px 0; }
+
+    /* ── Submit ─────────────────────────────────────── */
+    .submit-btn { width:100%; padding:16px; background:var(--dark); color:var(--cream); border:none; border-radius:12px; font-family:inherit; font-size:16px; font-weight:700; cursor:pointer; transition:background .15s; margin-top:4px; }
+    .submit-btn:hover { background:var(--sage); }
+    .submit-btn:disabled { opacity:.45; cursor:not-allowed; }
+
+    /* ── Messages ───────────────────────────────────── */
+    .msg { padding:14px 16px; border-radius:10px; font-size:14px; font-weight:600; margin-bottom:14px; display:none; }
+    .msg.show { display:block; }
+    .msg.success { background:var(--green-bg); color:var(--green); border:1px solid var(--green-bdr); }
+    .msg.error   { background:var(--red-bg); color:var(--red); border:1px solid #c0392b; }
+    .msg.loading { background:var(--amber-bg); color:var(--amber); border:1px solid #d4a017; }
+
+    /* ── Hidden sections ────────────────────────────── */
+    .hide { display:none !important; }
+
+    @media (max-width:400px) {
+      .field-row, .field-row-3, .chem-grid, .task-grid { grid-template-columns:1fr; }
+      .sc-readings { grid-template-columns:repeat(2,1fr); }
+      .vt-row { grid-template-columns:1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="header-logo">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 215.0001 45.6329" style="display:block;width:110px;height:auto" aria-label="Be Here">
+      <path d="M33.5812,26.2451c-4.585,0-8.3018,3.6929-8.3018,8.2482s3.7168,8.2482,8.3018,8.2482,8.3017-3.6928,8.3017-8.2482-3.7168-8.2482-8.3017-8.2482Z" style="fill:#fff;"/>
+      <polygon points="10.8809 19.7103 19.0665 19.7103 19.0665 11.5778 19.0665 11.3457 10.8822 3.2139 10.6473 3.2139 2.463 11.3457 2.463 11.5778 2.463 19.7103 10.648 19.7103 10.8809 19.7103" style="fill:#fff;"/>
+      <path d="M40.5754,5.4963l-5.4656-.2394c-4.4287-.1941-8.2128,3.2233-8.4095,7.594l-.243,5.4044,14.0587-12.6953.0595-.0638Z" style="fill:#fff;"/>
+      <path d="M27.6033,19.3885l5.4768-.2207c4.4294-.1785,7.9053-3.901,7.7245-8.2724l-.2232-5.3945-.0656.0592-12.9125,13.8284Z" style="fill:#fff;"/>
+      <polygon points="23.5662 22.0664 23.5662 0 22.0665 0 22.0665 22.0664 0 22.0664 0 23.5661 22.0665 23.5661 22.0665 45.6329 23.5662 45.6329 23.5662 23.5661 45.6329 23.5661 45.6329 22.0664 23.5662 22.0664" style="fill:#fff;"/>
+      <path d="M12.5345,33.8375c-1.8062-.127-3.257-2.1802-5.0582-1.9879-1.5029.1609-2.5817,1.8435-4.0738,2.0993-.319.0545-.6313.0405-.9396-.0181v3.1036c.3165.0619.6371.0784.9636.0222,1.4922-.2549,2.5709-1.9384,4.0739-2.0993,1.8012-.1931,3.2519,1.86,5.0581,1.9879,2.0581.1453,3.7267-2.2256,5.7881-2.1563.2469.0084.4863.0521.7199.1205v-3.1003c-.2418-.0726-.4888-.1188-.744-.1279-2.0605-.0693-3.7299,2.3015-5.788,2.1563Z" style="fill:#fff;"/>
+      <path d="M12.5229,28.1871c-1.8062-.1263-3.257-2.1794-5.0582-1.9872-1.5029.1609-2.5817,1.8436-4.0738,2.0994-.3149.0536-.6231.0404-.928-.0157v3.1037c.3132.0602.6297.0751.952.0197,1.4922-.2549,2.5709-1.9384,4.0739-2.0993,1.8012-.193,3.252,1.8609,5.0581,1.9879,2.0581.1453,3.7267-2.2255,5.788-2.1562.2511.0082.4948.0536.7316.1237v-3.1011c-.2452-.0743-.4962-.1221-.7556-.1312-2.0605-.0693-3.73,2.3015-5.788,2.1562Z" style="fill:#fff;"/>
+      <path d="M12.5774,39.4868c-1.8061-.127-3.2569-2.1802-5.058-1.9879-1.503.1609-2.5817,1.8435-4.0739,2.0993-.3339.057-.6603.0388-.9835-.0255v3.1036c.3306.0693.6653.0891,1.0075.0314,1.4921-.255,2.5709-1.9385,4.0738-2.0994,1.8012-.1922,3.252,1.8609,5.0581,1.988,2.0581.1452,3.7267-2.2257,5.7881-2.1563.2319.0074.4565.047.6769.108v-3.1028c-.2279-.0651-.4606-.1064-.701-.1146-2.0604-.0693-3.7299,2.3015-5.788,2.1562Z" style="fill:#fff;"/>
+      <path d="M79.2201,29.1735c0,5.3627-4.4154,8.2131-11.8064,8.2131h-12.0464l.144-1.6426,2.4956-.2899c.9119-.0966,1.2479-.2898,1.2479-.6763V9.752c0-.3865-.24-.4831-1.2479-.6281l-2.4956-.2899-.144-1.6426h12.2384c7.9189,0,10.5106,3.1403,10.5106,6.6671,0,3.865-2.9756,7.0053-7.2951,7.7783v.1932c5.8073.6281,8.3989,3.7684,8.3989,7.3435ZM75.0447,29.5117c0-4.493-3.6955-6.7154-8.8788-6.7154h-2.9757v12.1747l3.7435.6764,1.3919-.0483c3.5515-.1933,6.7191-2.1741,6.7191-6.0874ZM73.8928,15.0663c0-3.7683-2.3517-6.1357-7.679-6.1357h-3.0236v12.078l3.7915-.0483c4.7994-.0483,6.9111-3.1403,6.9111-5.8941Z" style="fill:#fff;"/>
+      <path d="M100.4881,32.652c-1.7275,3.4302-4.895,5.411-8.6385,5.411-5.5673,0-9.6468-4.5414-9.6468-10.822,0-7.0536,5.0394-12.1264,10.9906-12.1264,4.5114,0,7.3907,2.8505,7.3907,7.0053,0,.8213-.096,1.8842-.24,2.5606l-14.4457-.1933c-.048.1933-.048.9663-.048,1.1595,0,5.4593,3.1675,9.3726,7.535,9.3726,2.2077,0,4.4154-.8696,6.1431-2.947l.9596.5797ZM96.7449,22.9895c.24-3.7683-1.5358-6.1839-4.4154-6.1839-2.6397,0-5.4713,2.319-6.2392,6.2323,0,0,10.8466-.0484,10.6546-.0484Z" style="fill:#fff;"/>
+      <path d="M109.9551,35.1159c0,1.546-1.2,2.9954-2.928,2.9954-1.776,0-3.024-1.4494-3.024-2.9954s1.248-2.8987,3.024-2.8987c1.728,0,2.928,1.3527,2.928,2.8987Z" style="fill:#fff;"/>
+      <path d="M144.3351,37.3866h-11.71l.143-1.6426,2.496-.2899c.912-.0966,1.248-.2898,1.248-.6763v-11.8849h-15.502v11.9332c0,.3865.288.5314,1.248.628l2.496.2899.144,1.6426h-11.711l.144-1.6426,2.496-.2899c.912-.0966,1.248-.2898,1.248-.6763V9.752c0-.3865-.24-.4831-1.248-.6281l-2.496-.2899-.144-1.6426h11.711l-.144,1.6426-2.496.2899c-.912.0966-1.248.2899-1.248.6764v11.1118h15.502v-11.1601c0-.4348-.24-.5314-1.248-.6281l-2.496-.2899-.143-1.6426h11.71l-.144,1.6426-2.496.2899c-.912.0966-1.248.2899-1.248.6764v25.0258c0,.3865.24.4831,1.248.628l2.496.2899.144,1.6426Z" style="fill:#fff;"/>
+      <path d="M165.9261,32.652c-1.728,3.4302-4.896,5.411-8.639,5.411-5.568,0-9.647-4.5414-9.647-10.822,0-7.0536,5.039-12.1264,10.991-12.1264,4.511,0,7.391,2.8505,7.391,7.0053,0,.8213-.096,1.8842-.24,2.5606l-14.446-.1933c-.048.1933-.048.9663-.048,1.1595,0,5.4593,3.167,9.3726,7.535,9.3726,2.207,0,4.415-.8696,6.143-2.947l.96.5797ZM162.1821,22.9895c.24-3.7683-1.536-6.1839-4.415-6.1839-2.64,0-5.472,2.319-6.24,6.2323,0,0,10.847-.0484,10.655-.0484Z" style="fill:#fff;"/>
+      <path d="M185.4281,17.5302c0,1.3528-.816,2.464-2.256,2.464-1.008,0-1.871-.7247-2.303-1.546-1.488.9179-3.696,3.1403-4.896,5.5559v10.8703c0,.3865.192.628,1.296.6764l2.544.1932.144,1.6426h-10.703l.144-1.6426,1.92-.1932c.864-.0484,1.2-.2416,1.2-.7247v-13.6724c0-2.2224-.24-2.5123-1.488-2.8505l-1.968-.2898.096-1.3045,6.815-1.5943v6.2806h.192c2.784-4.6863,4.512-6.3289,6.575-6.3289,1.728,0,2.688,1.1112,2.688,2.4639Z" style="fill:#fff;"/>
+      <path d="M205.7931,32.652c-1.728,3.4302-4.895,5.411-8.639,5.411-5.567,0-9.647-4.5414-9.647-10.822,0-7.0536,5.04-12.1264,10.991-12.1264,4.511,0,7.391,2.8505,7.391,7.0053,0,.8213-.096,1.8842-.24,2.5606l-14.446-.1933c-.048.1933-.048.9663-.048,1.1595,0,5.4593,3.168,9.3726,7.535,9.3726,2.208,0,4.415-.8696,6.143-2.947l.96.5797ZM202.0501,22.9895c.24-3.7683-1.536-6.1839-4.416-6.1839-2.64,0-5.471,2.319-6.239,6.2323,0,0,10.847-.0484,10.655-.0484Z" style="fill:#fff;"/>
+      <path d="M215.0001,35.1159c0,1.546-1.199,2.9954-2.927,2.9954-1.776,0-3.024-1.4494-3.024-2.9954s1.248-2.8987,3.024-2.8987c1.728,0,2.927,1.3527,2.927,2.8987Z" style="fill:#fff;"/>
+    </svg>
+  </div>
+  <a href="hub.html" class="hdr-back">‹ Hub</a>
+</header>
+
+<div class="container">
+
+  <div id="msgBox" class="msg"></div>
+
+  <!-- ══════════════════════════════════════
+       VISIT SETUP
+  ══════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-title">🏊 Visit Setup</div>
+
+    <div class="field">
+      <label>Property <span class="req">*</span></label>
+      <select id="fProperty" onchange="onPropertyChange()">
+        <option value="">Loading…</option>
+      </select>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Tester <span class="req">*</span></label>
+        <select id="fTester">
+          <option value="">Select…</option>
+          <option>Saul</option>
+          <option>Barry</option>
+          <option>Mike</option>
+          <option>Meg</option>
+          <option>Alan</option>
+        </select>
+      </div>
+      <div class="field">
+        <label>Date &amp; Time <span class="req">*</span></label>
+        <input type="datetime-local" id="fDateTime">
+      </div>
+    </div>
+
+    <div class="field">
+      <label>Visit Type <span class="req">*</span></label>
+      <div class="vt-row">
+        <button class="vt-btn full"     onclick="setVisitType('full',this)">    <span>🧹</span>Full Clean</button>
+        <button class="vt-btn mid-stay" onclick="setVisitType('mid-stay',this)"><span>🏊</span>Mid-Stay</button>
+        <button class="vt-btn mid-vac"  onclick="setVisitType('mid-vac',this)"> <span>🏠</span>Mid-Vac</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       CURRENT STATUS (dynamic)
+  ══════════════════════════════════════ -->
+  <div id="statusCard">
+    <div class="sc-top">
+      <div>
+        <div class="sc-name" id="scName">—</div>
+        <div class="sc-sub"  id="scSub">—</div>
+      </div>
+      <div class="sc-badge" id="scBadge">—</div>
+    </div>
+    <div class="sc-readings">
+      <div class="sc-reading"><div class="sc-val" id="scTemp">—</div><div class="sc-lbl">Temp °C</div></div>
+      <div class="sc-reading"><div class="sc-val" id="scPH">—</div><div class="sc-lbl">PH</div></div>
+      <div class="sc-reading"><div class="sc-val" id="scBrom">—</div><div class="sc-lbl">Bromine</div></div>
+      <div class="sc-reading"><div class="sc-val" id="scTDS">—</div><div class="sc-lbl">TDS</div></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       INITIAL READINGS
+  ══════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-title">📊 Initial Readings <span class="card-title-note">before treatment</span></div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Temp °C <span class="req">*</span></label>
+        <input type="number" id="fInitTemp" step="0.1" min="15" max="45" placeholder="38">
+      </div>
+      <div class="field">
+        <label>TA <span class="req">*</span><span class="hint">80–160</span></label>
+        <input type="number" id="fInitTA" step="1" placeholder="120" oninput="rangeCheck(this,'ta')">
+        <div class="range-row"><div class="rdot" id="fInitTA_d"></div><span class="rtxt" id="fInitTA_t"></span></div>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Initial PH <span class="req">*</span><span class="hint">7.2–7.6</span></label>
+        <input type="number" id="fInitPH" step="0.01" min="5" max="10" placeholder="7.4" oninput="rangeCheck(this,'ph')">
+        <div class="range-row"><div class="rdot" id="fInitPH_d"></div><span class="rtxt" id="fInitPH_t"></span></div>
+      </div>
+      <div class="field">
+        <label>Initial Bromine <span class="req">*</span><span class="hint">3–5 ppm</span></label>
+        <input type="number" id="fInitBrom" step="0.01" min="0" max="20" placeholder="4.0" oninput="rangeCheck(this,'brom')">
+        <div class="range-row"><div class="rdot" id="fInitBrom_d"></div><span class="rtxt" id="fInitBrom_t"></span></div>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>TDS <span class="req">*</span><span class="hint">&lt;1500 good</span></label>
+        <input type="number" id="fInitTDS" step="1" min="0" placeholder="500" oninput="rangeCheck(this,'tds')">
+        <div class="range-row"><div class="rdot" id="fInitTDS_d"></div><span class="rtxt" id="fInitTDS_t"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       WATER
+  ══════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-title">💧 Water</div>
+
+    <div class="field">
+      <label>Water Change This Visit</label>
+      <div class="wc-row">
+        <button class="wc-btn active" id="wc_none"    onclick="setWC('none',this)">None</button>
+        <button class="wc-btn"        id="wc_partial" onclick="setWC('partial',this)">Partial</button>
+        <button class="wc-btn"        id="wc_full"    onclick="setWC('full',this)">Full</button>
+      </div>
+    </div>
+
+    <!-- Only shown on Mid-Stay visits -->
+    <div id="wcFlagWrap" class="hide">
+      <div class="flag-row" id="wcFlag" onclick="toggleFlag()">
+        <div class="flag-text">
+          <div class="flag-lbl">⚠ Flag for priority water change</div>
+          <div class="flag-sub">Recommend full WC when these guests depart</div>
+        </div>
+        <div class="toggle-pill" id="flagPill"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       CHEMICALS
+  ══════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-title">🧪 Chemicals Added <span class="card-title-note">leave 0 if not used</span></div>
+
+    <div class="chem-group-title">pH</div>
+    <div class="chem-grid">
+      <div class="chem-item"><label>PH Increaser</label><input type="number" id="cPHUp"   step="1" min="0" value="0"></div>
+      <div class="chem-item"><label>PH Decreaser</label><input type="number" id="cPHDown" step="1" min="0" value="0"></div>
+    </div>
+
+    <div class="chem-group-title">Alkalinity</div>
+    <div class="chem-grid">
+      <div class="chem-item"><label>Alkalinity Raiser</label><input type="number" id="cAlk" step="1" min="0" value="0"></div>
+    </div>
+
+    <div class="chem-group-title">Bromine</div>
+    <div class="chem-grid">
+      <div class="chem-item"><label>Bromine Tabs</label>    <input type="number" id="cBromTabs"   step="1" min="0" value="0"></div>
+      <div class="chem-item"><label>Bromine Granules</label><input type="number" id="cBromGran"   step="1" min="0" value="0"></div>
+      <div class="chem-item"><label>NC Shock</label>        <input type="number" id="cNCS"        step="1" min="0" value="0"></div>
+      <div class="chem-item"><label>Bromine Reducer</label> <input type="number" id="cBromReduce" step="1" min="0" value="0"></div>
+    </div>
+
+    <div class="chem-group-title">Other</div>
+    <div class="chem-grid">
+      <div class="chem-item"><label>Clarifier</label>       <input type="number" id="cClarifier" step="1" min="0" value="0"></div>
+      <div class="chem-item"><label>Foam Away</label>       <input type="number" id="cFoamAway"  step="1" min="0" value="0"></div>
+      <div class="chem-item"><label>Chlorine Shock</label>  <input type="number" id="cCS"        step="1" min="0" value="0"></div>
+    </div>
+
+    <div class="chem-group-title">Pipe Care</div>
+    <div class="chem-grid">
+      <div class="chem-item"><label>Pipe Cleaner (liquid)</label><input type="number" id="cPipeLiq"  step="1" min="0" value="0"></div>
+      <div class="chem-item"><label>Pipe Clean (bomb)</label>   <input type="number" id="cPipeBomb" step="1" min="0" value="0"></div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       CLEANING TASKS (Full Clean + Mid-Vac)
+  ══════════════════════════════════════ -->
+  <div class="card" id="tasksCard">
+    <div class="card-title">✅ Cleaning Tasks</div>
+    <div class="task-grid">
+      <label class="task-item" id="tSurface">
+        <input type="checkbox" onchange="toggleTask(this,'tSurface')">
+        <span>Surface Clean</span>
+      </label>
+      <label class="task-item" id="tFilter">
+        <input type="checkbox" onchange="toggleTask(this,'tFilter')">
+        <span>Filter Clean</span>
+      </label>
+      <label class="task-item" id="tFilterCleaner">
+        <input type="checkbox" onchange="toggleTask(this,'tFilterCleaner')">
+        <span>Filter Cleaner Used</span>
+      </label>
+      <label class="task-item" id="tPipeLiq">
+        <input type="checkbox" onchange="toggleTask(this,'tPipeLiq')">
+        <span>Pipe Clean (liquid)</span>
+      </label>
+      <label class="task-item" id="tPipeBomb">
+        <input type="checkbox" onchange="toggleTask(this,'tPipeBomb')">
+        <span>Pipe Clean (bomb)</span>
+      </label>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       FINAL READINGS
+  ══════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-title">✅ Final Readings <span class="card-title-note">after treatment</span></div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Final PH <span class="req">*</span><span class="hint">7.2–7.6</span></label>
+        <input type="number" id="fFinalPH" step="0.01" min="5" max="10" placeholder="7.4" oninput="rangeCheck(this,'ph')">
+        <div class="range-row"><div class="rdot" id="fFinalPH_d"></div><span class="rtxt" id="fFinalPH_t"></span></div>
+      </div>
+      <div class="field">
+        <label>Final Bromine <span class="req">*</span><span class="hint">3–5 ppm</span></label>
+        <input type="number" id="fFinalBrom" step="0.01" min="0" max="20" placeholder="4.0" oninput="rangeCheck(this,'brom')">
+        <div class="range-row"><div class="rdot" id="fFinalBrom_d"></div><span class="rtxt" id="fFinalBrom_t"></span></div>
+      </div>
+    </div>
+
+    <div class="field-row">
+      <div class="field">
+        <label>Final Temp °C</label>
+        <input type="number" id="fFinalTemp" step="0.1" min="15" max="45" placeholder="38">
+      </div>
+      <div class="field">
+        <label>Final TDS<span class="hint">&lt;1500 good</span></label>
+        <input type="number" id="fFinalTDS" step="1" min="0" placeholder="">
+        <div class="range-row"><div class="rdot" id="fFinalTDS_d"></div><span class="rtxt" id="fFinalTDS_t"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- ══════════════════════════════════════
+       DURATION & NOTES
+  ══════════════════════════════════════ -->
+  <div class="card">
+    <div class="card-title">⏱ Duration &amp; Notes</div>
+
+    <div class="timer-display" id="timerDisplay">00:00</div>
+    <div class="timer-btns">
+      <button class="tbtn start"  id="tBtnStart" onclick="timerStart()">▶ Start</button>
+      <button class="tbtn danger hide" id="tBtnStop"  onclick="timerStop()">⏹ Stop</button>
+      <button class="tbtn hide"   id="tBtnReset" onclick="timerReset()">↺ Reset</button>
+    </div>
+
+    <div class="divider"></div>
+
+    <div class="field">
+      <label>Duration (minutes) <span class="hint">auto-filled by timer, or enter manually</span></label>
+      <input type="number" id="fDuration" step="1" min="0" placeholder="45">
+    </div>
+
+    <div class="field">
+      <label>Notes</label>
+      <textarea id="fNotes" placeholder="Any issues, observations or follow-up actions…"></textarea>
+    </div>
+  </div>
+
+  <button class="submit-btn" id="submitBtn" onclick="submitForm()">Submit Log</button>
+
+</div><!-- /container -->
+
+<script>
+// ── Config ───────────────────────────────────────────────
+const API_TOKEN      = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const CHARGING_BOARD = 1621263971;
+const STATUS_BOARD   = 1918769299;
+
+// Charging board column IDs
+const CC = {
+  status:       'status6__1',
+  dateCleaned:  'date4',
+  nextClean:    'date_mkzc57k0',
+  tester:       'text__1',
+  temp:         'numbers__1',
+  finalPH:      'numbers9__1',
+  finalBrom:    'numbers5__1',
+  initPH:       'numeric_mkrabdeg',
+  initBrom:     'numeric_mkra56tq',
+  waterChange:  'text_mkzapa47',
+  tds:          'numbers1__1',
+  ta:           'numbers6__1',
+  bromTabs:     'bromine_tabs2__1',
+  bromGran:     'numbers_Mjj21mkM',
+  ncs:          'ncs0__1',
+  cs:           'cs9__1',
+  phUp:         'ph_increaser9__1',
+  phDown:       'ph_decreaser0__1',
+  alk:          'alkalinity_raiser5__1',
+  clarifier:    'clarifier2__1',
+  foamAway:     'foam_away07__1',
+  bromReduce:   'numeric_mkzcaarj',
+  pipeCleaner:  'numeric_mkzc2w6c',
+  requiredWC:   'dropdown_mm1kfqwj',
+  relation:     'board_relation_mkq2z984',
+  waterMaint:   'full_drop6__1',
+  lodge:        'text3__1',
+};
+
+// Status board column IDs
+const SC = {
+  status:       'status',
+  lastCleaned:  'date4',
+  nextClean:    'date_mkv05agp',
+  readingDate:  'date_mkq8rs3j',
+  temp:         'numeric_mkq6tn73',
+  ph:           'numeric_mkq6crfx',
+  bromine:      'numeric_mkq8v2yc',
+  tds:          'numeric_mkq6dt60',
+  duration:     'numeric_mm1j5v91',
+  waterChange:  'dropdown_mm1jd6ar',
+};
+
+// State
+let visitType  = null;
+let waterChange = 'none';
+let flagOn     = false;
+let timerSecs  = 0;
+let timerRunning = false;
+let timerInt   = null;
+let statusItems = {}; // name → { id, cv }
+
+// ── Init ─────────────────────────────────────────────────
+document.addEventListener('DOMContentLoaded', async () => {
+  // Set datetime to now (local)
+  const now = new Date();
+  now.setSeconds(0, 0);
+  const off = now.getTimezoneOffset();
+  const local = new Date(now.getTime() - off * 60000);
+  document.getElementById('fDateTime').value = local.toISOString().slice(0, 16);
+
+  await loadProperties();
+});
+
+// ── Monday API ───────────────────────────────────────────
+async function mq(query) {
+  const r = await fetch('https://api.monday.com/v2', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': API_TOKEN, 'API-Version': '2024-01' },
+    body: JSON.stringify({ query })
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+// ── Load properties from status board ───────────────────
+async function loadProperties() {
+  try {
+    const d = await mq(`{
+      boards(ids:[${STATUS_BOARD}]) {
+        items_page(limit:100) {
+          items {
+            id name
+            column_values(ids:["${SC.status}","${SC.lastCleaned}","${SC.nextClean}","${SC.readingDate}","${SC.temp}","${SC.ph}","${SC.bromine}","${SC.tds}"]) {
+              id text
+            }
+          }
+        }
+      }
+    }`);
+    const items = d?.boards?.[0]?.items_page?.items || [];
+    statusItems = {};
+    for (const item of items) {
+      const cv = {};
+      for (const c of item.column_values) cv[c.id] = c.text || '';
+      statusItems[item.name] = { id: item.id, cv };
+    }
+    const sel = document.getElementById('fProperty');
+    sel.innerHTML = '<option value="">Select property…</option>';
+    [...items].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
+      const o = document.createElement('option');
+      o.value = item.name;
+      o.textContent = item.name;
+      sel.appendChild(o);
+    });
+  } catch (e) {
+    showMsg('Could not load properties: ' + e.message, 'error');
+  }
+}
+
+// ── Property changed → show current status ───────────────
+function onPropertyChange() {
+  const prop = document.getElementById('fProperty').value;
+  const card = document.getElementById('statusCard');
+  if (!prop || !statusItems[prop]) { card.classList.remove('show'); return; }
+
+  const item = statusItems[prop];
+  const cv   = item.cv;
+  const status     = cv[SC.status] || '—';
+  const lastCleaned = cv[SC.lastCleaned] || '—';
+  const nextClean   = cv[SC.nextClean]   || '—';
+  const temp   = cv[SC.temp]    || '—';
+  const ph     = cv[SC.ph]      || '—';
+  const bromine = cv[SC.bromine] || '—';
+  const tds    = cv[SC.tds]     || '—';
+
+  // Status badge class
+  const badgeClass = { 'Clean':'clean', 'Dirty':'dirty', 'MidStay':'midstay', 'Not In Use':'notused' }[status] || 'clean';
+  document.getElementById('scBadge').textContent  = status;
+  document.getElementById('scBadge').className    = 'sc-badge ' + badgeClass;
+  document.getElementById('scName').textContent   = prop;
+  document.getElementById('scSub').textContent    = `Last cleaned: ${lastCleaned}  ·  Next due: ${nextClean}`;
+
+  // Colour-code last readings
+  function phClass(v)   { const n=parseFloat(v); return isNaN(n)?'':n>=7.2&&n<=7.6?'ph-good':n>=7.0&&n<=7.8?'ph-warn':'ph-bad'; }
+  function bromClass(v) { const n=parseFloat(v); return isNaN(n)?'':n>=3&&n<=5?'brom-good':n>=2&&n<=6?'brom-warn':'brom-bad'; }
+  function tdsClass(v)  { const n=parseFloat(v); return isNaN(n)?'':n<1500?'':n<2000?'tds-warn':'tds-bad'; }
+
+  document.getElementById('scTemp').textContent = temp !== '—' ? temp + '°' : '—';
+  document.getElementById('scTemp').className = 'sc-val';
+  const phEl = document.getElementById('scPH');
+  phEl.textContent = ph; phEl.className = 'sc-val ' + phClass(ph);
+  const brEl = document.getElementById('scBrom');
+  brEl.textContent = bromine; brEl.className = 'sc-val ' + bromClass(bromine);
+  const tdEl = document.getElementById('scTDS');
+  tdEl.textContent = tds; tdEl.className = 'sc-val ' + tdsClass(tds);
+
+  card.classList.add('show');
+}
+
+// ── Visit type ───────────────────────────────────────────
+function setVisitType(type, btn) {
+  visitType = type;
+  document.querySelectorAll('.vt-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+  // Cleaning tasks: Full Clean + Mid-Vac only
+  document.getElementById('tasksCard').classList.toggle('hide', type === 'mid-stay');
+  // WC flag: Mid-Stay only
+  document.getElementById('wcFlagWrap').classList.toggle('hide', type !== 'mid-stay');
+}
+
+// ── Water change ─────────────────────────────────────────
+function setWC(val, btn) {
+  waterChange = val;
+  document.querySelectorAll('.wc-btn').forEach(b => b.classList.remove('active'));
+  btn.classList.add('active');
+}
+
+// ── WC flag toggle ───────────────────────────────────────
+function toggleFlag() {
+  flagOn = !flagOn;
+  document.getElementById('flagPill').classList.toggle('on', flagOn);
+  document.getElementById('wcFlag').classList.toggle('on', flagOn);
+}
+
+// ── Task checkboxes ──────────────────────────────────────
+function toggleTask(cb, id) {
+  document.getElementById(id).classList.toggle('on', cb.checked);
+}
+
+// ── Range validation ─────────────────────────────────────
+const RANGES = {
+  ph:   { good:[7.2,7.6], warn:[7.0,7.8], labels:['In range','Borderline','Out of range'] },
+  brom: { good:[3.0,5.0], warn:[2.0,6.0], labels:['In range','Borderline','Out of range'] },
+  ta:   { good:[80,160],  warn:[60,200],  labels:['In range','Borderline','Out of range'] },
+  tds:  { tiers:true,     labels:['Good','Caution — consider water change','High — recommend water change'] },
+};
+
+function rangeCheck(input, type) {
+  const val = parseFloat(input.value);
+  const id  = input.id;
+  const dot = document.getElementById(id + '_d');
+  const txt = document.getElementById(id + '_t');
+  if (!dot) return;
+  if (isNaN(val) || input.value === '') {
+    dot.className = 'rdot'; txt.className = 'rtxt'; txt.textContent = '';
+    input.classList.remove('good','warn','bad'); return;
+  }
+  let state;
+  if (type === 'tds') {
+    state = val < 1500 ? 'good' : val < 2000 ? 'warn' : 'bad';
+    txt.textContent = RANGES.tds.labels[state==='good'?0:state==='warn'?1:2];
+  } else {
+    const r = RANGES[type];
+    state = (val>=r.good[0]&&val<=r.good[1]) ? 'good' : (val>=r.warn[0]&&val<=r.warn[1]) ? 'warn' : 'bad';
+    txt.textContent = r.labels[state==='good'?0:state==='warn'?1:2];
+  }
+  dot.className = 'rdot ' + state;
+  txt.className = 'rtxt ' + state;
+  input.classList.remove('good','warn','bad');
+  input.classList.add(state);
+}
+
+// ── Timer ────────────────────────────────────────────────
+function timerStart() {
+  if (timerRunning) return;
+  timerRunning = true;
+  document.getElementById('tBtnStart').classList.add('hide');
+  document.getElementById('tBtnStop').classList.remove('hide');
+  timerInt = setInterval(() => {
+    timerSecs++;
+    const m = String(Math.floor(timerSecs/60)).padStart(2,'0');
+    const s = String(timerSecs%60).padStart(2,'0');
+    document.getElementById('timerDisplay').textContent = m + ':' + s;
+    document.getElementById('fDuration').value = Math.round(timerSecs/60);
+  }, 1000);
+}
+function timerStop() {
+  clearInterval(timerInt); timerRunning = false;
+  document.getElementById('tBtnStop').classList.add('hide');
+  document.getElementById('tBtnReset').classList.remove('hide');
+}
+function timerReset() {
+  timerSecs = 0;
+  document.getElementById('timerDisplay').textContent = '00:00';
+  document.getElementById('fDuration').value = '';
+  document.getElementById('tBtnStart').classList.remove('hide');
+  document.getElementById('tBtnReset').classList.add('hide');
+}
+
+// ── Helpers ──────────────────────────────────────────────
+function g(id) { return document.getElementById(id)?.value?.trim() || ''; }
+function gn(id) { const v = parseFloat(g(id)); return isNaN(v) ? null : v; }
+function esc(s) { return s.replace(/\\/g,'\\\\').replace(/"/g,'\\"'); }
+
+// ── Submit ───────────────────────────────────────────────
+async function submitForm() {
+  // ── Validation ──
+  const errs = [];
+  if (!g('fProperty'))  errs.push('Property required');
+  if (!g('fTester'))    errs.push('Tester required');
+  if (!visitType)       errs.push('Visit type required');
+  if (!g('fInitPH'))    errs.push('Initial PH required');
+  if (!g('fInitBrom'))  errs.push('Initial Bromine required');
+  if (!g('fInitTA'))    errs.push('TA required');
+  if (!g('fInitTDS'))   errs.push('TDS required');
+  if (!g('fFinalPH'))   errs.push('Final PH required');
+  if (!g('fFinalBrom')) errs.push('Final Bromine required');
+  if (errs.length) { showMsg(errs.join(' · '), 'error'); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  showMsg('Submitting…', 'loading');
+
+  try {
+    const property = g('fProperty');
+    const tester   = g('fTester');
+    const dtVal    = g('fDateTime');
+    const dtParts  = dtVal.split('T');
+    const dateStr  = dtParts[0];
+    const timeStr  = (dtParts[1] || '00:00') + ':00';
+
+    // Next clean = +2 days
+    const nextCleanDt = new Date(dtVal + ':00');
+    nextCleanDt.setDate(nextCleanDt.getDate() + 2);
+    const nextCleanStr = nextCleanDt.toISOString().split('T')[0];
+
+    // Visit label
+    const vtLabel = visitType === 'full' ? 'Full Clean' : visitType === 'mid-stay' ? 'Mid-Stay' : 'Mid-Vac';
+
+    // Charging board status (based on water change)
+    const chargeStatusLabel = waterChange === 'full' ? 'Full Drop' : waterChange === 'partial' ? 'Part Drop' : 'Cleaned';
+    const waterMaintNum     = waterChange === 'full' ? 2 : waterChange === 'partial' ? 1 : 0;
+
+    // Build charging board column values
+    const cv = {};
+    cv[CC.status]      = JSON.stringify({ label: chargeStatusLabel });
+    cv[CC.dateCleaned] = JSON.stringify({ date: dateStr, time: timeStr });
+    cv[CC.nextClean]   = JSON.stringify({ date: nextCleanStr });
+    cv[CC.tester]      = tester;
+    cv[CC.waterMaint]  = String(waterMaintNum);
+    cv[CC.waterChange] = waterChange === 'none' ? 'N' : waterChange === 'partial' ? 'Partial' : 'Y';
+    cv[CC.lodge]       = property;
+    cv[CC.requiredWC]  = JSON.stringify({ ids: [flagOn ? 1 : 2] });
+
+    if (gn('fInitTemp') !== null) cv[CC.temp]     = String(gn('fInitTemp'));
+    if (gn('fInitPH')   !== null) cv[CC.initPH]   = String(gn('fInitPH'));
+    if (gn('fInitBrom') !== null) cv[CC.initBrom] = String(gn('fInitBrom'));
+    if (gn('fInitTDS')  !== null) cv[CC.tds]      = String(gn('fInitTDS'));
+    if (gn('fInitTA')   !== null) cv[CC.ta]        = String(gn('fInitTA'));
+    if (gn('fFinalPH')  !== null) cv[CC.finalPH]  = String(gn('fFinalPH'));
+    if (gn('fFinalBrom')!== null) cv[CC.finalBrom]= String(gn('fFinalBrom'));
+
+    // Chemicals
+    const chemMap = {
+      [CC.phUp]:       'cPHUp',   [CC.phDown]:     'cPHDown',
+      [CC.alk]:        'cAlk',    [CC.bromTabs]:   'cBromTabs',
+      [CC.bromGran]:   'cBromGran',[CC.ncs]:       'cNCS',
+      [CC.bromReduce]: 'cBromReduce',[CC.cs]:      'cCS',
+      [CC.clarifier]:  'cClarifier',[CC.foamAway]: 'cFoamAway',
+      [CC.pipeCleaner]:'cPipeLiq',
+    };
+    for (const [col, elId] of Object.entries(chemMap)) {
+      const v = gn(elId);
+      if (v !== null && v > 0) cv[col] = String(v);
+    }
+
+    // Board relation to status item
+    const statusItem = statusItems[property];
+    if (statusItem) {
+      cv[CC.relation] = JSON.stringify({ linkedPulseIds: [{ linkedPulseId: parseInt(statusItem.id) }] });
+    }
+
+    const colValsStr = JSON.stringify(JSON.stringify(cv));
+    const itemName   = esc(property) + ' — ' + vtLabel;
+
+    // 1. Create record in charging board
+    await mq(`mutation {
+      create_item(
+        board_id: ${CHARGING_BOARD}
+        item_name: "${itemName}"
+        column_values: ${colValsStr}
+      ) { id }
+    }`);
+
+    // 2. Update hot tub status board
+    if (statusItem) {
+      const htStatusLabel = visitType === 'mid-stay' ? 'MidStay' : 'Clean';
+      const scv = {};
+      scv[SC.status]      = JSON.stringify({ label: htStatusLabel });
+      scv[SC.nextClean]   = JSON.stringify({ date: nextCleanStr });
+      scv[SC.readingDate] = JSON.stringify({ date: dateStr, time: timeStr });
+      scv[SC.waterChange] = JSON.stringify({ ids: [waterChange !== 'none' ? 1 : 2] });
+
+      const finalPH   = gn('fFinalPH');
+      const finalBrom = gn('fFinalBrom');
+      const finalTDS  = gn('fFinalTDS');
+      const finalTemp = gn('fFinalTemp');
+      const initTemp  = gn('fInitTemp');
+      const dur       = gn('fDuration');
+
+      if (finalPH   !== null) scv[SC.ph]     = String(finalPH);
+      if (finalBrom !== null) scv[SC.bromine] = String(finalBrom);
+      if (finalTDS  !== null) scv[SC.tds]    = String(finalTDS);
+      else if (gn('fInitTDS') !== null) scv[SC.tds] = String(gn('fInitTDS'));
+      scv[SC.temp] = String(finalTemp !== null ? finalTemp : (initTemp || ''));
+      if (dur !== null) scv[SC.duration] = String(dur);
+
+      // Only update lastCleaned on Full Clean
+      if (visitType === 'full') scv[SC.lastCleaned] = JSON.stringify({ date: dateStr });
+
+      const scvStr = JSON.stringify(JSON.stringify(scv));
+      await mq(`mutation {
+        change_multiple_column_values(
+          board_id: ${STATUS_BOARD}
+          item_id: ${statusItem.id}
+          column_values: ${scvStr}
+        ) { id }
+      }`);
+    }
+
+    // Success
+    showMsg('✓ Log submitted — ' + property + ' · ' + vtLabel, 'success');
+    document.getElementById('submitBtn').disabled = false;
+    // Scroll to top to show success message
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+
+    // Reset timer if running
+    if (timerRunning) timerStop();
+
+  } catch (e) {
+    showMsg('Submission error: ' + e.message, 'error');
+    btn.disabled = false;
+  }
+}
+
+function showMsg(text, type) {
+  const box = document.getElementById('msgBox');
+  box.textContent = text;
+  box.className = 'msg show ' + type;
+  if (type === 'success') setTimeout(() => box.classList.remove('show'), 6000);
+}
+</script>
+</body>
+</html>

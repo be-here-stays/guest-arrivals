@@ -532,20 +532,23 @@ async function mq(query) {
 
 // ── Load properties from status board ───────────────────
 async function loadProperties() {
+  const sel = document.getElementById('fProperty');
   try {
     const d = await mq(`{
       boards(ids:[${STATUS_BOARD}]) {
+        name
         items_page(limit:100) {
           items { id name }
         }
       }
     }`);
-    const items = d?.boards?.[0]?.items_page?.items || [];
+    const boards = d?.boards || [];
+    console.log('Boards returned:', boards);
+    const items = boards[0]?.items_page?.items || [];
     statusItems = {};
     for (const item of items) {
       statusItems[item.name] = { id: item.id, cv: null };
     }
-    const sel = document.getElementById('fProperty');
     sel.innerHTML = '<option value="">Select property…</option>';
     [...items].sort((a, b) => a.name.localeCompare(b.name)).forEach(item => {
       const o = document.createElement('option');
@@ -553,9 +556,13 @@ async function loadProperties() {
       o.textContent = item.name;
       sel.appendChild(o);
     });
-    if (items.length === 0) sel.innerHTML = '<option value="">No properties found</option>';
+    if (items.length === 0) {
+      sel.innerHTML = '<option value="">— No properties found (board ID: ' + STATUS_BOARD + ') —</option>';
+      showMsg('Could not find the Hot Tub Status board. Open Monday.com, go to the Hot Tub Status board and check the number in the URL — then let me know and I\'ll update it.', 'error');
+    }
   } catch (e) {
-    document.getElementById('fProperty').innerHTML = '<option value="">Error loading properties</option>';
+    sel.innerHTML = '<option value="">Error: ' + e.message + '</option>';
+    showMsg('Monday.com error: ' + e.message, 'error');
     console.error('loadProperties:', e);
   }
 }

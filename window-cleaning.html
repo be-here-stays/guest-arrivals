@@ -195,9 +195,6 @@
 <script>
 const TOKEN        = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
 const BOARD_ID     = 1987064628;  // Windows & Balustrades
-const LOC_BOARD_ID = 1928673949;  // Lodge Status — master property list (Guesty IDs)
-const GUESTY_COL   = 'text_mktq3qh';   // Guesty ID column on Lodge Status
-const MAINT_GUESTY = 'text_mm2gq5rd';  // Guesty ID column on Windows board
 const DUE_DAYS     = 42;          // 6 weeks
 const OVERDUE_DAYS = 56;          // 8 weeks
 
@@ -251,49 +248,28 @@ async function loadAll() {
   ['stOverdue','stDue','stOk','stNever'].forEach(id => document.getElementById(id).textContent = '—');
 
   try {
-    // Fetch Lodge Status (master — has Guesty IDs) and Windows board in parallel
-    const [locData, maintData] = await Promise.all([
-      mq(`{ boards(ids:[${LOC_BOARD_ID}]) { items_page(limit:100) { items { id name column_values(ids:["${GUESTY_COL}"]) { id text } } } } }`),
-      mq(`{ boards(ids:[${BOARD_ID}]) { items_page(limit:500) { items { id name column_values(ids:["date4","text_mktp76yg","${MAINT_GUESTY}"]) { id text value } } } } }`)
-    ]);
+    // Fetch directly from Windows board — it is the source of truth
+    const data = await mq(`{ boards(ids:[${BOARD_ID}]) { items_page(limit:500) { items { id name column_values(ids:["status","date4","text_mktp76yg"]) { id text value } } } } }`);
 
-    // Build maintenance lookup keyed by Guesty ID
-    const maintMap = new Map();
-    for (const item of maintData?.boards?.[0]?.items_page?.items || []) {
-      const cv = {}; item.column_values.forEach(c => cv[c.id] = c);
-      const dateStr = (() => { try { return JSON.parse(cv['date4']?.value||'null')?.date||null; } catch { return null; } })();
-      const guestyId = cv[MAINT_GUESTY]?.text?.trim();
-      if (guestyId) {
-        maintMap.set(guestyId, {
-          id: item.id,
+    _items = (data?.boards?.[0]?.items_page?.items || [])
+      .filter(item => {
+        const s = item.column_values.find(c => c.id === 'status')?.text || '';
+        return s !== 'Not in Use';   // exclude not-in-use and unnamed placeholders
+      })
+      .map(item => {
+        const cv = {}; item.column_values.forEach(c => cv[c.id] = c);
+        const dateStr = (() => { try { return JSON.parse(cv['date4']?.value||'null')?.date||null; } catch { return null; } })();
+        return {
+          id:         item.id,
+          name:       item.name,
           dateStr,
+          days:       daysSince(dateStr),
+          status:     getCleanStatus(dateStr),
           balustrade: cv['text_mktp76yg']?.text?.trim().toUpperCase() === 'Y',
-        });
-      }
-    }
+        };
+      });
 
-    // Build display list from Lodge Status, excluding placeholder entries
-    const locItems = (locData?.boards?.[0]?.items_page?.items || [])
-      .filter(item => !item.name.match(/^Item \d+$/i));
-
-    _items = locItems.map(locItem => {
-      const locName  = locItem.name;
-      const guestyId = locItem.column_values[0]?.text?.trim();
-      const maint    = guestyId ? maintMap.get(guestyId) : null;
-
-      const dateStr = maint?.dateStr || null;
-      return {
-        id:         maint?.id   || null,   // null = no record in Windows board yet
-        name:       locName,
-        dateStr,
-        days:       daysSince(dateStr),
-        status:     getCleanStatus(dateStr),
-        balustrade: maint?.balustrade || false,
-        noRecord:   !maint,
-      };
-    });
-
-    // Sort: never/noRecord → overdue (oldest first) → due → ok
+    // Sort: never → overdue (oldest first) → due → ok
     const order = { never:0, overdue:1, due:2, ok:3 };
     _items.sort((a, b) => {
       const od = order[a.status] - order[b.status];
@@ -336,9 +312,7 @@ function renderList() {
     if (!g.items.length) return;
     html += `<div class="sec-lbl">${g.label}</div>`;
     g.items.forEach(i => {
-      const logBtn = i.id
-        ? `<button class="log-btn" onclick="openModal(${JSON.stringify(i.name)})">Log Clean</button>`
-        : `<button class="log-btn" style="opacity:.4;cursor:default" title="Not yet in Windows board">No record</button>`;
+      const logBtn = `<button class="log-btn" onclick="openModal(${JSON.stringify(i.name)})">Log Clean</button>`;
       html += `
         <div class="prop-row ${i.status}">
           <div class="prop-info">
@@ -359,7 +333,7 @@ function renderList() {
 
 function openModal(propName) {
   const item = _items.find(i => i.name === propName);
-  if (!item || !item.id) return;
+  if (!item) return;
   _activeItem = item;
   document.getElementById('modalTitle').textContent = 'Log Window Clean';
   document.getElementById('modalSub').textContent = item.name + (item.balustrade ? ' · includes balustrades' : '');

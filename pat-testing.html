@@ -98,7 +98,7 @@
 
 <header>
   <div>
-    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 215.0001 45.6329" style="display:block;width:90px;height:auto" aria-label="Be Here">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 215.0001 45.6329" style="display:block;width:120px;height:auto" aria-label="Be Here">
       <path d="M33.5812,26.2451c-4.585,0-8.3018,3.6929-8.3018,8.2482s3.7168,8.2482,8.3018,8.2482,8.3017-3.6928,8.3017-8.2482-3.7168-8.2482-8.3017-8.2482Z" fill="#fff"/>
       <polygon points="10.8809 19.7103 19.0665 19.7103 19.0665 11.5778 19.0665 11.3457 10.8822 3.2139 10.6473 3.2139 2.463 11.3457 2.463 11.5778 2.463 19.7103 10.648 19.7103 10.8809 19.7103" fill="#fff"/>
       <path d="M40.5754,5.4963l-5.4656-.2394c-4.4287-.1941-8.2128,3.2233-8.4095,7.594l-.243,5.4044,14.0587-12.6953.0595-.0638Z" fill="#fff"/>
@@ -283,7 +283,7 @@ function renderList() {
             <div class="prop-sub">${last}${nextStr}</div>
             <div class="prop-tags"><span class="tag ${g.tagCls}">${g.tagTxt}</span></div>
           </div>
-          <button class="log-btn" onclick="openModal(${JSON.stringify(i.name)})">Log Test</button>
+          <button class="log-btn" onclick="openModal('${i.id}')">Log Test</button>
         </div>`;
     });
   });
@@ -291,8 +291,8 @@ function renderList() {
   document.getElementById('mainContent').innerHTML = html || '<div class="empty">No properties found.</div>';
 }
 
-function openModal(propName) {
-  const item = _items.find(i => i.name === propName);
+function openModal(itemId) {
+  const item = _items.find(i => i.id === itemId);
   if (!item) return;
   _activeItem = item;
   document.getElementById('modalTitle').textContent = 'Log PAT Test';

@@ -536,21 +536,14 @@ async function loadProperties() {
     const d = await mq(`{
       boards(ids:[${STATUS_BOARD}]) {
         items_page(limit:100) {
-          items {
-            id name
-            column_values(ids:["${SC.status}","${SC.lastCleaned}","${SC.nextClean}","${SC.readingDate}","${SC.temp}","${SC.ph}","${SC.bromine}","${SC.tds}"]) {
-              id text
-            }
-          }
+          items { id name }
         }
       }
     }`);
     const items = d?.boards?.[0]?.items_page?.items || [];
     statusItems = {};
     for (const item of items) {
-      const cv = {};
-      for (const c of item.column_values) cv[c.id] = c.text || '';
-      statusItems[item.name] = { id: item.id, cv };
+      statusItems[item.name] = { id: item.id, cv: null };
     }
     const sel = document.getElementById('fProperty');
     sel.innerHTML = '<option value="">Select property…</option>';
@@ -560,26 +553,43 @@ async function loadProperties() {
       o.textContent = item.name;
       sel.appendChild(o);
     });
+    if (items.length === 0) sel.innerHTML = '<option value="">No properties found</option>';
   } catch (e) {
-    showMsg('Could not load properties: ' + e.message, 'error');
+    document.getElementById('fProperty').innerHTML = '<option value="">Error loading properties</option>';
+    console.error('loadProperties:', e);
   }
 }
 
 // ── Property changed → show current status ───────────────
-function onPropertyChange() {
+async function onPropertyChange() {
   const prop = document.getElementById('fProperty').value;
   const card = document.getElementById('statusCard');
   if (!prop || !statusItems[prop]) { card.classList.remove('show'); return; }
 
-  const item = statusItems[prop];
-  const cv   = item.cv;
-  const status     = cv[SC.status] || '—';
+  // Fetch column data on demand for the selected item
+  const itemId = statusItems[prop].id;
+  try {
+    const d = await mq(`{
+      items(ids:[${itemId}]) {
+        column_values { id text value }
+      }
+    }`);
+    const cols = d?.items?.[0]?.column_values || [];
+    const cv = {};
+    for (const c of cols) cv[c.id] = c.text || '';
+    statusItems[prop].cv = cv;
+  } catch (e) {
+    console.warn('Could not load status card data:', e);
+  }
+
+  const cv = statusItems[prop].cv || {};
+  const status      = cv[SC.status]      || '—';
   const lastCleaned = cv[SC.lastCleaned] || '—';
   const nextClean   = cv[SC.nextClean]   || '—';
-  const temp   = cv[SC.temp]    || '—';
-  const ph     = cv[SC.ph]      || '—';
-  const bromine = cv[SC.bromine] || '—';
-  const tds    = cv[SC.tds]     || '—';
+  const temp        = cv[SC.temp]        || '—';
+  const ph          = cv[SC.ph]          || '—';
+  const bromine     = cv[SC.bromine]     || '—';
+  const tds         = cv[SC.tds]         || '—';
 
   // Status badge class
   const badgeClass = { 'Clean':'clean', 'Dirty':'dirty', 'MidStay':'midstay', 'Not In Use':'notused' }[status] || 'clean';

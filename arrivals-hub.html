@@ -321,6 +321,7 @@
 </div>
 <div class="tabs">
   <div class="tab active" onclick="switchTab('changeovers', this)">🏠 Changeovers</div>
+  <div class="tab" onclick="switchTab('week', this)">📅 This Week</div>
   <div class="tab" onclick="switchTab('laundry', this)">🛏 Laundry Planner</div>
   <div class="tab" onclick="switchTab('overview', this)">📋 Bed Configs (7 days)</div>
   <div class="tab" onclick="switchTab('supplies', this)">📦 Supplies</div>
@@ -349,6 +350,10 @@
     </span>
   </div>
   <div id="changeoversContent"><div class="empty"><p>Loading…</p></div></div>
+</div>
+<!-- THIS WEEK TAB -->
+<div class="content" id="tab-week">
+  <div id="weekContent"><div class="empty"><p>Loading…</p></div></div>
 </div>
 <!-- BED CONFIGS TAB -->
 <div class="content" id="tab-overview">
@@ -405,6 +410,7 @@ function switchTab(tab, el) {
   if (tab === 'laundry'     && allItems.length) renderLaundry();
   if (tab === 'changeovers')                    renderChangeovers();
   if (tab === 'overview'    && allItems.length) renderOverview();
+  if (tab === 'week'        && allItems.length) renderWeekList();
   if (tab === 'supplies')                       showSuppliesView(supView || 'dashboard');
 }
 function changeDay(delta) {
@@ -467,6 +473,11 @@ async function loadAll() {
     btn.disabled = false;
     renderChangeovers();
     renderLaundry();
+    // Auto-switch to week list if launched from the "this week" hub card
+    if (new URLSearchParams(location.search).get('view') === 'week') {
+      const weekTab = [...document.querySelectorAll('.tab')].find(t => t.textContent.includes('This Week'));
+      if (weekTab) switchTab('week', weekTab);
+    }
   } catch(e) {
     status.textContent = 'Error: ' + e.message;
     btn.disabled = false;
@@ -492,6 +503,48 @@ function parseItem(item) {
 }
 function localDateStr(d) {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function renderWeekList() {
+  const today  = new Date(); today.setHours(0,0,0,0);
+  const in7    = new Date(today); in7.setDate(today.getDate() + 7);
+  const todayStr = localDateStr(today), in7Str = localDateStr(in7);
+  const STATUS_LABEL = { '1':'✓ Received', '0':'Pending', '2':'Sent', 'none':'—' };
+  const STATUS_COLOR = { '1':'#2d6a4f', '0':'#a86c00', '2':'#3a6ea5', 'none':'#999' };
+  const parsed = allItems.map(parseItem)
+    .filter(i => i.arrivalDate && i.arrivalDate >= todayStr && i.arrivalDate <= in7Str)
+    .sort((a,b) => a.arrivalDate !== b.arrivalDate ? a.arrivalDate.localeCompare(b.arrivalDate) : a.property.localeCompare(b.property));
+  if (!parsed.length) {
+    document.getElementById('weekContent').innerHTML = '<div class="empty"><p>No arrivals in the next 7 days.</p></div>';
+    return;
+  }
+  let html = `<div style="padding:16px;font-size:13px;color:#666;">${parsed.length} arrivals · ${todayStr} to ${in7Str}</div>`;
+  html += `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="background:#f5f4f0;text-align:left;">
+      <th style="padding:8px 12px;font-weight:600;white-space:nowrap;">Date</th>
+      <th style="padding:8px 12px;font-weight:600;">Property</th>
+      <th style="padding:8px 12px;font-weight:600;">Guest</th>
+      <th style="padding:8px 12px;font-weight:600;">Party</th>
+      <th style="padding:8px 12px;font-weight:600;">Form</th>
+    </tr></thead><tbody>`;
+  let lastDate = '';
+  for (const a of parsed) {
+    const dateLabel = a.arrivalDate === lastDate ? '' :
+      new Date(a.arrivalDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+    lastDate = a.arrivalDate;
+    const party = [a.adults ? `${a.adults}A` : '', a.children ? `${a.children}C` : '', a.pets ? `🐾${a.pets}` : ''].filter(Boolean).join(' ');
+    const statusLabel = STATUS_LABEL[a.formStatus] || '—';
+    const statusColor = STATUS_COLOR[a.formStatus] || '#999';
+    const rowBg = a.arrivalDate === todayStr ? '#fdf5e8' : '';
+    html += `<tr style="border-bottom:1px solid #eee;${rowBg ? 'background:'+rowBg+';' : ''}">
+      <td style="padding:8px 12px;color:#888;white-space:nowrap;">${dateLabel}</td>
+      <td style="padding:8px 12px;font-weight:600;">${esc(a.property || '—')}</td>
+      <td style="padding:8px 12px;">${esc(a.name || '—')}</td>
+      <td style="padding:8px 12px;color:#666;">${party || '—'}</td>
+      <td style="padding:8px 12px;color:${statusColor};font-weight:500;">${statusLabel}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  document.getElementById('weekContent').innerHTML = html;
 }
 function renderOverview() {
   const today  = new Date(); today.setHours(0,0,0,0);

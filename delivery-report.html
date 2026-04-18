@@ -234,8 +234,15 @@
 <script>
 // ─── CONFIG ──────────────────────────────────────────────────────────────────
 const MONDAY_TOKEN   = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
-const SUPPLIES_BOARD = 1615688857;
-const STOCK_BOARD    = 5094763973;
+const SUPPLIES_BOARD  = 1615688857;
+const STOCK_BOARD     = 5094763973;
+const HOT_TUB_BOARD   = 1621263971;
+
+const HT_COL = {
+  lodge:       'text3__1',
+  date:        'date4',
+  waterChange: 'text_mkzapa47',
+};
 
 const SUP_COL = {
   lodge:  'text6__1',
@@ -375,8 +382,37 @@ async function generateReport() {
       deliveries.push({ lodge, itemName, qty, date: itemDate, price });
     }
 
-    // 4. Render report
-    renderReport(deliveries, dateFrom, dateTo, lodgeSel, vatRate, markupRate, priceMap);
+    // 4. Fetch hot tub water changes
+    let htDrops = [];
+    try {
+      const htData = await mq(`{
+        boards(ids:[${HOT_TUB_BOARD}]) {
+          items_page(limit:500) {
+            items {
+              column_values(ids:["${HT_COL.lodge}","${HT_COL.date}","${HT_COL.waterChange}"]) { id text }
+            }
+          }
+        }
+      }`);
+      const htItems = htData?.boards?.[0]?.items_page?.items || [];
+      for (const item of htItems) {
+        const cv = {};
+        for (const c of item.column_values) cv[c.id] = c.text || '';
+        const lodge = cv[HT_COL.lodge]?.trim();
+        const date  = cv[HT_COL.date]?.trim();
+        const wc    = (cv[HT_COL.waterChange] || '').toLowerCase().trim();
+        if (!lodge || !date || wc === 'none' || wc === '') continue;
+        if (date < dateFrom || date > dateTo) continue;
+        if (lodgeSel !== 'All' && lodge.toLowerCase() !== lodgeSel.toLowerCase()) continue;
+        htDrops.push({ lodge, date, type: wc }); // 'full' or 'partial'
+      }
+    } catch(e) {
+      // Hot tub data optional — don't block the report
+      console.warn('Hot tub data fetch failed:', e);
+    }
+
+    // 5. Render report
+    renderReport(deliveries, dateFrom, dateTo, lodgeSel, vatRate, markupRate, priceMap, htDrops);
 
   } catch(e) {
     document.getElementById('reportArea').innerHTML = `<div class="empty">⚠️ Error: ${esc(e.message)}</div>`;
@@ -387,7 +423,8 @@ async function generateReport() {
 }
 
 // ─── RENDER REPORT ───────────────────────────────────────────────────────────
-function renderReport(deliveries, dateFrom, dateTo, lodgeSel, vatRate, markupRate, priceMap) {
+function renderReport(deliveries, dateFrom, dateTo, lodgeSel, vatRate, markupRate, priceMap, htDrops) {
+  htDrops = htDrops || [];
   const area = document.getElementById('reportArea');
 
   if (!deliveries.length) {
@@ -522,9 +559,16 @@ function renderReport(deliveries, dateFrom, dateTo, lodgeSel, vatRate, markupRat
   }
 
   // Summary stats row
+  const htTotalFull    = htDrops.filter(d => d.type === 'full').length;
+  const htTotalPartial = htDrops.filter(d => d.type === 'partial').length;
+  const htSummary      = htDrops.length > 0
+    ? `<div class="sum-card"><div class="sum-val">${htTotalFull}</div><div class="sum-lbl">Full drops 🛁</div></div>
+       <div class="sum-card"><div class="sum-val">${htTotalPartial}</div><div class="sum-lbl">Partial drops 🛁</div></div>`
+    : '';
   html += `<div class="summary-row">
     <div class="sum-card"><div class="sum-val">${deliveries.length}</div><div class="sum-lbl">Delivery lines</div></div>
     <div class="sum-card"><div class="sum-val">${lodgeNames.length}</div><div class="sum-lbl">Lodges</div></div>
+    ${htSummary}
     <div class="sum-card"><div class="sum-val">£${grandNet.toFixed(2)}</div><div class="sum-lbl">Net goods</div></div>
     <div class="sum-card"><div class="sum-val">£${grandHandling.toFixed(2)}</div><div class="sum-lbl">Handling (${Math.round(markupRate*100)}%)</div></div>
     <div class="sum-card"><div class="sum-val">£${grandVat.toFixed(2)}</div><div class="sum-lbl">VAT (${Math.round(vatRate*100)}%)</div></div>
@@ -533,6 +577,56 @@ function renderReport(deliveries, dateFrom, dateTo, lodgeSel, vatRate, markupRat
 
   // Lodge sections
   for (const { section } of lodgeSections) html += section;
+
+  // Hot tub water changes section
+  if (htDrops.length > 0) {
+    const totalFull    = htDrops.filter(d => d.type === 'full').length;
+    const totalPartial = htDrops.filter(d => d.type === 'partial').length;
+
+    // Group by lodge
+    const htByLodge = {};
+    for (const d of htDrops) {
+      if (!htByLodge[d.lodge]) htByLodge[d.lodge] = { full: 0, partial: 0 };
+      if (d.type === 'full')    htByLodge[d.lodge].full++;
+      else                      htByLodge[d.lodge].partial++;
+    }
+
+    let htRows = '';
+    for (const [lodge, counts] of Object.entries(htByLodge).sort(([a],[b]) => a.localeCompare(b))) {
+      htRows += `<tr>
+        <td>${esc(lodge)}</td>
+        <td class="td-right">${counts.full > 0 ? '<strong>' + counts.full + '</strong>' : '—'}</td>
+        <td class="td-right">${counts.partial > 0 ? counts.partial : '—'}</td>
+        <td class="td-right">${counts.full + counts.partial}</td>
+      </tr>`;
+    }
+
+    html += `<div class="lodge-section">
+      <div class="lodge-header">
+        <div class="lodge-name">🛁 Hot Tub Water Changes</div>
+        <div class="lodge-count">${totalFull} full · ${totalPartial} partial</div>
+      </div>
+      <div class="table-wrap">
+        <table>
+          <thead><tr>
+            <th>Lodge</th>
+            <th class="th-right">Full drops</th>
+            <th class="th-right">Partial drops</th>
+            <th class="th-right">Total visits with WC</th>
+          </tr></thead>
+          <tbody>
+            ${htRows}
+            <tr class="subtotal-row">
+              <td>Total</td>
+              <td class="td-right">${totalFull}</td>
+              <td class="td-right">${totalPartial}</td>
+              <td class="td-right">${totalFull + totalPartial}</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>`;
+  }
 
   // Grand total block
   html += `<div class="grand-total">

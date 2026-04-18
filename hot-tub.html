@@ -88,6 +88,9 @@
     .sc-readings { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
     .sc-reading { text-align:center; }
     .sc-val { font-size:18px; font-weight:700; color:#fff; }
+    .tds-alert { display:none; margin-top:10px; padding:8px 12px; border-radius:8px; font-size:12px; font-weight:700; }
+    .tds-alert.warn { background:rgba(240,180,41,0.25); color:#f0b429; border:1px solid rgba(240,180,41,0.4); display:block; }
+    .tds-alert.bad  { background:rgba(252,129,129,0.25); color:#fc8181; border:1px solid rgba(252,129,129,0.4); display:block; }
     .sc-lbl { font-size:10px; color:rgba(255,255,255,.45); margin-top:1px; }
     .sc-val.ph-good   { color:#52b788; }
     .sc-val.ph-warn   { color:#f0b429; }
@@ -247,6 +250,7 @@
       <div class="sc-reading"><div class="sc-val" id="scBrom">—</div><div class="sc-lbl">Bromine</div></div>
       <div class="sc-reading"><div class="sc-val" id="scTDS">—</div><div class="sc-lbl">TDS</div></div>
     </div>
+    <div class="tds-alert" id="tdsAlert"></div>
   </div>
 
   <!-- ══════════════════════════════════════
@@ -618,6 +622,20 @@ async function onPropertyChange() {
   brEl.textContent = bromine; brEl.className = 'sc-val ' + bromClass(bromine);
   const tdEl = document.getElementById('scTDS');
   tdEl.textContent = tds; tdEl.className = 'sc-val ' + tdsClass(tds);
+
+  // TDS alert banner
+  const tdsNum = parseFloat(tds);
+  const tdsAlertEl = document.getElementById('tdsAlert');
+  if (!isNaN(tdsNum) && tdsNum >= 2000) {
+    tdsAlertEl.className = 'tds-alert bad';
+    tdsAlertEl.textContent = '⚠ TDS critical (' + tdsNum + ') — full water change required before next guests';
+  } else if (!isNaN(tdsNum) && tdsNum >= 1500) {
+    tdsAlertEl.className = 'tds-alert warn';
+    tdsAlertEl.textContent = '⚠ TDS elevated (' + tdsNum + ') — monitor closely, plan water change soon';
+  } else {
+    tdsAlertEl.className = 'tds-alert';
+    tdsAlertEl.textContent = '';
+  }
 
   card.classList.add('show');
 }

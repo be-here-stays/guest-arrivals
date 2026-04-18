@@ -330,17 +330,23 @@ async function loadStats() {
   try {
     const in7 = new Date(); in7.setDate(in7.getDate() + 7);
     const in7Str = in7.toISOString().split('T')[0];
-    const d = await mq(`{ boards(ids:[5094453064]) { items_page(limit:500) { items { column_values(ids:["date_mm2adtwg","text_mm2ahbrx"]) { id value text } } } } }`);
     const arrProps = new Set(), weekProps = new Set();
-    for (const g of d?.boards?.[0]?.items_page?.items || []) {
-      const cv = {}; for (const c of g.column_values) cv[c.id] = c;
-      let dateVal = null;
-      try { dateVal = JSON.parse(cv['date_mm2adtwg']?.value || 'null')?.date; } catch {}
-      const prop = cv['text_mm2ahbrx']?.text?.trim();
-      if (!dateVal || !prop) continue;
-      if (dateVal === today) arrProps.add(prop);
-      if (dateVal >= today && dateVal <= in7Str) weekProps.add(prop);
-    }
+    let cursor = null;
+    do {
+      const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+      const d = await mq(`{ boards(ids:[5094453064]) { items_page(limit:500${cursorPart}) { cursor items { column_values(ids:["date_mm2adtwg","text_mm2ahbrx"]) { id value text } } } } }`);
+      const page = d?.boards?.[0]?.items_page;
+      for (const g of page?.items || []) {
+        const cv = {}; for (const c of g.column_values) cv[c.id] = c;
+        let dateVal = null;
+        try { dateVal = JSON.parse(cv['date_mm2adtwg']?.value || 'null')?.date; } catch {}
+        const prop = cv['text_mm2ahbrx']?.text?.trim();
+        if (!dateVal || !prop) continue;
+        if (dateVal === today) arrProps.add(prop);
+        if (dateVal >= today && dateVal <= in7Str) weekProps.add(prop);
+      }
+      cursor = page?.cursor || null;
+    } while (cursor);
     document.getElementById('stArr').textContent  = arrProps.size;
     document.getElementById('stNext').textContent = weekProps.size;
   } catch { document.getElementById('stArr').textContent = document.getElementById('stNext').textContent = '—'; }

@@ -827,9 +827,10 @@ async function submitForm() {
 
     // 2. Update hot tub status board
     if (statusItem) {
-      const htStatusLabel = visitType === 'mid-stay' ? 'MidStay' : 'Clean';
+      // Status indices: 1=Cleaned, 0=Part Drop, 2=Full Drop
+      // Mid-Stay leaves status as Cleaned (1); Full/Mid-Vac also Cleaned (1)
       const scv = {};
-      scv[SC.status]      = JSON.stringify({ label: htStatusLabel });
+      scv[SC.status]      = JSON.stringify({ index: 1 });
       scv[SC.nextClean]   = JSON.stringify({ date: nextCleanStr });
       scv[SC.readingDate] = JSON.stringify({ date: dateStr, time: timeStr });
       scv[SC.waterChange] = JSON.stringify({ ids: [waterChange !== 'none' ? 1 : 2] });

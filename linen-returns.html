@@ -191,6 +191,9 @@
 <div id="toast"></div>
 
 <script>
+  const MONDAY_API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+  const PROP_BOARD = '5094466278';
+
   const FIELDS = [
     ['rSkDuvets','Super King Duvets'],['rKingDuvets','King Duvets'],
     ['rDoubleDuvets','Double Duvets'],['rSingleDuvets','Single Duvets'],
@@ -201,31 +204,34 @@
     ['rTeaTowels','Tea Towels'],['rBathMats','Bath Mats'],
   ];
 
-  // Properties list — sorted; feel free to extend
-  const PROPERTIES = [
-    'Acacia','Alder','Anemone','Apple','Ash','Birch','Bluebell','Bramble',
-    'Cedar','Chestnut','Clover','Cobalt','Cobnut','Columbine','Copper',
-    'Cottage','Cuckoo','Daffodil','Daisy','Dove','Elder','Elm','Fern',
-    'Finch','Foxglove','Goldenrod','Hawthorn','Hazel','Heron','Hideaway',
-    'Holly','Hornbeam','Iris','Ivy','Jasmine','Juniper','Kingfisher',
-    'Larch','Laurel','Lavender','Linden','Lupin','Mallard','Maple',
-    'Meadow','Mistletoe','Mulberry','Nightjar','Oak','Orchid','Otter',
-    'Partridge','Pheasant','Pigeon','Pippin','Plover','Poppy','Primrose',
-    'Robin','Rowan','Sage','Sparrow','Swallow','Swift','Sycamore',
-    'Thyme','Toadflax','Tranquility','Beaver Brook','Violet','Walnut',
-    'Weasel','Willow Herb','Wren','Yarrow','Yew',
-  ].sort();
-
   // Set today's date
   const today = new Date().toISOString().split('T')[0];
   document.getElementById('fDate').value = today;
 
-  // Populate property dropdown
-  const sel = document.getElementById('fProperty');
-  PROPERTIES.forEach(p => {
-    const opt = document.createElement('option'); opt.value = p; opt.textContent = p;
-    sel.appendChild(opt);
-  });
+  // Load real property names from Monday.com Property Config board
+  async function loadProperties() {
+    const sel = document.getElementById('fProperty');
+    try {
+      const res = await fetch('https://api.monday.com/v2', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'Authorization': MONDAY_API_TOKEN },
+        body: JSON.stringify({ query: `{ boards(ids:[${PROP_BOARD}]){ items_page(limit:200){ items{ name } } } }` })
+      });
+      const j = await res.json();
+      const names = j.data.boards[0].items_page.items
+        .map(i => i.name.trim())
+        .filter(Boolean)
+        .sort();
+      names.forEach(p => {
+        const opt = document.createElement('option'); opt.value = p; opt.textContent = p;
+        sel.appendChild(opt);
+      });
+    } catch (e) {
+      // Fallback — let user type
+      sel.outerHTML = '<input type="text" id="fProperty" placeholder="Type property name…">';
+    }
+  }
+  loadProperties();
 
   // Storage helpers
   function loadReturns() {

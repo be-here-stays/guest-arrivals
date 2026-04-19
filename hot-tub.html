@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <title>Hot Tub Log — Be Here</title>
+  <title>Hot Tub Log v9 — Be Here</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -762,28 +762,19 @@ async function submitForm() {
     const dateStr  = dtParts[0];
     const timeStr  = (dtParts[1] || '00:00') + ':00';
 
-    // Next clean = +2 days
-    const nextCleanDt = new Date(dtVal + ':00');
-    nextCleanDt.setDate(nextCleanDt.getDate() + 2);
-    const nextCleanStr = nextCleanDt.toISOString().split('T')[0];
-
     // Visit label
     const vtLabel = visitType === 'full' ? 'Full Clean' : visitType === 'mid-stay' ? 'Mid-Stay' : 'Mid-Vac';
 
-    // Charging board status (based on water change) — indices: 0=Part Drop, 1=Cleaned, 2=Full Drop
-    const chargeStatusIndex = waterChange === 'full' ? 2 : waterChange === 'partial' ? 0 : 1;
-    const waterMaintNum     = waterChange === 'full' ? 2 : waterChange === 'partial' ? 1 : 0;
+    const waterMaintNum = waterChange === 'full' ? 2 : waterChange === 'partial' ? 1 : 0;
 
     // Build charging board column values
+    // NOTE: structured columns (dates etc.) must be plain objects — NOT pre-stringified.
     const cv = {};
-    cv[CC.status]      = JSON.stringify({ index: chargeStatusIndex });
-    cv[CC.dateCleaned] = JSON.stringify({ date: dateStr, time: timeStr });
-    cv[CC.nextClean]   = JSON.stringify({ date: nextCleanStr });
+    cv[CC.dateCleaned] = { date: dateStr, time: timeStr };
     cv[CC.tester]      = tester;
     cv[CC.waterMaint]  = String(waterMaintNum);
     cv[CC.waterChange] = waterChange === 'none' ? 'N' : waterChange === 'partial' ? 'Partial' : 'Y';
     cv[CC.lodge]       = property;
-    cv[CC.requiredWC]  = JSON.stringify({ ids: [flagOn ? 1 : 2] });
 
     if (gn('fInitTemp') !== null) cv[CC.temp]     = String(gn('fInitTemp'));
     if (gn('fInitPH')   !== null) cv[CC.initPH]   = String(gn('fInitPH'));
@@ -807,16 +798,12 @@ async function submitForm() {
       if (v !== null && v > 0) cv[col] = String(v);
     }
 
-    // Board relation to status item
-    const statusItem = statusItems[property];
-    if (statusItem) {
-      cv[CC.relation] = JSON.stringify({ linkedPulseIds: [{ linkedPulseId: parseInt(statusItem.id) }] });
-    }
-
     const colValsStr = JSON.stringify(JSON.stringify(cv));
-    const itemName   = esc(property) + ' — ' + vtLabel;
 
-    // 1. Create record in charging board
+    // Item name = property only (Make automations match on this)
+    const itemName = esc(property);
+
+    // Create record in charging board
     await mq(`mutation {
       create_item(
         board_id: ${CHARGING_BOARD}
@@ -825,56 +812,62 @@ async function submitForm() {
       ) { id }
     }`);
 
-    // 2. Update hot tub status board
-    if (statusItem) {
-      // Status indices: 1=Cleaned, 0=Part Drop, 2=Full Drop
-      // Mid-Stay leaves status as Cleaned (1); Full/Mid-Vac also Cleaned (1)
-      const scv = {};
-      scv[SC.status]      = JSON.stringify({ index: 1 });
-      scv[SC.nextClean]   = JSON.stringify({ date: nextCleanStr });
-      scv[SC.readingDate] = JSON.stringify({ date: dateStr, time: timeStr });
-      scv[SC.waterChange] = JSON.stringify({ ids: [waterChange !== 'none' ? 1 : 2] });
+    // Status board updated by Make automation triggered by new charging record
 
-      const finalPH   = gn('fFinalPH');
-      const finalBrom = gn('fFinalBrom');
-      const finalTDS  = gn('fFinalTDS');
-      const finalTemp = gn('fFinalTemp');
-      const initTemp  = gn('fInitTemp');
-      const dur       = gn('fDuration');
-
-      if (finalPH   !== null) scv[SC.ph]     = String(finalPH);
-      if (finalBrom !== null) scv[SC.bromine] = String(finalBrom);
-      if (finalTDS  !== null) scv[SC.tds]    = String(finalTDS);
-      else if (gn('fInitTDS') !== null) scv[SC.tds] = String(gn('fInitTDS'));
-      scv[SC.temp] = String(finalTemp !== null ? finalTemp : (initTemp || ''));
-      if (dur !== null) scv[SC.duration] = String(dur);
-
-      // Only update lastCleaned on Full Clean
-      if (visitType === 'full') scv[SC.lastCleaned] = JSON.stringify({ date: dateStr });
-
-      const scvStr = JSON.stringify(JSON.stringify(scv));
-      await mq(`mutation {
-        change_multiple_column_values(
-          board_id: ${STATUS_BOARD}
-          item_id: ${statusItem.id}
-          column_values: ${scvStr}
-        ) { id }
-      }`);
-    }
-
-    // Success
+    // Success — show message then reset form
     showMsg('✓ Log submitted — ' + property + ' · ' + vtLabel, 'success');
-    document.getElementById('submitBtn').disabled = false;
-    // Scroll to top to show success message
     window.scrollTo({ top: 0, behavior: 'smooth' });
-
-    // Reset timer if running
     if (timerRunning) timerStop();
+    setTimeout(resetForm, 2500);
 
   } catch (e) {
     showMsg('Submission error: ' + e.message, 'error');
     btn.disabled = false;
   }
+}
+
+function resetForm() {
+  // Clear readings
+  ['fInitTemp','fInitTA','fInitPH','fInitBrom','fInitTDS',
+   'fFinalPH','fFinalBrom','fFinalTemp','fFinalTDS','fDuration','fNotes']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+
+  // Reset chemicals to 0
+  ['cPHUp','cPHDown','cAlk','cBromTabs','cBromGran','cNCS',
+   'cBromReduce','cClarifier','cFoamAway','cCS','cPipeLiq','cPipeBomb']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = '0'; });
+
+  // Uncheck all task checkboxes
+  document.querySelectorAll('.task-item input[type="checkbox"]')
+    .forEach(cb => { cb.checked = false; cb.closest('.task-item')?.classList.remove('done'); });
+
+  // Reset visit type
+  visitType = null;
+  document.querySelectorAll('.vt-btn').forEach(b => b.classList.remove('active'));
+
+  // Reset water change to none
+  waterChange = 'none';
+  document.querySelectorAll('.wc-btn').forEach(b => b.classList.remove('active'));
+  const noneBtn = document.getElementById('wc_none');
+  if (noneBtn) noneBtn.classList.add('active');
+
+  // Reset flag
+  flagOn = false;
+  const flagBtn = document.getElementById('flagBtn');
+  if (flagBtn) { flagBtn.classList.remove('on'); flagBtn.textContent = '🚩 Flag for required water change'; }
+
+  // Reset datetime to now
+  const now = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  const dtStr = now.getFullYear() + '-' + pad(now.getMonth()+1) + '-' + pad(now.getDate())
+              + 'T' + pad(now.getHours()) + ':' + pad(now.getMinutes());
+  const dtEl = document.getElementById('fDateTime');
+  if (dtEl) dtEl.value = dtStr;
+
+  // Re-enable submit
+  document.getElementById('submitBtn').disabled = false;
+
+  // Keep property and tester — likely doing multiple tubs in one session
 }
 
 function showMsg(text, type) {

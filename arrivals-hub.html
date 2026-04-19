@@ -443,7 +443,7 @@ async function fetchAllItems(token) {
   let items = [], cursor = null;
   do {
     const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
-    const data = await mondayQuery(token, `{ boards(ids: [${BOARD_ID}]) { items_page(limit: 500${cursorPart}) { cursor items { id name column_values(ids: ["date_mm2adtwg","color_mm2aw8fx","text_mm2ahbrx","text_mm2ab56m","numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x"${WAIVER_COL_ID ? ',"'+WAIVER_COL_ID+'"' : ''}]) { id value } } } } }`);
+    const data = await mondayQuery(token, `{ boards(ids: [${BOARD_ID}]) { items_page(limit: 500${cursorPart}) { cursor items { id name column_values(ids: ["date_mm2adtwg","color_mm2aw8fx","text_mm2ahbrx","text_mm2ab56m","numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x","text_mm2ah8s"${WAIVER_COL_ID ? ',"'+WAIVER_COL_ID+'"' : ''}]) { id value } } } } }`);
     const page = data.boards[0].items_page;
     items = items.concat(page.items);
     cursor = page.cursor;
@@ -508,6 +508,7 @@ function parseItem(item) {
     adults:      parseInt(p(cv['numeric_mm2a5s8r'])) || 0,
     children:    parseInt(p(cv['numeric_mm2add81'])) || 0,
     pets:        parseInt(p(cv['numeric_mm2ahz0x'])) || 0,
+    bookingRef:  p(cv['text_mm2ah8s']) || '',
     waiverSigned: WAIVER_COL_ID ? (p(cv[WAIVER_COL_ID])?.date || null) : null,
   };
 }
@@ -614,8 +615,8 @@ function renderWaivers() {
       linkCell   = '';
     } else {
       waiverCell = `<span style="color:#c0392b;font-weight:600;">⚠ Not signed</span>`;
-      // Build a pre-filled waiver link — use Monday item ID as booking reference
-      const waiverLink = `${WAIVER_BASE_URL}?booking=${a.id}&name=${encodeURIComponent(a.name||'')}&property=${encodeURIComponent(a.property||'')}&checkin=${a.arrivalDate}`;
+      // Build a pre-filled waiver link using the booking reference
+      const waiverLink = `${WAIVER_BASE_URL}?booking=${encodeURIComponent(a.bookingRef||a.id)}&name=${encodeURIComponent(a.name||'')}&property=${encodeURIComponent(a.property||'')}&checkin=${a.arrivalDate}`;
       linkCell = `<a href="${waiverLink}" target="_blank" style="font-size:12px;color:#AF926A;font-weight:600;text-decoration:none;white-space:nowrap;">Send link ↗</a>`;
     }
 

@@ -377,16 +377,12 @@ async function submitWaiver() {
     const sigData   = canvas.toDataURL('image/png');
     const property  = decodeURIComponent(urlProp) || 'property';
 
-    // 1. Find the arrivals board item
-    // If booking param is a numeric Monday item ID, fetch directly; otherwise search by name
+    // 1. Find the arrivals board item by booking reference column (text_mm2ah8s)
     let itemId = null;
-    if (urlRef && /^\d+$/.test(urlRef.trim())) {
-      // Direct Monday item ID — no search needed
-      itemId = urlRef.trim();
-    } else if (urlRef) {
+    if (urlRef) {
       try {
         const searchData = await mq(`{
-          items_by_column_values(board_id: ${ARRIVALS_BOARD}, column_id: "name", column_value: "${urlRef.replace(/"/g,'')}") {
+          items_by_column_values(board_id: ${ARRIVALS_BOARD}, column_id: "text_mm2ah8s", column_value: "${urlRef.replace(/"/g,'')}") {
             id name
           }
         }`);

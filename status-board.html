@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Be Here — Status Board</title>
+  <title>Be Here — Status Board v10</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -392,6 +392,26 @@
       grid-column: 1 / -1;
     }
 
+    .laundry-order-block {
+      margin-bottom: 6px;
+    }
+
+    .laundry-order-label {
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      color: var(--green);
+      padding: 6px 0 3px;
+    }
+
+    .laundry-excluded {
+      font-size: 11px;
+      color: var(--muted);
+      padding: 5px 0 2px;
+      font-style: italic;
+    }
+
     .laundry-zero {
       opacity: 0.35;
     }
@@ -610,6 +630,7 @@
   <script>
     const BOARD_ID = '5094453064';
     const PROP_BOARD = '5094466278';
+    const HOT_TUB_STATUS_BOARD = '1918769299'; // one item per hot-tub property
     const REFRESH_MINS = 20;
 
     // ── READ-ONLY API TOKEN ──
@@ -682,15 +703,28 @@
       } while (cursor);
       allItems = items;
 
-      // Fetch property config including Bathrooms column (numeric_mm2drc46)
-      const pd = await mondayFetch(`{ boards(ids:[${PROP_BOARD}]){ items_page(limit:200){ items{ name column_values(ids:["text_mm2a2a78","long_text_mm2a30dy","numeric_mm2drc46"]){ id value } } } } }`);
+      // Fetch property config — fixed beds, bed options, bathrooms, max occupancy
+      const pd = await mondayFetch(`{ boards(ids:[${PROP_BOARD}]){ items_page(limit:200){ items{ name column_values(ids:["text_mm2a2a78","long_text_mm2a30dy","numeric_mm2drc46","numeric_mm2aa6z7"]){ id value } } } } }`);
       propConfigs = {};
       for (const it of pd.boards[0].items_page.items) {
         const cv = {}; for (const c of it.column_values) cv[c.id] = c.value;
         const p = v => { try { return JSON.parse(v); } catch { return null; } };
         const opts = (p(cv['long_text_mm2a30dy'])?.text || '').split('|').map(s => s.trim()).filter(Boolean);
         const bathrooms = parseInt(p(cv['numeric_mm2drc46'])) || 1;
-        propConfigs[it.name] = { fixedBeds: p(cv['text_mm2a2a78']) || '', bedOptions: opts, bathrooms };
+        const maxOccupancy = parseInt(p(cv['numeric_mm2aa6z7'])) || 0;
+        propConfigs[it.name] = { fixedBeds: p(cv['text_mm2a2a78']) || '', bedOptions: opts, bathrooms, maxOccupancy, hasHotTub: false };
+      }
+
+      // Fetch hot tub status board — any property with a row here has a hot tub
+      const htd = await mondayFetch(`{ boards(ids:[${HOT_TUB_STATUS_BOARD}]){ items_page(limit:100){ items{ name } } } }`);
+      for (const it of htd.boards[0].items_page.items) {
+        const name = it.name.trim();
+        if (propConfigs[name]) propConfigs[name].hasHotTub = true;
+        // Also try case-insensitive match
+        else {
+          const key = Object.keys(propConfigs).find(k => k.toLowerCase() === name.toLowerCase());
+          if (key) propConfigs[key].hasHotTub = true;
+        }
       }
       renderAll();
     }
@@ -766,6 +800,27 @@
     }
 
     // ── LAUNDRY ──
+
+    // Property categorisation for laundry orders.
+    // Comparisons are case-insensitive; use .trim().toLowerCase() when matching.
+    const LAUNDRY_CATS = {
+      // Supplied by Regency — all properties NOT listed below
+      // Own laundry: same spec, comes from internal stock
+      ownLaundry: ['hideaway', 'tranquility', 'beaver brook'],
+      // Not supplied at all (no linen provided)
+      notSupplied: ['island', 'boathouse', 'pond', 'willow', 'waterlily'],
+      // Excluded from Regency AND from own laundry (racing lets & glamping — manage their own)
+      excluded: ['ascot', 'aintree', 'cheltenham', 'york', 'epsom', 'goodwood', 'newmarket',
+                 'badgers', 'foxes', 'squirrels', 'rabbits'],
+    };
+
+    function getLaundryCategory(propertyName) {
+      const n = (propertyName || '').trim().toLowerCase();
+      if (LAUNDRY_CATS.notSupplied.some(p => n.includes(p))) return 'notSupplied';
+      if (LAUNDRY_CATS.excluded.some(p => n.includes(p)))    return 'excluded';
+      if (LAUNDRY_CATS.ownLaundry.some(p => n.includes(p)))  return 'ownLaundry';
+      return 'regency';
+    }
 
     // Order schedule: Tue order covers Thu+Fri, Thu order covers Sat+Sun+Mon, Sat order covers Tue+Wed
     function buildDeliveryWindow(fromDate) {
@@ -860,55 +915,90 @@
       };
     }
 
+    // Calculate linen totals for an array of arrivals.
+    // Returns { regency: {...}, ownLaundry: {...}, excluded: [...], notSupplied: [...] }
+    // Each totals object has all the item counts; excluded/notSupplied are arrays of property names.
     function calcLaundry(arrivals) {
-      let oxfordPillows = 0, standardPillows = 0,
-        bathTowels = 0, handTowels = 0, hotTubTowels = 0,
-        bathrobes = 0, teaTowels = 0, bathMats = 0;
-      // Duvet covers (by actual bed size)
-      let skDuvets = 0, kingDuvets = 0, doubleDuvets = 0, singleDuvets = 0;
-      // Sheets: superking beds use KING SIZE sheets — no superking sheets
-      let kingSheets = 0, doubleSheets = 0, singleSheets = 0;
-
-      for (const a of arrivals) {
-        const guests = (a.adults || 0) + (a.children || 0);
-        const adults = a.adults > 0 ? a.adults : guests;
-        const bathrooms = (propConfigs[a.property] || {}).bathrooms || 1;
-        const beds = getArrivalBedCounts(a);
-
-        oxfordPillows += guests;             // 1 oxford (front) per person
-        standardPillows += guests;             // 1 standard (back) per person
-        bathTowels += guests;             // 1 per person
-        handTowels += guests + bathrooms; // 1 per person + 1 per bathroom
-        hotTubTowels += guests;             // 1 per person
-        bathrobes += adults;             // 1 per adult
-        teaTowels += 2;                  // 2 per house (fixed)
-        bathMats += bathrooms;          // 1 per bathroom
-
-        // Duvet covers — by bed size
-        skDuvets += beds.superKing;
-        kingDuvets += beds.king;
-        doubleDuvets += beds.double;
-        singleDuvets += beds.single;
-
-        // Sheets — superking beds use king size sheets (no superking sheets)
-        kingSheets += beds.superKing + beds.king;
-        doubleSheets += beds.double;
-        singleSheets += beds.single;
+      function emptyTotals() {
+        return {
+          oxfordPillows: 0, standardPillows: 0,
+          bathTowels: 0, handTowels: 0, hotTubTowels: 0,
+          bathrobes: 0, teaTowels: 0, bathMats: 0,
+          skDuvets: 0, kingDuvets: 0, doubleDuvets: 0, singleDuvets: 0,
+          kingSheets: 0, doubleSheets: 0, singleSheets: 0,
+          arrivals: [],
+        };
       }
 
-      // Backward-compat aliases used by summaryLine and propList
-      const pillowCases = oxfordPillows + standardPillows;
-      const superKingBeds = skDuvets;
-      const kingBeds = kingDuvets;
-      const doubleBeds = doubleDuvets;
-      const singleBeds = singleDuvets;
+      function addArrival(totals, a) {
+        const cfg = propConfigs[a.property] || {};
+        const bathrooms = cfg.bathrooms || 1;
+        const hasHotTub = cfg.hasHotTub || false;
+        const beds = getArrivalBedCounts(a);
+
+        const totalBedSpaces = beds.superKing * 2 + beds.king * 2 + beds.double * 2 + beds.single;
+        const confirmedGuests = (a.adults || 0) + (a.children || 0);
+        const guests = confirmedGuests > 0 ? confirmedGuests : (cfg.maxOccupancy || totalBedSpaces || 2);
+        const adults = (a.adults > 0) ? a.adults : guests;
+
+        const doublePillows = (beds.superKing + beds.king + beds.double) * 2;
+        const singlePillows = beds.single * 1;
+        totals.oxfordPillows   += doublePillows + singlePillows;
+        totals.standardPillows += doublePillows + singlePillows;
+        totals.bathTowels += guests;
+        totals.handTowels += guests + bathrooms;
+        totals.teaTowels  += 2;
+        totals.bathMats   += bathrooms;
+        if (hasHotTub) {
+          totals.hotTubTowels += guests;
+          totals.bathrobes    += adults;
+        }
+        totals.skDuvets     += beds.superKing;
+        totals.kingDuvets   += beds.king;
+        totals.doubleDuvets += beds.double;
+        totals.singleDuvets += beds.single;
+        totals.kingSheets   += beds.superKing + beds.king;
+        totals.doubleSheets += beds.double;
+        totals.singleSheets += beds.single;
+        totals.arrivals.push(a);
+      }
+
+      function finaliseTotals(t) {
+        t.pillowCases   = t.oxfordPillows + t.standardPillows;
+        t.superKingBeds = t.skDuvets;
+        t.kingBeds      = t.kingDuvets;
+        t.doubleBeds    = t.doubleDuvets;
+        t.singleBeds    = t.singleDuvets;
+        return t;
+      }
+
+      const regency    = emptyTotals();
+      const ownLaundry = emptyTotals();
+      const excluded   = []; // property names — no linen needed from either source
+      const notSupplied = []; // property names — we don't supply linen at all
+
+      for (const a of arrivals) {
+        const cat = getLaundryCategory(a.property);
+        if (cat === 'regency')     addArrival(regency, a);
+        else if (cat === 'ownLaundry') addArrival(ownLaundry, a);
+        else if (cat === 'excluded')   { if (!excluded.includes(a.property)) excluded.push(a.property); }
+        else if (cat === 'notSupplied'){ if (!notSupplied.includes(a.property)) notSupplied.push(a.property); }
+      }
 
       return {
-        oxfordPillows, standardPillows, pillowCases,
-        bathTowels, handTowels, hotTubTowels, bathrobes, teaTowels, bathMats,
-        skDuvets, kingDuvets, doubleDuvets, singleDuvets,
-        kingSheets, doubleSheets, singleSheets,
-        superKingBeds, kingBeds, doubleBeds, singleBeds
+        regency:    finaliseTotals(regency),
+        ownLaundry: finaliseTotals(ownLaundry),
+        excluded,
+        notSupplied,
+        // Flat totals for the compact summary line (regency + own laundry combined)
+        combined: finaliseTotals((() => {
+          const c = emptyTotals();
+          for (const a of arrivals) {
+            const cat = getLaundryCategory(a.property);
+            if (cat === 'regency' || cat === 'ownLaundry') addArrival(c, a);
+          }
+          return c;
+        })()),
       };
     }
 
@@ -955,24 +1045,78 @@
       document.getElementById('laundryDeliveryDate').textContent = (isCentreToday ? 'Today — ' : '') + centreL.delivery;
       document.getElementById('laundryCoversDates').textContent = 'covers ' + centreL.covers;
 
-      // ── Helper: compact summary line ──
+      // ── Helper: compact summary line (uses combined Regency+own totals) ──
       function summaryLine(arrivals) {
         if (!arrivals.length) return 'No arrivals this window';
-        const t = calcLaundry(arrivals);
-        // Duvets
+        const r = calcLaundry(arrivals);
+        const t = r.combined;
         const duvetParts = [];
         if (t.skDuvets) duvetParts.push(`${t.skDuvets} s/king`);
         if (t.kingDuvets) duvetParts.push(`${t.kingDuvets} king`);
         if (t.doubleDuvets) duvetParts.push(`${t.doubleDuvets} dbl`);
         if (t.singleDuvets) duvetParts.push(`${t.singleDuvets} single`);
         const duvetStr = duvetParts.length ? duvetParts.join(' · ') + ' duvets  ·  ' : '';
-        // Sheets (king covers superking+king, no superking sheets)
         const sheetParts = [];
         if (t.kingSheets) sheetParts.push(`${t.kingSheets} king`);
         if (t.doubleSheets) sheetParts.push(`${t.doubleSheets} dbl`);
         if (t.singleSheets) sheetParts.push(`${t.singleSheets} single`);
         const sheetStr = sheetParts.length ? sheetParts.join(' · ') + ' sheets  ·  ' : '';
         return `${duvetStr}${sheetStr}${t.oxfordPillows} oxford · ${t.standardPillows} std pillow · ${t.bathTowels} bath · ${t.handTowels} hand · ${t.hotTubTowels} hot tub · ${t.bathrobes} robe · ${t.teaTowels} tea · ${t.bathMats} mat`;
+      }
+
+      // ── Helper: render one order block (Regency or Own Laundry) ──
+      function renderOrderBlock(label, totals, arrivals, hasUnconfirmed, labelStyle) {
+        if (!arrivals.length) return '';
+        const propList = arrivals.map(a => {
+          const g = (a.adults || 0) + (a.children || 0);
+          const b = (propConfigs[a.property] || {}).bathrooms || 1;
+          const beds = getArrivalBedCounts(a);
+          const cfg = propConfigs[a.property] || {};
+          const isDefault = cfg.bedOptions && cfg.bedOptions.length > 0 && !a.bedConfig;
+          const bedNote = [
+            beds.superKing ? `${beds.superKing}SK` : '',
+            beds.king ? `${beds.king}K` : '',
+            beds.double ? `${beds.double}D` : '',
+            beds.single ? `${beds.single}S` : '',
+          ].filter(Boolean).join('+');
+          return `${a.property} (${g}g/${b}bth${bedNote ? ' · ' + bedNote + (isDefault ? '*' : '') : ''})`;
+        }).join(', ');
+
+        const DUVET_ITEMS = [
+          { label: 'Super King Duvets', value: totals.skDuvets },
+          { label: 'King Duvets', value: totals.kingDuvets },
+          { label: 'Double Duvets', value: totals.doubleDuvets },
+          { label: 'Single Duvets', value: totals.singleDuvets },
+        ];
+        const SHEET_ITEMS = [
+          { label: 'King Sheets', value: totals.kingSheets },
+          { label: 'Double Sheets', value: totals.doubleSheets },
+          { label: 'Single Sheets', value: totals.singleSheets },
+        ];
+        const TOWEL_ITEMS = [
+          { label: 'Oxford Pillow Cases', value: totals.oxfordPillows },
+          { label: 'Standard Pillow Cases', value: totals.standardPillows },
+          { label: 'Bath Towels', value: totals.bathTowels },
+          { label: 'Hand Towels', value: totals.handTowels },
+          { label: 'Hot Tub Towels', value: totals.hotTubTowels },
+          { label: 'Bathrobes', value: totals.bathrobes },
+          { label: 'Tea Towels', value: totals.teaTowels },
+          { label: 'Bath Mats', value: totals.bathMats },
+        ];
+
+        return `
+          <div class="laundry-order-block">
+            <div class="laundry-order-label" style="${labelStyle || ''}">${label}</div>
+            <div class="laundry-grid">
+              <div class="laundry-subheader">Duvets${hasUnconfirmed ? ' <span style="font-weight:400;color:#bbb">* default twin</span>' : ''}</div>
+              ${DUVET_ITEMS.map(renderItem).join('')}
+              <div class="laundry-subheader">Sheets <span style="font-weight:400;color:#bbb">(superking beds → king sheets)</span></div>
+              ${SHEET_ITEMS.map(renderItem).join('')}
+              <div class="laundry-subheader">Pillows &amp; towels</div>
+              ${TOWEL_ITEMS.map(renderItem).join('')}
+            </div>
+            ${propList ? `<div class="laundry-props">${propList}</div>` : ''}
+          </div>`;
       }
 
       // ── PAST — summary strip ──
@@ -990,36 +1134,15 @@
     </div>`;
 
       // ── CURRENT — full detail ──
-      const curTotals = calcLaundry(currentArrivals);
+      const curSplit = calcLaundry(currentArrivals);
 
-      // Check whether any bed choice is still default (not yet confirmed by guest)
+      // Check whether any Regency/own bed choice is still default
       const hasUnconfirmed = currentArrivals.some(a => {
+        const cat = getLaundryCategory(a.property);
+        if (cat !== 'regency' && cat !== 'ownLaundry') return false;
         const cfg = propConfigs[a.property] || {};
         return cfg.bedOptions && cfg.bedOptions.length > 0 && !a.bedConfig;
       });
-
-      const DUVET_ITEMS = [
-        { label: 'Super King Duvets', value: curTotals.skDuvets },
-        { label: 'King Duvets', value: curTotals.kingDuvets },
-        { label: 'Double Duvets', value: curTotals.doubleDuvets },
-        { label: 'Single Duvets', value: curTotals.singleDuvets },
-      ];
-      // Sheets: superking beds use king size sheets — no superking sheets
-      const SHEET_ITEMS = [
-        { label: 'King Sheets', value: curTotals.kingSheets },
-        { label: 'Double Sheets', value: curTotals.doubleSheets },
-        { label: 'Single Sheets', value: curTotals.singleSheets },
-      ];
-      const TOWEL_ITEMS = [
-        { label: 'Oxford Pillow Cases', value: curTotals.oxfordPillows },
-        { label: 'Standard Pillow Cases', value: curTotals.standardPillows },
-        { label: 'Bath Towels', value: curTotals.bathTowels },
-        { label: 'Hand Towels', value: curTotals.handTowels },
-        { label: 'Hot Tub Towels', value: curTotals.hotTubTowels },
-        { label: 'Bathrobes', value: curTotals.bathrobes },
-        { label: 'Tea Towels', value: curTotals.teaTowels },
-        { label: 'Bath Mats', value: curTotals.bathMats },
-      ];
 
       function renderItem(item) {
         return `<div class="laundry-item ${item.value === 0 ? 'laundry-zero' : ''}">
@@ -1028,35 +1151,23 @@
     </div>`;
       }
 
-      const propList = currentArrivals.map(a => {
-        const g = (a.adults || 0) + (a.children || 0);
-        const b = (propConfigs[a.property] || {}).bathrooms || 1;
-        const beds = getArrivalBedCounts(a);
-        const cfg = propConfigs[a.property] || {};
-        const isDefault = cfg.bedOptions && cfg.bedOptions.length > 0 && !a.bedConfig;
-        const bedNote = [
-          beds.superKing ? `${beds.superKing}SK` : '',
-          beds.king ? `${beds.king}K` : '',
-          beds.double ? `${beds.double}D` : '',
-          beds.single ? `${beds.single}S` : '',
-        ].filter(Boolean).join('+');
-        return `${a.property} (${g}g/${b}bth${bedNote ? ' · ' + bedNote + (isDefault ? '*' : '') : ''})`;
-      }).join(', ');
+      // Build excluded/not-supplied notice
+      const allExcluded = [...curSplit.excluded, ...curSplit.notSupplied];
+      const excludedNotice = allExcluded.length
+        ? `<div class="laundry-excluded">Not ordering: ${allExcluded.join(', ')}</div>`
+        : '';
+
+      const regencyBlock    = renderOrderBlock('Regency order', curSplit.regency,    curSplit.regency.arrivals,    hasUnconfirmed, '');
+      const ownLaundryBlock = renderOrderBlock('Own laundry',   curSplit.ownLaundry, curSplit.ownLaundry.arrivals, hasUnconfirmed, 'color:var(--amber)');
+
+      const noOrders = !curSplit.regency.arrivals.length && !curSplit.ownLaundry.arrivals.length;
 
       const currentHTML = `
     <div class="laundry-section">
       <div class="laundry-section-label">Order now</div>
-      ${currentArrivals.length === 0
+      ${noOrders && !allExcluded.length
           ? '<div style="padding:6px 0 8px;font-size:13px;color:#bbb;text-align:center;">No arrivals in this window</div>'
-          : `<div class="laundry-grid">
-            <div class="laundry-subheader">Duvets${hasUnconfirmed ? ' <span style="font-weight:400;color:#bbb">* default twin</span>' : ''}</div>
-            ${DUVET_ITEMS.map(renderItem).join('')}
-            <div class="laundry-subheader">Sheets <span style="font-weight:400;color:#bbb">(superking beds → king sheets)</span></div>
-            ${SHEET_ITEMS.map(renderItem).join('')}
-            <div class="laundry-subheader">Pillows &amp; towels</div>
-            ${TOWEL_ITEMS.map(renderItem).join('')}
-          </div>
-          ${propList ? `<div class="laundry-props">${propList}</div>` : ''}`
+          : `${regencyBlock}${ownLaundryBlock}${excludedNotice}`
         }
     </div>`;
 

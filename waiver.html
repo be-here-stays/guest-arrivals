@@ -1,0 +1,440 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <title>Be Here — Guest Liability Waiver</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:      #D5D0C4;
+      --dark:    #272F2E;
+      --sage:    #646955;
+      --gold:    #AF926A;
+      --cream:   #F3E3C3;
+      --surface: #fff;
+      --border:  #e0ddd6;
+      --green:   #2d6a4f;
+      --green-bg:#edf7f2;
+      --red:     #c0392b;
+      --red-bg:  #fdf0ec;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: 'Instrument Sans', -apple-system, sans-serif; background: var(--bg); color: var(--dark); min-height: 100vh; }
+
+    /* ── Header ── */
+    header { background: var(--dark); padding: 18px 24px; display: flex; align-items: center; gap: 16px; }
+    .hdr-logo svg { display: block; width: 110px; height: auto; }
+    .hdr-title { font-size: 14px; font-weight: 600; color: rgba(255,255,255,0.6); }
+
+    /* ── Layout ── */
+    .page { max-width: 680px; margin: 0 auto; padding: 24px 16px 48px; }
+
+    /* ── Property banner ── */
+    .prop-banner { background: var(--dark); color: #fff; border-radius: 12px; padding: 16px 20px; margin-bottom: 20px; display: flex; align-items: flex-start; justify-content: space-between; }
+    .prop-name { font-size: 16px; font-weight: 700; }
+    .prop-meta { font-size: 12px; color: rgba(255,255,255,0.55); margin-top: 4px; }
+    .prop-badge { background: var(--gold); color: var(--dark); font-size: 11px; font-weight: 700; padding: 4px 10px; border-radius: 20px; flex-shrink: 0; margin-top: 2px; }
+
+    /* ── Card ── */
+    .card { background: var(--surface); border-radius: 14px; padding: 20px; margin-bottom: 14px; box-shadow: 0 1px 4px rgba(39,47,46,.06); }
+    .card-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: .5px; color: var(--sage); margin-bottom: 14px; }
+
+    /* ── Waiver text ── */
+    .waiver-intro { font-size: 14px; line-height: 1.6; color: var(--dark); margin-bottom: 16px; }
+    .waiver-section { margin-bottom: 14px; }
+    .waiver-section h3 { font-size: 13px; font-weight: 700; color: var(--dark); margin-bottom: 6px; }
+    .waiver-section p, .waiver-section li { font-size: 13px; line-height: 1.65; color: #444; }
+    .waiver-section ul { padding-left: 18px; margin-top: 4px; }
+    .waiver-section li { margin-bottom: 4px; }
+
+    /* ── Fields ── */
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .4px; color: var(--sage); margin-bottom: 6px; }
+    .field input[type="text"] { width: 100%; padding: 11px 14px; border: 1.5px solid var(--border); border-radius: 9px; font-size: 14px; font-family: inherit; color: var(--dark); background: var(--surface); outline: none; transition: border-color .15s; }
+    .field input:focus { border-color: var(--gold); }
+    .field .hint { font-size: 11px; color: var(--sage); margin-top: 4px; }
+    .req { color: var(--red); }
+
+    /* ── Declaration checkbox ── */
+    .declaration { background: #f8f6f0; border: 1.5px solid var(--border); border-radius: 10px; padding: 14px 16px; display: flex; gap: 12px; align-items: flex-start; cursor: pointer; transition: border-color .15s; }
+    .declaration:hover { border-color: var(--gold); }
+    .declaration input[type="checkbox"] { width: 18px; height: 18px; flex-shrink: 0; margin-top: 2px; cursor: pointer; accent-color: var(--dark); }
+    .declaration-text { font-size: 13px; line-height: 1.55; color: var(--dark); }
+    .declaration-text strong { font-weight: 700; }
+
+    /* ── Signature pad ── */
+    .sig-wrap { border: 1.5px solid var(--border); border-radius: 10px; overflow: hidden; background: #fafaf8; position: relative; }
+    .sig-wrap canvas { display: block; width: 100%; touch-action: none; cursor: crosshair; }
+    .sig-placeholder { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); font-size: 13px; color: #bbb; pointer-events: none; text-align: center; line-height: 1.5; }
+    .sig-placeholder.hide { display: none; }
+    .sig-actions { display: flex; justify-content: flex-end; padding: 8px 12px; border-top: 1px solid var(--border); background: var(--surface); }
+    .btn-clear { font-size: 12px; font-weight: 600; color: var(--sage); background: none; border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px; cursor: pointer; font-family: inherit; }
+    .btn-clear:hover { background: #f0ede6; }
+
+    /* ── Submit ── */
+    .btn-submit { width: 100%; padding: 15px; background: var(--dark); color: #fff; border: none; border-radius: 11px; font-size: 15px; font-weight: 700; font-family: inherit; cursor: pointer; transition: background .15s; margin-top: 6px; }
+    .btn-submit:hover:not(:disabled) { background: #3a4a3a; }
+    .btn-submit:disabled { opacity: .5; cursor: default; }
+
+    /* ── Messages ── */
+    .msg { padding: 12px 16px; border-radius: 9px; font-size: 13px; font-weight: 600; margin-bottom: 14px; display: none; }
+    .msg.show { display: block; }
+    .msg.error   { background: var(--red-bg); color: var(--red); border: 1px solid #f4b8a8; }
+    .msg.success { background: var(--green-bg); color: var(--green); border: 1px solid #a8d5bc; }
+
+    /* ── Thank you screen ── */
+    #thankYou { display: none; text-align: center; padding: 40px 20px; }
+    #thankYou.show { display: block; }
+    #thankYou .ty-icon { font-size: 56px; margin-bottom: 16px; }
+    #thankYou h2 { font-size: 22px; font-weight: 700; color: var(--dark); margin-bottom: 8px; }
+    #thankYou p { font-size: 14px; color: var(--sage); line-height: 1.6; max-width: 420px; margin: 0 auto; }
+    #thankYou .ty-ref { font-size: 12px; color: var(--sage); margin-top: 20px; background: #f0ede6; display: inline-block; padding: 6px 14px; border-radius: 20px; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div class="hdr-logo">
+    <svg viewBox="0 0 500 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+      <!-- Be Here. wordmark (white on dark) -->
+      <g fill="#fff">
+        <!-- B -->
+        <path d="M20 20h28c10 0 17 6 17 15 0 5-2 9-6 12 5 3 8 8 8 14 0 10-8 17-19 17H20V20zm12 22h14c4 0 6-2 6-6s-2-6-6-6H32v12zm0 22h16c5 0 8-3 8-7s-3-7-8-7H32v14z"/>
+        <!-- e -->
+        <path d="M80 62c0-14 10-24 24-24s23 10 23 24v3H92c1 7 5 11 12 11 5 0 9-2 12-6l7 7c-5 6-12 9-20 9-14 0-23-10-23-24zm36-5c-1-6-5-10-12-10s-11 4-12 10h24z"/>
+        <!-- space then H -->
+        <path d="M148 20h12v28h24V20h12v58h-12V60h-24v18h-12V20z"/>
+        <!-- e -->
+        <path d="M210 62c0-14 10-24 24-24s23 10 23 24v3h-35c1 7 5 11 12 11 5 0 9-2 12-6l7 7c-5 6-12 9-20 9-14 0-23-10-23-24zm36-5c-1-6-5-10-12-10s-11 4-12 10h24z"/>
+        <!-- r -->
+        <path d="M270 40h11v8c3-5 8-9 15-9v11c-9-1-15 4-15 14v14h-11V40z"/>
+        <!-- e -->
+        <path d="M298 62c0-14 10-24 24-24s23 10 23 24v3h-35c1 7 5 11 12 11 5 0 9-2 12-6l7 7c-5 6-12 9-20 9-14 0-23-10-23-24zm36-5c-1-6-5-10-12-10s-11 4-12 10h24z"/>
+        <!-- dot -->
+        <rect x="348" y="66" width="11" height="12" rx="2"/>
+      </g>
+      <!-- cross/plus icon -->
+      <g fill="#AF926A">
+        <rect x="390" y="25" width="10" height="30" rx="3"/>
+        <rect x="378" y="37" width="34" height="10" rx="3"/>
+      </g>
+    </svg>
+  </div>
+  <div class="hdr-title">Liability Waiver</div>
+</header>
+
+<div class="page">
+
+  <!-- Property info banner -->
+  <div class="prop-banner" id="propBanner" style="display:none">
+    <div>
+      <div class="prop-name" id="propName">—</div>
+      <div class="prop-meta" id="propMeta">—</div>
+    </div>
+    <div class="prop-badge">Pre-Arrival</div>
+  </div>
+
+  <!-- Message area -->
+  <div class="msg" id="msg"></div>
+
+  <!-- Form -->
+  <div id="waiverForm">
+
+    <!-- Intro -->
+    <div class="card">
+      <div class="card-title">Before Your Stay</div>
+      <p class="waiver-intro">Please read this waiver carefully and sign at the bottom. By signing, the lead booker confirms they understand and accept these terms on behalf of their entire party. This must be completed before you arrive.</p>
+    </div>
+
+    <!-- Waiver text -->
+    <div class="card">
+      <div class="card-title">Terms &amp; Conditions of Stay</div>
+
+      <div class="waiver-section">
+        <h3>1. Use of the Property</h3>
+        <p>I/we agree to treat the property and its contents with care and respect. I/we understand that we are responsible for any damage caused by members of our party during the stay beyond normal fair wear and tear. Any damage must be reported to Be Here immediately.</p>
+      </div>
+
+      <div class="waiver-section">
+        <h3>2. Hot Tub Use</h3>
+        <p>Where the property includes a hot tub, I/we acknowledge and accept the following:</p>
+        <ul>
+          <li>The hot tub must not be used under the influence of alcohol, drugs, or medications that affect alertness or blood pressure.</li>
+          <li>Children under the age of 5 must not use the hot tub. Children under 16 must be supervised by an adult at all times.</li>
+          <li>Persons with heart conditions, high or low blood pressure, circulatory conditions, skin conditions, or who are pregnant should consult a doctor before using the hot tub.</li>
+          <li>Maximum recommended soak time is 15 minutes. Users should stay hydrated and exit the tub if they feel unwell.</li>
+          <li>No glass, food, or sharp objects in or around the hot tub. Swimwear must be worn at all times.</li>
+          <li>The hot tub cover must be replaced after each use.</li>
+          <li>We accept no liability for any illness, injury, or adverse reaction arising from use of the hot tub.</li>
+        </ul>
+      </div>
+
+      <div class="waiver-section">
+        <h3>3. Supervision of Children</h3>
+        <p>I/we accept full responsibility for the supervision of all children in our party at all times, including around the hot tub, any open water, and all outdoor areas. Be Here accepts no liability for accidents involving unsupervised children.</p>
+      </div>
+
+      <div class="waiver-section">
+        <h3>4. Outdoor Areas &amp; Water</h3>
+        <p>The Cotswold Water Park contains lakes, rivers, and open water areas in and around the estate. I/we understand and accept the associated risks, and accept that Be Here cannot be held responsible for accidents or injury occurring outside the immediate property boundary.</p>
+      </div>
+
+      <div class="waiver-section">
+        <h3>5. Liability</h3>
+        <p>Be Here and its staff accept no liability for personal injury, loss, or damage to personal belongings during your stay, except where such liability cannot be excluded by law. Guests are encouraged to ensure they hold appropriate personal travel and liability insurance.</p>
+      </div>
+
+      <div class="waiver-section">
+        <h3>6. Property Rules</h3>
+        <ul>
+          <li>No smoking inside the property at any time.</li>
+          <li>No pets unless specifically agreed in writing prior to booking.</li>
+          <li>Guest numbers must not exceed the stated maximum occupancy for the property.</li>
+          <li>Noise levels must be kept reasonable, particularly between 10pm and 8am, out of consideration for neighbouring properties.</li>
+          <li>No events, parties, or gatherings beyond the booked guest party without prior written consent.</li>
+        </ul>
+      </div>
+
+      <div class="waiver-section">
+        <h3>7. Data &amp; Privacy</h3>
+        <p>The information provided in this waiver is collected by Be Here for the sole purpose of managing your booking and ensuring the safety of all guests. It is stored securely and will not be shared with third parties. For our full privacy policy please contact us at hello@be-here.travel.</p>
+      </div>
+    </div>
+
+    <!-- Guest details -->
+    <div class="card">
+      <div class="card-title">Lead Booker Details</div>
+      <div class="field">
+        <label>Full Name <span class="req">*</span></label>
+        <input type="text" id="fName" placeholder="Your full name" autocomplete="name">
+      </div>
+      <div class="field">
+        <label>Booking Reference</label>
+        <input type="text" id="fRef" placeholder="e.g. CWPR-12345">
+        <div class="hint">Found in your booking confirmation email.</div>
+      </div>
+    </div>
+
+    <!-- Declaration -->
+    <div class="card">
+      <div class="card-title">Declaration</div>
+      <label class="declaration" id="declLabel">
+        <input type="checkbox" id="fDecl">
+        <span class="declaration-text">
+          <strong>I confirm that I am the lead booker</strong> for this reservation and that I have read, understood, and agree to the above terms on behalf of myself and all members of my party. I acknowledge that these conditions are a requirement of our stay.
+        </span>
+      </label>
+    </div>
+
+    <!-- Signature -->
+    <div class="card">
+      <div class="card-title">Signature <span class="req">*</span></div>
+      <div class="sig-wrap">
+        <canvas id="sigCanvas" height="160"></canvas>
+        <div class="sig-placeholder" id="sigPlaceholder">Sign here with your finger or mouse</div>
+      </div>
+      <div class="sig-actions">
+        <button class="btn-clear" onclick="clearSig()">Clear</button>
+      </div>
+    </div>
+
+    <button class="btn-submit" id="submitBtn" onclick="submitWaiver()">Submit Waiver</button>
+
+  </div><!-- /waiverForm -->
+
+  <!-- Thank you screen -->
+  <div id="thankYou">
+    <div class="ty-icon">✅</div>
+    <h2>Waiver Signed — Thank You</h2>
+    <p>Your liability waiver has been received and linked to your booking. We look forward to welcoming you to <span id="tyProp">the property</span> soon.</p>
+    <div class="ty-ref" id="tyRef"></div>
+  </div>
+
+</div><!-- /page -->
+
+<script>
+// ── Config ────────────────────────────────────────────────
+const API_TOKEN      = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const ARRIVALS_BOARD = 5094453064;
+// Column ID for "Waiver Signed" (date column) on the arrivals board.
+// Add a Date column called "Waiver Signed" to the board and paste its ID here.
+const WAIVER_COL     = 'date_mm2jrjej';
+
+// ── URL params ────────────────────────────────────────────
+const params   = new URLSearchParams(location.search);
+const urlRef   = params.get('booking')  || '';
+const urlName  = params.get('name')     || '';
+const urlProp  = params.get('property') || '';
+const urlDate  = params.get('checkin')  || '';
+
+// ── Init ──────────────────────────────────────────────────
+window.addEventListener('DOMContentLoaded', () => {
+  if (urlName)  document.getElementById('fName').value = decodeURIComponent(urlName);
+  if (urlRef)   document.getElementById('fRef').value  = decodeURIComponent(urlRef);
+
+  if (urlProp || urlDate) {
+    document.getElementById('propBanner').style.display = 'flex';
+    document.getElementById('propName').textContent = decodeURIComponent(urlProp) || 'Your property';
+    if (urlDate) {
+      const d = new Date(urlDate);
+      document.getElementById('propMeta').textContent = 'Check-in: ' + d.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long', year:'numeric' });
+    } else {
+      document.getElementById('propMeta').style.display = 'none';
+    }
+  }
+
+  initSig();
+});
+
+// ── Signature pad ─────────────────────────────────────────
+const canvas = document.getElementById('sigCanvas');
+const ctx    = canvas.getContext('2d');
+let drawing  = false;
+let hasSig   = false;
+
+function initSig() {
+  // Set canvas internal size to match display size
+  const resize = () => {
+    const w = canvas.offsetWidth;
+    canvas.width  = w;
+    canvas.height = 160;
+    ctx.strokeStyle = '#272F2E';
+    ctx.lineWidth   = 2;
+    ctx.lineCap     = 'round';
+    ctx.lineJoin    = 'round';
+  };
+  resize();
+  window.addEventListener('resize', resize);
+
+  const pos = (e) => {
+    const r = canvas.getBoundingClientRect();
+    const t = e.touches ? e.touches[0] : e;
+    return { x: (t.clientX - r.left) * (canvas.width / r.width), y: (t.clientY - r.top) * (canvas.height / r.height) };
+  };
+
+  canvas.addEventListener('mousedown',  e => { drawing = true; ctx.beginPath(); const p = pos(e); ctx.moveTo(p.x, p.y); });
+  canvas.addEventListener('mousemove',  e => { if (!drawing) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); markSigned(); });
+  canvas.addEventListener('mouseup',    () => drawing = false);
+  canvas.addEventListener('mouseleave', () => drawing = false);
+
+  canvas.addEventListener('touchstart', e => { e.preventDefault(); drawing = true; ctx.beginPath(); const p = pos(e); ctx.moveTo(p.x, p.y); }, { passive: false });
+  canvas.addEventListener('touchmove',  e => { e.preventDefault(); if (!drawing) return; const p = pos(e); ctx.lineTo(p.x, p.y); ctx.stroke(); markSigned(); }, { passive: false });
+  canvas.addEventListener('touchend',   () => drawing = false);
+}
+
+function markSigned() {
+  hasSig = true;
+  document.getElementById('sigPlaceholder').classList.add('hide');
+}
+
+function clearSig() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  hasSig = false;
+  document.getElementById('sigPlaceholder').classList.remove('hide');
+}
+
+function sigIsBlank() {
+  const px = ctx.getImageData(0, 0, canvas.width, canvas.height).data;
+  for (let i = 3; i < px.length; i += 4) { if (px[i] > 0) return false; }
+  return true;
+}
+
+// ── Monday API ────────────────────────────────────────────
+async function mq(query) {
+  const r = await fetch('https://api.monday.com/v2', {
+    method:  'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': API_TOKEN, 'API-Version': '2024-01' },
+    body:    JSON.stringify({ query })
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+// ── Submit ────────────────────────────────────────────────
+async function submitWaiver() {
+  const name = document.getElementById('fName').value.trim();
+  const ref  = document.getElementById('fRef').value.trim();
+  const decl = document.getElementById('fDecl').checked;
+
+  const errs = [];
+  if (!name)          errs.push('Please enter your full name.');
+  if (!decl)          errs.push('Please tick the declaration checkbox.');
+  if (sigIsBlank())   errs.push('Please add your signature.');
+  if (errs.length) { showMsg(errs.join(' '), 'error'); return; }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  btn.textContent = 'Submitting…';
+  showMsg('', '');
+
+  try {
+    const today     = new Date().toISOString().split('T')[0];
+    const timestamp = new Date().toLocaleString('en-GB');
+    const sigData   = canvas.toDataURL('image/png');
+    const property  = decodeURIComponent(urlProp) || 'property';
+
+    // 1. Search arrivals board for the booking item
+    let itemId = null;
+    if (ref) {
+      try {
+        // Search by item name containing the booking reference
+        const searchData = await mq(`{
+          items_by_column_values(board_id: ${ARRIVALS_BOARD}, column_id: "name", column_value: "${ref.replace(/"/g,'')}") {
+            id name
+          }
+        }`);
+        const found = searchData?.items_by_column_values || [];
+        if (found.length > 0) itemId = found[0].id;
+      } catch(e) {
+        console.warn('Booking lookup failed:', e);
+      }
+    }
+
+    // 2. If found, add an update (comment) to the booking item with waiver details
+    if (itemId) {
+      try {
+        const updateText = `✅ Waiver signed by ${name} on ${timestamp}. Booking ref: ${ref || 'not provided'}. Signed on behalf of all party members.`;
+        await mq(`mutation {
+          create_update(item_id: ${itemId}, body: "${updateText.replace(/"/g, '\\"')}") { id }
+        }`);
+
+        // 3. Also update the waiver column if it exists (the WAIVER_COL constant above)
+        if (WAIVER_COL) {
+          try {
+            await mq(`mutation {
+              change_column_value(board_id: ${ARRIVALS_BOARD}, item_id: ${itemId}, column_id: "${WAIVER_COL}", value: "${JSON.stringify({date: today}).replace(/"/g, '\\"')}") { id }
+            }`);
+          } catch(e) { console.warn('Waiver column update failed:', e); }
+        }
+      } catch(e) {
+        console.warn('Monday update failed:', e);
+      }
+    }
+
+    // 4. Show thank you screen
+    document.getElementById('waiverForm').style.display = 'none';
+    const ty = document.getElementById('thankYou');
+    document.getElementById('tyProp').textContent = property;
+    document.getElementById('tyRef').textContent  = ref ? `Booking ref: ${ref} · Signed: ${timestamp}` : `Signed: ${timestamp}`;
+    ty.classList.add('show');
+
+  } catch(e) {
+    showMsg('Something went wrong. Please try again or contact us at hello@be-here.travel.', 'error');
+    btn.disabled = false;
+    btn.textContent = 'Submit Waiver';
+  }
+}
+
+function showMsg(text, type) {
+  const el = document.getElementById('msg');
+  el.textContent = text;
+  el.className = 'msg' + (type ? ' ' + type : '');
+  if (text) el.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+}
+</script>
+</body>
+</html>

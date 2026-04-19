@@ -325,6 +325,7 @@
   <div class="tab" onclick="switchTab('laundry', this)">🛏 Laundry Planner</div>
   <div class="tab" onclick="switchTab('overview', this)">📋 Bed Configs (7 days)</div>
   <div class="tab" onclick="switchTab('supplies', this)">📦 Supplies</div>
+  <div class="tab" onclick="switchTab('waivers', this)">📝 Waivers</div>
 </div>
 <!-- CHANGEOVERS TAB -->
 <div class="content active" id="tab-changeovers">
@@ -383,10 +384,17 @@
   </div>
   <div id="suppliesContent"><div class="sup-empty">Loading…</div></div>
 </div>
+<!-- WAIVERS TAB -->
+<div class="content" id="tab-waivers">
+  <div id="waiversContent"><div class="empty"><p>Loading…</p></div></div>
+</div>
 <div class="sup-toast" id="supToast"></div>
 <script>
-const BOARD_ID           = '5094453064';
+const BOARD_ID             = '5094453064';
 const PROP_CONFIG_BOARD_ID = '5094466278';
+// Set this to the column ID of a "Waiver Signed" date column on the arrivals board.
+// Add a Date column called "Waiver Signed" to the board, then paste its ID here.
+const WAIVER_COL_ID        = 'date_mm2jrjej';
 const MONDAY_API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
 const SUP_WRITE_TOKEN  = MONDAY_API_TOKEN;
 const STATUS       = { '0': 'Sent', '1': 'Received', '2': 'Pending', 'none': 'Not Set' };
@@ -412,6 +420,7 @@ function switchTab(tab, el) {
   if (tab === 'overview'    && allItems.length) renderOverview();
   if (tab === 'week'        && allItems.length) renderWeekList();
   if (tab === 'supplies')                       showSuppliesView(supView || 'dashboard');
+  if (tab === 'waivers'  && allItems.length)    renderWaivers();
 }
 function changeDay(delta) {
   const d = new Date(currentDate);
@@ -434,7 +443,7 @@ async function fetchAllItems(token) {
   let items = [], cursor = null;
   do {
     const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
-    const data = await mondayQuery(token, `{ boards(ids: [${BOARD_ID}]) { items_page(limit: 500${cursorPart}) { cursor items { id name column_values(ids: ["date_mm2adtwg","color_mm2aw8fx","text_mm2ahbrx","text_mm2ab56m","numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x"]) { id value } } } } }`);
+    const data = await mondayQuery(token, `{ boards(ids: [${BOARD_ID}]) { items_page(limit: 500${cursorPart}) { cursor items { id name column_values(ids: ["date_mm2adtwg","color_mm2aw8fx","text_mm2ahbrx","text_mm2ab56m","numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x"${WAIVER_COL_ID ? ',"'+WAIVER_COL_ID+'"' : ''}]) { id value } } } } }`);
     const page = data.boards[0].items_page;
     items = items.concat(page.items);
     cursor = page.cursor;
@@ -499,6 +508,7 @@ function parseItem(item) {
     adults:      parseInt(p(cv['numeric_mm2a5s8r'])) || 0,
     children:    parseInt(p(cv['numeric_mm2add81'])) || 0,
     pets:        parseInt(p(cv['numeric_mm2ahz0x'])) || 0,
+    waiverSigned: WAIVER_COL_ID ? (p(cv[WAIVER_COL_ID])?.date || null) : null,
   };
 }
 function localDateStr(d) {
@@ -546,6 +556,83 @@ function renderWeekList() {
   html += '</tbody></table>';
   document.getElementById('weekContent').innerHTML = html;
 }
+// ── Waivers tab ───────────────────────────────────────────
+const WAIVER_BASE_URL = 'waiver.html';
+function renderWaivers() {
+  const today  = new Date(); today.setHours(0,0,0,0);
+  const in14   = new Date(today); in14.setDate(today.getDate() + 14);
+  const todayStr = localDateStr(today), in14Str = localDateStr(in14);
+
+  // Show all arrivals in the next 14 days (or all future if fewer)
+  const parsed = allItems.map(parseItem)
+    .filter(i => i.arrivalDate && i.arrivalDate >= todayStr && i.arrivalDate <= in14Str)
+    .sort((a,b) => a.arrivalDate !== b.arrivalDate ? a.arrivalDate.localeCompare(b.arrivalDate) : a.property.localeCompare(b.property));
+
+  const signed   = parsed.filter(i => i.waiverSigned);
+  const unsigned = parsed.filter(i => !i.waiverSigned);
+
+  let html = `<div style="display:flex;gap:10px;padding:16px;flex-wrap:wrap;">
+    <div style="background:#edf7f2;border:1px solid #a8d5bc;border-radius:10px;padding:12px 20px;min-width:120px;text-align:center;">
+      <div style="font-size:22px;font-weight:700;color:#2d6a4f;">${signed.length}</div>
+      <div style="font-size:11px;font-weight:600;color:#2d6a4f;text-transform:uppercase;letter-spacing:.4px;">Signed</div>
+    </div>
+    <div style="background:#fdf0ec;border:1px solid #f4b8a8;border-radius:10px;padding:12px 20px;min-width:120px;text-align:center;">
+      <div style="font-size:22px;font-weight:700;color:#c0392b;">${unsigned.length}</div>
+      <div style="font-size:11px;font-weight:600;color:#c0392b;text-transform:uppercase;letter-spacing:.4px;">Not Signed</div>
+    </div>
+    <div style="flex:1;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;">
+      <span style="font-size:12px;color:#888;">Next 14 days · ${parsed.length} arrival${parsed.length===1?'':'s'}</span>
+    </div>
+  </div>`;
+
+  if (!parsed.length) {
+    document.getElementById('waiversContent').innerHTML = '<div class="empty"><p>No arrivals in the next 14 days.</p></div>';
+    return;
+  }
+
+  html += `<table style="width:100%;border-collapse:collapse;font-size:13px;">
+    <thead><tr style="background:#f5f4f0;text-align:left;">
+      <th style="padding:8px 12px;font-weight:600;white-space:nowrap;">Check-in</th>
+      <th style="padding:8px 12px;font-weight:600;">Property</th>
+      <th style="padding:8px 12px;font-weight:600;">Guest</th>
+      <th style="padding:8px 12px;font-weight:600;">Party</th>
+      <th style="padding:8px 12px;font-weight:600;">Waiver</th>
+      <th style="padding:8px 12px;font-weight:600;"></th>
+    </tr></thead><tbody>`;
+
+  let lastDate = '';
+  for (const a of parsed) {
+    const dateLabel = a.arrivalDate === lastDate ? '' :
+      new Date(a.arrivalDate + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+    lastDate = a.arrivalDate;
+    const party = [a.adults ? `${a.adults}A` : '', a.children ? `${a.children}C` : '', a.pets ? `🐾${a.pets}` : ''].filter(Boolean).join(' ');
+    const rowBg  = a.arrivalDate === todayStr ? '#fdf5e8' : '';
+
+    let waiverCell, linkCell;
+    if (a.waiverSigned) {
+      const sigDate = new Date(a.waiverSigned).toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+      waiverCell = `<span style="color:#2d6a4f;font-weight:600;">✅ Signed ${sigDate}</span>`;
+      linkCell   = '';
+    } else {
+      waiverCell = `<span style="color:#c0392b;font-weight:600;">⚠ Not signed</span>`;
+      // Build a pre-filled waiver link
+      const waiverLink = `${WAIVER_BASE_URL}?name=${encodeURIComponent(a.name||'')}&property=${encodeURIComponent(a.property||'')}&checkin=${a.arrivalDate}`;
+      linkCell = `<a href="${waiverLink}" target="_blank" style="font-size:12px;color:#AF926A;font-weight:600;text-decoration:none;white-space:nowrap;">Send link ↗</a>`;
+    }
+
+    html += `<tr style="border-bottom:1px solid #eee;${rowBg ? 'background:'+rowBg+';' : ''}">
+      <td style="padding:8px 12px;color:#888;white-space:nowrap;">${dateLabel}</td>
+      <td style="padding:8px 12px;font-weight:600;">${esc(a.property || '—')}</td>
+      <td style="padding:8px 12px;">${esc(a.name || '—')}</td>
+      <td style="padding:8px 12px;color:#666;">${party || '—'}</td>
+      <td style="padding:8px 12px;">${waiverCell}</td>
+      <td style="padding:8px 12px;">${linkCell}</td>
+    </tr>`;
+  }
+  html += '</tbody></table>';
+  document.getElementById('waiversContent').innerHTML = html;
+}
+
 function renderOverview() {
   const today  = new Date(); today.setHours(0,0,0,0);
   const in7    = new Date(today); in7.setDate(today.getDate() + 7);

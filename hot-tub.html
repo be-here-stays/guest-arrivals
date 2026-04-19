@@ -770,13 +770,13 @@ async function submitForm() {
     // Visit label
     const vtLabel = visitType === 'full' ? 'Full Clean' : visitType === 'mid-stay' ? 'Mid-Stay' : 'Mid-Vac';
 
-    // Charging board status (based on water change)
-    const chargeStatusLabel = waterChange === 'full' ? 'Full Drop' : waterChange === 'partial' ? 'Part Drop' : 'Cleaned';
+    // Charging board status (based on water change) — indices: 0=Part Drop, 1=Cleaned, 2=Full Drop
+    const chargeStatusIndex = waterChange === 'full' ? 2 : waterChange === 'partial' ? 0 : 1;
     const waterMaintNum     = waterChange === 'full' ? 2 : waterChange === 'partial' ? 1 : 0;
 
     // Build charging board column values
     const cv = {};
-    cv[CC.status]      = JSON.stringify({ label: chargeStatusLabel });
+    cv[CC.status]      = JSON.stringify({ index: chargeStatusIndex });
     cv[CC.dateCleaned] = JSON.stringify({ date: dateStr, time: timeStr });
     cv[CC.nextClean]   = JSON.stringify({ date: nextCleanStr });
     cv[CC.tester]      = tester;

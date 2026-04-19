@@ -2,7 +2,7 @@
 // Caches app shell for fast loading and offline UI.
 // Monday.com API calls are always fetched from the network.
 
-const CACHE    = 'be-here-v10';
+const CACHE    = 'be-here-v11';
 const PRECACHE = [
   '/guest-arrivals/hub.html',
   '/guest-arrivals/index.html',
@@ -16,6 +16,8 @@ const PRECACHE = [
   '/guest-arrivals/pat-testing.html',
   '/guest-arrivals/hot-tub.html',
   '/guest-arrivals/waiver.html',
+  '/guest-arrivals/linen-returns.html',
+  '/guest-arrivals/linen-stock.html',
   '/guest-arrivals/manifest.json',
   '/guest-arrivals/icon.svg',
   '/guest-arrivals/icon-192.png',

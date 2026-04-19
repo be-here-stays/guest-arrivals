@@ -1,0 +1,299 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Linen Returns — Be Here</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --green: #646955; --green-dark: #272F2E; --green-light: #eaede4;
+      --amber: #AF926A; --red: #B98B73;
+      --text: #1a1a1a; --muted: #888; --border: #e0ddd6;
+      --card: #ffffff; --bg: #D5D0C4;
+    }
+    body {
+      font-family: 'Instrument Sans', system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; padding-bottom: 40px;
+    }
+    #header {
+      height: 52px; background: var(--green-dark);
+      display: flex; align-items: center; padding: 0 20px; gap: 14px;
+    }
+    .back-btn {
+      background: rgba(255,255,255,0.12); border: none; color: #fff;
+      padding: 5px 12px; border-radius: 7px; font-size: 13px;
+      font-family: inherit; cursor: pointer; text-decoration: none;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .back-btn:hover { background: rgba(255,255,255,0.22); }
+    .header-title { color: #fff; font-size: 15px; font-weight: 600; }
+    .header-sub { color: rgba(255,255,255,0.55); font-size: 12px; }
+
+    .page-wrap {
+      max-width: 700px; margin: 24px auto; padding: 0 16px;
+    }
+    .card {
+      background: var(--card); border-radius: 14px;
+      padding: 24px; margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .card-title {
+      font-size: 13px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.6px; color: var(--muted); margin-bottom: 16px;
+    }
+
+    /* Meta row */
+    .meta-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    label { font-size: 12px; font-weight: 600; color: var(--muted);
+            text-transform: uppercase; letter-spacing: 0.4px; display: block; margin-bottom: 5px; }
+    select, input[type="date"], input[type="text"] {
+      width: 100%; padding: 10px 12px; border: 1.5px solid var(--border);
+      border-radius: 9px; font-size: 14px; font-family: inherit;
+      background: #fafaf8; color: var(--text); appearance: none;
+    }
+    select:focus, input:focus {
+      outline: none; border-color: var(--green);
+    }
+
+    /* Item grid */
+    .items-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .item-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 13px; background: var(--green-light);
+      border-radius: 9px; border-left: 3px solid var(--green);
+    }
+    .item-label { font-size: 13px; color: #444; }
+    .item-input {
+      width: 64px; padding: 6px 8px; text-align: center;
+      border: 1.5px solid var(--border); border-radius: 7px;
+      font-size: 16px; font-weight: 700; font-family: inherit;
+      color: var(--green); background: #fff;
+    }
+    .item-input:focus { outline: none; border-color: var(--green); }
+
+    .section-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.7px; color: var(--muted);
+      grid-column: 1 / -1; margin: 8px 0 2px;
+    }
+
+    /* Submit */
+    .submit-btn {
+      width: 100%; padding: 14px; background: var(--green);
+      color: #fff; border: none; border-radius: 10px;
+      font-size: 15px; font-weight: 700; font-family: inherit;
+      cursor: pointer; margin-top: 8px; transition: background 0.15s;
+    }
+    .submit-btn:hover { background: #545943; }
+    .submit-btn:disabled { background: #aaa; cursor: default; }
+
+    /* Toast */
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--green-dark); color: #fff;
+      padding: 12px 24px; border-radius: 10px; font-size: 14px;
+      opacity: 0; transition: opacity 0.3s; pointer-events: none;
+      white-space: nowrap;
+    }
+    #toast.show { opacity: 1; }
+
+    /* History */
+    .history-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
+    .hist-entry {
+      padding: 10px 12px; border-radius: 9px; background: #f5f5f3;
+      margin-bottom: 7px; font-size: 12px; line-height: 1.6;
+    }
+    .hist-header { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
+    .hist-date { color: var(--muted); font-size: 11px; }
+    .hist-items { color: #555; }
+    .hist-delete {
+      float: right; background: none; border: none;
+      color: #ccc; font-size: 14px; cursor: pointer; padding: 0 0 0 8px;
+    }
+    .hist-delete:hover { color: var(--red); }
+
+    @media (max-width: 480px) {
+      .meta-row { grid-template-columns: 1fr; }
+      .items-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <a href="hub.html" class="back-btn">← Hub</a>
+  <div>
+    <div class="header-title">Linen Returns</div>
+    <div class="header-sub">Record linen returned to shelf stock</div>
+  </div>
+</div>
+
+<div class="page-wrap">
+
+  <!-- Entry form -->
+  <div class="card">
+    <div class="card-title">Log a return</div>
+
+    <div class="meta-row">
+      <div>
+        <label for="fProperty">Property</label>
+        <select id="fProperty">
+          <option value="">— select property —</option>
+        </select>
+      </div>
+      <div>
+        <label for="fDate">Date returned</label>
+        <input type="date" id="fDate">
+      </div>
+    </div>
+
+    <div class="items-grid">
+      <div class="section-label">Duvets</div>
+      <div class="item-row"><span class="item-label">Super King Duvets</span><input class="item-input" type="number" id="rSkDuvets" value="0" min="0"></div>
+      <div class="item-row"><span class="item-label">King Duvets</span><input class="item-input" type="number" id="rKingDuvets" value="0" min="0"></div>
+      <div class="item-row"><span class="item-label">Double Duvets</span><input class="item-input" type="number" id="rDoubleDuvets" value="0" min="0"></div>
+      <div class="item-row"><span class="item-label">Single Duvets</span><input class="item-input" type="number" id="rSingleDuvets" value="0" min="0"></div>
+
+      <div class="section-label">Sheets</div>
+      <div class="item-row"><span class="item-label">King Sheets</span><input class="item-input" type="number" id="rKingSheets" value="0" min="0"></div>
+      <div class="item-row"><span class="item-label">Double Sheets</span><input class="item-input" type="number" id="rDoubleSheets" value="0" min="0"></div>
+      <div class="item-row"><span class="item-label">Single Sheets</span><input class="item-input" type="number" id="rSingleSheets" value="0" min="0"></div>
+
+      <div class="section-label">Pillows &amp; Towels</div>
+      <div class="item-row"><span class="item-label">Oxford Pillow Cases</span><input class="item-input" type="number" id="rOxford" value="0" min="0"></div>
+      <div class="item-row"><span class="item-label">Standard Pillow Cases</span><input class="item-input" type="number" id="rStandard" value="0" min="0"></div>
+      <div class="item-row"><span class="item-label">Bath Towels</span><input class="item-input" type="number" id="rBathTowels" value="0" min="0"></div>
+      <div class="item-row"><span class="item-label">Hand Towels</span><input class="item-input" type="number" id="rHandTowels" value="0" min="0"></div>
+      <div class="item-row"><span class="item-label">Hot Tub Towels</span><input class="item-input" type="number" id="rHotTubTowels" value="0" min="0"></div>
+      <div class="item-row"><span class="item-label">Bathrobes</span><input class="item-input" type="number" id="rBathrobes" value="0" min="0"></div>
+      <div class="item-row"><span class="item-label">Tea Towels</span><input class="item-input" type="number" id="rTeaTowels" value="0" min="0"></div>
+      <div class="item-row"><span class="item-label">Bath Mats</span><input class="item-input" type="number" id="rBathMats" value="0" min="0"></div>
+    </div>
+
+    <button class="submit-btn" id="submitBtn" onclick="saveReturn()">Save Return</button>
+  </div>
+
+  <!-- History -->
+  <div class="card">
+    <div class="card-title">Return history (last 30 days)</div>
+    <div id="historyList"></div>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const FIELDS = [
+    ['rSkDuvets','Super King Duvets'],['rKingDuvets','King Duvets'],
+    ['rDoubleDuvets','Double Duvets'],['rSingleDuvets','Single Duvets'],
+    ['rKingSheets','King Sheets'],['rDoubleSheets','Double Sheets'],['rSingleSheets','Single Sheets'],
+    ['rOxford','Oxford Pillow Cases'],['rStandard','Standard Pillow Cases'],
+    ['rBathTowels','Bath Towels'],['rHandTowels','Hand Towels'],
+    ['rHotTubTowels','Hot Tub Towels'],['rBathrobes','Bathrobes'],
+    ['rTeaTowels','Tea Towels'],['rBathMats','Bath Mats'],
+  ];
+
+  // Properties list — sorted; feel free to extend
+  const PROPERTIES = [
+    'Acacia','Alder','Anemone','Apple','Ash','Birch','Bluebell','Bramble',
+    'Cedar','Chestnut','Clover','Cobalt','Cobnut','Columbine','Copper',
+    'Cottage','Cuckoo','Daffodil','Daisy','Dove','Elder','Elm','Fern',
+    'Finch','Foxglove','Goldenrod','Hawthorn','Hazel','Heron','Hideaway',
+    'Holly','Hornbeam','Iris','Ivy','Jasmine','Juniper','Kingfisher',
+    'Larch','Laurel','Lavender','Linden','Lupin','Mallard','Maple',
+    'Meadow','Mistletoe','Mulberry','Nightjar','Oak','Orchid','Otter',
+    'Partridge','Pheasant','Pigeon','Pippin','Plover','Poppy','Primrose',
+    'Robin','Rowan','Sage','Sparrow','Swallow','Swift','Sycamore',
+    'Thyme','Toadflax','Tranquility','Beaver Brook','Violet','Walnut',
+    'Weasel','Willow Herb','Wren','Yarrow','Yew',
+  ].sort();
+
+  // Set today's date
+  const today = new Date().toISOString().split('T')[0];
+  document.getElementById('fDate').value = today;
+
+  // Populate property dropdown
+  const sel = document.getElementById('fProperty');
+  PROPERTIES.forEach(p => {
+    const opt = document.createElement('option'); opt.value = p; opt.textContent = p;
+    sel.appendChild(opt);
+  });
+
+  // Storage helpers
+  function loadReturns() {
+    try { return JSON.parse(localStorage.getItem('linenReturns') || '[]'); }
+    catch { return []; }
+  }
+  function saveReturns(arr) { localStorage.setItem('linenReturns', JSON.stringify(arr)); }
+
+  function saveReturn() {
+    const property = document.getElementById('fProperty').value;
+    if (!property) { showToast('Please select a property'); return; }
+    const date = document.getElementById('fDate').value;
+    if (!date) { showToast('Please set a date'); return; }
+
+    const items = {};
+    let total = 0;
+    FIELDS.forEach(([id, label]) => {
+      const v = parseInt(document.getElementById(id).value) || 0;
+      if (v > 0) { items[id] = { label, qty: v }; total += v; }
+    });
+    if (total === 0) { showToast('No items entered'); return; }
+
+    const returns = loadReturns();
+    returns.unshift({ id: Date.now(), date, property, items });
+    saveReturns(returns);
+
+    showToast(`Saved: ${total} items returned from ${property}`);
+
+    // Reset item counts
+    FIELDS.forEach(([id]) => { document.getElementById(id).value = '0'; });
+    document.getElementById('fProperty').value = '';
+
+    renderHistory();
+  }
+
+  function deleteReturn(id) {
+    const returns = loadReturns().filter(r => r.id !== id);
+    saveReturns(returns);
+    renderHistory();
+  }
+
+  function renderHistory() {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+    const returns = loadReturns().filter(r => new Date(r.date) >= cutoff);
+    const el = document.getElementById('historyList');
+    if (!returns.length) {
+      el.innerHTML = '<div class="history-empty">No returns in the last 30 days</div>';
+      return;
+    }
+    el.innerHTML = returns.map(r => {
+      const itemStr = Object.values(r.items).map(i => `${i.qty} ${i.label}`).join(' · ');
+      const d = new Date(r.date).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+      return `<div class="hist-entry">
+        <button class="hist-delete" onclick="deleteReturn(${r.id})" title="Delete">✕</button>
+        <div class="hist-header">${r.property}</div>
+        <div class="hist-date">${d}</div>
+        <div class="hist-items">${itemStr}</div>
+      </div>`;
+    }).join('');
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  renderHistory();
+</script>
+</body>
+</html>

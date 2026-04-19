@@ -1,0 +1,512 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Linen Stock — Be Here</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --green: #646955; --green-dark: #272F2E; --green-light: #eaede4;
+      --amber: #AF926A; --red: #B98B73;
+      --text: #1a1a1a; --muted: #888; --border: #e0ddd6;
+      --card: #ffffff; --bg: #D5D0C4;
+    }
+    body {
+      font-family: 'Instrument Sans', system-ui, sans-serif;
+      background: var(--bg); color: var(--text);
+      min-height: 100vh; padding-bottom: 40px;
+    }
+    #header {
+      height: 52px; background: var(--green-dark);
+      display: flex; align-items: center; padding: 0 20px; gap: 14px;
+    }
+    .back-btn {
+      background: rgba(255,255,255,0.12); border: none; color: #fff;
+      padding: 5px 12px; border-radius: 7px; font-size: 13px;
+      font-family: inherit; cursor: pointer; text-decoration: none;
+      display: flex; align-items: center; gap: 5px;
+    }
+    .back-btn:hover { background: rgba(255,255,255,0.22); }
+    .header-title { color: #fff; font-size: 15px; font-weight: 600; }
+    .header-sub { color: rgba(255,255,255,0.55); font-size: 12px; }
+
+    .page-wrap { max-width: 700px; margin: 24px auto; padding: 0 16px; }
+
+    .card {
+      background: var(--card); border-radius: 14px;
+      padding: 24px; margin-bottom: 16px;
+      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+    }
+    .card-title {
+      font-size: 13px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.6px; color: var(--muted); margin-bottom: 4px;
+    }
+    .card-sub {
+      font-size: 12px; color: var(--muted); margin-bottom: 18px;
+    }
+
+    .items-grid {
+      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+    }
+    .section-label {
+      font-size: 10px; font-weight: 700; text-transform: uppercase;
+      letter-spacing: 0.7px; color: var(--muted);
+      grid-column: 1 / -1; margin: 8px 0 2px;
+    }
+    .item-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 10px 13px; border-radius: 9px;
+      border-left: 3px solid var(--green); position: relative;
+    }
+    .item-row.ok    { background: var(--green-light); }
+    .item-row.low   { background: #faf3e8; border-left-color: var(--amber); }
+    .item-row.empty { background: #f9ecec; border-left-color: var(--red); }
+
+    .item-label { font-size: 13px; color: #444; }
+    .item-controls {
+      display: flex; align-items: center; gap: 6px;
+    }
+    .qty-btn {
+      width: 28px; height: 28px; border-radius: 7px;
+      border: 1.5px solid var(--border); background: #fff;
+      font-size: 16px; font-weight: 700; cursor: pointer;
+      display: flex; align-items: center; justify-content: center;
+      color: var(--green); transition: background 0.1s;
+    }
+    .qty-btn:hover { background: var(--green-light); }
+    .item-input {
+      width: 56px; padding: 5px 6px; text-align: center;
+      border: 1.5px solid var(--border); border-radius: 7px;
+      font-size: 16px; font-weight: 700; font-family: inherit;
+      color: var(--green); background: #fff;
+    }
+    .item-input:focus { outline: none; border-color: var(--green); }
+    .min-badge {
+      position: absolute; right: 6px; top: 4px;
+      font-size: 9px; color: #bbb; font-weight: 600;
+    }
+
+    /* Minimum config */
+    .min-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .min-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; background: #f7f7f5; border-radius: 9px;
+      border-left: 3px solid #ddd;
+    }
+    .min-label { font-size: 12px; color: #555; }
+    input.min-input {
+      width: 56px; padding: 5px 6px; text-align: center;
+      border: 1.5px solid var(--border); border-radius: 7px;
+      font-size: 14px; font-weight: 700; font-family: inherit;
+      color: #555; background: #fff;
+    }
+    input.min-input:focus { outline: none; border-color: var(--green); }
+
+    .save-btn {
+      width: 100%; padding: 13px; background: var(--green);
+      color: #fff; border: none; border-radius: 10px;
+      font-size: 15px; font-weight: 700; font-family: inherit;
+      cursor: pointer; margin-top: 10px; transition: background 0.15s;
+    }
+    .save-btn:hover { background: #545943; }
+    .save-btn.amber { background: var(--amber); }
+    .save-btn.amber:hover { background: #9a7e56; }
+
+    .last-updated {
+      font-size: 12px; color: var(--muted); text-align: center;
+      margin-top: 10px;
+    }
+
+    /* Summary card */
+    .summary-row {
+      display: flex; align-items: center; gap: 12px;
+      padding: 9px 13px; border-radius: 9px; margin-bottom: 6px;
+      font-size: 13px;
+    }
+    .summary-row.ok    { background: var(--green-light); }
+    .summary-row.low   { background: #faf3e8; }
+    .summary-row.empty { background: #f9ecec; }
+    .summary-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; }
+    .dot-ok    { background: var(--green); }
+    .dot-low   { background: var(--amber); }
+    .dot-empty { background: var(--red); }
+    .summary-label { flex: 1; }
+    .summary-stock { font-weight: 700; }
+    .summary-min { font-size: 11px; color: var(--muted); }
+    .summary-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
+
+    #toast {
+      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+      background: var(--green-dark); color: #fff;
+      padding: 12px 24px; border-radius: 10px; font-size: 14px;
+      opacity: 0; transition: opacity 0.3s; pointer-events: none;
+      white-space: nowrap;
+    }
+    #toast.show { opacity: 1; }
+
+    @media (max-width: 480px) {
+      .items-grid, .min-grid { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <a href="hub.html" class="back-btn">← Hub</a>
+  <div>
+    <div class="header-title">Shelf Stock</div>
+    <div class="header-sub">Record what's currently on the shelf</div>
+  </div>
+</div>
+
+<div class="page-wrap">
+
+  <!-- Current stock status -->
+  <div class="card">
+    <div class="card-title">Current status</div>
+    <div class="card-sub" id="statusSub">No stock count recorded yet</div>
+    <div id="statusList"></div>
+  </div>
+
+  <!-- Stock count form -->
+  <div class="card">
+    <div class="card-title">Update shelf count</div>
+    <div class="card-sub">Count what's physically on the shelf now and save.</div>
+
+    <div class="items-grid" id="stockGrid">
+      <div class="section-label">Duvets</div>
+      <div class="item-row ok" id="row_skDuvets">
+        <span class="item-label">Super King Duvets</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('skDuvets',-1)">−</button>
+          <input class="item-input" type="number" id="skDuvets" value="0" min="0" oninput="updateRow('skDuvets')">
+          <button class="qty-btn" onclick="adj('skDuvets',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_skDuvets"></span>
+      </div>
+      <div class="item-row ok" id="row_kingDuvets">
+        <span class="item-label">King Duvets</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('kingDuvets',-1)">−</button>
+          <input class="item-input" type="number" id="kingDuvets" value="0" min="0" oninput="updateRow('kingDuvets')">
+          <button class="qty-btn" onclick="adj('kingDuvets',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_kingDuvets"></span>
+      </div>
+      <div class="item-row ok" id="row_doubleDuvets">
+        <span class="item-label">Double Duvets</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('doubleDuvets',-1)">−</button>
+          <input class="item-input" type="number" id="doubleDuvets" value="0" min="0" oninput="updateRow('doubleDuvets')">
+          <button class="qty-btn" onclick="adj('doubleDuvets',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_doubleDuvets"></span>
+      </div>
+      <div class="item-row ok" id="row_singleDuvets">
+        <span class="item-label">Single Duvets</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('singleDuvets',-1)">−</button>
+          <input class="item-input" type="number" id="singleDuvets" value="0" min="0" oninput="updateRow('singleDuvets')">
+          <button class="qty-btn" onclick="adj('singleDuvets',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_singleDuvets"></span>
+      </div>
+
+      <div class="section-label">Sheets</div>
+      <div class="item-row ok" id="row_kingSheets">
+        <span class="item-label">King Sheets</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('kingSheets',-1)">−</button>
+          <input class="item-input" type="number" id="kingSheets" value="0" min="0" oninput="updateRow('kingSheets')">
+          <button class="qty-btn" onclick="adj('kingSheets',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_kingSheets"></span>
+      </div>
+      <div class="item-row ok" id="row_doubleSheets">
+        <span class="item-label">Double Sheets</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('doubleSheets',-1)">−</button>
+          <input class="item-input" type="number" id="doubleSheets" value="0" min="0" oninput="updateRow('doubleSheets')">
+          <button class="qty-btn" onclick="adj('doubleSheets',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_doubleSheets"></span>
+      </div>
+      <div class="item-row ok" id="row_singleSheets">
+        <span class="item-label">Single Sheets</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('singleSheets',-1)">−</button>
+          <input class="item-input" type="number" id="singleSheets" value="0" min="0" oninput="updateRow('singleSheets')">
+          <button class="qty-btn" onclick="adj('singleSheets',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_singleSheets"></span>
+      </div>
+
+      <div class="section-label">Pillows &amp; Towels</div>
+      <div class="item-row ok" id="row_oxford">
+        <span class="item-label">Oxford Pillow Cases</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('oxford',-1)">−</button>
+          <input class="item-input" type="number" id="oxford" value="0" min="0" oninput="updateRow('oxford')">
+          <button class="qty-btn" onclick="adj('oxford',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_oxford"></span>
+      </div>
+      <div class="item-row ok" id="row_standard">
+        <span class="item-label">Standard Pillow Cases</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('standard',-1)">−</button>
+          <input class="item-input" type="number" id="standard" value="0" min="0" oninput="updateRow('standard')">
+          <button class="qty-btn" onclick="adj('standard',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_standard"></span>
+      </div>
+      <div class="item-row ok" id="row_bathTowels">
+        <span class="item-label">Bath Towels</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('bathTowels',-1)">−</button>
+          <input class="item-input" type="number" id="bathTowels" value="0" min="0" oninput="updateRow('bathTowels')">
+          <button class="qty-btn" onclick="adj('bathTowels',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_bathTowels"></span>
+      </div>
+      <div class="item-row ok" id="row_handTowels">
+        <span class="item-label">Hand Towels</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('handTowels',-1)">−</button>
+          <input class="item-input" type="number" id="handTowels" value="0" min="0" oninput="updateRow('handTowels')">
+          <button class="qty-btn" onclick="adj('handTowels',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_handTowels"></span>
+      </div>
+      <div class="item-row ok" id="row_hotTubTowels">
+        <span class="item-label">Hot Tub Towels</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('hotTubTowels',-1)">−</button>
+          <input class="item-input" type="number" id="hotTubTowels" value="0" min="0" oninput="updateRow('hotTubTowels')">
+          <button class="qty-btn" onclick="adj('hotTubTowels',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_hotTubTowels"></span>
+      </div>
+      <div class="item-row ok" id="row_bathrobes">
+        <span class="item-label">Bathrobes</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('bathrobes',-1)">−</button>
+          <input class="item-input" type="number" id="bathrobes" value="0" min="0" oninput="updateRow('bathrobes')">
+          <button class="qty-btn" onclick="adj('bathrobes',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_bathrobes"></span>
+      </div>
+      <div class="item-row ok" id="row_teaTowels">
+        <span class="item-label">Tea Towels</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('teaTowels',-1)">−</button>
+          <input class="item-input" type="number" id="teaTowels" value="0" min="0" oninput="updateRow('teaTowels')">
+          <button class="qty-btn" onclick="adj('teaTowels',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_teaTowels"></span>
+      </div>
+      <div class="item-row ok" id="row_bathMats">
+        <span class="item-label">Bath Mats</span>
+        <div class="item-controls">
+          <button class="qty-btn" onclick="adj('bathMats',-1)">−</button>
+          <input class="item-input" type="number" id="bathMats" value="0" min="0" oninput="updateRow('bathMats')">
+          <button class="qty-btn" onclick="adj('bathMats',1)">+</button>
+        </div>
+        <span class="min-badge" id="min_bathMats"></span>
+      </div>
+    </div>
+
+    <button class="save-btn" onclick="saveStock()">Save Shelf Count</button>
+    <div class="last-updated" id="lastUpdated"></div>
+  </div>
+
+  <!-- Minimum levels config -->
+  <div class="card">
+    <div class="card-title">Minimum shelf levels</div>
+    <div class="card-sub">Alert threshold — items below minimum will be flagged.</div>
+    <div class="min-grid" id="minGrid"></div>
+    <button class="save-btn amber" onclick="saveMinimums()" style="margin-top:12px">Save Minimums</button>
+  </div>
+
+</div>
+
+<div id="toast"></div>
+
+<script>
+  const ITEMS = [
+    { id:'skDuvets',     label:'Super King Duvets',    section:'Duvets' },
+    { id:'kingDuvets',   label:'King Duvets',           section:'Duvets' },
+    { id:'doubleDuvets', label:'Double Duvets',         section:'Duvets' },
+    { id:'singleDuvets', label:'Single Duvets',         section:'Duvets' },
+    { id:'kingSheets',   label:'King Sheets',           section:'Sheets' },
+    { id:'doubleSheets', label:'Double Sheets',         section:'Sheets' },
+    { id:'singleSheets', label:'Single Sheets',         section:'Sheets' },
+    { id:'oxford',       label:'Oxford Pillow Cases',   section:'Pillows & Towels' },
+    { id:'standard',     label:'Standard Pillow Cases', section:'Pillows & Towels' },
+    { id:'bathTowels',   label:'Bath Towels',           section:'Pillows & Towels' },
+    { id:'handTowels',   label:'Hand Towels',           section:'Pillows & Towels' },
+    { id:'hotTubTowels', label:'Hot Tub Towels',        section:'Pillows & Towels' },
+    { id:'bathrobes',    label:'Bathrobes',             section:'Pillows & Towels' },
+    { id:'teaTowels',    label:'Tea Towels',            section:'Pillows & Towels' },
+    { id:'bathMats',     label:'Bath Mats',             section:'Pillows & Towels' },
+  ];
+
+  // Default minimums
+  const DEFAULT_MINS = {
+    skDuvets:4, kingDuvets:4, doubleDuvets:6, singleDuvets:8,
+    kingSheets:8, doubleSheets:10, singleSheets:12,
+    oxford:20, standard:20, bathTowels:20, handTowels:20,
+    hotTubTowels:10, bathrobes:10, teaTowels:12, bathMats:12,
+  };
+
+  function loadStock()    { try { return JSON.parse(localStorage.getItem('linenStock') || 'null'); } catch { return null; } }
+  function loadMins()     { try { return JSON.parse(localStorage.getItem('linenMins') || 'null'); }  catch { return null; } }
+  function saveStockData(d){ localStorage.setItem('linenStock', JSON.stringify(d)); }
+  function saveMinsData(d) { localStorage.setItem('linenMins', JSON.stringify(d)); }
+
+  let mins = { ...DEFAULT_MINS, ...(loadMins() || {}) };
+
+  function getStatus(id, qty) {
+    const m = mins[id] || 0;
+    if (qty === 0) return 'empty';
+    if (qty < m)  return 'low';
+    return 'ok';
+  }
+
+  function updateRow(id) {
+    const qty = parseInt(document.getElementById(id)?.value) || 0;
+    const row = document.getElementById('row_' + id);
+    const minEl = document.getElementById('min_' + id);
+    if (!row) return;
+    const st = getStatus(id, qty);
+    row.className = 'item-row ' + st;
+    if (minEl) minEl.textContent = 'min ' + (mins[id] || 0);
+  }
+
+  function adj(id, delta) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    el.value = Math.max(0, (parseInt(el.value) || 0) + delta);
+    updateRow(id);
+  }
+
+  function saveStock() {
+    const data = { ts: Date.now(), items: {} };
+    ITEMS.forEach(item => {
+      data.items[item.id] = parseInt(document.getElementById(item.id)?.value) || 0;
+    });
+    saveStockData(data);
+    showToast('Shelf count saved');
+    renderStatus();
+    updateLastUpdated();
+  }
+
+  function saveMinimums() {
+    ITEMS.forEach(item => {
+      const el = document.getElementById('min_input_' + item.id);
+      if (el) mins[item.id] = parseInt(el.value) || 0;
+    });
+    saveMinsData(mins);
+    // Refresh row colours
+    const stock = loadStock();
+    if (stock) {
+      ITEMS.forEach(item => {
+        const qty = stock.items[item.id] || 0;
+        document.getElementById(item.id).value = qty;
+        updateRow(item.id);
+      });
+    }
+    // Refresh min badges
+    ITEMS.forEach(item => {
+      const el = document.getElementById('min_' + item.id);
+      if (el) el.textContent = 'min ' + (mins[item.id] || 0);
+    });
+    showToast('Minimum levels saved');
+    renderStatus();
+  }
+
+  function buildMinGrid() {
+    const grid = document.getElementById('minGrid');
+    let html = '';
+    let lastSection = '';
+    ITEMS.forEach(item => {
+      if (item.section !== lastSection) {
+        html += `<div class="section-label">${item.section}</div>`;
+        lastSection = item.section;
+      }
+      html += `<div class="min-row">
+        <span class="min-label">${item.label}</span>
+        <input class="min-input" type="number" id="min_input_${item.id}" value="${mins[item.id] || 0}" min="0">
+      </div>`;
+    });
+    grid.innerHTML = html;
+  }
+
+  function renderStatus() {
+    const stock = loadStock();
+    const listEl = document.getElementById('statusList');
+    const subEl  = document.getElementById('statusSub');
+    if (!stock) {
+      subEl.textContent = 'No stock count recorded yet';
+      listEl.innerHTML = '<div class="summary-empty">Save a shelf count to see status here.</div>';
+      return;
+    }
+    const d = new Date(stock.ts).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    subEl.textContent = 'Last counted: ' + d;
+    listEl.innerHTML = ITEMS.map(item => {
+      const qty = stock.items[item.id] || 0;
+      const st  = getStatus(item.id, qty);
+      const min = mins[item.id] || 0;
+      return `<div class="summary-row ${st}">
+        <span class="summary-dot dot-${st}"></span>
+        <span class="summary-label">${item.label}</span>
+        <span class="summary-stock">${qty}</span>
+        <span class="summary-min">/ ${min} min</span>
+      </div>`;
+    }).join('');
+  }
+
+  function updateLastUpdated() {
+    const stock = loadStock();
+    const el = document.getElementById('lastUpdated');
+    if (!stock) { el.textContent = ''; return; }
+    const d = new Date(stock.ts).toLocaleDateString('en-GB',
+      { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    el.textContent = 'Last saved: ' + d;
+  }
+
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 3000);
+  }
+
+  // Init — load saved counts into inputs
+  function init() {
+    const stock = loadStock();
+    if (stock) {
+      ITEMS.forEach(item => {
+        const el = document.getElementById(item.id);
+        if (el) el.value = stock.items[item.id] || 0;
+      });
+    }
+    // Show min badges and colour rows
+    ITEMS.forEach(item => {
+      const qty = parseInt(document.getElementById(item.id)?.value) || 0;
+      const el = document.getElementById('min_' + item.id);
+      if (el) el.textContent = 'min ' + (mins[item.id] || 0);
+      updateRow(item.id);
+    });
+    buildMinGrid();
+    renderStatus();
+    updateLastUpdated();
+  }
+
+  init();
+</script>
+</body>
+</html>

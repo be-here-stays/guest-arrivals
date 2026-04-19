@@ -4,7 +4,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Be Here — Status Board v10</title>
+  <title>Be Here — Status Board v11</title>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -121,10 +121,10 @@
     #main {
       height: calc(100vh - 58px);
       display: grid;
-      grid-template-columns: 1fr 1fr 1fr;
-      grid-template-rows: 1fr 190px;
-      gap: 14px;
-      padding: 14px;
+      grid-template-columns: 1fr 1fr;
+      grid-template-rows: 1fr 1fr 160px;
+      gap: 12px;
+      padding: 12px;
     }
 
     /* ── PANELS ── */
@@ -340,11 +340,15 @@
     }
 
     .laundry-value {
-      font-size: 20px;
+      font-size: 17px;
       font-weight: 700;
       color: var(--green);
       margin-left: 8px;
       flex-shrink: 0;
+    }
+
+    .panel-body.laundry-body {
+      padding: 10px 14px;
     }
 
     .laundry-props {
@@ -402,7 +406,22 @@
       text-transform: uppercase;
       letter-spacing: 0.6px;
       color: var(--green);
-      padding: 6px 0 3px;
+      padding: 4px 0 2px;
+    }
+
+    /* Own laundry panel — amber accent */
+    .own-laundry-panel .laundry-item {
+      background: #faf3e8;
+      border-left-color: var(--amber);
+    }
+    .own-laundry-panel .laundry-value {
+      color: var(--amber);
+    }
+    .own-laundry-panel .laundry-order-label {
+      color: var(--amber);
+    }
+    .own-laundry-panel .laundry-subheader {
+      color: var(--amber);
     }
 
     .laundry-excluded {
@@ -419,6 +438,7 @@
     /* ── BOTTOM PANEL (chart) ── */
     .chart-panel {
       grid-column: 1 / -1;
+      grid-row: 3;
       background: var(--card);
       border-radius: 14px;
       box-shadow: 0 1px 4px rgba(0, 0, 0, 0.06);
@@ -441,12 +461,12 @@
     }
 
     .chart-wrap {
-      height: 170px;
-      padding: 8px 16px;
+      height: 130px;
+      padding: 6px 16px;
     }
 
     .chart-wrap canvas {
-      height: 154px !important;
+      height: 118px !important;
     }
 
     .week-stat {
@@ -592,14 +612,25 @@
       </div>
     </div>
 
-    <!-- Laundry Order panel -->
+    <!-- Regency Laundry panel -->
     <div class="panel">
       <div class="panel-header">
-        <div class="panel-title">Laundry Order</div>
+        <div class="panel-title">Regency Order</div>
         <div class="panel-date" id="laundryDeliveryDate">—</div>
         <div class="laundry-header-sub" id="laundryCoversDates"></div>
       </div>
-      <div class="panel-body" id="laundryBody">
+      <div class="panel-body laundry-body" id="regencyLaundryBody">
+        <div class="empty-state">Loading…</div>
+      </div>
+    </div>
+
+    <!-- Own Laundry panel -->
+    <div class="panel own-laundry-panel">
+      <div class="panel-header">
+        <div class="panel-title">Own Laundry</div>
+        <div class="panel-date" style="font-size:13px;color:var(--muted)">Hideaway · Tranquility · Beaver Brook</div>
+      </div>
+      <div class="panel-body laundry-body" id="ownLaundryBody">
         <div class="empty-state">Loading…</div>
       </div>
     </div>
@@ -1119,9 +1150,10 @@
           </div>`;
       }
 
-      // ── PAST — summary strip ──
+      // ── PAST — summary strip (Regency only) ──
       const pastL = winLabel(past);
       const pastIsToday = localDateStr(past.deliveryDate) === localDateStr(today);
+      const pastRegency = calcLaundry(pastArrivals).regency;
       const pastHTML = `
     <div class="laundry-section">
       <div class="laundry-section-label">Last order${pastIsToday ? ' — placed today' : ''}</div>
@@ -1151,38 +1183,40 @@
     </div>`;
       }
 
-      // Build excluded/not-supplied notice
-      const allExcluded = [...curSplit.excluded, ...curSplit.notSupplied];
-      const excludedNotice = allExcluded.length
-        ? `<div class="laundry-excluded">Not ordering: ${allExcluded.join(', ')}</div>`
-        : '';
-
-      const regencyBlock    = renderOrderBlock('Regency order', curSplit.regency,    curSplit.regency.arrivals,    hasUnconfirmed, '');
-      const ownLaundryBlock = renderOrderBlock('Own laundry',   curSplit.ownLaundry, curSplit.ownLaundry.arrivals, hasUnconfirmed, 'color:var(--amber)');
-
-      const noOrders = !curSplit.regency.arrivals.length && !curSplit.ownLaundry.arrivals.length;
-
-      const currentHTML = `
-    <div class="laundry-section">
-      <div class="laundry-section-label">Order now</div>
-      ${noOrders && !allExcluded.length
-          ? '<div style="padding:6px 0 8px;font-size:13px;color:#bbb;text-align:center;">No arrivals in this window</div>'
-          : `${regencyBlock}${ownLaundryBlock}${excludedNotice}`
-        }
-    </div>`;
-
       // ── NEXT — compact strip ──
       const nextL = winLabel(next);
+      const nextSummary = summaryLine(nextArrivals);
       const nextHTML = `
     <div class="laundry-next">
       <div>
         <div class="laundry-next-label">Next: ${nextL.delivery}</div>
         <div style="font-size:11px;color:var(--muted)">covers ${nextL.covers}</div>
       </div>
-      <div class="laundry-next-detail">${summaryLine(nextArrivals)}</div>
+      <div class="laundry-next-detail">${nextSummary}</div>
     </div>`;
 
-      document.getElementById('laundryBody').innerHTML = pastHTML + currentHTML + nextHTML;
+      // ── REGENCY PANEL ──
+      const allExcluded = [...curSplit.excluded, ...curSplit.notSupplied];
+      const excludedNotice = allExcluded.length
+        ? `<div class="laundry-excluded">Not ordering: ${allExcluded.join(', ')}</div>`
+        : '';
+
+      let regencyContent;
+      if (!curSplit.regency.arrivals.length && !allExcluded.length) {
+        regencyContent = '<div class="empty-state" style="height:auto;padding:16px 0;">No Regency arrivals this window</div>';
+      } else {
+        regencyContent = renderOrderBlock('', curSplit.regency, curSplit.regency.arrivals, hasUnconfirmed, '') + excludedNotice;
+      }
+      document.getElementById('regencyLaundryBody').innerHTML = pastHTML + regencyContent + nextHTML;
+
+      // ── OWN LAUNDRY PANEL ──
+      let ownContent;
+      if (!curSplit.ownLaundry.arrivals.length) {
+        ownContent = '<div class="empty-state" style="height:auto;padding:16px 0;">No arrivals this window</div>';
+      } else {
+        ownContent = renderOrderBlock('', curSplit.ownLaundry, curSplit.ownLaundry.arrivals, hasUnconfirmed, '');
+      }
+      document.getElementById('ownLaundryBody').innerHTML = ownContent;
     }
 
     function renderAll() {

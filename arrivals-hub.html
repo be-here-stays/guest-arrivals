@@ -560,12 +560,11 @@ function renderWeekList() {
 const WAIVER_BASE_URL = 'waiver.html';
 function renderWaivers() {
   const today  = new Date(); today.setHours(0,0,0,0);
-  const in14   = new Date(today); in14.setDate(today.getDate() + 14);
-  const todayStr = localDateStr(today), in14Str = localDateStr(in14);
+  const in7    = new Date(today); in7.setDate(today.getDate() + 7);
+  const todayStr = localDateStr(today), in7Str = localDateStr(in7);
 
-  // Show all arrivals in the next 14 days (or all future if fewer)
   const parsed = allItems.map(parseItem)
-    .filter(i => i.arrivalDate && i.arrivalDate >= todayStr && i.arrivalDate <= in14Str)
+    .filter(i => i.arrivalDate && i.arrivalDate >= todayStr && i.arrivalDate <= in7Str)
     .sort((a,b) => a.arrivalDate !== b.arrivalDate ? a.arrivalDate.localeCompare(b.arrivalDate) : a.property.localeCompare(b.property));
 
   const signed   = parsed.filter(i => i.waiverSigned);
@@ -581,12 +580,12 @@ function renderWaivers() {
       <div style="font-size:11px;font-weight:600;color:#c0392b;text-transform:uppercase;letter-spacing:.4px;">Not Signed</div>
     </div>
     <div style="flex:1;display:flex;align-items:center;justify-content:flex-end;padding-right:4px;">
-      <span style="font-size:12px;color:#888;">Next 14 days · ${parsed.length} arrival${parsed.length===1?'':'s'}</span>
+      <span style="font-size:12px;color:#888;">Next 7 days · ${parsed.length} arrival${parsed.length===1?'':'s'}</span>
     </div>
   </div>`;
 
   if (!parsed.length) {
-    document.getElementById('waiversContent').innerHTML = '<div class="empty"><p>No arrivals in the next 14 days.</p></div>';
+    document.getElementById('waiversContent').innerHTML = '<div class="empty"><p>No arrivals in the next 7 days.</p></div>';
     return;
   }
 
@@ -615,8 +614,8 @@ function renderWaivers() {
       linkCell   = '';
     } else {
       waiverCell = `<span style="color:#c0392b;font-weight:600;">⚠ Not signed</span>`;
-      // Build a pre-filled waiver link
-      const waiverLink = `${WAIVER_BASE_URL}?name=${encodeURIComponent(a.name||'')}&property=${encodeURIComponent(a.property||'')}&checkin=${a.arrivalDate}`;
+      // Build a pre-filled waiver link — use Monday item ID as booking reference
+      const waiverLink = `${WAIVER_BASE_URL}?booking=${a.id}&name=${encodeURIComponent(a.name||'')}&property=${encodeURIComponent(a.property||'')}&checkin=${a.arrivalDate}`;
       linkCell = `<a href="${waiverLink}" target="_blank" style="font-size:12px;color:#AF926A;font-weight:600;text-decoration:none;white-space:nowrap;">Send link ↗</a>`;
     }
 

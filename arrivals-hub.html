@@ -712,17 +712,17 @@ function renderLaundry() {
     const fixedBeds = a.bedConfig || cfg.fixedBeds || 'Unknown';
     const bedOptions = cfg.bedOptions || [];
     const hasOptions = bedOptions.length > 0;
-    const confirmed  = a.formStatus === '1' && a.bedConfig;
+    const confirmed  = !!(a.bedConfig && a.bedConfig.trim());
     countBeds(fixedBeds);
     const partyParts = [];
     if (a.adults)   partyParts.push(`👤 ${a.adults} adult${a.adults>1?'s':''}`);
     if (a.children) partyParts.push(`🧒 ${a.children}`);
     if (a.pets)     partyParts.push(`🐾 ${a.pets}`);
-    cards += `<div class="property-card ${STATUS_CLASS[a.formStatus]}"><div class="prop-name">${a.property}</div><div class="guest-name">${a.name || '—'}</div>${partyParts.length ? `<div class="party">${partyParts.map(p=>`<span>${p}</span>`).join('')}</div>` : ''}<div class="beds-label">${confirmed ? 'Confirmed Beds' : (hasOptions ? 'Fixed Beds (choice pending)' : 'Fixed Beds')}</div><div class="beds">${formatBeds(fixedBeds)}</div>${hasOptions && !confirmed ? `<div class="bed-options">Guest chooses from: ${bedOptions.join(' · ')}</div>` : ''}<span class="status-badge ${BADGE_CLASS[a.formStatus]}">${STATUS[a.formStatus]}</span></div>`;
+    cards += `<div class="property-card ${STATUS_CLASS[a.formStatus]}"><div class="prop-name">${a.property}</div><div class="guest-name">${a.name || '—'}</div>${partyParts.length ? `<div class="party">${partyParts.map(p=>`<span>${p}</span>`).join('')}</div>` : ''}<div class="beds-label">${confirmed ? '✓ Confirmed Beds' : (hasOptions ? 'Choice pending' : 'Fixed only')}</div><div class="beds">${formatBeds(fixedBeds)}</div>${hasOptions && !confirmed ? `<div class="bed-options">Guest chooses from: ${bedOptions.join(' · ')}</div>` : ''}<span class="status-badge ${BADGE_CLASS[a.formStatus]}">${STATUS[a.formStatus]}</span></div>`;
   }
   const totalCounts = Object.entries(bedTotals).filter(([,v])=>v>0);
   const bedSummaryHtml = totalCounts.length > 0 ? totalCounts.map(([t,c])=>`<div class="bed-total"><div class="count">${c}</div><div class="type">${t}</div></div>`).join('') : '<p style="color:#aaa;font-size:13px">Unable to calculate — check bed configs</p>';
-  document.getElementById('laundryContent').innerHTML = `<div style="margin-bottom:16px;font-size:14px;color:#666;">${dateStr} · <strong>${arrivals.length}</strong> propert${arrivals.length===1?'y':'ies'} arriving</div><div class="laundry-grid">${cards}</div><div class="beds-summary"><h3>Bed Totals for ${dayName}</h3><div class="bed-totals">${bedSummaryHtml}</div><p style="font-size:11px;color:#bbb;margin-top:12px;">* Fixed beds only. Totals update once forms received.</p></div>`;
+  document.getElementById('laundryContent').innerHTML = `<div style="margin-bottom:16px;font-size:14px;color:#666;">${dateStr} · <strong>${arrivals.length}</strong> propert${arrivals.length===1?'y':'ies'} arriving</div><div class="laundry-grid">${cards}</div><div class="beds-summary"><h3>Bed Totals for ${dayName}</h3><div class="bed-totals">${bedSummaryHtml}</div><p style="font-size:11px;color:#bbb;margin-top:12px;">* Unconfirmed properties use fixed beds + all-doubles assumption.</p></div>`;
 }
 window.addEventListener('DOMContentLoaded', loadAll);
 // ════════════════════════════════════════════════════════════

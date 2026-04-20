@@ -248,6 +248,11 @@
       color: #bbb;
       font-style: italic;
     }
+    .arr-opts-confirmed {
+      color: #2d6a4f;
+      font-style: normal;
+      font-weight: 600;
+    }
 
     .status-dot {
       width: 9px;
@@ -806,7 +811,8 @@
       const fixedBeds = a.bedConfig || cfg.fixedBeds || '';
       const bedOptions = cfg.bedOptions || [];
       const hasOptions = bedOptions.length > 0;
-      const confirmed = a.formStatus === '1';
+      // Bed config is confirmed if explicitly set (guest services or guest form)
+      const bedConfirmed = !!(a.bedConfig && a.bedConfig.trim());
       const bedStr = formatBeds(fixedBeds);
 
       const party = [];
@@ -814,12 +820,18 @@
       if (a.children) party.push(`${a.children}C`);
       if (a.pets) party.push(`${a.pets}P`);
 
+      const bedLabel = hasOptions
+        ? (bedConfirmed
+            ? ' <span class="arr-opts arr-opts-confirmed">✓ confirmed</span>'
+            : ' <span class="arr-opts">(choice pending)</span>')
+        : ' <span class="arr-opts">Fixed only</span>';
+
       return `<div class="arrival-row ${statusClass(a.formStatus)}">
     <div class="status-dot ${dotClass(a.formStatus)}"></div>
     <div class="arr-prop">${a.property}</div>
     <div class="arr-guest">${a.name || '—'}</div>
     ${party.length ? `<div class="arr-party">${party.join(' · ')}</div>` : ''}
-    ${showBeds && bedStr ? `<div class="arr-beds">${bedStr}${hasOptions && !confirmed ? ' <span class="arr-opts">(choice pending)</span>' : ''}</div>` : ''}
+    ${showBeds && bedStr ? `<div class="arr-beds">${bedStr}${bedLabel}</div>` : ''}
   </div>`;
     }
 
@@ -916,28 +928,30 @@
     }
 
     // Return the effective bed counts for a single arrival.
-    // If the guest has made a choice (bedConfig set) → use that for the configurable part.
-    // If no choice yet → default to the all-singles option (most single beds) from bedOptions.
-    // Fixed beds (fixedBeds) are always added on top.
+    // If bedConfig is confirmed (set by guest form or guest services) → use it as the
+    // COMPLETE bed picture for the property (fixed + configurable combined).
+    // If not confirmed → fixed beds + assume all configurable beds zipped up (fewest singles).
     function getArrivalBedCounts(arrival) {
       const cfg = propConfigs[arrival.property] || {};
       const hasOptions = cfg.bedOptions && cfg.bedOptions.length > 0;
       const fixed = parseBedString(cfg.fixedBeds || '');
 
-      if (!hasOptions) return fixed; // fixed-only property
-
-      let configurable = { superKing: 0, king: 0, double: 0, single: 0 };
+      // Confirmed config: treat as the total bed count for this stay
       if (arrival.bedConfig && arrival.bedConfig.trim()) {
-        configurable = parseBedString(arrival.bedConfig);
-      } else {
-        // Default to all-singles: pick the option with the most single beds
-        let bestSingle = -1;
-        for (const opt of cfg.bedOptions) {
-          const c = parseBedString(opt);
-          if (c.single > bestSingle) { bestSingle = c.single; configurable = c; }
-        }
+        return parseBedString(arrival.bedConfig);
       }
 
+      // No confirmed config — fixed-only property
+      if (!hasOptions) return fixed;
+
+      // No confirmed config — assume all configurable beds zipped up as doubles/superkings
+      // (fewest singles = adults-first assumption)
+      let configurable = { superKing: 0, king: 0, double: 0, single: 0 };
+      let fewestSingles = Infinity;
+      for (const opt of cfg.bedOptions) {
+        const c = parseBedString(opt);
+        if (c.single < fewestSingles) { fewestSingles = c.single; configurable = c; }
+      }
       return {
         superKing: fixed.superKing + configurable.superKing,
         king: fixed.king + configurable.king,
@@ -1232,7 +1246,7 @@
       document.getElementById('todayDate').textContent = today.toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
       document.getElementById('todayCount').textContent = todayArr.length ? `${todayArr.length} propert${todayArr.length === 1 ? 'y' : 'ies'}` : '';
       document.getElementById('todayBody').innerHTML = todayArr.length
-        ? todayArr.map(a => arrivalCard(a, false)).join('')
+        ? todayArr.map(a => arrivalCard(a, true)).join('')
         : '<div class="empty-state">No arrivals today</div>';
 
       // Tomorrow

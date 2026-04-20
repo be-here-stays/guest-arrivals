@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bed Config Updater — Be Here</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+           background: #f5f4f0; color: #1a1a1a; padding: 32px 20px; }
+    .wrap { max-width: 900px; margin: 0 auto; }
+    h1 { font-size: 20px; font-weight: 700; color: #272F2E; margin-bottom: 6px; }
+    .sub { font-size: 13px; color: #888; margin-bottom: 24px; }
+    .card { background: #fff; border-radius: 12px; padding: 20px 24px;
+            margin-bottom: 16px; box-shadow: 0 1px 4px rgba(0,0,0,.07); }
+    .card h2 { font-size: 11px; font-weight: 700; text-transform: uppercase;
+               letter-spacing: .6px; color: #999; margin-bottom: 14px; }
+    .drop-zone {
+      border: 2px dashed #d0cec8; border-radius: 10px; padding: 40px 20px;
+      text-align: center; cursor: pointer; transition: all .2s; color: #888;
+      font-size: 14px;
+    }
+    .drop-zone:hover, .drop-zone.drag-over { border-color: #646955; background: #f9f8f4; color: #444; }
+    .drop-zone input { display: none; }
+    .drop-icon { font-size: 32px; margin-bottom: 10px; }
+    .btn { padding: 11px 24px; border: none; border-radius: 9px; font-size: 14px;
+           font-weight: 700; cursor: pointer; font-family: inherit; transition: background .15s; }
+    .btn-go   { background: #272F2E; color: #fff; }
+    .btn-go:hover { background: #3a4544; }
+    .btn-go:disabled { background: #aaa; cursor: default; }
+    .btn-secondary { background: #f0eeea; color: #444; margin-left: 10px; }
+    .btn-secondary:hover { background: #e8e5df; }
+    .progress { margin-top: 16px; }
+    .bar-wrap { background: #eee; border-radius: 6px; height: 8px; margin-bottom: 8px; }
+    .bar      { background: #646955; height: 8px; border-radius: 6px; width: 0;
+                transition: width .3s; }
+    .prog-txt  { font-size: 13px; color: #555; }
+    table { width: 100%; border-collapse: collapse; font-size: 12px; }
+    th { background: #f5f4f0; padding: 8px 10px; text-align: left; font-weight: 600;
+         color: #666; text-transform: uppercase; letter-spacing: .4px; font-size: 10px; }
+    td { padding: 7px 10px; border-bottom: 1px solid #f0eeea; vertical-align: top; }
+    tr:last-child td { border-bottom: none; }
+    .tag { display: inline-block; padding: 2px 8px; border-radius: 5px;
+           font-size: 10px; font-weight: 700; }
+    .tag-ok       { background: #edf7f2; color: #2d6a4f; }
+    .tag-skip     { background: #f5f5f5; color: #aaa; }
+    .tag-error    { background: #fdf0ec; color: #c0392b; }
+    .tag-notfound { background: #fff0f5; color: #c0392b; }
+    .tag-no-config { background: #f5f5f5; color: #999; }
+    .summary { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 12px; }
+    .sum-box { background: #f5f4f0; border-radius: 8px; padding: 10px 16px; min-width: 100px; }
+    .sum-num { font-size: 26px; font-weight: 700; }
+    .sum-lbl { font-size: 11px; color: #888; margin-top: 2px; }
+    .sum-green { color: #2d6a4f; }
+    .sum-amber { color: #AF926A; }
+    .sum-red   { color: #c0392b; }
+    .sum-grey  { color: #999; }
+    .note { font-size: 12px; color: #888; font-style: italic; }
+    .parsed-note { font-size: 11px; color: #888; }
+  </style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Bed Config Updater</h1>
+  <p class="sub">Drop a Guesty CSV export — it finds bed configs in the GENERAL NOTES and writes them to Monday</p>
+
+  <!-- Step 1: File upload -->
+  <div class="card" id="uploadCard">
+    <h2>Step 1 — Drop your Guesty CSV export</h2>
+    <div class="drop-zone" id="dropZone" onclick="document.getElementById('fileInput').click()">
+      <div class="drop-icon">📂</div>
+      <div>Drop CSV file here, or click to browse</div>
+      <div style="font-size:11px;margin-top:6px;color:#bbb">Expects columns: CONFIRMATION CODE · GENERAL NOTES · LISTING'S NICKNAME · GUEST · CHECK-IN</div>
+      <input type="file" id="fileInput" accept=".csv,.txt">
+    </div>
+  </div>
+
+  <!-- Step 2: Preview -->
+  <div class="card" id="previewCard" style="display:none">
+    <h2>Step 2 — Review parsed configs</h2>
+    <p class="note" style="margin-bottom:14px" id="previewSub"></p>
+    <div class="summary" id="previewSummary" style="margin-bottom:18px"></div>
+    <table>
+      <thead>
+        <tr><th>Date</th><th>Property</th><th>Guest</th><th>Raw note</th><th>Config found</th></tr>
+      </thead>
+      <tbody id="previewBody"></tbody>
+    </table>
+    <div style="margin-top:18px">
+      <button class="btn btn-go" id="runBtn" onclick="runUpdate()">Write to Monday</button>
+      <button class="btn btn-secondary" onclick="reset()">Start over</button>
+    </div>
+    <div class="progress" id="progressArea" style="display:none;margin-top:16px">
+      <div class="bar-wrap"><div class="bar" id="bar"></div></div>
+      <div class="prog-txt" id="progTxt">Starting…</div>
+    </div>
+  </div>
+
+  <!-- Step 3: Results -->
+  <div class="card" id="resultsCard" style="display:none">
+    <h2>Results</h2>
+    <div class="summary" id="summaryBoxes"></div>
+    <table style="margin-top:18px">
+      <thead>
+        <tr><th>Date</th><th>Property</th><th>Guest</th><th>Config written</th><th>Status</th></tr>
+      </thead>
+      <tbody id="resultsBody"></tbody>
+    </table>
+    <div style="margin-top:18px">
+      <button class="btn btn-secondary" onclick="reset()">Load another file</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const BOARD  = 5094453064;
+const BED_COL = 'text_mm2ab56m';
+const REF_COL = 'text_mm2ah8s';
+
+let parsedBookings = []; // bookings that have a config to write
+
+// ── CSV parsing ───────────────────────────────────────────────────────────────
+
+function parseCSV(text) {
+  const lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n');
+  const rows = [];
+  for (const line of lines) {
+    if (!line.trim()) continue;
+    rows.push(splitCSVLine(line));
+  }
+  return rows;
+}
+
+function splitCSVLine(line) {
+  const result = [];
+  let cur = '', inQuote = false;
+  for (let i = 0; i < line.length; i++) {
+    const c = line[i];
+    if (c === '"') {
+      if (inQuote && line[i+1] === '"') { cur += '"'; i++; }
+      else inQuote = !inQuote;
+    } else if (c === ',' && !inQuote) {
+      result.push(cur.trim()); cur = '';
+    } else {
+      cur += c;
+    }
+  }
+  result.push(cur.trim());
+  return result;
+}
+
+// ── Bed config extraction from GENERAL NOTES ─────────────────────────────────
+
+function extractBedConfig(note) {
+  if (!note || !note.trim()) return null;
+  const n = note.trim();
+
+  // Look for patterns like: 1SK, 2K, 3D, 4S  or  1 Superking, 2 King  etc.
+  const bedMap = {
+    superking: /\b(\d+)\s*(?:superking|super\s*king|sk)\b/gi,
+    king:      /\b(\d+)\s*king\b(?!\s*size)/gi,  // "king" not followed by "size"
+    double:    /\b(\d+)\s*(?:double|d)\b/gi,
+    single:    /\b(\d+)\s*(?:single|s)\b/gi,
+  };
+
+  // Also handle shorthand-only lines like "1SK 2K" or "2K 1D 4S"
+  const shorthand = /\b(\d+)(SK|K|D|S)\b/gi;
+
+  // Only treat as a config if the note looks like it contains bed info
+  // Must have at least one bed type match
+  let superking = 0, king = 0, double_ = 0, single = 0;
+  let found = false;
+
+  // Try full-word matching first
+  let m;
+  const tmp = n;
+
+  const rSK = /\b(\d+)\s*(?:superking|super\s*king|sk)\b/gi;
+  while ((m = rSK.exec(tmp)) !== null) { superking += parseInt(m[1]); found = true; }
+
+  const rK = /\b(\d+)\s*king\b/gi;
+  while ((m = rK.exec(tmp)) !== null) { king += parseInt(m[1]); found = true; }
+
+  const rD = /\b(\d+)\s*double\b/gi;
+  while ((m = rD.exec(tmp)) !== null) { double_ += parseInt(m[1]); found = true; }
+
+  const rS = /\b(\d+)\s*single\b/gi;
+  while ((m = rS.exec(tmp)) !== null) { single += parseInt(m[1]); found = true; }
+
+  // If nothing found yet, try shorthand (only if the whole note looks like a config line)
+  if (!found) {
+    // Only parse shorthand if the note looks like a bed config (mostly numbers and letters)
+    const stripped = tmp.replace(/[\d\s,&+]+/g, '').replace(/SK|King|K|Double|D|Single|S/gi, '').trim();
+    if (stripped.length < 10) { // very short remaining text = likely a config-only note
+      const rSh = /\b(\d+)(SK|K|D|S)\b/gi;
+      while ((m = rSh.exec(tmp)) !== null) {
+        const count = parseInt(m[1]);
+        const type = m[2].toUpperCase();
+        if (type === 'SK') superking += count;
+        else if (type === 'K') king += count;
+        else if (type === 'D') double_ += count;
+        else if (type === 'S') single += count;
+        found = true;
+      }
+    }
+  }
+
+  if (!found) return null;
+
+  // Build config string
+  const parts = [];
+  if (superking) parts.push(`${superking} Superking`);
+  if (king)      parts.push(`${king} King`);
+  if (double_)   parts.push(`${double_} Double`);
+  if (single)    parts.push(`${single} Single`);
+  return parts.length ? parts.join(' ') : null;
+}
+
+// ── File handling ─────────────────────────────────────────────────────────────
+
+function reset() {
+  document.getElementById('uploadCard').style.display = 'block';
+  document.getElementById('previewCard').style.display = 'none';
+  document.getElementById('resultsCard').style.display = 'none';
+  document.getElementById('fileInput').value = '';
+  parsedBookings = [];
+}
+
+function handleFile(file) {
+  const reader = new FileReader();
+  reader.onload = e => processCSV(e.target.result);
+  reader.readAsText(file);
+}
+
+function processCSV(text) {
+  const rows = parseCSV(text);
+  if (rows.length < 2) { alert('Could not read CSV — is this the right file?'); return; }
+
+  const headers = rows[0].map(h => h.toUpperCase().trim());
+  const col = name => headers.indexOf(name);
+
+  const idxRef   = col('CONFIRMATION CODE');
+  const idxNotes = col('GENERAL NOTES');
+  const idxProp  = col("LISTING'S NICKNAME");
+  const idxGuest = col('GUEST');
+  const idxDate  = col('CHECK-IN');
+
+  if (idxRef === -1 || idxNotes === -1) {
+    alert(`Missing required columns.\nFound: ${headers.join(', ')}\n\nExpected: CONFIRMATION CODE and GENERAL NOTES`);
+    return;
+  }
+
+  const all = [];
+  for (let i = 1; i < rows.length; i++) {
+    const row = rows[i];
+    if (!row[idxRef]) continue;
+    const note   = idxNotes >= 0  ? (row[idxNotes] || '') : '';
+    const config = extractBedConfig(note);
+    all.push({
+      code:  row[idxRef]  || '',
+      prop:  idxProp >= 0 ? (row[idxProp]  || '') : '',
+      guest: idxGuest >= 0? (row[idxGuest] || '') : '',
+      date:  idxDate >= 0 ? (row[idxDate]  || '') : '',
+      note,
+      config,
+    });
+  }
+
+  parsedBookings = all.filter(b => b.config);
+  const noConfig = all.length - parsedBookings.length;
+
+  // Render preview
+  document.getElementById('uploadCard').style.display = 'none';
+  document.getElementById('previewCard').style.display = 'block';
+  document.getElementById('previewSub').textContent =
+    `${all.length} bookings in file — ${parsedBookings.length} have a bed config in GENERAL NOTES, ${noConfig} do not (skipped).`;
+
+  document.getElementById('previewSummary').innerHTML = `
+    <div class="sum-box"><div class="sum-num sum-green">${parsedBookings.length}</div><div class="sum-lbl">Will write</div></div>
+    <div class="sum-box"><div class="sum-num sum-grey">${noConfig}</div><div class="sum-lbl">No config (skip)</div></div>
+  `;
+
+  document.getElementById('previewBody').innerHTML = all.map(b => `
+    <tr>
+      <td>${b.date}</td>
+      <td>${b.prop}</td>
+      <td>${b.guest}</td>
+      <td class="parsed-note">${b.note ? b.note.substring(0, 60) + (b.note.length > 60 ? '…' : '') : '<em style="color:#ccc">—</em>'}</td>
+      <td>${b.config
+        ? `<span class="tag tag-ok" style="font-size:11px">${b.config}</span>`
+        : `<span class="tag tag-no-config">no config</span>`}</td>
+    </tr>
+  `).join('');
+}
+
+// ── Drag & drop ───────────────────────────────────────────────────────────────
+
+const dz = document.getElementById('dropZone');
+dz.addEventListener('dragover', e => { e.preventDefault(); dz.classList.add('drag-over'); });
+dz.addEventListener('dragleave', () => dz.classList.remove('drag-over'));
+dz.addEventListener('drop', e => {
+  e.preventDefault(); dz.classList.remove('drag-over');
+  if (e.dataTransfer.files[0]) handleFile(e.dataTransfer.files[0]);
+});
+document.getElementById('fileInput').addEventListener('change', e => {
+  if (e.target.files[0]) handleFile(e.target.files[0]);
+});
+
+// ── Monday API ────────────────────────────────────────────────────────────────
+
+async function mq(query) {
+  const r = await fetch('https://api.monday.com/v2', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': TOKEN, 'API-Version': '2024-01' },
+    body: JSON.stringify({ query })
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+async function findItemByRef(ref) {
+  const safe = ref.replace(/"/g, '');
+  const d = await mq(`{
+    items_page_by_column_values(board_id: ${BOARD}, limit: 5,
+      columns: [{column_id: "${REF_COL}", column_values: ["${safe}"]}]) {
+      items {
+        id
+        column_values(ids: ["${BED_COL}"]) { id value }
+      }
+    }
+  }`);
+  const items = d?.items_page_by_column_values?.items || [];
+  if (!items.length) return null;
+  const existing = (() => { try { return JSON.parse(items[0].column_values[0]?.value); } catch { return null; } })();
+  return { id: items[0].id, existing };
+}
+
+async function writeConfig(itemId, config) {
+  const safe = config.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+  await mq(`mutation {
+    change_column_value(board_id: ${BOARD}, item_id: ${itemId}, column_id: "${BED_COL}", value: "\\"${safe}\\"") { id }
+  }`);
+}
+
+// ── Run ───────────────────────────────────────────────────────────────────────
+
+async function runUpdate() {
+  if (!parsedBookings.length) return;
+  document.getElementById('runBtn').disabled = true;
+  document.getElementById('progressArea').style.display = 'block';
+
+  let updated = 0, overwritten = 0, notFound = 0, errors = 0;
+  const rows = [];
+
+  for (let i = 0; i < parsedBookings.length; i++) {
+    const b = parsedBookings[i];
+    const pct = Math.round((i / parsedBookings.length) * 100);
+    document.getElementById('bar').style.width = pct + '%';
+    document.getElementById('progTxt').textContent =
+      `Writing ${i + 1} of ${parsedBookings.length}: ${b.prop} — ${b.guest}`;
+
+    let status = '', tag = '', existing = '';
+    try {
+      const found = await findItemByRef(b.code);
+      if (!found) {
+        status = 'Not found in Monday'; tag = 'tag-notfound'; notFound++;
+      } else {
+        existing = found.existing || '';
+        await writeConfig(found.id, b.config);
+        if (existing) { status = `Updated (was: ${existing})`; tag = 'tag-ok'; overwritten++; }
+        else           { status = 'Written';                    tag = 'tag-ok'; updated++; }
+      }
+    } catch(e) {
+      status = 'Error: ' + e.message; tag = 'tag-error'; errors++;
+    }
+
+    rows.push({ ...b, status, tag });
+    await new Promise(r => setTimeout(r, 600));
+  }
+
+  document.getElementById('bar').style.width = '100%';
+  document.getElementById('progTxt').textContent = 'Done!';
+
+  // Show results
+  document.getElementById('resultsCard').style.display = 'block';
+  document.getElementById('previewCard').style.display = 'none';
+
+  document.getElementById('summaryBoxes').innerHTML = `
+    <div class="sum-box"><div class="sum-num sum-green">${updated}</div><div class="sum-lbl">Written (new)</div></div>
+    <div class="sum-box"><div class="sum-num sum-amber">${overwritten}</div><div class="sum-lbl">Updated</div></div>
+    <div class="sum-box"><div class="sum-num sum-red">${notFound}</div><div class="sum-lbl">Not found</div></div>
+    <div class="sum-box"><div class="sum-num sum-red">${errors}</div><div class="sum-lbl">Errors</div></div>
+  `;
+
+  document.getElementById('resultsBody').innerHTML = rows.map(r => `
+    <tr>
+      <td>${r.date}</td>
+      <td>${r.prop}</td>
+      <td>${r.guest}</td>
+      <td style="font-weight:600">${r.config}</td>
+      <td><span class="tag ${r.tag}">${r.status}</span></td>
+    </tr>
+  `).join('');
+}
+</script>
+</body>
+</html>

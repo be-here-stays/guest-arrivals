@@ -12,8 +12,10 @@
     :root {
       --green: #646955; --green-dark: #272F2E; --green-light: #eaede4;
       --amber: #AF926A; --amber-light: #faf3e8;
-      --own: #4a7c6e; --own-light: #e0f0ec;
-      --red: #B98B73; --text: #1a1a1a; --muted: #888; --border: #e0ddd6;
+      /* Laundry type colours — blue = In House, red = Regency (matches whiteboard) */
+      --own: #1a6fba;   --own-light: #ddeeff;
+      --reg: #c0392b;   --reg-light: #fde8e8;
+      --text: #1a1a1a; --muted: #888; --border: #e0ddd6;
       --card: #ffffff; --bg: #D5D0C4;
     }
     body { font-family: 'Instrument Sans', system-ui, sans-serif;
@@ -50,81 +52,90 @@
                  padding: 5px 10px; border-radius: 7px; font-size: 11px; font-weight: 600;
                  font-family: inherit; cursor: pointer; }
     .today-btn:hover { background: rgba(255,255,255,0.22); color: #fff; }
+    .hide-bagged-row { display: flex; align-items: center; gap: 12px;
+                       background: rgba(0,0,0,0.25); padding: 8px 16px; border-top: 1px solid rgba(255,255,255,0.1); }
+    .hide-bagged-label { color: #fff; font-size: 13px; font-weight: 700; flex: 1;
+                         letter-spacing: 0.2px; }
+    /* Toggle switch */
+    .toggle-wrap { position: relative; width: 44px; height: 24px; flex-shrink: 0; }
+    .toggle-wrap input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-slider { position: absolute; inset: 0; background: rgba(255,255,255,0.25);
+                     border-radius: 24px; cursor: pointer; transition: background 0.2s; }
+    .toggle-slider::before { content: ''; position: absolute; width: 18px; height: 18px;
+                              left: 3px; top: 3px; background: #fff; border-radius: 50%;
+                              transition: transform 0.2s; box-shadow: 0 1px 3px rgba(0,0,0,0.2); }
+    .toggle-wrap input:checked + .toggle-slider { background: #4a7c6e; }
+    .toggle-wrap input:checked + .toggle-slider::before { transform: translateX(20px); }
 
     /* ── PAGE WRAP ── */
-    .page-wrap { max-width: 700px; margin: 0 auto; padding: 16px; }
+    .page-wrap { padding: 10px 10px 10px; overflow-x: auto; }
 
-    /* ── DAY SECTION ── */
-    .day-section { margin-bottom: 12px; }
-    .day-header { display: flex; align-items: baseline; gap: 8px;
-                  padding: 6px 0 6px 2px; }
-    .day-label { font-size: 14px; font-weight: 700; color: var(--green-dark); }
-    .day-count { font-size: 12px; color: var(--muted); }
-    .day-section.day-past .day-label { color: var(--muted); }
-    .day-section.day-past .day-header { opacity: 0.7; }
-    .day-section.day-today .day-label { color: var(--own); }
+    /* ── WEEK GRID (7 columns) ── */
+    .rota-week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr));
+                 gap: 5px; margin-bottom: 10px; }
+    .week-label-row { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                      letter-spacing: 0.6px; color: var(--muted);
+                      margin-bottom: 4px; padding-left: 2px; }
 
-    .day-empty { font-size: 12px; color: #bbb; padding: 6px 0 4px; font-style: italic; }
+    /* ── DAY COLUMN ── */
+    .day-col { background: rgba(255,255,255,0.3); border-radius: 8px;
+               padding: 6px 5px 5px; min-width: 0; }
+    .day-col.day-past { opacity: 0.65; }
+    .day-col-hdr { font-size: 10px; font-weight: 700; color: var(--green-dark);
+                   margin-bottom: 5px; padding-bottom: 4px;
+                   border-bottom: 1.5px solid rgba(0,0,0,0.08);
+                   white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .day-col.day-today .day-col-hdr { color: var(--own); }
+    .day-col.day-past  .day-col-hdr { color: var(--muted); }
+    .day-empty { font-size: 10px; color: #bbb; font-style: italic; padding: 2px 0; }
 
-    /* ── ENTRY CARDS ── */
-    .entry-card { background: var(--card); border-radius: 11px;
-                  margin-bottom: 7px; border-left: 4px solid #ddd;
-                  box-shadow: 0 1px 3px rgba(0,0,0,0.06);
-                  transition: border-color 0.15s; }
+    /* ── COMPACT ENTRY CARDS ── */
+    .entry-card { background: #fff; border-radius: 5px; margin-bottom: 3px;
+                  border-left: 3px solid #ddd; font-size: 11px; }
     .entry-card.own     { border-left-color: var(--own); }
-    .entry-card.regency { border-left-color: var(--amber); }
-    .entry-card.bagged  { opacity: 0.7; }
-    .entry-card.bagged .card-name { text-decoration: line-through; color: var(--muted); }
+    .entry-card.regency { border-left-color: var(--reg); }
+    .entry-card.bagged  { opacity: 0.55; }
+    .entry-card.bagged .card-name { text-decoration: line-through; }
 
-    .card-main { display: flex; align-items: center; gap: 8px;
-                 padding: 10px 12px 10px 12px; }
-    .card-left { display: flex; align-items: center; gap: 8px; flex: 1; min-width: 0; }
-    .card-name { font-size: 14px; font-weight: 600; white-space: nowrap;
-                 overflow: hidden; text-overflow: ellipsis; }
-    .card-actions { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
+    .card-row { display: flex; align-items: center; padding: 4px 5px 3px 5px; gap: 3px; }
+    .card-name { flex: 1; font-size: 11px; font-weight: 700; min-width: 0;
+                 white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-btns { display: flex; gap: 1px; flex-shrink: 0; }
+    .cb { border: none; background: transparent; cursor: pointer; padding: 2px 3px;
+          font-size: 10px; border-radius: 3px; color: #bbb; line-height: 1;
+          font-family: inherit; transition: all 0.1s; }
+    .cb:hover   { background: #f0f0ee; color: #555; }
+    .cb.bag     { color: #999; background: #f4f4f2; border-radius: 3px; }
+    .cb.bag.on  { color: #fff; background: #2d6a4f; font-weight: 700; }
+    .cb.note.on { color: #7b5ea7; }
 
+    .card-sub { font-size: 10px; color: #777; padding: 0 5px 3px 5px;
+                line-height: 1.3; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bed-tag { display: inline-block; font-size: 9px; font-weight: 700;
+               padding: 0px 4px; border-radius: 3px; margin-left: 3px; vertical-align: middle; }
+    .bed-confirmed { background: #d4edda; color: #2d6a4f; }
+    .bed-fixed-ok  { background: #fef3e2; color: #b07d2a; }
+    .bed-chase     { background: #fde8e8; color: #c0392b; font-weight: 700; }
+
+    .card-note { font-size: 10px; color: #7b5ea7; background: #f8f4fd;
+                 padding: 2px 5px 3px; border-top: 1px solid #ede8f5;
+                 cursor: pointer; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .card-note:hover { background: #ede8f5; }
+    .moved-note { font-size: 9px; color: #bbb; padding: 0 5px 3px; font-style: italic; }
+
+    .add-btn { background: transparent; border: 1px dashed #ccc;
+               color: #bbb; padding: 4px 6px; border-radius: 5px;
+               font-size: 10px; font-family: inherit; cursor: pointer;
+               width: 100%; text-align: center; margin-top: 3px; }
+    .add-btn:hover { border-color: var(--own); color: var(--own); background: var(--own-light); }
+    .day-col.today .day-col-hdr { color: var(--own); }
+
+    /* type badge still used in modals */
     .type-badge { display: inline-block; font-size: 10px; font-weight: 700;
                   text-transform: uppercase; letter-spacing: 0.5px;
                   padding: 2px 7px; border-radius: 5px; white-space: nowrap; flex-shrink: 0; }
     .type-badge.own     { background: var(--own-light); color: var(--own); }
-    .type-badge.regency { background: var(--amber-light); color: var(--amber); }
-
-    .action-btn { border: none; border-radius: 7px; font-size: 12px; font-family: inherit;
-                  cursor: pointer; padding: 5px 8px; font-weight: 600; transition: all 0.12s; }
-    .bag-btn  { background: #f0f0ee; color: #888; }
-    .bag-btn.active { background: #d4edda; color: #2d6a4f; }
-    .bag-btn:hover  { background: #e0ede5; color: #2d6a4f; }
-    .note-btn { background: #f0f0ee; color: #888; font-size: 13px; padding: 5px 7px; }
-    .note-btn:hover { background: #e8e0f0; color: #7b5ea7; }
-    .move-btn { background: #f0f0ee; color: #888; font-size: 13px; padding: 5px 7px; }
-    .move-btn:hover { background: #e8edf8; color: #4a6b9c; }
-    .del-btn  { background: transparent; color: #ccc; font-size: 14px; padding: 5px 6px; }
-    .del-btn:hover  { background: #fce8e8; color: var(--red); }
-
-    .entry-note { font-size: 12px; color: #7b5ea7; background: #f5f0fb;
-                  padding: 5px 12px 7px; border-top: 1px solid #ede8f5;
-                  border-radius: 0 0 8px 8px; cursor: pointer; line-height: 1.4; }
-    .entry-note:hover { background: #ede8f5; }
-    .note-edit { font-size: 11px; opacity: 0.6; }
-    .moved-note { font-size: 11px; color: #aaa; padding: 0 12px 7px;
-                  font-style: italic; }
-    .card-detail { padding: 2px 12px 9px; display: flex; flex-wrap: wrap;
-                   gap: 6px; align-items: center; }
-    .card-guests { font-size: 12px; color: #555; }
-    .card-beds   { font-size: 12px; color: #555; }
-    .bed-tag { display: inline-block; font-size: 10px; font-weight: 700;
-               padding: 1px 6px; border-radius: 4px; margin-left: 5px;
-               vertical-align: middle; }
-    .bed-confirmed { background: #d4edda; color: #2d6a4f; }
-    .bed-assumed   { background: #f0f0ee; color: #999; }
-    .bed-fixed     { background: #f0f0ee; color: #aaa; }
-
-    .add-btn { background: transparent; border: 1.5px dashed var(--border);
-               color: var(--muted); padding: 8px 14px; border-radius: 9px;
-               font-size: 13px; font-family: inherit; cursor: pointer;
-               width: 100%; text-align: center; margin-top: 4px;
-               transition: all 0.15s; }
-    .add-btn:hover { border-color: var(--own); color: var(--own); background: var(--own-light); }
+    .type-badge.regency { background: var(--reg-light);  color: var(--reg); }
 
     /* ── MODALS ── */
     .modal-overlay { display: none; position: fixed; inset: 0;
@@ -201,8 +212,13 @@
              transition: opacity 0.3s; pointer-events: none; white-space: nowrap; z-index: 200; }
     #toast.show { opacity: 1; }
 
+    @media (max-width: 600px) {
+      .rota-week { grid-template-columns: repeat(4, minmax(0,1fr)); }
+    }
+    @media (max-width: 380px) {
+      .rota-week { grid-template-columns: repeat(3, minmax(0,1fr)); }
+    }
     @media (max-width: 480px) {
-      .day-pick-grid { grid-template-columns: 1fr 1fr; }
       .add-row { flex-wrap: wrap; }
       .add-row select { flex: none; width: 120px; }
     }
@@ -223,6 +239,13 @@
   <span id="weekLabel"></span>
   <button class="today-btn" onclick="goToToday()">Today</button>
   <button class="week-arrow" onclick="nextWeek()">›</button>
+</div>
+<div class="hide-bagged-row">
+  <span class="hide-bagged-label">Hide bagged properties</span>
+  <label class="toggle-wrap">
+    <input type="checkbox" id="hideBaggedToggle" onchange="render()">
+    <span class="toggle-slider"></span>
+  </label>
 </div>
 
 <div class="page-wrap">
@@ -316,6 +339,10 @@
     'badgers', 'foxes', 'squirrels', 'rabbits',
   ];
   function getLaundryType(name) {
+    // Prefer Monday dropdown value if available
+    const cfg = propConfigs[name];
+    if (cfg?.supplier) return cfg.supplier;
+    // Fallback: hardcoded list (used on first load before propConfigs fetched)
     const n = (name || '').trim().toLowerCase();
     return OWN_LAUNDRY.some(p => n.includes(p)) ? 'own' : 'regency';
   }
@@ -404,14 +431,20 @@
 
   async function fetchPropConfigs() {
     const pd = await mondayFetch(`{ boards(ids:[${PROP_BOARD}]){ items_page(limit:200){ items{
-      name column_values(ids:["text_mm2a2a78","long_text_mm2a30dy"]){ id value }
+      name column_values(ids:["text_mm2a2a78","long_text_mm2a30dy","dropdown_mm2k2p4p"]){ id value }
     } } } }`);
     propConfigs = {};
     for (const it of pd.boards[0].items_page.items) {
       const cv = {}; for (const c of it.column_values) cv[c.id] = c.value;
       const p = v => { try { return JSON.parse(v); } catch { return null; } };
       const opts = (p(cv['long_text_mm2a30dy'])?.text || '').split('|').map(s => s.trim()).filter(Boolean);
-      propConfigs[it.name] = { fixedBeds: p(cv['text_mm2a2a78']) || '', bedOptions: opts };
+      // Laundry supplier dropdown — label may say "Regency" or "In House" (or similar)
+      const dropRaw  = p(cv['dropdown_mm2k2p4p']);
+      const dropText = (typeof dropRaw === 'string' ? dropRaw : (dropRaw?.text || dropRaw?.label || '')).toLowerCase().trim();
+      const supplier = dropText.includes('regency') ? 'regency'
+                     : (dropText.includes('house') || dropText.includes('internal') || dropText.includes('own')) ? 'own'
+                     : null; // null = not set, fall back to name matching
+      propConfigs[it.name] = { fixedBeds: p(cv['text_mm2a2a78']) || '', bedOptions: opts, supplier };
     }
   }
 
@@ -507,6 +540,7 @@
           entry.children  = a.children;
           entry.pets      = a.pets;
           entry.bedConfig = a.bedConfig;
+          entry.type      = getLaundryType(a.property); // re-evaluate now propConfigs loaded
         }
       }
     }
@@ -518,98 +552,92 @@
   }
 
   function render() {
-    const days    = getDays();
-    const today   = new Date(); today.setHours(0,0,0,0);
+    const days     = getDays();
+    const today    = new Date(); today.setHours(0,0,0,0);
     const todayStr = localStr(today);
-    const endDate = addDays(windowStart, 13);
+    const endDate  = addDays(windowStart, 13);
+    const hideBagged = document.getElementById('hideBaggedToggle')?.checked;
 
     document.getElementById('weekLabel').textContent =
       windowStart.toLocaleDateString('en-GB', { day: 'numeric', month: 'short' }) + ' – ' +
       endDate.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' });
 
-    document.getElementById('rotaContent').innerHTML = days.map(day => {
-      const dayStr   = localStr(day);
-      const isPast   = day < today;
-      const isToday  = dayStr === todayStr;
-      const entries  = rota.filter(r => r.assignedDay === dayStr);
+    // Split 14 days into two rows of 7
+    function buildWeekRow(weekDays, label) {
+      const cols = weekDays.map(day => {
+        const dayStr  = localStr(day);
+        const isPast  = day < today;
+        const isToday = dayStr === todayStr;
+        const entries = rota.filter(r => r.assignedDay === dayStr && !(hideBagged && r.bagged));
+        const hdr     = day.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+        const cards   = entries.length
+          ? entries.map(e => renderCard(e)).join('')
+          : '<div class="day-empty">—</div>';
+        return `
+          <div class="day-col ${isPast ? 'day-past' : ''} ${isToday ? 'day-today' : ''}">
+            <div class="day-col-hdr">${isToday ? '📍 ' : ''}${hdr}</div>
+            ${cards}
+            <button class="add-btn" onclick="showAddModal('${dayStr}')">+</button>
+          </div>`;
+      }).join('');
+      return `<div class="week-label-row">${label}</div><div class="rota-week">${cols}</div>`;
+    }
 
-      const cardsHtml = entries.length
-        ? entries.map(e => renderCard(e)).join('')
-        : '<div class="day-empty">Nothing scheduled</div>';
-
-      return `
-        <div class="day-section ${isPast ? 'day-past' : ''} ${isToday ? 'day-today' : ''}">
-          <div class="day-header">
-            <span class="day-label">${isToday ? '📍 ' : ''}${fmtDay(day)}</span>
-            <span class="day-count">${entries.length ? entries.length + ' propert' + (entries.length === 1 ? 'y' : 'ies') : ''}</span>
-          </div>
-          <div id="cards-${dayStr}">${cardsHtml}</div>
-          <button class="add-btn" onclick="showAddModal('${dayStr}')">+ Add property</button>
-        </div>`;
-    }).join('');
+    document.getElementById('rotaContent').innerHTML =
+      buildWeekRow(days.slice(0, 7), 'This week') +
+      buildWeekRow(days.slice(7, 14), 'Next week');
   }
 
   function renderCard(entry) {
-    const isOwn     = entry.type === 'own';
-    const typeLabel = isOwn ? 'Own' : 'Regency';
-    const typeCls   = isOwn ? 'own' : 'regency';
+    const typeCls   = entry.type === 'own' ? 'own' : 'regency';
     const baggedCls = entry.bagged ? 'bagged' : '';
 
-    // ── Guest + bed detail (arrivals from Monday only) ──
-    let detailHtml = '';
+    // ── Sub-line: guests + bed config ──
+    let subParts = [];
     if (entry.source === 'arrival') {
+      // Check-in date — always shown, flagged if moved
+      if (entry.originalDay) {
+        const moved = entry.originalDay !== entry.assignedDay;
+        subParts.push(`in: ${fmtShort(entry.originalDay)}${moved ? ' ↕' : ''}`);
+      }
       const gParts = [];
-      if (entry.adults   > 0) gParts.push(`${entry.adults} adult${entry.adults   !== 1 ? 's' : ''}`);
-      if (entry.children > 0) gParts.push(`${entry.children} child${entry.children !== 1 ? 'ren' : ''}`);
-      if (entry.pets     > 0) gParts.push(`🐾 ${entry.pets}`);
-      const guestStr = gParts.join(' · ');
+      if (entry.adults   > 0) gParts.push(`${entry.adults}a`);
+      if (entry.children > 0) gParts.push(`${entry.children}c`);
+      if (entry.pets     > 0) gParts.push(`🐾${entry.pets}`);
+      if (gParts.length) subParts.push(gParts.join(' '));
 
       const { beds, status } = getEffectiveBeds(entry);
       const bStr = bedSummary(beds);
-      const tagLabel = status === 'confirmed' ? '✓ confirmed'
-                     : status === 'assumed'   ? 'assumed'
-                     :                          'fixed only';
-      const tagCls   = status === 'confirmed' ? 'bed-confirmed'
-                     : status === 'assumed'   ? 'bed-assumed'
-                     :                          'bed-fixed';
-      const bedStr = bStr
-        ? `${bStr}<span class="bed-tag ${tagCls}">${tagLabel}</span>`
-        : '';
-
-      if (guestStr || bedStr) {
-        detailHtml = `<div class="card-detail">
-          ${guestStr ? `<div class="card-guests">${guestStr}</div>` : ''}
-          ${bedStr   ? `<div class="card-beds">${bedStr}</div>`    : ''}
-        </div>`;
+      if (bStr) {
+        const tagHtml = status === 'confirmed'
+          ? `<span class="bed-tag bed-confirmed">✓</span>`
+          : status === 'fixed'
+            ? `<span class="bed-tag bed-fixed-ok">✓</span>`
+            : `<span class="bed-tag bed-chase">?</span>`;
+        subParts.push(bStr + tagHtml);
       }
     }
-
-    const movedHtml = (entry.source === 'arrival' && entry.originalDay && entry.originalDay !== entry.assignedDay)
-      ? `<div class="moved-note">↕ Moved from ${fmtShort(entry.originalDay)}</div>` : '';
+    const subHtml = subParts.length
+      ? `<div class="card-sub">${subParts.join('  ·  ')}</div>` : '';
 
     const noteHtml = entry.note
-      ? `<div class="entry-note" onclick="editNote('${entry.id}')">
-           📝 ${entry.note} <span class="note-edit">edit</span>
-         </div>` : '';
+      ? `<div class="card-note" onclick="editNote('${entry.id}')">📝 ${entry.note}</div>` : '';
+
+    const movedHtml = '';
 
     return `
       <div class="entry-card ${typeCls} ${baggedCls}" id="card-${entry.id}">
-        <div class="card-main">
-          <div class="card-left">
-            <span class="type-badge ${typeCls}">${typeLabel}</span>
-            <span class="card-name">${entry.property}</span>
-          </div>
-          <div class="card-actions">
-            <button class="action-btn bag-btn ${entry.bagged ? 'active' : ''}"
-                    onclick="toggleBagged('${entry.id}')" title="${entry.bagged ? 'Unmark bagged' : 'Mark as bagged'}">
-              ${entry.bagged ? '✓ Bagged' : '○ Bag'}
-            </button>
-            <button class="action-btn note-btn" onclick="editNote('${entry.id}')" title="Add note">📝</button>
-            <button class="action-btn move-btn" onclick="showMoveModal('${entry.id}')" title="Move to another day">↕</button>
-            <button class="action-btn del-btn" onclick="removeEntry('${entry.id}')" title="Remove">✕</button>
+        <div class="card-row">
+          <span class="card-name" title="${entry.property}">${entry.property}</span>
+          <div class="card-btns">
+            <button class="cb bag ${entry.bagged ? 'on' : ''}" onclick="toggleBagged('${entry.id}')"
+                    title="${entry.bagged ? 'Unmark bagged' : 'Mark as bagged'}">${entry.bagged ? '✓ Bag' : '○ Bag'}</button>
+            <button class="cb note ${entry.note ? 'on' : ''}" onclick="editNote('${entry.id}')" title="Note">📝</button>
+            <button class="cb" onclick="showMoveModal('${entry.id}')" title="Move">↕</button>
+            <button class="cb" onclick="removeEntry('${entry.id}')" title="Remove">✕</button>
           </div>
         </div>
-        ${detailHtml}${noteHtml}${movedHtml}
+        ${subHtml}${noteHtml}${movedHtml}
       </div>`;
   }
 

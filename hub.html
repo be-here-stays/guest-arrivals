@@ -83,6 +83,8 @@
     /* Maintenance 3-col grid */
     .cards-3 { grid-template-columns:1fr 1fr; }
     @media (min-width:680px) { .cards-3 { grid-template-columns:repeat(3,1fr); } }
+    .cards-4 { grid-template-columns:1fr 1fr; }
+    @media (min-width:680px) { .cards-4 { grid-template-columns:repeat(4,1fr); } }
 
     /* Desktop layout */
     @media (min-width:680px) {
@@ -237,26 +239,32 @@
     </div>
   </div>
 
-  <!-- Linen — full width row -->
+  <!-- Laundry — full width row -->
   <div style="grid-column:1/-1">
-    <div class="section-label">🧺 Linen</div>
-    <div class="cards cards-3">
+    <div class="section-label">🧺 Laundry</div>
+    <div class="cards cards-4">
+      <a href="status-board.html" class="tool-card">
+        <div class="card-icon">📊</div>
+        <div class="card-name">Laundry Planner</div>
+        <div class="card-desc">Regency order totals and own laundry requirements for each delivery window.</div>
+        <span class="card-badge b-both">📱💻 Any</span>
+      </a>
       <a href="laundry-rota.html" class="tool-card">
         <div class="card-icon">📋</div>
         <div class="card-name">Laundry Rota</div>
-        <div class="card-desc">14-day rota — move runs between days, mark as bagged, add one-off notes. Own laundry &amp; Regency.</div>
-        <span class="card-badge b-both">📱💻 Any</span>
-      </a>
-      <a href="linen-returns.html" class="tool-card">
-        <div class="card-icon">↩️</div>
-        <div class="card-name">Log Returns</div>
-        <div class="card-desc">Record linen returned to the shelf after a changeover. Keeps a 30-day history.</div>
+        <div class="card-desc">14-day rota — move wash runs between days, mark as bagged, add one-off notes.</div>
         <span class="card-badge b-both">📱💻 Any</span>
       </a>
       <a href="linen-stock.html" class="tool-card">
         <div class="card-icon">📦</div>
-        <div class="card-name">Shelf Stock</div>
-        <div class="card-desc">Count what's physically on the shelf. Set minimum levels and see RAG status at a glance.</div>
+        <div class="card-name">Stock Take</div>
+        <div class="card-desc">Count what's on the shelf. Set buffer levels and see RAG status for own laundry and Regency.</div>
+        <span class="card-badge b-both">📱💻 Any</span>
+      </a>
+      <a href="linen-returns.html" class="tool-card">
+        <div class="card-icon">↩️</div>
+        <div class="card-name">Returns &amp; Deliveries</div>
+        <div class="card-desc">Log property returns, wash runs off the line, and incoming Regency deliveries.</div>
         <span class="card-badge b-both">📱💻 Any</span>
       </a>
     </div>

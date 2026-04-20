@@ -248,11 +248,9 @@
       color: #bbb;
       font-style: italic;
     }
-    .arr-opts-confirmed {
-      color: #2d6a4f;
-      font-style: normal;
-      font-weight: 600;
-    }
+    .arr-opts-confirmed { color: #2d6a4f; font-style: normal; font-weight: 600; }
+    .arr-opts-fixed     { color: #b07d2a; font-style: normal; font-weight: 600; }
+    .arr-opts-chase     { color: #c0392b; font-style: normal; font-weight: 700; }
 
     .status-dot {
       width: 9px;
@@ -740,7 +738,7 @@
       allItems = items;
 
       // Fetch property config — fixed beds, bed options, bathrooms, max occupancy
-      const pd = await mondayFetch(`{ boards(ids:[${PROP_BOARD}]){ items_page(limit:200){ items{ name column_values(ids:["text_mm2a2a78","long_text_mm2a30dy","numeric_mm2drc46","numeric_mm2aa6z7"]){ id value } } } } }`);
+      const pd = await mondayFetch(`{ boards(ids:[${PROP_BOARD}]){ items_page(limit:200){ items{ name column_values(ids:["text_mm2a2a78","long_text_mm2a30dy","numeric_mm2drc46","numeric_mm2aa6z7","dropdown_mm2k2p4p"]){ id value } } } } }`);
       propConfigs = {};
       for (const it of pd.boards[0].items_page.items) {
         const cv = {}; for (const c of it.column_values) cv[c.id] = c.value;
@@ -748,7 +746,12 @@
         const opts = (p(cv['long_text_mm2a30dy'])?.text || '').split('|').map(s => s.trim()).filter(Boolean);
         const bathrooms = parseInt(p(cv['numeric_mm2drc46'])) || 1;
         const maxOccupancy = parseInt(p(cv['numeric_mm2aa6z7'])) || 0;
-        propConfigs[it.name] = { fixedBeds: p(cv['text_mm2a2a78']) || '', bedOptions: opts, bathrooms, maxOccupancy, hasHotTub: false };
+        const dropRaw  = p(cv['dropdown_mm2k2p4p']);
+        const dropText = (typeof dropRaw === 'string' ? dropRaw : (dropRaw?.text || dropRaw?.label || '')).toLowerCase().trim();
+        const supplier = dropText.includes('regency') ? 'regency'
+                       : (dropText.includes('house') || dropText.includes('internal') || dropText.includes('own')) ? 'ownLaundry'
+                       : null;
+        propConfigs[it.name] = { fixedBeds: p(cv['text_mm2a2a78']) || '', bedOptions: opts, bathrooms, maxOccupancy, hasHotTub: false, supplier };
       }
 
       // Fetch hot tub status board — any property with a row here has a hot tub
@@ -823,8 +826,8 @@
       const bedLabel = hasOptions
         ? (bedConfirmed
             ? ' <span class="arr-opts arr-opts-confirmed">✓ confirmed</span>'
-            : ' <span class="arr-opts">(choice pending)</span>')
-        : ' <span class="arr-opts">Fixed only</span>';
+            : ' <span class="arr-opts arr-opts-chase">? chase</span>')
+        : ' <span class="arr-opts arr-opts-fixed">✓ fixed</span>';
 
       return `<div class="arrival-row ${statusClass(a.formStatus)}">
     <div class="status-dot ${dotClass(a.formStatus)}"></div>
@@ -855,6 +858,10 @@
     ];
 
     function getLaundryCategory(propertyName) {
+      // Prefer Monday dropdown if set
+      const cfg = propConfigs[propertyName];
+      if (cfg?.supplier) return cfg.supplier;
+      // Fallback: hardcoded list
       const n = (propertyName || '').trim().toLowerCase();
       if (OWN_LAUNDRY.some(p => n.includes(p))) return 'ownLaundry';
       return 'regency';

@@ -11,116 +11,113 @@
     * { box-sizing: border-box; margin: 0; padding: 0; }
     :root {
       --green: #646955; --green-dark: #272F2E; --green-light: #eaede4;
-      --amber: #AF926A; --red: #B98B73;
-      --text: #1a1a1a; --muted: #888; --border: #e0ddd6;
+      --amber: #AF926A; --amber-light: #faf3e8;
+      --red: #B98B73; --text: #1a1a1a; --muted: #888; --border: #e0ddd6;
       --card: #ffffff; --bg: #D5D0C4;
     }
-    body {
-      font-family: 'Instrument Sans', system-ui, sans-serif;
-      background: var(--bg); color: var(--text);
-      min-height: 100vh; padding-bottom: 40px;
-    }
-    #header {
-      height: 52px; background: var(--green-dark);
-      display: flex; align-items: center; padding: 0 20px; gap: 14px;
-    }
-    .back-btn {
-      background: rgba(255,255,255,0.12); border: none; color: #fff;
-      padding: 5px 12px; border-radius: 7px; font-size: 13px;
-      font-family: inherit; cursor: pointer; text-decoration: none;
-      display: flex; align-items: center; gap: 5px;
-    }
+    body { font-family: 'Instrument Sans', system-ui, sans-serif;
+           background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
+    #header { height: 52px; background: var(--green-dark);
+              display: flex; align-items: center; padding: 0 20px; gap: 14px; }
+    .back-btn { background: rgba(255,255,255,0.12); border: none; color: #fff;
+                padding: 5px 12px; border-radius: 7px; font-size: 13px;
+                font-family: inherit; cursor: pointer; text-decoration: none;
+                display: flex; align-items: center; gap: 5px; }
     .back-btn:hover { background: rgba(255,255,255,0.22); }
     .header-title { color: #fff; font-size: 15px; font-weight: 600; }
-    .header-sub { color: rgba(255,255,255,0.55); font-size: 12px; }
+    .header-sub   { color: rgba(255,255,255,0.55); font-size: 12px; }
 
-    .page-wrap {
-      max-width: 700px; margin: 24px auto; padding: 0 16px;
-    }
-    .card {
-      background: var(--card); border-radius: 14px;
-      padding: 24px; margin-bottom: 16px;
-      box-shadow: 0 1px 4px rgba(0,0,0,0.06);
-    }
-    .card-title {
-      font-size: 13px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.6px; color: var(--muted); margin-bottom: 16px;
-    }
+    .page-wrap { max-width: 700px; margin: 24px auto; padding: 0 16px; }
 
-    /* Meta row */
+    /* Type toggle */
+    .type-toggle { display: flex; gap: 0; background: #e8e5df; border-radius: 11px;
+                   padding: 4px; margin-bottom: 16px; }
+    .type-btn { flex: 1; padding: 9px 12px; border: none; border-radius: 8px;
+                font-size: 13px; font-weight: 600; font-family: inherit;
+                cursor: pointer; background: transparent; color: #666;
+                transition: all 0.15s; text-align: center; }
+    .type-btn.active { background: var(--card); color: var(--text);
+                       box-shadow: 0 1px 3px rgba(0,0,0,0.12); }
+    .type-btn.active.regency { color: var(--amber); }
+
+    .card { background: var(--card); border-radius: 14px;
+            padding: 24px; margin-bottom: 16px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+    .card.regency-card { border-top: 3px solid var(--amber); }
+    .card-title { font-size: 13px; font-weight: 700; text-transform: uppercase;
+                  letter-spacing: 0.6px; color: var(--muted); margin-bottom: 16px; }
+
     .meta-row { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 16px; }
+    .meta-row.three { grid-template-columns: 1fr 1fr 1fr; }
     label { font-size: 12px; font-weight: 600; color: var(--muted);
             text-transform: uppercase; letter-spacing: 0.4px; display: block; margin-bottom: 5px; }
+    .optional-tag { font-size: 10px; color: #bbb; font-weight: 400;
+                    text-transform: none; letter-spacing: 0; margin-left: 4px; }
     select, input[type="date"], input[type="text"] {
       width: 100%; padding: 10px 12px; border: 1.5px solid var(--border);
       border-radius: 9px; font-size: 14px; font-family: inherit;
-      background: #fafaf8; color: var(--text); appearance: none;
-    }
-    select:focus, input:focus {
-      outline: none; border-color: var(--green);
-    }
+      background: #fafaf8; color: var(--text); appearance: none; }
+    select:focus, input:focus { outline: none; border-color: var(--green); }
 
-    /* Item grid */
-    .items-grid {
-      display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
-    }
-    .item-row {
-      display: flex; align-items: center; justify-content: space-between;
-      padding: 10px 13px; background: var(--green-light);
-      border-radius: 9px; border-left: 3px solid var(--green);
-    }
+    .items-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .item-row { display: flex; align-items: center; justify-content: space-between;
+                padding: 10px 13px; background: var(--green-light);
+                border-radius: 9px; border-left: 3px solid var(--green); }
+    .item-row.amber { background: var(--amber-light); border-left-color: var(--amber); }
     .item-label { font-size: 13px; color: #444; }
-    .item-input {
-      width: 64px; padding: 6px 8px; text-align: center;
-      border: 1.5px solid var(--border); border-radius: 7px;
-      font-size: 16px; font-weight: 700; font-family: inherit;
-      color: var(--green); background: #fff;
-    }
+    .item-input { width: 64px; padding: 6px 8px; text-align: center;
+                  border: 1.5px solid var(--border); border-radius: 7px;
+                  font-size: 16px; font-weight: 700; font-family: inherit;
+                  color: var(--green); background: #fff; }
+    .item-input.amber { color: var(--amber); }
     .item-input:focus { outline: none; border-color: var(--green); }
+    .section-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                     letter-spacing: 0.7px; color: var(--muted);
+                     grid-column: 1 / -1; margin: 8px 0 2px; }
 
-    .section-label {
-      font-size: 10px; font-weight: 700; text-transform: uppercase;
-      letter-spacing: 0.7px; color: var(--muted);
-      grid-column: 1 / -1; margin: 8px 0 2px;
-    }
-
-    /* Submit */
-    .submit-btn {
-      width: 100%; padding: 14px; background: var(--green);
-      color: #fff; border: none; border-radius: 10px;
-      font-size: 15px; font-weight: 700; font-family: inherit;
-      cursor: pointer; margin-top: 8px; transition: background 0.15s;
-    }
+    .submit-btn { width: 100%; padding: 14px; background: var(--green);
+                  color: #fff; border: none; border-radius: 10px;
+                  font-size: 15px; font-weight: 700; font-family: inherit;
+                  cursor: pointer; margin-top: 8px; transition: background 0.15s; }
     .submit-btn:hover { background: #545943; }
-    .submit-btn:disabled { background: #aaa; cursor: default; }
+    .submit-btn.amber-btn { background: var(--amber); }
+    .submit-btn.amber-btn:hover { background: #9a7d59; }
 
-    /* Toast */
-    #toast {
-      position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-      background: var(--green-dark); color: #fff;
-      padding: 12px 24px; border-radius: 10px; font-size: 14px;
-      opacity: 0; transition: opacity 0.3s; pointer-events: none;
-      white-space: nowrap;
-    }
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+             background: var(--green-dark); color: #fff;
+             padding: 12px 24px; border-radius: 10px; font-size: 14px;
+             opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; }
     #toast.show { opacity: 1; }
 
     /* History */
     .history-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
-    .hist-entry {
-      padding: 10px 12px; border-radius: 9px; background: #f5f5f3;
-      margin-bottom: 7px; font-size: 12px; line-height: 1.6;
-    }
+    .hist-entry { padding: 10px 12px; border-radius: 9px; background: #f5f5f3;
+                  margin-bottom: 7px; font-size: 12px; line-height: 1.6;
+                  border-left: 3px solid #ddd; }
+    .hist-entry.regency { background: var(--amber-light); border-left-color: var(--amber); }
     .hist-header { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
-    .hist-date { color: var(--muted); font-size: 11px; }
-    .hist-items { color: #555; }
-    .hist-delete {
-      float: right; background: none; border: none;
-      color: #ccc; font-size: 14px; cursor: pointer; padding: 0 0 0 8px;
-    }
+    .hist-date   { color: var(--muted); font-size: 11px; }
+    .hist-items  { color: #555; }
+    .hist-delete { float: right; background: none; border: none;
+                   color: #ccc; font-size: 14px; cursor: pointer; padding: 0 0 0 8px; }
     .hist-delete:hover { color: var(--red); }
+    .hist-type   { display: inline-block; font-size: 10px; font-weight: 700;
+                   text-transform: uppercase; letter-spacing: 0.4px;
+                   padding: 1px 7px; border-radius: 5px; margin-bottom: 4px; }
+    .hist-type.property { background: var(--green-light); color: var(--green); }
+    .hist-type.regency  { background: #f5e6d0; color: var(--amber); }
+
+    .card.washrun-card { border-top: 3px solid #4a7c6e; }
+    .type-btn.active.washrun { color: #4a7c6e; }
+    .hist-type.washrun { background: #e0f0ec; color: #4a7c6e; }
+    .hist-entry.washrun { background: #f0f8f5; border-left-color: #4a7c6e; }
+    .submit-btn.washrun-btn { background: #4a7c6e; }
+    .submit-btn.washrun-btn:hover { background: #3a6c5e; }
+    .item-row.washrun { background: #e0f0ec; border-left-color: #4a7c6e; }
+    .item-input.washrun { color: #4a7c6e; }
 
     @media (max-width: 480px) {
-      .meta-row { grid-template-columns: 1fr; }
+      .meta-row, .meta-row.three { grid-template-columns: 1fr; }
       .items-grid { grid-template-columns: 1fr; }
     }
   </style>
@@ -131,21 +128,27 @@
   <a href="hub.html" class="back-btn">← Hub</a>
   <div>
     <div class="header-title">Linen Returns</div>
-    <div class="header-sub">Record linen returned to shelf stock</div>
+    <div class="header-sub">Log property returns, wash runs &amp; Regency deliveries</div>
   </div>
 </div>
 
 <div class="page-wrap">
 
-  <!-- Entry form -->
-  <div class="card">
-    <div class="card-title">Log a return</div>
+  <!-- Type toggle -->
+  <div class="type-toggle">
+    <button class="type-btn active"   id="btnProperty" onclick="switchType('property')">↩ Property Return</button>
+    <button class="type-btn washrun"  id="btnWashrun"  onclick="switchType('washrun')">🫧 Wash Run</button>
+    <button class="type-btn regency"  id="btnRegency"  onclick="switchType('regency')">🚚 Regency Delivery</button>
+  </div>
 
+  <!-- Property Return form -->
+  <div class="card" id="propertyForm">
+    <div class="card-title">Log a property return</div>
     <div class="meta-row">
       <div>
-        <label for="fProperty">Property</label>
+        <label for="fProperty">Property <span class="optional-tag">(optional)</span></label>
         <select id="fProperty">
-          <option value="">— select property —</option>
+          <option value="">— unknown / mixed bag —</option>
         </select>
       </div>
       <div>
@@ -153,36 +156,62 @@
         <input type="date" id="fDate">
       </div>
     </div>
-
-    <div class="items-grid">
-      <div class="section-label">Duvets</div>
-      <div class="item-row"><span class="item-label">Super King Duvets</span><input class="item-input" type="number" id="rSkDuvets" value="0" min="0"></div>
-      <div class="item-row"><span class="item-label">King Duvets</span><input class="item-input" type="number" id="rKingDuvets" value="0" min="0"></div>
-      <div class="item-row"><span class="item-label">Double Duvets</span><input class="item-input" type="number" id="rDoubleDuvets" value="0" min="0"></div>
-      <div class="item-row"><span class="item-label">Single Duvets</span><input class="item-input" type="number" id="rSingleDuvets" value="0" min="0"></div>
-
-      <div class="section-label">Sheets</div>
-      <div class="item-row"><span class="item-label">King Sheets</span><input class="item-input" type="number" id="rKingSheets" value="0" min="0"></div>
-      <div class="item-row"><span class="item-label">Double Sheets</span><input class="item-input" type="number" id="rDoubleSheets" value="0" min="0"></div>
-      <div class="item-row"><span class="item-label">Single Sheets</span><input class="item-input" type="number" id="rSingleSheets" value="0" min="0"></div>
-
-      <div class="section-label">Pillows &amp; Towels</div>
-      <div class="item-row"><span class="item-label">Oxford Pillow Cases</span><input class="item-input" type="number" id="rOxford" value="0" min="0"></div>
-      <div class="item-row"><span class="item-label">Standard Pillow Cases</span><input class="item-input" type="number" id="rStandard" value="0" min="0"></div>
-      <div class="item-row"><span class="item-label">Bath Towels</span><input class="item-input" type="number" id="rBathTowels" value="0" min="0"></div>
-      <div class="item-row"><span class="item-label">Hand Towels</span><input class="item-input" type="number" id="rHandTowels" value="0" min="0"></div>
-      <div class="item-row"><span class="item-label">Hot Tub Towels</span><input class="item-input" type="number" id="rHotTubTowels" value="0" min="0"></div>
-      <div class="item-row"><span class="item-label">Bathrobes</span><input class="item-input" type="number" id="rBathrobes" value="0" min="0"></div>
-      <div class="item-row"><span class="item-label">Tea Towels</span><input class="item-input" type="number" id="rTeaTowels" value="0" min="0"></div>
-      <div class="item-row"><span class="item-label">Bath Mats</span><input class="item-input" type="number" id="rBathMats" value="0" min="0"></div>
+    <div style="margin-bottom:16px">
+      <label>Linen type</label>
+      <div class="type-toggle" style="margin-top:6px">
+        <button class="type-btn active own" id="btnLinenOwn"     onclick="switchLinenType('own')">🧺 Own Laundry</button>
+        <button class="type-btn regency"    id="btnLinenRegency" onclick="switchLinenType('regency')">🚚 Regency</button>
+      </div>
     </div>
+    <div class="items-grid" id="propertyItems"></div>
+    <button class="submit-btn" id="pSubmitBtn" onclick="savePropertyReturn()">Save Own Laundry Return</button>
+  </div>
 
-    <button class="submit-btn" id="submitBtn" onclick="saveReturn()">Save Return</button>
+  <!-- Wash Run form -->
+  <div class="card washrun-card" id="washrunForm" style="display:none">
+    <div class="card-title">Log a wash run — own laundry onto shelves</div>
+    <div class="meta-row">
+      <div>
+        <label for="wDate">Date processed</label>
+        <input type="date" id="wDate">
+      </div>
+      <div>
+        <label for="wNotes">Notes <span class="optional-tag">(optional)</span></label>
+        <input type="text" id="wNotes" placeholder="e.g. morning run, short on towels">
+      </div>
+    </div>
+    <div class="items-grid" id="washrunItems"></div>
+    <button class="submit-btn washrun-btn" onclick="saveWashRun()">Save Wash Run</button>
+  </div>
+
+  <!-- Regency Delivery form -->
+  <div class="card regency-card" id="regencyForm" style="display:none">
+    <div class="card-title">Log a Regency delivery</div>
+    <div class="meta-row three">
+      <div>
+        <label for="rDelivery">Delivery</label>
+        <select id="rDelivery">
+          <option value="1">Delivery 1</option>
+          <option value="2">Delivery 2</option>
+          <option value="3">Delivery 3</option>
+        </select>
+      </div>
+      <div>
+        <label for="rDate">Date received</label>
+        <input type="date" id="rDate">
+      </div>
+      <div>
+        <label for="rNotes">Notes <span class="optional-tag">(optional)</span></label>
+        <input type="text" id="rNotes" placeholder="e.g. short on towels">
+      </div>
+    </div>
+    <div class="items-grid" id="regencyItems"></div>
+    <button class="submit-btn amber-btn" onclick="saveRegencyDelivery()">Save Delivery</button>
   </div>
 
   <!-- History -->
   <div class="card">
-    <div class="card-title">Return history (last 30 days)</div>
+    <div class="card-title">History (last 30 days)</div>
     <div id="historyList"></div>
   </div>
 
@@ -195,20 +224,57 @@
   const PROP_BOARD = '5094466278';
 
   const FIELDS = [
-    ['rSkDuvets','Super King Duvets'],['rKingDuvets','King Duvets'],
-    ['rDoubleDuvets','Double Duvets'],['rSingleDuvets','Single Duvets'],
-    ['rKingSheets','King Sheets'],['rDoubleSheets','Double Sheets'],['rSingleSheets','Single Sheets'],
-    ['rOxford','Oxford Pillow Cases'],['rStandard','Standard Pillow Cases'],
-    ['rBathTowels','Bath Towels'],['rHandTowels','Hand Towels'],
-    ['rHotTubTowels','Hot Tub Towels'],['rBathrobes','Bathrobes'],
-    ['rTeaTowels','Tea Towels'],['rBathMats','Bath Mats'],
+    { id: 'SkDuvets',    label: 'Super King Duvets',    section: 'Duvets' },
+    { id: 'KingDuvets',  label: 'King Duvets' },
+    { id: 'DblDuvets',   label: 'Double Duvets' },
+    { id: 'SglDuvets',   label: 'Single Duvets' },
+    { id: 'KingSheets',  label: 'Superking Sheets',      section: 'Sheets' },
+    { id: 'DblSheets',   label: 'Double Sheets' },
+    { id: 'SglSheets',   label: 'Single Sheets' },
+    { id: 'Oxford',      label: 'Oxford Pillow Cases',  section: 'Pillows & Towels' },
+    { id: 'Standard',    label: 'Standard Pillow Cases' },
+    { id: 'BathTowels',  label: 'Bath Towels' },
+    { id: 'HandTowels',  label: 'Hand Towels' },
+    { id: 'HotTubTowels',label: 'Hot Tub Towels' },
+    { id: 'Bathrobes',   label: 'Bathrobes' },
+    { id: 'TeaTowels',   label: 'Tea Towels' },
+    { id: 'BathMats',    label: 'Bath Mats' },
   ];
 
-  // Set today's date
-  const today = new Date().toISOString().split('T')[0];
-  document.getElementById('fDate').value = today;
+  function buildItemsGrid(containerId, prefix, amber = false, colorCls = '') {
+    const grid = document.getElementById(containerId);
+    grid.innerHTML = '';
+    let lastSection = '';
+    FIELDS.forEach(f => {
+      if (f.section && f.section !== lastSection) {
+        lastSection = f.section;
+        const sl = document.createElement('div');
+        sl.className = 'section-label';
+        sl.textContent = f.section;
+        grid.appendChild(sl);
+      }
+      const row = document.createElement('div');
+      const rowCls = colorCls ? colorCls : (amber ? 'amber' : '');
+      row.className = 'item-row' + (rowCls ? ' ' + rowCls : '');
+      const inputCls = colorCls ? colorCls : (amber ? 'amber' : '');
+      row.innerHTML = `<span class="item-label">${f.label}</span>
+        <input class="item-input${inputCls ? ' ' + inputCls : ''}" type="number"
+               id="${prefix}${f.id}" value="0" min="0">`;
+      grid.appendChild(row);
+    });
+  }
 
-  // Load real property names from Monday.com Property Config board
+  buildItemsGrid('propertyItems', 'p_');
+  buildItemsGrid('washrunItems',  'w_', false, 'washrun');
+  buildItemsGrid('regencyItems',  'r_', true);
+
+  // Date defaults
+  const todayStr = new Date().toISOString().split('T')[0];
+  document.getElementById('fDate').value = todayStr;
+  document.getElementById('wDate').value = todayStr;
+  document.getElementById('rDate').value = todayStr;
+
+  // Load properties
   async function loadProperties() {
     const sel = document.getElementById('fProperty');
     try {
@@ -218,76 +284,153 @@
         body: JSON.stringify({ query: `{ boards(ids:[${PROP_BOARD}]){ items_page(limit:200){ items{ name } } } }` })
       });
       const j = await res.json();
-      const names = j.data.boards[0].items_page.items
-        .map(i => i.name.trim())
-        .filter(Boolean)
-        .sort();
+      const names = j.data.boards[0].items_page.items.map(i => i.name.trim()).filter(Boolean).sort();
       names.forEach(p => {
-        const opt = document.createElement('option'); opt.value = p; opt.textContent = p;
+        const opt = document.createElement('option');
+        opt.value = p; opt.textContent = p;
         sel.appendChild(opt);
       });
-    } catch (e) {
-      // Fallback — let user type
-      sel.outerHTML = '<input type="text" id="fProperty" placeholder="Type property name…">';
-    }
+    } catch { /* keep default unknown option */ }
   }
   loadProperties();
 
-  // Storage helpers
-  function loadReturns() {
-    try { return JSON.parse(localStorage.getItem('linenReturns') || '[]'); }
-    catch { return []; }
+  // Linen type within property return form
+  let linenType = 'own';
+  function switchLinenType(type) {
+    linenType = type;
+    document.getElementById('btnLinenOwn').classList.toggle('active',     type === 'own');
+    document.getElementById('btnLinenRegency').classList.toggle('active', type === 'regency');
+    const btn = document.getElementById('pSubmitBtn');
+    if (type === 'regency') {
+      btn.textContent = 'Save Regency Return';
+      btn.classList.add('amber-btn');
+    } else {
+      btn.textContent = 'Save Own Laundry Return';
+      btn.classList.remove('amber-btn');
+    }
   }
-  function saveReturns(arr) { localStorage.setItem('linenReturns', JSON.stringify(arr)); }
 
-  function saveReturn() {
-    const property = document.getElementById('fProperty').value;
-    if (!property) { showToast('Please select a property'); return; }
-    const date = document.getElementById('fDate').value;
-    if (!date) { showToast('Please set a date'); return; }
+  // Top-level toggle
+  let currentType = 'property';
+  function switchType(type) {
+    currentType = type;
+    document.getElementById('btnProperty').classList.toggle('active', type === 'property');
+    document.getElementById('btnWashrun').classList.toggle('active',  type === 'washrun');
+    document.getElementById('btnRegency').classList.toggle('active',  type === 'regency');
+    document.getElementById('propertyForm').style.display = type === 'property' ? '' : 'none';
+    document.getElementById('washrunForm').style.display  = type === 'washrun'  ? '' : 'none';
+    document.getElementById('regencyForm').style.display  = type === 'regency'  ? '' : 'none';
+  }
 
+  // Storage
+  function loadHistory() {
+    try { return JSON.parse(localStorage.getItem('linenReturns') || '[]'); } catch { return []; }
+  }
+  function saveHistory(arr) { localStorage.setItem('linenReturns', JSON.stringify(arr)); }
+
+  function collectItems(prefix) {
     const items = {};
     let total = 0;
-    FIELDS.forEach(([id, label]) => {
-      const v = parseInt(document.getElementById(id).value) || 0;
-      if (v > 0) { items[id] = { label, qty: v }; total += v; }
+    FIELDS.forEach(f => {
+      const v = parseInt(document.getElementById(prefix + f.id).value) || 0;
+      if (v > 0) { items[f.id] = { label: f.label, qty: v }; total += v; }
     });
+    return { items, total };
+  }
+  function resetItems(prefix) {
+    FIELDS.forEach(f => { document.getElementById(prefix + f.id).value = '0'; });
+  }
+
+  function savePropertyReturn() {
+    const property = document.getElementById('fProperty').value || null;
+    const date = document.getElementById('fDate').value;
+    if (!date) { showToast('Please set a date'); return; }
+    const { items, total } = collectItems('p_');
     if (total === 0) { showToast('No items entered'); return; }
 
-    const returns = loadReturns();
-    returns.unshift({ id: Date.now(), date, property, items });
-    saveReturns(returns);
-
-    showToast(`Saved: ${total} items returned from ${property}`);
-
-    // Reset item counts
-    FIELDS.forEach(([id]) => { document.getElementById(id).value = '0'; });
+    const history = loadHistory();
+    history.unshift({ id: Date.now(), type: 'property', linenType, date, property, items });
+    saveHistory(history);
+    const typeLabel = linenType === 'regency' ? 'Regency' : 'Own Laundry';
+    showToast(`Saved: ${total} ${typeLabel} items${property ? ' from ' + property : ''}`);
+    resetItems('p_');
     document.getElementById('fProperty').value = '';
-
     renderHistory();
   }
 
-  function deleteReturn(id) {
-    const returns = loadReturns().filter(r => r.id !== id);
-    saveReturns(returns);
+  function saveWashRun() {
+    const date = document.getElementById('wDate').value;
+    const notes = document.getElementById('wNotes').value.trim();
+    if (!date) { showToast('Please set a date'); return; }
+    const { items, total } = collectItems('w_');
+    if (total === 0) { showToast('No items entered'); return; }
+
+    const history = loadHistory();
+    history.unshift({ id: Date.now(), type: 'washrun', date, notes, items });
+    saveHistory(history);
+    showToast(`Wash run saved — ${total} items onto shelves`);
+    resetItems('w_');
+    document.getElementById('wNotes').value = '';
+    renderHistory();
+  }
+
+  function saveRegencyDelivery() {
+    const delivery = document.getElementById('rDelivery').value;
+    const date = document.getElementById('rDate').value;
+    const notes = document.getElementById('rNotes').value.trim();
+    if (!date) { showToast('Please set a date'); return; }
+    const { items, total } = collectItems('r_');
+    if (total === 0) { showToast('No items entered'); return; }
+
+    const history = loadHistory();
+    history.unshift({ id: Date.now(), type: 'regency', date, delivery, notes, items });
+    saveHistory(history);
+    showToast(`Regency Delivery ${delivery} saved — ${total} items`);
+    resetItems('r_');
+    document.getElementById('rNotes').value = '';
+    renderHistory();
+  }
+
+  function deleteEntry(id) {
+    saveHistory(loadHistory().filter(r => r.id !== id));
     renderHistory();
   }
 
   function renderHistory() {
     const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
-    const returns = loadReturns().filter(r => new Date(r.date) >= cutoff);
+    const history = loadHistory().filter(r => new Date(r.date) >= cutoff);
     const el = document.getElementById('historyList');
-    if (!returns.length) {
-      el.innerHTML = '<div class="history-empty">No returns in the last 30 days</div>';
+    if (!history.length) {
+      el.innerHTML = '<div class="history-empty">No entries in the last 30 days</div>';
       return;
     }
-    el.innerHTML = returns.map(r => {
+    el.innerHTML = history.map(r => {
       const itemStr = Object.values(r.items).map(i => `${i.qty} ${i.label}`).join(' · ');
       const d = new Date(r.date).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
-      return `<div class="hist-entry">
-        <button class="hist-delete" onclick="deleteReturn(${r.id})" title="Delete">✕</button>
-        <div class="hist-header">${r.property}</div>
+      const isRegencyDelivery = r.type === 'regency';
+      const isWashRun         = r.type === 'washrun';
+      const isRegencyLinen    = r.type === 'property' && r.linenType === 'regency';
+      const header = isRegencyDelivery
+        ? `Regency Delivery ${r.delivery}`
+        : isWashRun
+          ? 'Own Laundry — off the line'
+          : (r.property || 'Unknown property');
+      const badgeCls  = isRegencyDelivery || isRegencyLinen ? 'regency'
+                      : isWashRun ? 'washrun' : 'property';
+      const badgeText = isRegencyDelivery ? 'Regency Delivery'
+                      : isRegencyLinen    ? 'Regency Return'
+                      : isWashRun         ? 'Wash Run'
+                      :                     'Own Laundry Return';
+      const entryCls  = isRegencyDelivery || isRegencyLinen ? 'regency'
+                      : isWashRun ? 'washrun' : '';
+      const sub = (isRegencyDelivery || isWashRun) && r.notes
+                  ? `<div class="hist-date">${r.notes}</div>` : '';
+      return `<div class="hist-entry ${entryCls}">
+        <button class="hist-delete" onclick="deleteEntry(${r.id})" title="Delete">✕</button>
+        <div><span class="hist-type ${badgeCls}">${badgeText}</span></div>
+        <div class="hist-header">${header}</div>
         <div class="hist-date">${d}</div>
+        ${sub}
         <div class="hist-items">${itemStr}</div>
       </div>`;
     }).join('');

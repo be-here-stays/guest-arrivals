@@ -633,7 +633,7 @@
     <div class="panel own-laundry-panel">
       <div class="panel-header">
         <div class="panel-title">Own Laundry</div>
-        <div class="panel-date" style="font-size:13px;color:var(--muted)">Hideaway · Tranquility · Beaver Brook</div>
+        <div class="panel-date" style="font-size:13px;color:var(--muted)">Yellowstone · Little Horseshoe · Glamping · Hideaway · Tranquility · Beaver Brook</div>
       </div>
       <div class="panel-body laundry-body" id="ownLaundryBody">
         <div class="empty-state">Loading…</div>
@@ -845,23 +845,18 @@
     // ── LAUNDRY ──
 
     // Property categorisation for laundry orders.
-    // Comparisons are case-insensitive; use .trim().toLowerCase() when matching.
-    const LAUNDRY_CATS = {
-      // Supplied by Regency — all properties NOT listed below
-      // Own laundry: same spec, comes from internal stock
-      ownLaundry: ['hideaway', 'tranquility', 'beaver brook'],
-      // Not supplied at all (no linen provided)
-      notSupplied: ['island', 'boathouse', 'pond', 'willow', 'waterlily'],
-      // Excluded from Regency AND from own laundry (racing lets & glamping — manage their own)
-      excluded: ['ascot', 'aintree', 'cheltenham', 'york', 'epsom', 'goodwood', 'newmarket',
-                 'badgers', 'foxes', 'squirrels', 'rabbits'],
-    };
+    // Own laundry = washed in-house. Everything else = Regency.
+    const OWN_LAUNDRY = [
+      'hideaway', 'tranquility', 'beaver brook',          // core own laundry
+      'york', 'cheltenham', 'ascot', 'aintree',           // Yellowstone
+      'epsom', 'goodwood', 'newmarket',
+      'pond', 'island', 'waterlily', 'willow', 'boathouse', // Little Horseshoe
+      'badgers', 'foxes', 'squirrels', 'rabbits',         // Glamping
+    ];
 
     function getLaundryCategory(propertyName) {
       const n = (propertyName || '').trim().toLowerCase();
-      if (LAUNDRY_CATS.notSupplied.some(p => n.includes(p))) return 'notSupplied';
-      if (LAUNDRY_CATS.excluded.some(p => n.includes(p)))    return 'excluded';
-      if (LAUNDRY_CATS.ownLaundry.some(p => n.includes(p)))  return 'ownLaundry';
+      if (OWN_LAUNDRY.some(p => n.includes(p))) return 'ownLaundry';
       return 'regency';
     }
 
@@ -1019,29 +1014,20 @@
 
       const regency    = emptyTotals();
       const ownLaundry = emptyTotals();
-      const excluded   = []; // property names — no linen needed from either source
-      const notSupplied = []; // property names — we don't supply linen at all
 
       for (const a of arrivals) {
         const cat = getLaundryCategory(a.property);
         if (cat === 'regency')     addArrival(regency, a);
         else if (cat === 'ownLaundry') addArrival(ownLaundry, a);
-        else if (cat === 'excluded')   { if (!excluded.includes(a.property)) excluded.push(a.property); }
-        else if (cat === 'notSupplied'){ if (!notSupplied.includes(a.property)) notSupplied.push(a.property); }
       }
 
       return {
         regency:    finaliseTotals(regency),
         ownLaundry: finaliseTotals(ownLaundry),
-        excluded,
-        notSupplied,
-        // Flat totals for the compact summary line (regency + own laundry combined)
+        // Flat totals for the compact summary line (combined)
         combined: finaliseTotals((() => {
           const c = emptyTotals();
-          for (const a of arrivals) {
-            const cat = getLaundryCategory(a.property);
-            if (cat === 'regency' || cat === 'ownLaundry') addArrival(c, a);
-          }
+          for (const a of arrivals) addArrival(c, a);
           return c;
         })()),
       };
@@ -1102,7 +1088,7 @@
         if (t.singleDuvets) duvetParts.push(`${t.singleDuvets} single`);
         const duvetStr = duvetParts.length ? duvetParts.join(' · ') + ' duvets  ·  ' : '';
         const sheetParts = [];
-        if (t.kingSheets) sheetParts.push(`${t.kingSheets} king`);
+        if (t.kingSheets) sheetParts.push(`${t.kingSheets} superking`);
         if (t.doubleSheets) sheetParts.push(`${t.doubleSheets} dbl`);
         if (t.singleSheets) sheetParts.push(`${t.singleSheets} single`);
         const sheetStr = sheetParts.length ? sheetParts.join(' · ') + ' sheets  ·  ' : '';
@@ -1134,7 +1120,7 @@
           { label: 'Single Duvets', value: totals.singleDuvets },
         ];
         const SHEET_ITEMS = [
-          { label: 'King Sheets', value: totals.kingSheets },
+          { label: 'Superking Sheets', value: totals.kingSheets },
           { label: 'Double Sheets', value: totals.doubleSheets },
           { label: 'Single Sheets', value: totals.singleSheets },
         ];
@@ -1182,10 +1168,8 @@
       // ── CURRENT — full detail ──
       const curSplit = calcLaundry(currentArrivals);
 
-      // Check whether any Regency/own bed choice is still default
+      // Check whether any arrival's bed choice is still unconfirmed
       const hasUnconfirmed = currentArrivals.some(a => {
-        const cat = getLaundryCategory(a.property);
-        if (cat !== 'regency' && cat !== 'ownLaundry') return false;
         const cfg = propConfigs[a.property] || {};
         return cfg.bedOptions && cfg.bedOptions.length > 0 && !a.bedConfig;
       });
@@ -1210,16 +1194,11 @@
     </div>`;
 
       // ── REGENCY PANEL ──
-      const allExcluded = [...curSplit.excluded, ...curSplit.notSupplied];
-      const excludedNotice = allExcluded.length
-        ? `<div class="laundry-excluded">Not ordering: ${allExcluded.join(', ')}</div>`
-        : '';
-
       let regencyContent;
-      if (!curSplit.regency.arrivals.length && !allExcluded.length) {
+      if (!curSplit.regency.arrivals.length) {
         regencyContent = '<div class="empty-state" style="height:auto;padding:16px 0;">No Regency arrivals this window</div>';
       } else {
-        regencyContent = renderOrderBlock('', curSplit.regency, curSplit.regency.arrivals, hasUnconfirmed, '') + excludedNotice;
+        regencyContent = renderOrderBlock('', curSplit.regency, curSplit.regency.arrivals, hasUnconfirmed, '');
       }
       document.getElementById('regencyLaundryBody').innerHTML = pastHTML + regencyContent + nextHTML;
 

@@ -713,12 +713,13 @@ function renderLaundry() {
     const bedOptions = cfg.bedOptions || [];
     const hasOptions = bedOptions.length > 0;
     const confirmed  = !!(a.bedConfig && a.bedConfig.trim());
+    const isFixed    = !hasOptions;
     countBeds(fixedBeds);
     const partyParts = [];
     if (a.adults)   partyParts.push(`👤 ${a.adults} adult${a.adults>1?'s':''}`);
     if (a.children) partyParts.push(`🧒 ${a.children}`);
     if (a.pets)     partyParts.push(`🐾 ${a.pets}`);
-    cards += `<div class="property-card ${STATUS_CLASS[a.formStatus]}"><div class="prop-name">${a.property}</div><div class="guest-name">${a.name || '—'}</div>${partyParts.length ? `<div class="party">${partyParts.map(p=>`<span>${p}</span>`).join('')}</div>` : ''}<div class="beds-label">${confirmed ? '✓ Confirmed Beds' : (hasOptions ? 'Choice pending' : 'Fixed only')}</div><div class="beds">${formatBeds(fixedBeds)}</div>${hasOptions && !confirmed ? `<div class="bed-options">Guest chooses from: ${bedOptions.join(' · ')}</div>` : ''}<span class="status-badge ${BADGE_CLASS[a.formStatus]}">${STATUS[a.formStatus]}</span></div>`;
+    cards += `<div class="property-card ${STATUS_CLASS[a.formStatus]}"><div class="prop-name">${a.property}</div><div class="guest-name">${a.name || '—'}</div>${partyParts.length ? `<div class="party">${partyParts.map(p=>`<span>${p}</span>`).join('')}</div>` : ''}<div class="beds-label">${confirmed ? '✓ Confirmed Beds' : (hasOptions ? 'Choice pending' : 'Fixed only')}</div><div class="beds">${formatBeds(fixedBeds)}</div>${hasOptions && !confirmed ? `<div class="bed-options">Guest chooses from: ${bedOptions.join(' · ')}</div>` : ''}${hasOptions && !confirmed ? `<span class="status-badge ${BADGE_CLASS[a.formStatus]}">${STATUS[a.formStatus]}</span>` : ''}</div>`;
   }
   const totalCounts = Object.entries(bedTotals).filter(([,v])=>v>0);
   const bedSummaryHtml = totalCounts.length > 0 ? totalCounts.map(([t,c])=>`<div class="bed-total"><div class="count">${c}</div><div class="type">${t}</div></div>`).join('') : '<p style="color:#aaa;font-size:13px">Unable to calculate — check bed configs</p>';

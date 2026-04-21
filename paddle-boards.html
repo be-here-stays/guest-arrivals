@@ -1,0 +1,917 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>Paddle Boards — Be Here</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+      --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+      --red:#8B2020; --red-bg:#fdf0ec; --amber:#a86c00; --amber-bg:#fdf5e8;
+      --green:#2d6a4f; --green-bg:#edf7f2; --green-bdr:#52b788;
+      --blue:#0a5c96; --blue-bg:#e8f4fd; --blue-bdr:#5aace0;
+    }
+    * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+    body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:40px; }
+
+    /* ── Header ── */
+    header { background:var(--dark); color:#fff; padding:16px 20px; padding-top:max(16px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; gap:12px; }
+    .hdr-logo svg { display:block; width:110px; height:auto; }
+    .hdr-right { display:flex; align-items:center; gap:10px; flex-shrink:0; }
+    .hdr-sub { font-size:10px; color:rgba(255,255,255,.5); margin-top:3px; letter-spacing:.3px; }
+    .hdr-hub { color:rgba(255,255,255,.6); font-size:12px; font-weight:600; text-decoration:none; padding:5px 10px; border:1px solid rgba(255,255,255,.2); border-radius:6px; }
+    .hdr-hub:hover { background:rgba(255,255,255,.1); color:#fff; }
+
+    /* ── Stats strip ── */
+    .stats-strip { background:var(--dark); border-top:1px solid rgba(255,255,255,.1); padding:0 20px 12px; display:flex; gap:20px; }
+    .stat-chip { display:flex; align-items:center; gap:6px; }
+    .stat-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+    .stat-dot.avail { background:#52b788; }
+    .stat-dot.out   { background:#f0b429; }
+    .stat-dot.over  { background:#fc8181; }
+    .stat-lbl { font-size:12px; color:rgba(255,255,255,.6); }
+    .stat-num { font-size:14px; font-weight:700; color:#fff; }
+
+    /* ── Main ── */
+    .main { padding:16px 16px 0; max-width:720px; margin:0 auto; }
+    .section-lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--sage-mid); margin:0 0 10px; display:flex; align-items:center; gap:8px; }
+    .section-lbl::after { content:''; flex:1; height:1px; background:var(--border); }
+
+    /* ── Board grid ── */
+    .board-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px; }
+    @media (min-width:520px) { .board-grid { grid-template-columns:repeat(3,1fr); } }
+
+    /* ── Board card ── */
+    .board-card { background:var(--surface); border-radius:14px; padding:14px 14px 12px; box-shadow:0 1px 4px rgba(39,47,46,.08); border-left:4px solid var(--border); position:relative; transition:box-shadow .15s; }
+    .board-card.available  { border-left-color:var(--green-bdr); }
+    .board-card.out        { border-left-color:#f0b429; }
+    .board-card.overdue    { border-left-color:var(--red); background:#fff8f8; }
+    .board-card.maintenance{ border-left-color:var(--sage-mid); }
+
+    .bc-head { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:6px; }
+    .bc-num { font-size:20px; font-weight:700; color:var(--dark); line-height:1; }
+    .bc-badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; text-transform:uppercase; letter-spacing:.3px; white-space:nowrap; }
+    .bc-badge.available   { background:var(--green-bg); color:var(--green); }
+    .bc-badge.out         { background:#fff8e6; color:#a07000; }
+    .bc-badge.overdue     { background:var(--red-bg); color:var(--red); }
+    .bc-badge.maintenance { background:#f0eeea; color:var(--sage-mid); }
+
+    .bc-loc { font-size:11px; color:var(--sage-mid); margin-bottom:8px; }
+    .bc-guest { font-size:13px; font-weight:600; color:var(--dark); margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .bc-prop  { font-size:11px; color:var(--sage); margin-bottom:2px; }
+    .bc-due   { font-size:11px; font-weight:600; margin-bottom:8px; }
+    .bc-due.ok       { color:var(--sage-mid); }
+    .bc-due.soon     { color:var(--amber); }
+    .bc-due.overdue  { color:var(--red); }
+    .bc-dur  { font-size:10px; color:var(--sage-mid); margin-bottom:8px; }
+
+    .bc-btn { width:100%; padding:8px 6px; border:none; border-radius:8px; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; transition:opacity .15s; }
+    .bc-btn.handout  { background:var(--dark); color:var(--cream); }
+    .bc-btn.collect  { background:#8B2020; color:#fff; }
+    .bc-btn.collect-soon { background:#a86c00; color:#fff; }
+    .bc-btn:hover { opacity:.85; }
+
+    /* ── Modal overlay ── */
+    .modal-overlay { position:fixed; inset:0; background:rgba(39,47,46,.55); z-index:200; display:flex; align-items:flex-end; justify-content:center; }
+    .modal-sheet { background:var(--surface); border-radius:20px 20px 0 0; width:100%; max-width:560px; max-height:92vh; overflow-y:auto; padding:0 0 calc(24px + env(safe-area-inset-bottom)); }
+    .modal-handle { width:40px; height:4px; background:#ddd; border-radius:2px; margin:12px auto 0; }
+    .modal-inner { padding:16px 22px 0; }
+    .modal-title { font-size:18px; font-weight:700; color:var(--dark); margin-bottom:2px; }
+    .modal-sub   { font-size:13px; color:var(--sage); margin-bottom:18px; }
+
+    /* ── Form fields ── */
+    .fld { margin-bottom:14px; }
+    .fld label { display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--sage-mid); margin-bottom:6px; }
+    .fld select, .fld input[type="text"], .fld input[type="datetime-local"], .fld textarea {
+      width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:9px;
+      font-family:inherit; font-size:15px; color:var(--dark); background:#fff; outline:none;
+      -webkit-appearance:none; transition:border-color .15s;
+    }
+    .fld select:focus, .fld input:focus, .fld textarea:focus { border-color:var(--dark); }
+    .fld textarea { min-height:72px; resize:vertical; font-size:13px; }
+    .fld-row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+
+    /* ── Duration buttons ── */
+    .dur-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .dur-btn { padding:11px 8px; border:2px solid var(--border); border-radius:9px; background:var(--surface); font-family:inherit; font-size:13px; font-weight:600; color:var(--sage-mid); cursor:pointer; text-align:center; transition:all .15s; }
+    .dur-btn.active { border-color:var(--dark); background:var(--dark); color:#fff; }
+
+    /* ── Waiver result ── */
+    .waiver-result { margin-top:8px; padding:10px 12px; border-radius:8px; font-size:12px; font-weight:600; display:none; }
+    .waiver-result.ok  { background:var(--green-bg); color:var(--green); border:1px solid var(--green-bdr); display:block; }
+    .waiver-result.warn{ background:var(--amber-bg); color:var(--amber); border:1px solid #d4a017; display:block; }
+    .waiver-result.err { background:var(--red-bg); color:var(--red); border:1px solid #d4a017; display:block; }
+    .waiver-result.loading { background:#f5f3ef; color:var(--sage-mid); border:1px solid var(--border); display:block; }
+
+    /* ── Checklist ── */
+    .checklist-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--sage-mid); margin-bottom:8px; padding-top:4px; border-top:1px solid var(--border); }
+    .check-item { display:flex; align-items:center; gap:10px; padding:11px 12px; border:1.5px solid var(--border); border-radius:9px; cursor:pointer; user-select:none; transition:all .15s; margin-bottom:7px; }
+    .check-item:last-child { margin-bottom:0; }
+    .check-item.ticked { border-color:var(--green-bdr); background:var(--green-bg); }
+    .check-item.flagged { border-color:var(--red); background:var(--red-bg); }
+    .check-item input[type="checkbox"] { width:18px; height:18px; accent-color:var(--green); cursor:pointer; flex-shrink:0; }
+    .check-item .ci-text { flex:1; }
+    .ci-label { font-size:13px; font-weight:600; color:var(--dark); }
+    .ci-sub   { font-size:11px; color:var(--sage-mid); margin-top:1px; }
+    .check-item.flagged .ci-label { color:var(--red); }
+
+    /* ── Return condition ── */
+    .cond-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+    .cond-btn { padding:10px 6px; border:2px solid var(--border); border-radius:9px; background:var(--surface); font-family:inherit; font-size:12px; font-weight:600; color:var(--sage-mid); cursor:pointer; text-align:center; transition:all .15s; }
+    .cond-btn.active.good    { border-color:var(--green-bdr); background:var(--green-bg); color:var(--green); }
+    .cond-btn.active.damaged { border-color:var(--red); background:var(--red-bg); color:var(--red); }
+    .cond-btn.active.missing { border-color:var(--red); background:var(--red-bg); color:var(--red); }
+    .cond-btn.active.minor   { border-color:#d4a017; background:var(--amber-bg); color:var(--amber); }
+
+    /* ── Hire summary card ── */
+    .hire-summary { background:linear-gradient(135deg,#272F2E,#3a4a3a); border-radius:12px; padding:14px 16px; margin-bottom:16px; }
+    .hs-board { font-size:13px; font-weight:700; color:rgba(255,255,255,.55); margin-bottom:2px; }
+    .hs-guest { font-size:17px; font-weight:700; color:#fff; margin-bottom:2px; }
+    .hs-meta  { font-size:12px; color:rgba(255,255,255,.55); margin-bottom:8px; }
+    .hs-row   { display:flex; gap:16px; }
+    .hs-stat  { text-align:center; }
+    .hs-val   { font-size:16px; font-weight:700; color:#fff; }
+    .hs-lbl   { font-size:10px; color:rgba(255,255,255,.4); margin-top:1px; }
+    .hs-overdue .hs-val { color:#fc8181; }
+
+    /* ── Issue flag ── */
+    .issue-flag { background:var(--red-bg); border:1.5px solid var(--red); border-radius:10px; padding:12px 14px; margin-bottom:14px; font-size:12px; color:var(--red); font-weight:600; display:none; }
+    .issue-flag.show { display:block; }
+    .issue-flag strong { display:block; margin-bottom:4px; font-size:13px; }
+
+    /* ── Submit ── */
+    .submit-btn { width:100%; padding:15px; background:var(--dark); color:var(--cream); border:none; border-radius:12px; font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; transition:background .15s; margin-top:16px; }
+    .submit-btn:hover:not(:disabled) { background:var(--sage); }
+    .submit-btn:disabled { opacity:.4; cursor:not-allowed; }
+    .submit-btn.danger { background:var(--red); }
+    .submit-btn.danger:hover:not(:disabled) { background:#7a1a1a; }
+
+    .btn-cancel { width:100%; padding:12px; background:transparent; border:1.5px solid var(--border); border-radius:12px; font-family:inherit; font-size:14px; font-weight:600; color:var(--sage); cursor:pointer; margin-top:8px; }
+
+    /* ── Toast ── */
+    .toast { position:fixed; bottom:28px; left:50%; transform:translateX(-50%) translateY(80px); background:var(--dark); color:var(--cream); border-radius:10px; padding:12px 22px; font-size:13px; font-weight:600; z-index:9999; transition:transform .3s; white-space:nowrap; pointer-events:none; box-shadow:0 8px 24px rgba(39,47,46,.3); }
+    .toast.show  { transform:translateX(-50%) translateY(0); }
+    .toast.ok    { background:var(--sage); }
+    .toast.err   { background:var(--red); }
+    .toast.warn  { background:var(--amber); }
+
+    .msg { padding:12px 16px; border-radius:9px; font-size:13px; font-weight:600; margin-bottom:14px; display:none; }
+    .msg.show { display:block; }
+    .msg.error   { background:var(--red-bg); color:var(--red); }
+    .msg.loading { background:var(--amber-bg); color:var(--amber); }
+    .msg.success { background:var(--green-bg); color:var(--green); }
+
+    .divider { height:1px; background:var(--border); margin:16px 0; }
+  </style>
+</head>
+<body>
+
+<header>
+  <div>
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 215.0001 45.6329" style="display:block;width:110px;height:auto" aria-label="Be Here">
+      <path d="M33.5812,26.2451c-4.585,0-8.3018,3.6929-8.3018,8.2482s3.7168,8.2482,8.3018,8.2482,8.3017-3.6928,8.3017-8.2482-3.7168-8.2482-8.3017-8.2482Z" fill="#fff"/>
+      <polygon points="10.8809 19.7103 19.0665 19.7103 19.0665 11.5778 19.0665 11.3457 10.8822 3.2139 10.6473 3.2139 2.463 11.3457 2.463 11.5778 2.463 19.7103 10.648 19.7103 10.8809 19.7103" fill="#fff"/>
+      <path d="M40.5754,5.4963l-5.4656-.2394c-4.4287-.1941-8.2128,3.2233-8.4095,7.594l-.243,5.4044,14.0587-12.6953.0595-.0638Z" fill="#fff"/>
+      <path d="M27.6033,19.3885l5.4768-.2207c4.4294-.1785,7.9053-3.901,7.7245-8.2724l-.2232-5.3945-.0656.0592-12.9125,13.8284Z" fill="#fff"/>
+      <polygon points="23.5662 22.0664 23.5662 0 22.0665 0 22.0665 22.0664 0 22.0664 0 23.5661 22.0665 23.5661 22.0665 45.6329 23.5662 45.6329 23.5662 23.5661 45.6329 23.5661 45.6329 22.0664 23.5662 22.0664" fill="#fff"/>
+      <path d="M12.5345,33.8375c-1.8062-.127-3.257-2.1802-5.0582-1.9879-1.5029.1609-2.5817,1.8435-4.0738,2.0993-.319.0545-.6313.0405-.9396-.0181v3.1036c.3165.0619.6371.0784.9636.0222,1.4922-.2549,2.5709-1.9384,4.0739-2.0993,1.8012-.1931,3.2519,1.86,5.0581,1.9879,2.0581.1453,3.7267-2.2256,5.7881-2.1563.2469.0084.4863.0521.7199.1205v-3.1003c-.2418-.0726-.4888-.1188-.744-.1279-2.0605-.0693-3.7299,2.3015-5.788,2.1563Z" fill="#fff"/>
+      <path d="M12.5229,28.1871c-1.8062-.1263-3.257-2.1794-5.0582-1.9872-1.5029.1609-2.5817,1.8436-4.0738,2.0994-.3149.0536-.6231.0404-.928-.0157v3.1037c.3132.0602.6297.0751.952.0197,1.4922-.2549,2.5709-1.9384,4.0739-2.0993,1.8012-.193,3.252,1.8609,5.0581,1.9879,2.0581.1453,3.7267-2.2255,5.788-2.1562.2511.0082.4948.0536.7316.1237v-3.1011c-.2452-.0743-.4962-.1221-.7556-.1312-2.0605-.0693-3.73,2.3015-5.788,2.1562Z" fill="#fff"/>
+      <path d="M12.5774,39.4868c-1.8061-.127-3.2569-2.1802-5.058-1.9879-1.503.1609-2.5817,1.8435-4.0739,2.0993-.3339.057-.6603.0388-.9835-.0255v3.1036c.3306.0693.6653.0891,1.0075.0314,1.4921-.255,2.5709-1.9385,4.0738-2.0994,1.8012-.1922,3.252,1.8609,5.0581,1.988,2.0581.1452,3.7267-2.2257,5.7881-2.1563.2319.0074.4565.047.6769.108v-3.1028c-.2279-.0651-.4606-.1064-.701-.1146-2.0604-.0693-3.7299,2.3015-5.788,2.1562Z" fill="#fff"/>
+      <path d="M79.2201,29.1735c0,5.3627-4.4154,8.2131-11.8064,8.2131h-12.0464l.144-1.6426,2.4956-.2899c.9119-.0966,1.2479-.2898,1.2479-.6763V9.752c0-.3865-.24-.4831-1.2479-.6281l-2.4956-.2899-.144-1.6426h12.2384c7.9189,0,10.5106,3.1403,10.5106,6.6671,0,3.865-2.9756,7.0053-7.2951,7.7783v.1932c5.8073.6281,8.3989,3.7684,8.3989,7.3435ZM75.0447,29.5117c0-4.493-3.6955-6.7154-8.8788-6.7154h-2.9757v12.1747l3.7435.6764,1.3919-.0483c3.5515-.1933,6.7191-2.1741,6.7191-6.0874ZM73.8928,15.0663c0-3.7683-2.3517-6.1357-7.679-6.1357h-3.0236v12.078l3.7915-.0483c4.7994-.0483,6.9111-3.1403,6.9111-5.8941Z" fill="#fff"/>
+      <path d="M100.4881,32.652c-1.7275,3.4302-4.895,5.411-8.6385,5.411-5.5673,0-9.6468-4.5414-9.6468-10.822,0-7.0536,5.0394-12.1264,10.9906-12.1264,4.5114,0,7.3907,2.8505,7.3907,7.0053,0,.8213-.096,1.8842-.24,2.5606l-14.4457-.1933c-.048.1933-.048.9663-.048,1.1595,0,5.4593,3.1675,9.3726,7.535,9.3726,2.2077,0,4.4154-.8696,6.1431-2.947l.9596.5797ZM96.7449,22.9895c.24-3.7683-1.5358-6.1839-4.4154-6.1839-2.6397,0-5.4713,2.319-6.2392,6.2323,0,0,10.8466-.0484,10.6546-.0484Z" fill="#fff"/>
+      <path d="M109.9551,35.1159c0,1.546-1.2,2.9954-2.928,2.9954-1.776,0-3.024-1.4494-3.024-2.9954s1.248-2.8987,3.024-2.8987c1.728,0,2.928,1.3527,2.928,2.8987Z" fill="#fff"/>
+      <path d="M144.3351,37.3866h-11.71l.143-1.6426,2.496-.2899c.912-.0966,1.248-.2898,1.248-.6763v-11.8849h-15.502v11.9332c0,.3865.288.5314,1.248.628l2.496.2899.144,1.6426h-11.711l.144-1.6426,2.496-.2899c.912-.0966,1.248-.2898,1.248-.6763V9.752c0-.3865-.24-.4831-1.248-.6281l-2.496-.2899-.144-1.6426h11.711l-.144,1.6426-2.496.2899c-.912.0966-1.248.2899-1.248.6764v11.1118h15.502v-11.1601c0-.4348-.24-.5314-1.248-.6281l-2.496-.2899-.143-1.6426h11.71l-.144,1.6426-2.496.2899c-.912.0966-1.248.2899-1.248.6764v25.0258c0,.3865.24.4831,1.248.628l2.496.2899.144,1.6426Z" fill="#fff"/>
+      <path d="M165.9261,32.652c-1.728,3.4302-4.896,5.411-8.639,5.411-5.568,0-9.647-4.5414-9.647-10.822,0-7.0536,5.039-12.1264,10.991-12.1264,4.511,0,7.391,2.8505,7.391,7.0053,0,.8213-.096,1.8842-.24,2.5606l-14.446-.1933c-.048.1933-.048.9663-.048,1.1595,0,5.4593,3.167,9.3726,7.535,9.3726,2.207,0,4.415-.8696,6.143-2.947l.96.5797ZM162.1821,22.9895c.24-3.7683-1.536-6.1839-4.415-6.1839-2.64,0-5.472,2.319-6.24,6.2323,0,0,10.847-.0484,10.655-.0484Z" fill="#fff"/>
+      <path d="M185.4281,17.5302c0,1.3528-.816,2.464-2.256,2.464-1.008,0-1.871-.7247-2.303-1.546-1.488.9179-3.696,3.1403-4.896,5.5559v10.8703c0,.3865.192.628,1.296.6764l2.544.1932.144,1.6426h-10.703l.144-1.6426,1.92-.1932c.864-.0484,1.2-.2416,1.2-.7247v-13.6724c0-2.2224-.24-2.5123-1.488-2.8505l-1.968-.2898.096-1.3045,6.815-1.5943v6.2806h.192c2.784-4.6863,4.512-6.3289,6.575-6.3289,1.728,0,2.688,1.1112,2.688,2.4639Z" fill="#fff"/>
+      <path d="M205.7931,32.652c-1.728,3.4302-4.895,5.411-8.639,5.411-5.567,0-9.647-4.5414-9.647-10.822,0-7.0536,5.04-12.1264,10.991-12.1264,4.511,0,7.391,2.8505,7.391,7.0053,0,.8213-.096,1.8842-.24,2.5606l-14.446-.1933c-.048.1933-.048.9663-.048,1.1595,0,5.4593,3.168,9.3726,7.535,9.3726,2.208,0,4.415-.8696,6.143-2.947l.96.5797ZM202.0501,22.9895c.24-3.7683-1.536-6.1839-4.416-6.1839-2.64,0-5.471,2.319-6.239,6.2323,0,0,10.847-.0484,10.655-.0484Z" fill="#fff"/>
+      <path d="M215.0001,35.1159c0,1.546-1.199,2.9954-2.927,2.9954-1.776,0-3.024-1.4494-3.024-2.9954s1.248-2.8987,3.024-2.8987c1.728,0,2.927,1.3527,2.927,2.8987Z" fill="#fff"/>
+    </svg>
+    <div class="hdr-sub">Paddle Board Hire</div>
+  </div>
+  <div class="hdr-right">
+    <a href="hub.html" class="hdr-hub">‹ Hub</a>
+  </div>
+</header>
+
+<!-- Stats strip -->
+<div class="stats-strip">
+  <div class="stat-chip"><div class="stat-dot avail"></div><span class="stat-num" id="cntAvail">—</span><span class="stat-lbl">&nbsp;Available</span></div>
+  <div class="stat-chip"><div class="stat-dot out"></div><span class="stat-num" id="cntOut">—</span><span class="stat-lbl">&nbsp;Out</span></div>
+  <div class="stat-chip"><div class="stat-dot over"></div><span class="stat-num" id="cntOver">—</span><span class="stat-lbl">&nbsp;Overdue</span></div>
+</div>
+
+<div class="main">
+  <div class="section-lbl">Boards 1–4 · WatersEdge base</div>
+  <div class="board-grid" id="gridWE"></div>
+
+  <div class="section-lbl">Boards 5–6 · Little Horseshoe base</div>
+  <div class="board-grid" id="gridLH"></div>
+</div>
+
+<!-- ══════════════════════════════════════
+     HAND-OUT MODAL
+══════════════════════════════════════ -->
+<div class="modal-overlay" id="hoModal" style="display:none" onclick="outsideClose(event,'hoModal')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-inner">
+      <div class="modal-title">Hand Out — Board <span id="hoBoardNum">1</span></div>
+      <div class="modal-sub" id="hoSub">WatersEdge</div>
+
+      <div id="hoMsg" class="msg"></div>
+
+      <!-- Guest from current arrivals -->
+      <div class="fld">
+        <label>Guest / Current Booking <span style="color:var(--red)">*</span></label>
+        <select id="hoGuest" onchange="onGuestSelect()">
+          <option value="">Loading guests…</option>
+        </select>
+        <div class="waiver-result" id="waiverResult"></div>
+      </div>
+
+      <div class="fld-row">
+        <div class="fld">
+          <label>Staff handing over <span style="color:var(--red)">*</span></label>
+          <select id="hoStaff">
+            <option value="">Select…</option>
+            <option>Saul</option><option>Barry</option><option>Mike</option>
+            <option>Meg</option><option>Alan</option>
+          </select>
+        </div>
+        <div class="fld">
+          <label>Hire duration</label>
+          <div class="dur-row" style="margin-top:0">
+            <button class="dur-btn active" id="dur24" onclick="setDur(24,this)">24 hrs</button>
+            <button class="dur-btn" id="dur48" onclick="setDur(48,this)">48 hrs</button>
+          </div>
+        </div>
+      </div>
+
+      <div id="hoReturnNote" class="msg" style="display:block; background:var(--blue-bg); color:var(--blue); border:1px solid var(--blue-bdr)"></div>
+
+      <div class="divider"></div>
+      <div class="checklist-title">🏄 Pre-Hire Equipment Check — all must be ticked</div>
+
+      <label class="check-item" id="ci_inflated">
+        <input type="checkbox" id="ch_inflated" onchange="tickCheck(this,'ci_inflated')">
+        <div class="ci-text"><div class="ci-label">Board inflated</div><div class="ci-sub">Firm to touch, valve secure</div></div>
+      </label>
+      <label class="check-item" id="ci_fin">
+        <input type="checkbox" id="ch_fin" onchange="tickCheck(this,'ci_fin')">
+        <div class="ci-text"><div class="ci-label">Fin attached</div><div class="ci-sub">Fin fitted and locked</div></div>
+      </label>
+      <label class="check-item" id="ci_cond">
+        <input type="checkbox" id="ch_cond" onchange="tickCheck(this,'ci_cond')">
+        <div class="ci-text"><div class="ci-label">Board condition checked</div><div class="ci-sub">No damage, seams intact</div></div>
+      </label>
+      <label class="check-item" id="ci_lj">
+        <input type="checkbox" id="ch_lj" onchange="tickCheck(this,'ci_lj')">
+        <div class="ci-text"><div class="ci-label">Life jacket present &amp; good condition</div><div class="ci-sub">Correct size, all clips working</div></div>
+      </label>
+      <label class="check-item" id="ci_oar">
+        <input type="checkbox" id="ch_oar" onchange="tickCheck(this,'ci_oar')">
+        <div class="ci-text"><div class="ci-label">Paddle / oar present</div><div class="ci-sub">Correct length, clip intact</div></div>
+      </label>
+
+      <div class="fld" style="margin-top:14px">
+        <label>Notes (optional)</label>
+        <textarea id="hoNotes" placeholder="Any observations before handover…"></textarea>
+      </div>
+
+      <button class="submit-btn" id="hoSubmit" onclick="submitHandOut()" disabled>Hand Out Board</button>
+      <button class="btn-cancel" onclick="closeModal('hoModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     RETURN / COLLECT MODAL
+══════════════════════════════════════ -->
+<div class="modal-overlay" id="retModal" style="display:none" onclick="outsideClose(event,'retModal')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-inner">
+      <div class="modal-title">Collect — Board <span id="retBoardNum">1</span></div>
+
+      <!-- Hire summary -->
+      <div class="hire-summary" id="retSummary"></div>
+
+      <div id="retMsg" class="msg"></div>
+
+      <div class="fld">
+        <label>Staff collecting <span style="color:var(--red)">*</span></label>
+        <select id="retStaff">
+          <option value="">Select…</option>
+          <option>Saul</option><option>Barry</option><option>Mike</option>
+          <option>Meg</option><option>Alan</option>
+        </select>
+      </div>
+
+      <div class="divider"></div>
+      <div class="checklist-title">🔍 Return Equipment Check</div>
+      <div style="font-size:11px; color:var(--sage-mid); margin-bottom:10px;">Untick anything missing or damaged — will auto-flag to management</div>
+
+      <label class="check-item ticked" id="ri_board">
+        <input type="checkbox" id="rh_board" checked onchange="tickReturnCheck(this,'ri_board','Board')">
+        <div class="ci-text"><div class="ci-label">Board returned</div><div class="ci-sub">Physically returned with hire</div></div>
+      </label>
+      <label class="check-item ticked" id="ri_fin">
+        <input type="checkbox" id="rh_fin" checked onchange="tickReturnCheck(this,'ri_fin','Fin')">
+        <div class="ci-text"><div class="ci-label">Fin present</div><div class="ci-sub">Fin attached and undamaged</div></div>
+      </label>
+      <label class="check-item ticked" id="ri_lj">
+        <input type="checkbox" id="rh_lj" checked onchange="tickReturnCheck(this,'ri_lj','Life jacket')">
+        <div class="ci-text"><div class="ci-label">Life jacket returned</div><div class="ci-sub">Present and in reasonable condition</div></div>
+      </label>
+      <label class="check-item ticked" id="ri_oar">
+        <input type="checkbox" id="rh_oar" checked onchange="tickReturnCheck(this,'ri_oar','Paddle/oar')">
+        <div class="ci-text"><div class="ci-label">Paddle / oar returned</div><div class="ci-sub">Clip intact, no obvious damage</div></div>
+      </label>
+
+      <div class="divider"></div>
+      <div class="checklist-title">📋 Board Condition on Return</div>
+      <div class="cond-row" id="condRow">
+        <button class="cond-btn active good" onclick="setCondition('good',this)">✓ Good</button>
+        <button class="cond-btn" onclick="setCondition('minor',this)">⚠ Minor marks</button>
+        <button class="cond-btn" onclick="setCondition('damaged',this)">✕ Damaged</button>
+        <button class="cond-btn" onclick="setCondition('missing',this)">✕ Board missing</button>
+      </div>
+
+      <!-- Issue panel — shown when anything flagged -->
+      <div class="issue-flag" id="issueFlag">
+        <strong>⚠ Issue will be flagged to management</strong>
+        <span id="issueFlagItems"></span>
+      </div>
+
+      <div class="fld" id="issueField" style="display:none; margin-top:12px;">
+        <label>Issue description <span style="color:var(--red)">*</span></label>
+        <textarea id="retIssues" placeholder="Describe damage or missing items for the management record…"></textarea>
+      </div>
+
+      <div class="fld" style="margin-top:14px">
+        <label>Notes (optional)</label>
+        <textarea id="retNotes" placeholder="Any other observations on collection…"></textarea>
+      </div>
+
+      <button class="submit-btn" id="retSubmit" onclick="submitReturn()">Record Return</button>
+      <button class="btn-cancel" onclick="closeModal('retModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+/* ════════════════════════════════════
+   CONFIG
+════════════════════════════════════ */
+const API_TOKEN      = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const ARRIVALS_BOARD = 5094453064;
+const WAIVER_COL     = 'date_mm2jrjej';
+const PROP_COL       = 'text_mm2ahbrx';
+const ARRIVAL_COL    = 'date_mm2adtwg';
+const GUEST_NAME_COL = 'text_mm2ah8s';   // booking ref / lead guest column
+
+const LS_STATE    = 'pbState_v1';
+const LS_BOARD_ID = 'pbMondayBoardId';
+
+const BOARD_BASE = {
+  1:'WatersEdge', 2:'WatersEdge', 3:'WatersEdge', 4:'WatersEdge',
+  5:'Little Horseshoe', 6:'Little Horseshoe'
+};
+
+/* ════════════════════════════════════
+   STATE
+════════════════════════════════════ */
+let state = {};          // { [1..6]: { status, location, hire } }
+let activeBoard = null;
+let hireDur = 24;
+let returnIssues = [];   // flagged items on return
+let condition = 'good';
+let guestList = [];      // [{id, name, property, hasWaiver, arrivalDate}]
+let mondayBoardId = null;
+
+function loadState() {
+  try { state = JSON.parse(localStorage.getItem(LS_STATE) || '{}'); } catch(e) { state = {}; }
+  for (let i = 1; i <= 6; i++) {
+    if (!state[i]) state[i] = { status:'available', location:BOARD_BASE[i], hire:null };
+  }
+  mondayBoardId = localStorage.getItem(LS_BOARD_ID) || null;
+}
+
+function saveState() {
+  localStorage.setItem(LS_STATE, JSON.stringify(state));
+}
+
+function checkOverdue() {
+  const now = Date.now();
+  let changed = false;
+  for (let i = 1; i <= 6; i++) {
+    const b = state[i];
+    if ((b.status === 'out') && b.hire?.dueBack) {
+      if (new Date(b.hire.dueBack).getTime() < now) {
+        b.status = 'overdue'; changed = true;
+      }
+    }
+  }
+  if (changed) saveState();
+}
+
+/* ════════════════════════════════════
+   MONDAY API
+════════════════════════════════════ */
+async function mq(query) {
+  const r = await fetch('https://api.monday.com/v2', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':API_TOKEN,'API-Version':'2024-01'},
+    body:JSON.stringify({ query })
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+async function getOrCreateHireBoard() {
+  if (mondayBoardId) return mondayBoardId;
+  try {
+    const d = await mq(`mutation {
+      create_board(board_name: "Paddle Board Hires", board_kind: public) { id }
+    }`);
+    mondayBoardId = String(d.create_board.id);
+    localStorage.setItem(LS_BOARD_ID, mondayBoardId);
+    return mondayBoardId;
+  } catch(e) {
+    console.error('Could not create Monday board:', e);
+    return null;
+  }
+}
+
+async function logToMonday(boardId, itemName, updateText) {
+  if (!boardId) return null;
+  try {
+    const d = await mq(`mutation {
+      create_item(board_id: ${boardId}, item_name: "${esc(itemName)}") { id }
+    }`);
+    const itemId = d.create_item.id;
+    await mq(`mutation {
+      create_update(item_id: ${itemId}, body: "${esc(updateText)}") { id }
+    }`);
+    return itemId;
+  } catch(e) {
+    console.warn('Monday log failed:', e.message);
+    return null;
+  }
+}
+
+async function appendMondayUpdate(itemId, text) {
+  if (!itemId || !mondayBoardId) return;
+  try {
+    await mq(`mutation {
+      create_update(item_id: ${itemId}, body: "${esc(text)}") { id }
+    }`);
+  } catch(e) {
+    console.warn('Monday update failed:', e.message);
+  }
+}
+
+/* ════════════════════════════════════
+   LOAD CURRENT GUESTS FROM MONDAY
+════════════════════════════════════ */
+async function loadGuests() {
+  const sel = document.getElementById('hoGuest');
+  try {
+    const d = await mq(`{
+      boards(ids:[${ARRIVALS_BOARD}]) {
+        items_page(limit:100) {
+          items {
+            id
+            name
+            column_values(ids:["${PROP_COL}","${ARRIVAL_COL}","${WAIVER_COL}","${GUEST_NAME_COL}"]) {
+              id text
+            }
+          }
+        }
+      }
+    }`);
+    const items = d?.boards?.[0]?.items_page?.items || [];
+    const today = new Date(); today.setHours(0,0,0,0);
+    const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + 30);
+    const cutoffPast = new Date(today); cutoffPast.setDate(cutoffPast.getDate() - 14);
+
+    guestList = [];
+    for (const item of items) {
+      const cv = {};
+      for (const c of item.column_values) cv[c.id] = c.text || '';
+      const property = cv[PROP_COL] || item.name;
+      const arrStr   = cv[ARRIVAL_COL];
+      const waiverDt = cv[WAIVER_COL];
+      if (arrStr) {
+        const arr = new Date(arrStr);
+        if (arr < cutoffPast || arr > cutoff) continue; // outside window
+      }
+      guestList.push({
+        id: item.id,
+        name: item.name,
+        property,
+        hasWaiver: !!(waiverDt && waiverDt.trim()),
+        arrivalDate: cv[ARRIVAL_COL] || '',
+        bookingRef: cv[GUEST_NAME_COL] || ''
+      });
+    }
+
+    sel.innerHTML = '<option value="">Select current guest…</option>';
+    if (guestList.length === 0) {
+      sel.innerHTML = '<option value="">— No current arrivals found —</option>';
+    } else {
+      guestList.forEach((g, idx) => {
+        const o = document.createElement('option');
+        o.value = idx;
+        o.textContent = `${g.name}${g.property ? ' · ' + g.property : ''}`;
+        sel.appendChild(o);
+      });
+    }
+  } catch(e) {
+    sel.innerHTML = '<option value="">Error loading guests: ' + e.message.slice(0,40) + '</option>';
+  }
+}
+
+function onGuestSelect() {
+  const idx = document.getElementById('hoGuest').value;
+  const res = document.getElementById('waiverResult');
+  if (idx === '') { res.className = 'waiver-result'; updateHoSubmit(); return; }
+  const g = guestList[parseInt(idx)];
+  if (!g) { res.className = 'waiver-result'; updateHoSubmit(); return; }
+  if (g.hasWaiver) {
+    res.className = 'waiver-result ok';
+    res.textContent = '✓ Waiver on file — signed';
+  } else {
+    res.className = 'waiver-result warn';
+    res.textContent = '⚠ No waiver found — confirm with management before proceeding';
+  }
+  updateHoSubmit();
+}
+
+/* ════════════════════════════════════
+   RENDER BOARDS
+════════════════════════════════════ */
+function fmtDue(dueStr) {
+  if (!dueStr) return { text:'—', cls:'ok' };
+  const due = new Date(dueStr);
+  const diff = due - Date.now();
+  const h = Math.floor(diff / 3600000);
+  const now = new Date();
+  const dueDate = due.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+  const dueTime = due.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+  let cls = 'ok';
+  let text = '';
+  if (diff < 0) {
+    const over = Math.abs(h);
+    text = `Overdue by ${over}h${Math.abs(Math.round((diff/60000)%60))}m`;
+    cls = 'overdue';
+  } else if (h <= 3) {
+    text = `Due back in ${h}h — ${dueTime}`;
+    cls = 'soon';
+  } else {
+    text = `Due back ${dueDate} ${dueTime}`;
+    cls = 'ok';
+  }
+  return { text, cls };
+}
+
+function renderBoards() {
+  checkOverdue();
+  const weGrid = document.getElementById('gridWE');
+  const lhGrid = document.getElementById('gridLH');
+  weGrid.innerHTML = '';
+  lhGrid.innerHTML = '';
+
+  let avail = 0, out = 0, over = 0;
+
+  for (let i = 1; i <= 6; i++) {
+    const b = state[i];
+    const status = b.status || 'available';
+    if (status === 'available') avail++;
+    else if (status === 'overdue') over++;
+    else out++;
+
+    const card = document.createElement('div');
+    card.className = `board-card ${status}`;
+
+    const badgeText = { available:'Available', out:'Out on hire', overdue:'Overdue', maintenance:'Maintenance' }[status] || status;
+    let inner = `
+      <div class="bc-head">
+        <div class="bc-num">Board ${i}</div>
+        <div class="bc-badge ${status}">${badgeText}</div>
+      </div>
+      <div class="bc-loc">${b.location || BOARD_BASE[i]}</div>`;
+
+    if ((status === 'out' || status === 'overdue') && b.hire) {
+      const due = fmtDue(b.hire.dueBack);
+      inner += `
+        <div class="bc-guest">${b.hire.guestName || '—'}</div>
+        <div class="bc-prop">${b.hire.property || ''}</div>
+        <div class="bc-due ${due.cls}">${due.text}</div>
+        <div class="bc-dur">Hire: ${b.hire.duration || 24}h · Out: ${fmtHandedOut(b.hire.handedOut)}</div>`;
+      const btnCls = status === 'overdue' ? 'collect' : (due.cls === 'soon' ? 'collect-soon' : 'collect');
+      inner += `<button class="bc-btn ${btnCls}" onclick="openReturnModal(${i})">Record Return</button>`;
+    } else if (status === 'available') {
+      inner += `<button class="bc-btn handout" onclick="openHandOutModal(${i})">Hand Out</button>`;
+    } else if (status === 'maintenance') {
+      inner += `<div class="bc-dur" style="color:var(--sage-mid);margin-bottom:8px">In maintenance</div>`;
+    }
+
+    card.innerHTML = inner;
+    if (i <= 4) weGrid.appendChild(card);
+    else        lhGrid.appendChild(card);
+  }
+
+  document.getElementById('cntAvail').textContent = avail;
+  document.getElementById('cntOut').textContent   = out;
+  document.getElementById('cntOver').textContent  = over;
+}
+
+function fmtHandedOut(dtStr) {
+  if (!dtStr) return '—';
+  return new Date(dtStr).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+}
+
+/* ════════════════════════════════════
+   HAND-OUT MODAL
+════════════════════════════════════ */
+function openHandOutModal(boardNum) {
+  activeBoard = boardNum;
+  hireDur = 24;
+
+  document.getElementById('hoBoardNum').textContent = boardNum;
+  document.getElementById('hoSub').textContent = `Currently at: ${state[boardNum]?.location || BOARD_BASE[boardNum]}`;
+  document.getElementById('hoMsg').className = 'msg';
+
+  // Reset form
+  document.getElementById('hoGuest').value = '';
+  document.getElementById('hoStaff').value = '';
+  document.getElementById('hoNotes').value = '';
+  document.getElementById('waiverResult').className = 'waiver-result';
+  document.getElementById('dur24').className = 'dur-btn active';
+  document.getElementById('dur48').className = 'dur-btn';
+  ['ch_inflated','ch_fin','ch_cond','ch_lj','ch_oar'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.checked = false; el.closest('.check-item')?.classList.remove('ticked'); }
+  });
+
+  updateReturnNote();
+  updateHoSubmit();
+  loadGuests();
+  document.getElementById('hoModal').style.display = 'flex';
+}
+
+function setDur(d, btn) {
+  hireDur = d;
+  document.getElementById('dur24').className = 'dur-btn' + (d === 24 ? ' active' : '');
+  document.getElementById('dur48').className = 'dur-btn' + (d === 48 ? ' active' : '');
+  updateReturnNote();
+}
+
+function updateReturnNote() {
+  const el = document.getElementById('hoReturnNote');
+  const due = new Date(Date.now() + hireDur * 3600000);
+  const dueStr = due.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'short' }) + ' at ' +
+    due.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
+  el.textContent = `Due back: ${dueStr}`;
+  el.style.display = 'block';
+}
+
+function tickCheck(cb, wrapperId) {
+  document.getElementById(wrapperId)?.classList.toggle('ticked', cb.checked);
+  updateHoSubmit();
+}
+
+function updateHoSubmit() {
+  const allTicked = ['ch_inflated','ch_fin','ch_cond','ch_lj','ch_oar'].every(id => document.getElementById(id)?.checked);
+  const hasGuest  = document.getElementById('hoGuest').value !== '';
+  const hasStaff  = document.getElementById('hoStaff').value !== '';
+  document.getElementById('hoSubmit').disabled = !(allTicked && hasGuest && hasStaff);
+}
+
+async function submitHandOut() {
+  const guestIdx = document.getElementById('hoGuest').value;
+  const staff    = document.getElementById('hoStaff').value;
+  const notes    = document.getElementById('hoNotes').value.trim();
+  if (guestIdx === '' || !staff) return;
+
+  const g = guestList[parseInt(guestIdx)];
+  const btn = document.getElementById('hoSubmit');
+  btn.disabled = true;
+  showMsgEl('hoMsg', 'Logging to Monday…', 'loading');
+
+  const now = new Date();
+  const dueBack = new Date(now.getTime() + hireDur * 3600000);
+
+  // Log to Monday
+  const boardId = await getOrCreateHireBoard();
+  const itemName = `Board ${activeBoard} · ${g.name} · ${now.toLocaleDateString('en-GB')}`;
+  const updateText = `🏄 HAND OUT — Board ${activeBoard}\\nGuest: ${g.name}\\nProperty: ${g.property}\\nHanded out: ${now.toLocaleString('en-GB')}\\nDue back: ${dueBack.toLocaleString('en-GB')}\\nDuration: ${hireDur}h\\nStaff: ${staff}\\nWaiver on file: ${g.hasWaiver ? 'Yes' : 'NOT CONFIRMED'}\\nEquipment check: All items confirmed\\n${notes ? 'Notes: ' + notes : ''}`;
+  const mondayItemId = await logToMonday(boardId, itemName, updateText);
+
+  // Update local state
+  state[activeBoard] = {
+    status: 'out',
+    location: g.property || state[activeBoard]?.location || BOARD_BASE[activeBoard],
+    hire: {
+      guestName:    g.name,
+      guestMondayId: g.id,
+      property:     g.property,
+      handedOut:    now.toISOString(),
+      dueBack:      dueBack.toISOString(),
+      duration:     hireDur,
+      staff,
+      waiverOk:     g.hasWaiver,
+      mondayItemId: mondayItemId || null,
+      notes
+    }
+  };
+  saveState();
+
+  showMsgEl('hoMsg', `✓ Board ${activeBoard} handed out to ${g.name} — due back ${dueBack.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})} ${dueBack.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}`, 'success');
+
+  setTimeout(() => {
+    closeModal('hoModal');
+    renderBoards();
+    showToast(`Board ${activeBoard} out · ${g.name}`, 'ok');
+  }, 1800);
+}
+
+/* ════════════════════════════════════
+   RETURN MODAL
+════════════════════════════════════ */
+function openReturnModal(boardNum) {
+  activeBoard = boardNum;
+  const b = state[boardNum];
+  const hire = b?.hire;
+
+  document.getElementById('retBoardNum').textContent = boardNum;
+  document.getElementById('retMsg').className = 'msg';
+  document.getElementById('retStaff').value = '';
+  document.getElementById('retNotes').value = '';
+  document.getElementById('retIssues').value = '';
+  returnIssues = [];
+  condition = 'good';
+
+  // Reset condition buttons
+  document.querySelectorAll('.cond-btn').forEach(b => b.classList.remove('active','good','damaged','missing','minor'));
+  document.querySelector('.cond-btn').classList.add('active','good');
+
+  // Reset return checklist to all ticked
+  ['rh_board','rh_fin','rh_lj','rh_oar'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.checked = true; el.closest('.check-item')?.classList.add('ticked'); el.closest('.check-item')?.classList.remove('flagged'); }
+  });
+  document.getElementById('issueFlag').classList.remove('show');
+  document.getElementById('issueField').style.display = 'none';
+
+  // Hire summary
+  const sumEl = document.getElementById('retSummary');
+  if (hire) {
+    const due = fmtDue(hire.dueBack);
+    const isOver = b.status === 'overdue';
+    sumEl.innerHTML = `
+      <div class="hs-board">Board ${boardNum}</div>
+      <div class="hs-guest">${hire.guestName || '—'}</div>
+      <div class="hs-meta">${hire.property || ''} · ${hire.duration || 24}h hire</div>
+      <div class="hs-row">
+        <div class="hs-stat"><div class="hs-val">${fmtTime(hire.handedOut)}</div><div class="hs-lbl">Handed out</div></div>
+        <div class="hs-stat ${isOver ? 'hs-overdue' : ''}"><div class="hs-val">${fmtTime(hire.dueBack)}</div><div class="hs-lbl">${isOver ? '⚠ Overdue' : 'Due back'}</div></div>
+      </div>`;
+  }
+
+  updateIssueFlag();
+  document.getElementById('retModal').style.display = 'flex';
+}
+
+function fmtTime(isoStr) {
+  if (!isoStr) return '—';
+  return new Date(isoStr).toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+}
+
+function tickReturnCheck(cb, wrapperId, label) {
+  const el = document.getElementById(wrapperId);
+  if (el) {
+    el.classList.toggle('ticked', cb.checked);
+    el.classList.toggle('flagged', !cb.checked);
+  }
+  if (!cb.checked && !returnIssues.includes(label)) returnIssues.push(label);
+  if (cb.checked) returnIssues = returnIssues.filter(x => x !== label);
+  updateIssueFlag();
+}
+
+function setCondition(c, btn) {
+  condition = c;
+  document.querySelectorAll('.cond-btn').forEach(b => b.classList.remove('active','good','damaged','missing','minor'));
+  btn.classList.add('active', c);
+  if (c !== 'good' && !returnIssues.includes('Board condition')) returnIssues.push('Board condition: ' + c);
+  if (c === 'good') returnIssues = returnIssues.filter(x => !x.startsWith('Board condition'));
+  updateIssueFlag();
+}
+
+function updateIssueFlag() {
+  const hasIssues = returnIssues.length > 0;
+  const flagEl = document.getElementById('issueFlag');
+  const fieldEl = document.getElementById('issueField');
+  flagEl.classList.toggle('show', hasIssues);
+  fieldEl.style.display = hasIssues ? 'block' : 'none';
+  document.getElementById('issueFlagItems').textContent = hasIssues ? ' Missing/damaged: ' + returnIssues.join(', ') : '';
+}
+
+async function submitReturn() {
+  const staff  = document.getElementById('retStaff').value;
+  const notes  = document.getElementById('retNotes').value.trim();
+  const issues = document.getElementById('retIssues').value.trim();
+  const hasIssues = returnIssues.length > 0;
+
+  if (!staff) { showMsgEl('retMsg','Please select staff member','error'); return; }
+  if (hasIssues && !issues) { showMsgEl('retMsg','Please describe the issues','error'); return; }
+
+  const btn = document.getElementById('retSubmit');
+  btn.disabled = true;
+  showMsgEl('retMsg', 'Logging return…', 'loading');
+
+  const now = new Date();
+  const hire = state[activeBoard]?.hire;
+  const boardId = await getOrCreateHireBoard();
+
+  // Update Monday item with return details
+  const returnText = `✅ RETURNED — Board ${activeBoard}\\nCollected: ${now.toLocaleString('en-GB')}\\nCollected by: ${staff}\\nCondition: ${condition}\\n${hasIssues ? '⚠ ISSUES: ' + returnIssues.join(', ') + '\\nDetail: ' + issues : 'No issues'}\\n${notes ? 'Notes: ' + notes : ''}`;
+  if (hire?.mondayItemId) {
+    await appendMondayUpdate(hire.mondayItemId, returnText);
+  } else if (boardId) {
+    const itemName = `Return: Board ${activeBoard} · ${hire?.guestName || '?'} · ${now.toLocaleDateString('en-GB')}`;
+    await logToMonday(boardId, itemName, returnText);
+  }
+
+  // Update local state
+  state[activeBoard] = {
+    status: 'available',
+    location: BOARD_BASE[activeBoard],
+    hire: null
+  };
+  saveState();
+
+  const msg = hasIssues
+    ? `⚠ Board ${activeBoard} returned — issues flagged to management`
+    : `✓ Board ${activeBoard} returned — all good`;
+
+  showMsgEl('retMsg', msg, hasIssues ? 'loading' : 'success');
+  setTimeout(() => {
+    closeModal('retModal');
+    renderBoards();
+    showToast(hasIssues ? `Board ${activeBoard} returned — issues flagged` : `Board ${activeBoard} returned ✓`, hasIssues ? 'warn' : 'ok');
+  }, 1800);
+}
+
+/* ════════════════════════════════════
+   UTILITIES
+════════════════════════════════════ */
+function esc(s) {
+  return String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,'\\n');
+}
+
+function outsideClose(e, modalId) {
+  if (e.target === document.getElementById(modalId)) closeModal(modalId);
+}
+
+function closeModal(id) {
+  document.getElementById(id).style.display = 'none';
+  activeBoard = null;
+}
+
+function showMsgEl(id, text, type) {
+  const el = document.getElementById(id);
+  el.textContent = text;
+  el.className = 'msg show ' + type;
+}
+
+function showToast(text, type = '') {
+  const t = document.getElementById('toast');
+  t.textContent = text;
+  t.className = 'toast show' + (type ? ' ' + type : '');
+  clearTimeout(t._timer);
+  t._timer = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+/* ════════════════════════════════════
+   INIT
+════════════════════════════════════ */
+document.addEventListener('DOMContentLoaded', () => {
+  loadState();
+  renderBoards();
+  // Refresh every 5 minutes to update countdowns
+  setInterval(() => renderBoards(), 300000);
+});
+</script>
+</body>
+</html>

@@ -540,6 +540,192 @@
       height: 8px;
       border-radius: 50%;
     }
+
+    /* ── WORKING SHEET MODAL ── */
+    .ws-overlay {
+      position: fixed;
+      inset: 0;
+      background: rgba(39,47,46,0.6);
+      z-index: 9000;
+      display: flex;
+      align-items: flex-start;
+      justify-content: center;
+      padding: 32px 16px 48px;
+      overflow-y: auto;
+    }
+    .ws-modal {
+      background: #fff;
+      border-radius: 16px;
+      width: 100%;
+      max-width: 900px;
+      box-shadow: 0 8px 48px rgba(0,0,0,0.28);
+      font-family: 'Instrument Sans', 'Segoe UI', system-ui, sans-serif;
+    }
+    .ws-modal-header {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      padding: 20px 24px 16px;
+      border-bottom: 1px solid #e8e4dc;
+    }
+    .ws-modal-title {
+      font-size: 17px;
+      font-weight: 700;
+      color: var(--green-dark);
+    }
+    .ws-modal-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-top: 2px;
+    }
+    .ws-modal-header-left { flex: 1; }
+    .ws-print-btn {
+      background: var(--green-dark);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 8px 16px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      font-family: inherit;
+    }
+    .ws-close-btn {
+      background: none;
+      border: 1px solid #e0ddd6;
+      border-radius: 8px;
+      padding: 7px 12px;
+      font-size: 13px;
+      cursor: pointer;
+      font-family: inherit;
+      color: var(--text);
+    }
+    .ws-modal-body {
+      padding: 20px 24px 28px;
+      display: flex;
+      flex-direction: column;
+      gap: 16px;
+    }
+    .ws-property-block {
+      border: 1px solid #e8e4dc;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .ws-property-header {
+      background: var(--green-light);
+      padding: 10px 16px;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+    }
+    .ws-property-name {
+      font-size: 14px;
+      font-weight: 700;
+      color: var(--green-dark);
+      flex: 1;
+    }
+    .ws-property-meta {
+      font-size: 11px;
+      color: var(--green);
+    }
+    .ws-calc-grid {
+      display: grid;
+      grid-template-columns: 1fr auto auto;
+    }
+    .ws-calc-label {
+      padding: 5px 16px;
+      font-size: 12px;
+      color: #444;
+      border-bottom: 1px solid #f5f2ed;
+    }
+    .ws-calc-working {
+      padding: 5px 12px;
+      font-size: 11px;
+      color: var(--muted);
+      font-style: italic;
+      border-bottom: 1px solid #f5f2ed;
+      text-align: right;
+    }
+    .ws-calc-value {
+      padding: 5px 16px;
+      font-size: 12px;
+      font-weight: 700;
+      color: var(--green-dark);
+      border-bottom: 1px solid #f5f2ed;
+      text-align: right;
+      min-width: 36px;
+    }
+    .ws-calc-group-header {
+      grid-column: 1 / -1;
+      background: #faf8f5;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--green);
+      padding: 5px 16px;
+      border-bottom: 1px solid #eeebe5;
+    }
+    .ws-totals-block {
+      background: var(--green-dark);
+      border-radius: 10px;
+      color: #fff;
+      padding: 16px 20px;
+    }
+    .ws-totals-title {
+      font-size: 11px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: rgba(255,255,255,0.55);
+      margin-bottom: 12px;
+    }
+    .ws-totals-grid {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 8px;
+    }
+    .ws-total-item {
+      background: rgba(255,255,255,0.1);
+      border-radius: 6px;
+      padding: 8px 10px;
+    }
+    .ws-total-item-label {
+      font-size: 10px;
+      color: rgba(255,255,255,0.55);
+      margin-bottom: 3px;
+    }
+    .ws-total-item-value {
+      font-size: 22px;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+    .ws-open-btn {
+      background: none;
+      border: 1px solid rgba(255,255,255,0.25);
+      border-radius: 6px;
+      color: rgba(255,255,255,0.8);
+      font-size: 11px;
+      font-weight: 600;
+      padding: 4px 10px;
+      cursor: pointer;
+      font-family: inherit;
+      margin-left: auto;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .ws-open-btn:hover { background: rgba(255,255,255,0.12); }
+    .own-laundry-panel .ws-open-btn {
+      border-color: rgba(175,146,106,0.4);
+      color: var(--amber);
+    }
+    .own-laundry-panel .ws-open-btn:hover { background: rgba(175,146,106,0.1); }
+    @media print {
+      body > *:not(.ws-overlay) { display: none !important; }
+      .ws-overlay { position: static !important; background: none !important; padding: 0 !important; display: block !important; }
+      .ws-modal { box-shadow: none !important; border-radius: 0 !important; max-width: 100% !important; }
+      .ws-print-btn, .ws-close-btn { display: none !important; }
+    }
   </style>
 </head>
 
@@ -621,6 +807,7 @@
         <div class="panel-title">Regency Order</div>
         <div class="panel-date" id="laundryDeliveryDate">—</div>
         <div class="laundry-header-sub" id="laundryCoversDates"></div>
+        <button class="ws-open-btn" onclick="openWorkingSheet('regency')">📋 Working Sheet</button>
       </div>
       <div class="panel-body laundry-body" id="regencyLaundryBody">
         <div class="empty-state">Loading…</div>
@@ -632,6 +819,7 @@
       <div class="panel-header">
         <div class="panel-title">Own Laundry</div>
         <div class="panel-date" style="font-size:13px;color:var(--muted)">Yellowstone · Little Horseshoe · Glamping · Hideaway · Tranquility · Beaver Brook</div>
+        <button class="ws-open-btn" onclick="openWorkingSheet('ownLaundry')">📋 Working Sheet</button>
       </div>
       <div class="panel-body laundry-body" id="ownLaundryBody">
         <div class="empty-state">Loading…</div>
@@ -1329,7 +1517,198 @@
 
     // Kick off automatically — no token entry required
     window.addEventListener('DOMContentLoaded', init);
+
+    // ── WORKING SHEET MODAL ──
+    function openWorkingSheet(type) {
+      const today = new Date(); today.setHours(0, 0, 0, 0);
+      const addD = (d, n) => { const r = new Date(d); r.setDate(r.getDate() + n); return r; };
+      const past   = buildDeliveryWindow(getLastDeliveryDate(today));
+      const centre = buildDeliveryWindow(addD(past.deliveryDate, 1));
+      const centreL = winLabel(centre);
+      const parsed = allItems.map(parseItem);
+      const currentArrivals = dedupe(parsed.filter(i => centre.coveredKeys.includes(i.arrivalDate)));
+      const arrivals = currentArrivals.filter(a => getLaundryCategory(a.property) === type);
+
+      const label = type === 'regency' ? 'Regency Order' : 'Own Laundry';
+      document.getElementById('wsSubtitle').textContent =
+        `${label} · Delivery: ${centreL.delivery} · Covers: ${centreL.covers}`;
+
+      const overlay = document.getElementById('wsOverlay');
+      overlay.style.display = 'flex';
+      overlay.scrollTop = 0;
+
+      if (!arrivals.length) {
+        document.getElementById('wsBody').innerHTML =
+          '<div style="text-align:center;padding:48px;color:#bbb;font-size:15px;">No arrivals in this window</div>';
+        return;
+      }
+
+      const grandTotals = {};
+      function addG(key, val) { grandTotals[key] = (grandTotals[key] || 0) + val; }
+
+      const propertyBlocks = [];
+
+      for (const a of arrivals) {
+        const cfg     = propConfigs[a.property] || {};
+        const bathrooms = cfg.bathrooms || 1;
+        const hasHotTub = cfg.hasHotTub || false;
+        const beds    = getArrivalBedCounts(a);
+
+        const totalBedSpaces   = beds.superKing * 2 + beds.king * 2 + beds.double * 2 + beds.single;
+        const confirmedGuests  = (a.adults || 0) + (a.children || 0);
+        const guests = confirmedGuests > 0 ? confirmedGuests : (cfg.maxOccupancy || totalBedSpaces || 2);
+        const adults = (a.adults > 0) ? a.adults : guests;
+
+        const doublePillows = (beds.superKing + beds.king + beds.double) * 2;
+        const singlePillows = beds.single;
+        const oxford    = doublePillows + singlePillows;
+        const standard  = doublePillows + singlePillows;
+        const bathTowels  = guests;
+        const handTowels  = guests + bathrooms;
+        const teaTowels   = 2;
+        const bathMats    = bathrooms;
+        const hotTubTowels = hasHotTub ? guests : 0;
+        const bathrobes    = hasHotTub ? adults : 0;
+        const skDuvets  = beds.superKing;
+        const kDuvets   = beds.king;
+        const dDuvets   = beds.double;
+        const sDuvets   = beds.single;
+        const kSheets   = beds.superKing + beds.king;
+        const dSheets   = beds.double;
+        const sSheets   = beds.single;
+
+        addG('oxford', oxford);    addG('standard', standard);
+        addG('bathTowels', bathTowels);  addG('handTowels', handTowels);
+        addG('teaTowels', teaTowels);    addG('bathMats', bathMats);
+        addG('hotTubTowels', hotTubTowels); addG('bathrobes', bathrobes);
+        addG('skDuvets', skDuvets); addG('kDuvets', kDuvets);
+        addG('dDuvets', dDuvets);   addG('sDuvets', sDuvets);
+        addG('kSheets', kSheets);   addG('dSheets', dSheets); addG('sSheets', sSheets);
+
+        const bedNote = [
+          beds.superKing ? `${beds.superKing} SK`     : '',
+          beds.king      ? `${beds.king} King`        : '',
+          beds.double    ? `${beds.double} Double`    : '',
+          beds.single    ? `${beds.single} Single`    : '',
+        ].filter(Boolean).join(', ');
+
+        // Build pillow working note
+        const pillowParts = [];
+        if (beds.superKing) pillowParts.push(`${beds.superKing}SK×2`);
+        if (beds.king)      pillowParts.push(`${beds.king}K×2`);
+        if (beds.double)    pillowParts.push(`${beds.double}D×2`);
+        if (beds.single)    pillowParts.push(`${beds.single}S×1`);
+
+        const duvetRows = [
+          skDuvets ? `<div class="ws-calc-label">Super King Duvets</div><div class="ws-calc-working">${beds.superKing} SK bed${beds.superKing>1?'s':''}</div><div class="ws-calc-value">${skDuvets}</div>` : '',
+          kDuvets  ? `<div class="ws-calc-label">King Duvets</div><div class="ws-calc-working">${beds.king} king bed${beds.king>1?'s':''}</div><div class="ws-calc-value">${kDuvets}</div>` : '',
+          dDuvets  ? `<div class="ws-calc-label">Double Duvets</div><div class="ws-calc-working">${beds.double} double bed${beds.double>1?'s':''}</div><div class="ws-calc-value">${dDuvets}</div>` : '',
+          sDuvets  ? `<div class="ws-calc-label">Single Duvets</div><div class="ws-calc-working">${beds.single} single bed${beds.single>1?'s':''}</div><div class="ws-calc-value">${sDuvets}</div>` : '',
+        ].filter(Boolean).join('');
+
+        const sheetRows = [
+          kSheets ? `<div class="ws-calc-label">Superking/King Sheets</div><div class="ws-calc-working">${beds.superKing} SK + ${beds.king} King beds</div><div class="ws-calc-value">${kSheets}</div>` : '',
+          dSheets ? `<div class="ws-calc-label">Double Sheets</div><div class="ws-calc-working">${beds.double} double bed${beds.double>1?'s':''}</div><div class="ws-calc-value">${dSheets}</div>` : '',
+          sSheets ? `<div class="ws-calc-label">Single Sheets</div><div class="ws-calc-working">${beds.single} single bed${beds.single>1?'s':''}</div><div class="ws-calc-value">${sSheets}</div>` : '',
+        ].filter(Boolean).join('');
+
+        const hotTubRows = hasHotTub ? `
+          <div class="ws-calc-label">Hot Tub Towels</div><div class="ws-calc-working">${guests} guests (hot tub)</div><div class="ws-calc-value">${hotTubTowels}</div>
+          <div class="ws-calc-label">Bathrobes</div><div class="ws-calc-working">${adults} adults (hot tub)</div><div class="ws-calc-value">${bathrobes}</div>` : '';
+
+        propertyBlocks.push(`
+          <div class="ws-property-block">
+            <div class="ws-property-header">
+              <div class="ws-property-name">${a.property}</div>
+              <div class="ws-property-meta">
+                ${guests} guest${guests>1?'s':''} &nbsp;·&nbsp; ${bathrooms} bathroom${bathrooms>1?'s':''}
+                &nbsp;·&nbsp; ${bedNote}
+                ${hasHotTub ? ' &nbsp;·&nbsp; 🛁 Hot Tub' : ''}
+              </div>
+            </div>
+            <div class="ws-calc-grid">
+              ${duvetRows ? `<div class="ws-calc-group-header">Duvets</div>${duvetRows}` : ''}
+              ${sheetRows ? `<div class="ws-calc-group-header">Sheets</div>${sheetRows}` : ''}
+              <div class="ws-calc-group-header">Pillows &amp; Towels</div>
+              <div class="ws-calc-label">Oxford Pillow Cases</div>
+              <div class="ws-calc-working">${pillowParts.join(' + ')} = ${oxford}</div>
+              <div class="ws-calc-value">${oxford}</div>
+              <div class="ws-calc-label">Standard Pillow Cases</div>
+              <div class="ws-calc-working">same as Oxford = ${standard}</div>
+              <div class="ws-calc-value">${standard}</div>
+              <div class="ws-calc-label">Bath Towels</div>
+              <div class="ws-calc-working">${guests} guest${guests>1?'s':''}</div>
+              <div class="ws-calc-value">${bathTowels}</div>
+              <div class="ws-calc-label">Hand Towels</div>
+              <div class="ws-calc-working">${guests} guests + ${bathrooms} bathroom${bathrooms>1?'s':''} = ${handTowels}</div>
+              <div class="ws-calc-value">${handTowels}</div>
+              ${hotTubRows}
+              <div class="ws-calc-label">Tea Towels</div>
+              <div class="ws-calc-working">2 per property</div>
+              <div class="ws-calc-value">${teaTowels}</div>
+              <div class="ws-calc-label">Bath Mats</div>
+              <div class="ws-calc-working">${bathrooms} bathroom${bathrooms>1?'s':''}</div>
+              <div class="ws-calc-value">${bathMats}</div>
+            </div>
+          </div>`);
+      }
+
+      // Grand totals section
+      const GT = grandTotals;
+      const totalItems = [
+        { label: 'Oxford Pillow Cases',    value: GT.oxford        || 0 },
+        { label: 'Standard Pillow Cases',  value: GT.standard      || 0 },
+        { label: 'Bath Towels',            value: GT.bathTowels    || 0 },
+        { label: 'Hand Towels',            value: GT.handTowels    || 0 },
+        { label: 'Hot Tub Towels',         value: GT.hotTubTowels  || 0 },
+        { label: 'Bathrobes',              value: GT.bathrobes     || 0 },
+        { label: 'Tea Towels',             value: GT.teaTowels     || 0 },
+        { label: 'Bath Mats',              value: GT.bathMats      || 0 },
+        { label: 'SK Duvets',              value: GT.skDuvets      || 0 },
+        { label: 'King Duvets',            value: GT.kDuvets       || 0 },
+        { label: 'Double Duvets',          value: GT.dDuvets       || 0 },
+        { label: 'Single Duvets',          value: GT.sDuvets       || 0 },
+        { label: 'SK/King Sheets',         value: GT.kSheets       || 0 },
+        { label: 'Double Sheets',          value: GT.dSheets       || 0 },
+        { label: 'Single Sheets',          value: GT.sSheets       || 0 },
+      ].filter(i => i.value > 0);
+
+      const totalsHTML = `
+        <div class="ws-totals-block">
+          <div class="ws-totals-title">Grand Totals — ${arrivals.length} propert${arrivals.length>1?'ies':'y'}</div>
+          <div class="ws-totals-grid">
+            ${totalItems.map(i => `
+              <div class="ws-total-item">
+                <div class="ws-total-item-label">${i.label}</div>
+                <div class="ws-total-item-value">${i.value}</div>
+              </div>`).join('')}
+          </div>
+        </div>`;
+
+      document.getElementById('wsBody').innerHTML = propertyBlocks.join('') + totalsHTML;
+    }
+
+    function closeWorkingSheet() {
+      document.getElementById('wsOverlay').style.display = 'none';
+    }
   </script>
+
+  <!-- Working Sheet Modal -->
+  <div id="wsOverlay" class="ws-overlay" style="display:none"
+       onclick="if(event.target===this)closeWorkingSheet()">
+    <div class="ws-modal">
+      <div class="ws-modal-header">
+        <div class="ws-modal-header-left">
+          <div class="ws-modal-title">🧺 Laundry Working Sheet</div>
+          <div class="ws-modal-sub" id="wsSubtitle"></div>
+        </div>
+        <button class="ws-print-btn" onclick="window.print()">🖨️ Print</button>
+        <button class="ws-close-btn" onclick="closeWorkingSheet()">✕ Close</button>
+      </div>
+      <div class="ws-modal-body" id="wsBody"></div>
+    </div>
+  </div>
+
 </body>
 
 </html>

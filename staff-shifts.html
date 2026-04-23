@@ -1,0 +1,863 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#272F2E">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Staff Shifts — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --gold:#AF926A; --cream:#F3E3C3;
+    --ink:#272F2E; --muted:#7b7a71; --line:rgba(39,47,46,.15);
+    --r-house:#00c875; --r-van:#579bfc; --r-laun:#fdab3d; --r-check:#9d50dd;
+    --r-off:#b3b3b3;  --r-leave:#ffb86b; --r-sick:#df2f4a; --r-train:#c757bc; --r-office:#66ccff;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Instrument Sans',system-ui,sans-serif}
+  body{min-height:100vh;min-height:100svh}
+  a{color:inherit}
+  .hide{display:none!important}
+
+  /* ===== Top bar ===== */
+  .top{position:sticky;top:0;z-index:20;background:var(--dark);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .top a.home{color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:6px 10px;border:1px solid rgba(255,255,255,.25);border-radius:8px}
+  .top h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.3px;flex:1;min-width:0}
+  .top h1 small{font-weight:500;color:var(--cream);font-size:12px;margin-left:6px}
+  .pill{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 10px;border-radius:999px;font-size:12px;cursor:pointer;user-select:none}
+  .pill:hover{background:rgba(255,255,255,.2)}
+  .pill.on{background:var(--gold);border-color:var(--gold);color:#fff}
+  .pill.ghost{background:transparent}
+  .sel{background:#fff;color:var(--ink);border:1px solid #e8e8de;padding:6px 8px;border-radius:8px;font:inherit;font-size:13px}
+  button.btn{background:var(--sage);color:#fff;border:0;border-radius:8px;padding:8px 14px;font:inherit;font-size:13px;cursor:pointer;font-weight:600}
+  button.btn.gold{background:var(--gold)}
+  button.btn.danger{background:#a9434a}
+  button.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff}
+  button.btn:disabled{opacity:.5;cursor:not-allowed}
+
+  /* ===== Sub bar ===== */
+  .sub{background:var(--cream);padding:8px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+  .sub .nav{display:flex;gap:4px;align-items:center}
+  .sub .nav button{background:#fff;border:1px solid var(--line);width:32px;height:32px;border-radius:8px;cursor:pointer;font-size:15px;color:var(--ink)}
+  .sub .nav button:hover{background:var(--bg)}
+  .week-label{font-weight:700;font-size:14px;color:var(--dark)}
+  .role-chips{display:flex;gap:6px;flex-wrap:wrap}
+  .role-chip{background:#fff;border:1px solid var(--line);padding:4px 10px;border-radius:999px;font-size:12px;cursor:pointer;color:var(--dark)}
+  .role-chip.on{background:var(--sage);color:#fff;border-color:var(--sage)}
+  .status-bar{margin-left:auto;font-size:12px;color:var(--muted)}
+  .status-bar .sync{color:var(--sage);font-weight:700}
+  .status-bar .err{color:#a9434a;font-weight:700}
+
+  /* ===== Matrix ===== */
+  .wrap{padding:10px 14px 80px;overflow:auto}
+  .matrix{display:grid;gap:4px;min-width:900px}
+  .m-head{display:contents}
+  .m-head > div{background:var(--dark);color:#fff;padding:6px 8px;font-size:12px;font-weight:600;text-align:center;border-radius:6px}
+  .m-head .today{background:var(--gold)}
+  .m-row{display:contents}
+  .m-staff{background:#fff;border:1px solid var(--line);padding:8px;border-radius:8px;display:flex;flex-direction:column;gap:2px;position:sticky;left:0;z-index:2}
+  .m-staff .nm{font-weight:700;font-size:14px;color:var(--dark);line-height:1.1}
+  .m-staff .rl{font-size:11px;color:var(--muted)}
+  .m-staff .wt{font-size:11px;margin-top:4px}
+  .m-staff .wt b{color:var(--sage)}
+  .m-staff .wt.over b{color:#a9434a}
+  .m-staff .clone-btn{background:transparent;border:1px solid var(--line);color:var(--muted);
+                      font:inherit;font-size:10px;padding:2px 6px;border-radius:999px;
+                      cursor:pointer;margin-top:4px;align-self:flex-start}
+  .m-staff .clone-btn:hover{background:var(--cream);color:var(--dark);border-color:var(--gold)}
+  .m-cell{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px;min-height:72px;cursor:pointer;display:flex;flex-direction:column;gap:3px;font-size:12px;position:relative}
+  .m-cell:hover{border-color:var(--gold)}
+  .m-cell.today{border-left:3px solid var(--gold)}
+  .m-cell.empty{color:var(--muted);font-style:italic}
+  .m-cell.empty:hover{background:#fcfbf6}
+  .m-cell .role-pill{display:inline-block;padding:2px 6px;border-radius:4px;color:#fff;font-weight:600;font-size:11px;line-height:1.2;align-self:flex-start}
+  .m-cell .tm{font-size:12px;color:var(--dark);font-weight:600}
+  .m-cell .hrs{font-size:11px;color:var(--muted)}
+  .m-cell .nt{font-size:10px;color:var(--muted);font-style:italic;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .m-cell.block{background:#fde9ec;border-color:#e6acb2}
+  .m-cell.off{background:#eee;border-color:#ddd}
+  .m-cell.leave{background:#fff2de;border-color:#ffcfa2}
+
+  /* role color map */
+  .r-Housekeeping{background:var(--r-house)}
+  .r-Van{background:var(--r-van)}
+  .r-Laundry{background:var(--r-laun)}
+  .r-Checker{background:var(--r-check)}
+  .r-Office{background:var(--r-office);color:#072a3e}
+  .r-Training{background:var(--r-train)}
+  .r-Off{background:var(--r-off);color:#333}
+  .r-Leave{background:var(--r-leave);color:#4a2a00}
+  .r-Sick{background:var(--r-sick)}
+
+  /* ===== Modal ===== */
+  .mod{position:fixed;inset:0;background:rgba(39,47,46,.55);display:none;align-items:center;justify-content:center;z-index:50;padding:12px}
+  .mod.show{display:flex}
+  .mod .card{background:#fff;border-radius:14px;width:100%;max-width:440px;padding:16px;display:flex;flex-direction:column;gap:10px;max-height:92vh;overflow:auto}
+  .mod h2{margin:0 0 4px;font-size:17px;color:var(--dark)}
+  .mod .sub-cap{margin:-4px 0 6px;font-size:12px;color:var(--muted)}
+  .modal-row{display:flex;flex-direction:column;gap:4px}
+  .modal-row-inline{flex-direction:row;gap:10px}
+  .modal-row-inline > div{flex:1}
+  .modal-label{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px}
+  .modal-input,.modal-select{padding:8px 10px;border:1px solid var(--line);border-radius:8px;font:inherit;font-size:14px;background:#fff}
+  .mod-actions{display:flex;gap:8px;justify-content:space-between;flex-wrap:wrap;margin-top:6px}
+  .quick-block{display:flex;gap:4px;flex-wrap:wrap;margin-top:4px}
+  .quick-block button{background:#eee;border:0;border-radius:6px;padding:4px 10px;font:inherit;font-size:12px;cursor:pointer}
+  .quick-block button:hover{filter:brightness(.95)}
+
+  /* ===== PIN ===== */
+  .pin-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+  .pin-card{background:#fff;border-radius:14px;padding:28px 22px;width:100%;max-width:320px;box-shadow:0 12px 40px rgba(0,0,0,.18);text-align:center}
+  .pin-card h2{margin:0 0 6px;color:var(--dark);font-size:18px}
+  .pin-card p{margin:0 0 14px;color:var(--muted);font-size:13px}
+  .pin-card input{width:100%;padding:14px;border:2px solid var(--line);border-radius:10px;font-size:22px;text-align:center;letter-spacing:10px;font-family:inherit;font-weight:700}
+  .pin-card input:focus{outline:none;border-color:var(--gold)}
+  .pin-err{color:#a9434a;font-size:13px;margin-top:8px;min-height:18px}
+
+  @media (max-width:640px){
+    .top h1{font-size:16px}
+    .matrix{min-width:720px}
+    .m-cell{min-height:60px;font-size:11px}
+  }
+</style>
+</head>
+<body>
+
+<!-- PIN overlay -->
+<div id="pinOverlay" class="pin-overlay">
+  <div class="pin-card">
+    <h2>Staff Shifts</h2>
+    <p>Manager PIN required</p>
+    <input id="pinInput" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••••">
+    <div id="pinErr" class="pin-err"></div>
+  </div>
+</div>
+
+<div id="app" class="hide">
+
+  <div class="top">
+    <a href="hub.html" class="home">← Hub</a>
+    <h1>Staff Shifts <small id="wkTitle"></small></h1>
+    <button class="pill" id="copyPrevBtn" title="Copy previous week's shifts into this week">← ⧉ Copy from prev</button>
+    <button class="pill" id="copyWeekBtn" title="Copy this week's shifts into next week">⧉ Copy week →</button>
+    <button class="btn gold" id="refreshBtn">↻ Refresh</button>
+  </div>
+
+  <div class="sub">
+    <div class="nav">
+      <button id="navPrev" title="Previous week">‹</button>
+      <button id="navToday" title="This week">⦿</button>
+      <button id="navNext" title="Next week">›</button>
+    </div>
+    <div class="week-label" id="weekLabel">—</div>
+    <div class="role-chips" id="roleChips"></div>
+    <div class="status-bar" id="statusBar">Loading…</div>
+  </div>
+
+  <div class="wrap">
+    <div class="matrix" id="matrix"></div>
+  </div>
+
+</div>
+
+<!-- Clone rota picker -->
+<div class="mod" id="cloneModal">
+  <div class="card">
+    <h2 id="cloneTitle">Copy rota from…</h2>
+    <div class="sub-cap" id="cloneSub">Pick the source — their shifts for this week will be copied onto the selected staff member. Existing shifts won't be overwritten.</div>
+    <div class="modal-row">
+      <span class="modal-label">Source staff</span>
+      <select class="modal-select" id="cloneSrc"></select>
+    </div>
+    <div class="modal-row">
+      <label style="display:flex;gap:6px;align-items:center;font-size:13px">
+        <input type="checkbox" id="cloneOverwrite"> Overwrite existing shifts on target
+      </label>
+    </div>
+    <div class="mod-actions">
+      <div></div>
+      <div style="display:flex;gap:6px">
+        <button class="btn ghost" id="cloneCancel" style="background:#eee;color:var(--dark);border:0">Cancel</button>
+        <button class="btn gold" id="cloneGo">Copy</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Shift edit modal -->
+<div class="mod" id="shiftModal">
+  <div class="card">
+    <h2 id="smTitle">Shift</h2>
+    <div class="sub-cap" id="smSub"></div>
+
+    <div class="modal-row">
+      <span class="modal-label">Role</span>
+      <select class="modal-select" id="smRole">
+        <option value="">— none —</option>
+        <option value="Housekeeping">Housekeeping</option>
+        <option value="Van">Van</option>
+        <option value="Laundry">Laundry</option>
+        <option value="Checker">Checker</option>
+        <option value="Office">Office</option>
+        <option value="Training">Training</option>
+        <option value="Off">Off</option>
+        <option value="Leave">Leave</option>
+        <option value="Sick">Sick</option>
+      </select>
+    </div>
+
+    <div class="modal-row modal-row-inline" id="smTimesRow">
+      <div>
+        <span class="modal-label">Start</span>
+        <input type="time" class="modal-input" id="smStart">
+      </div>
+      <div>
+        <span class="modal-label">End</span>
+        <input type="time" class="modal-input" id="smEnd">
+      </div>
+      <div>
+        <span class="modal-label">Hours</span>
+        <input type="number" step="0.25" class="modal-input" id="smHrs" readonly>
+      </div>
+    </div>
+
+    <div class="modal-row">
+      <span class="modal-label">Rate override £/hr (optional)</span>
+      <input type="number" step="0.05" class="modal-input" id="smRate" placeholder="uses default rate if blank">
+    </div>
+
+    <div class="modal-row">
+      <span class="modal-label">Notes</span>
+      <input type="text" class="modal-input" id="smNotes" placeholder="e.g. covering for Sally">
+    </div>
+
+    <div class="quick-block">
+      <span style="font-size:11px;color:var(--muted);align-self:center;margin-right:4px">Quick:</span>
+      <button data-qr="Housekeeping" data-qs="09:00" data-qe="15:00">HK 9–3</button>
+      <button data-qr="Housekeeping" data-qs="10:00" data-qe="16:00">HK 10–4</button>
+      <button data-qr="Van" data-qs="09:00" data-qe="17:00">Van 9–5</button>
+      <button data-qr="Checker" data-qs="14:00" data-qe="16:00">Check 2–4</button>
+      <button data-qr="Off">Off</button>
+      <button data-qr="Leave">Leave</button>
+      <button data-qr="Sick">Sick</button>
+    </div>
+
+    <div class="mod-actions">
+      <button class="btn danger" id="smDelete">Delete</button>
+      <div style="display:flex;gap:6px">
+        <button class="btn ghost" id="smCancel" style="background:#eee;color:var(--dark);border:0">Cancel</button>
+        <button class="btn gold" id="smSave">Save</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+/* ========== Config ========== */
+const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const MONDAY_URL = 'https://api.monday.com/v2';
+
+const STAFF_BOARD  = '5095127554';
+const SHIFTS_BOARD = '5095155773';
+
+// Staff board columns
+const ST_ROLE       = 'color_mm2psadz';
+const ST_STATUS     = 'color_mm2psvh2';
+const ST_CONTRACT   = 'numeric_mm2pc978';
+const ST_DEFRATE    = 'numeric_mm2p4pme';
+
+// Shifts board columns
+const SH_STAFF      = 'text_mm2p1gqx';  // StaffID text col (board_relation doesn't persist via API)
+const SH_DATE       = 'date_mm2phk9q';
+const SH_ROLE       = 'color_mm2pcrmp';
+const SH_START      = 'hour_mm2p7j0b';
+const SH_END        = 'hour_mm2pr0f2';
+const SH_HOURS      = 'numeric_mm2pawya';
+const SH_RATE       = 'numeric_mm2pqva0';
+const SH_NOTES      = 'long_text_mm2pped0';
+
+// PIN (6-digit). Hash of 652318.
+const PIN_HASH = 'df8d602b7bcaf41725409b83af2a3df79722be244d9f33b5f128b81a269b955e';
+
+const ROLE_ORDER = ['Housekeeper','A Team','Checker','Van driver','Manager','Owner'];
+const BLOCK_ROLES = ['Off','Leave','Sick'];   // lines that block out a day
+
+/* ========== State ========== */
+let weekStart = mondayOf(todayDate());
+let roleFilter = 'All';
+let staff = [];
+let shifts = [];        // {id, staffId, date, role, start, end, hours, rate, notes, dirty}
+let editingShiftId = null;
+let editingStaffId = null;
+let editingDate = null;
+
+/* ========== Helpers ========== */
+function todayDate(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
+function mondayOf(d){ const x=new Date(d); const day=x.getDay(); const diff = (day===0?-6:1-day); x.setDate(x.getDate()+diff); x.setHours(0,0,0,0); return x; }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function isoDate(d){ return d.toISOString().slice(0,10); }
+function fmtDay(d){ return d.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short'}); }
+function fmtDayShort(d){ return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric'}); }
+function fmtRange(a,b){ return a.toLocaleDateString('en-GB',{day:'numeric',month:'short'}) + ' – ' + b.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
+function sameDay(a,b){ return isoDate(a)===isoDate(b); }
+function todayIso(){ return isoDate(todayDate()); }
+function hhmm(v){ if(!v) return ''; if(v.length===8) return v.slice(0,5); return v; }
+function diffHours(s,e){
+  if(!s||!e) return 0;
+  const [h1,m1] = s.split(':').map(Number);
+  const [h2,m2] = e.split(':').map(Number);
+  const mins = (h2*60+m2) - (h1*60+m1);
+  return Math.max(0, Math.round(mins/15) * 0.25 / 1);  // quarter-hour precision
+}
+function parseBarryHour(col){
+  if(!col || !col.value) return null;
+  try{
+    const v = JSON.parse(col.value);
+    if(!v || v.hour==null) return null;
+    const h = String(v.hour).padStart(2,'0');
+    const m = String(v.minute||0).padStart(2,'0');
+    return `${h}:${m}`;
+  }catch(e){return null;}
+}
+function setStatus(txt, cls){
+  const el = document.getElementById('statusBar');
+  el.innerHTML = txt;
+  el.className = 'status-bar' + (cls?' '+cls:'');
+}
+
+/* ========== Monday API ========== */
+async function mondayQuery(q, vars){
+  let r;
+  try {
+    r = await fetch(MONDAY_URL,{method:'POST',headers:{'Authorization':TOKEN,'Content-Type':'application/json','API-Version':'2024-01'},body:JSON.stringify(vars ? {query:q,variables:vars} : {query:q})});
+  } catch(err){
+    throw new Error('Network error: ' + err.message + ' (check connection / VPN)');
+  }
+  if(!r.ok){
+    const txt = await r.text().catch(()=>'(no body)');
+    throw new Error(`HTTP ${r.status}: ${txt.slice(0,200)}`);
+  }
+  const j = await r.json();
+  if(j.errors){
+    console.error('Monday query:', q, 'vars:', vars, 'errors:', j.errors);
+    throw new Error(j.errors[0].message);
+  }
+  return j.data;
+}
+
+async function fetchStaff(){
+  const q = `query ($b:[ID!]){ boards(ids:$b){ items_page(limit:500){ items{ id name column_values(ids:["${ST_ROLE}","${ST_STATUS}","${ST_CONTRACT}","${ST_DEFRATE}"]){ id text value } } } } }`;
+  const d = await mondayQuery(q,{b:[STAFF_BOARD]});
+  const items = d.boards[0].items_page.items;
+  staff = items.map(it => {
+    const cv = Object.fromEntries(it.column_values.map(c=>[c.id,c]));
+    return {
+      id: it.id,
+      name: it.name,
+      role: cv[ST_ROLE]?.text || '',
+      status: cv[ST_STATUS]?.text || 'Active',
+      contractHrs: parseFloat(cv[ST_CONTRACT]?.text || '0') || 0,
+      defaultRate: parseFloat(cv[ST_DEFRATE]?.text || '0') || 0,
+    };
+  }).filter(s => s.status !== '' && s.status !== 'Inactive')
+    .sort((a,b) => {
+      const ai = ROLE_ORDER.indexOf(a.role); const bi = ROLE_ORDER.indexOf(b.role);
+      if(ai !== bi) return (ai<0?99:ai) - (bi<0?99:bi);
+      return a.name.localeCompare(b.name);
+    });
+}
+
+async function fetchShifts(){
+  // Pull all shifts (paginated) and filter client-side. Shifts board stays manageable for years.
+  const colIds = `["${SH_STAFF}","${SH_DATE}","${SH_ROLE}","${SH_START}","${SH_END}","${SH_HOURS}","${SH_RATE}","${SH_NOTES}"]`;
+  let cursor = null;
+  let items = [];
+  do {
+    const q = cursor
+      ? `query ($c:String!){ next_items_page(limit:500,cursor:$c){ cursor items{ id name column_values(ids:${colIds}){ id text value } } } }`
+      : `query ($b:[ID!]){ boards(ids:$b){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id text value } } } } }`;
+    const d = await mondayQuery(q, cursor ? {c:cursor} : {b:[SHIFTS_BOARD]});
+    const page = cursor ? d.next_items_page : d.boards[0].items_page;
+    items = items.concat(page.items);
+    cursor = page.cursor;
+  } while(cursor);
+  const fresh = items.map(it => {
+    const cv = Object.fromEntries(it.column_values.map(c=>[c.id,c]));
+    const staffId = cv[SH_STAFF]?.text || null;
+    return {
+      id: it.id,
+      staffId,
+      date: cv[SH_DATE]?.text || '',
+      role: cv[SH_ROLE]?.text || '',
+      start: parseBarryHour(cv[SH_START]),
+      end:   parseBarryHour(cv[SH_END]),
+      hours: parseFloat(cv[SH_HOURS]?.text || '0') || 0,
+      rate:  parseFloat(cv[SH_RATE]?.text || '') || null,
+      notes: cv[SH_NOTES]?.text || '',
+      dirty: false,
+    };
+  }).filter(s => s.staffId && s.date);
+  // Keep any local-only dirty shifts
+  const dirty = shifts.filter(s => s.dirty);
+  const freshIds = new Set(fresh.map(s=>s.id));
+  shifts = fresh.concat(dirty.filter(s => !freshIds.has(s.id)));
+}
+
+function buildShiftColumnValues(s){
+  const v = {};
+  v[SH_DATE] = { date: s.date };
+  v[SH_STAFF] = String(s.staffId);  // plain text: the Staff board item id
+  if(s.role) v[SH_ROLE] = { label: s.role };
+  if(s.start){ const [h,m] = s.start.split(':').map(Number); v[SH_START] = { hour: h, minute: m }; }
+  if(s.end){   const [h,m] = s.end.split(':').map(Number);   v[SH_END]   = { hour: h, minute: m }; }
+  v[SH_HOURS] = s.hours || 0;
+  if(s.rate!=null && s.rate!=='') v[SH_RATE] = Number(s.rate);
+  if(s.notes) v[SH_NOTES] = s.notes;
+  return JSON.stringify(v);
+}
+
+async function pushShift(s){
+  if(s.id && !String(s.id).startsWith('local_')){
+    const q = `mutation ($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`;
+    await mondayQuery(q,{b:SHIFTS_BOARD,i:s.id,v:buildShiftColumnValues(s)});
+  }else{
+    const sf = staff.find(x=>x.id===s.staffId);
+    const name = `${sf?sf.name:'?'} ${s.date}`;
+    const q = `mutation ($b:ID!,$n:String!,$v:JSON!){ create_item(board_id:$b,item_name:$n,column_values:$v,create_labels_if_missing:true){ id } }`;
+    const d = await mondayQuery(q,{b:SHIFTS_BOARD,n:name,v:buildShiftColumnValues(s)});
+    s.id = d.create_item.id;
+  }
+  s.dirty = false;
+}
+
+async function deleteShiftRemote(id){
+  if(!id || String(id).startsWith('local_')) return;
+  const q = `mutation ($i:ID!){ delete_item(item_id:$i){ id } }`;
+  await mondayQuery(q,{i:id});
+}
+
+/* ========== Render ========== */
+function filteredStaff(){
+  if(roleFilter==='All') return staff;
+  return staff.filter(s => s.role === roleFilter);
+}
+
+function cellFor(staffId, iso){
+  return shifts.find(s => s.staffId === staffId && s.date === iso);
+}
+
+function weekHours(staffId){
+  let h = 0;
+  for(let i=0;i<7;i++){
+    const iso = isoDate(addDays(weekStart,i));
+    const s = cellFor(staffId, iso);
+    if(s && s.hours) h += s.hours;
+  }
+  return Math.round(h*100)/100;
+}
+
+function renderRoleChips(){
+  const el = document.getElementById('roleChips');
+  const roles = ['All'];
+  const seen = new Set();
+  for(const r of ROLE_ORDER){ if(staff.some(s=>s.role===r)){ roles.push(r); seen.add(r); } }
+  for(const s of staff){ if(s.role && !seen.has(s.role)){ roles.push(s.role); seen.add(s.role); } }
+  el.innerHTML = roles.map(r =>
+    `<span class="role-chip ${r===roleFilter?'on':''}" data-role="${r}">${r}</span>`
+  ).join('');
+  el.querySelectorAll('.role-chip').forEach(c => c.addEventListener('click', () => {
+    roleFilter = c.dataset.role; renderMatrix(); renderRoleChips();
+  }));
+}
+
+function renderMatrix(){
+  document.getElementById('weekLabel').textContent = fmtRange(weekStart, addDays(weekStart,6));
+  document.getElementById('wkTitle').textContent = `— ${fmtRange(weekStart, addDays(weekStart,6))}`;
+  const el = document.getElementById('matrix');
+  const cols = ['220px'];
+  for(let i=0;i<7;i++) cols.push('1fr');
+  el.style.gridTemplateColumns = cols.join(' ');
+
+  const tIso = todayIso();
+  let html = `<div class="m-head"><div>Staff</div>`;
+  for(let i=0;i<7;i++){
+    const d = addDays(weekStart,i);
+    html += `<div class="${isoDate(d)===tIso?'today':''}">${fmtDayShort(d)}</div>`;
+  }
+  html += `</div>`;
+
+  const list = filteredStaff();
+  for(const s of list){
+    const wh = weekHours(s.id);
+    const ctr = s.contractHrs || 0;
+    const over = ctr && wh > ctr;
+    html += `<div class="m-row">`;
+    html += `<div class="m-staff">
+      <div class="nm">${s.name}</div>
+      <div class="rl">${s.role||'—'}</div>
+      <div class="wt ${over?'over':''}"><b>${wh}h</b>${ctr?` / ${ctr}h`:''}</div>
+      <button class="clone-btn" data-clone-target="${s.id}" title="Copy another staff member's rota for this week into ${s.name}">⧉ copy from…</button>
+    </div>`;
+    for(let i=0;i<7;i++){
+      const d = addDays(weekStart,i);
+      const iso = isoDate(d);
+      const sh = cellFor(s.id, iso);
+      const isToday = iso===tIso;
+      if(!sh){
+        html += `<div class="m-cell empty ${isToday?'today':''}" data-staff="${s.id}" data-date="${iso}">+ add</div>`;
+      }else if(BLOCK_ROLES.includes(sh.role)){
+        const cls = sh.role==='Sick' ? 'block' : (sh.role==='Leave' ? 'leave' : 'off');
+        html += `<div class="m-cell ${cls} ${isToday?'today':''}" data-shift="${sh.id}"><span class="role-pill r-${sh.role}">${sh.role}</span>${sh.notes?`<div class="nt">${sh.notes}</div>`:''}</div>`;
+      }else{
+        html += `<div class="m-cell ${isToday?'today':''}" data-shift="${sh.id}"><span class="role-pill r-${sh.role||'Off'}">${sh.role||'?'}</span><div class="tm">${sh.start||'–'}–${sh.end||'–'}</div><div class="hrs">${sh.hours||0}h${sh.rate?` @£${sh.rate}`:''}</div>${sh.notes?`<div class="nt">${sh.notes}</div>`:''}</div>`;
+      }
+    }
+    html += `</div>`;
+  }
+  if(list.length === 0){
+    html += `<div style="grid-column:1/-1;padding:20px;text-align:center;color:var(--muted)">No staff match this filter.</div>`;
+  }
+  el.innerHTML = html;
+
+  el.querySelectorAll('.m-cell').forEach(c => c.addEventListener('click', e => {
+    if(c.dataset.shift) openShift(c.dataset.shift);
+    else openNew(c.dataset.staff, c.dataset.date);
+  }));
+  el.querySelectorAll('.clone-btn').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    openClonePicker(b.dataset.cloneTarget);
+  }));
+}
+
+/* ========== Clone rota ========== */
+let cloneTargetId = null;
+
+function openClonePicker(targetStaffId){
+  cloneTargetId = targetStaffId;
+  const target = staff.find(s => s.id === targetStaffId);
+  if(!target){ return; }
+  // Source list: any OTHER staff who actually have shifts this week
+  const isos = []; for(let i=0;i<7;i++) isos.push(isoDate(addDays(weekStart,i)));
+  const hasWeek = new Set(shifts.filter(s => isos.includes(s.date)).map(s => s.staffId));
+  const options = staff
+    .filter(s => s.id !== targetStaffId && hasWeek.has(s.id))
+    .map(s => `<option value="${s.id}">${s.name} (${s.role||'—'})</option>`);
+  const sel = document.getElementById('cloneSrc');
+  if(options.length === 0){
+    sel.innerHTML = '<option value="">— no other staff have shifts this week —</option>';
+  }else{
+    sel.innerHTML = options.join('');
+  }
+  document.getElementById('cloneTitle').textContent = `Copy rota → ${target.name}`;
+  document.getElementById('cloneOverwrite').checked = false;
+  document.getElementById('cloneModal').classList.add('show');
+}
+
+function closeCloneModal(){
+  document.getElementById('cloneModal').classList.remove('show');
+  cloneTargetId = null;
+}
+
+async function runClone(){
+  const srcId = document.getElementById('cloneSrc').value;
+  const overwrite = document.getElementById('cloneOverwrite').checked;
+  if(!srcId || !cloneTargetId){ closeCloneModal(); return; }
+  const targetId = cloneTargetId;
+  const isos = []; for(let i=0;i<7;i++) isos.push(isoDate(addDays(weekStart,i)));
+  const toCreate = [];
+  const toDelete = [];
+  for(const iso of isos){
+    const src = cellFor(srcId, iso);
+    const dst = cellFor(targetId, iso);
+    if(!src) continue;
+    if(dst && !overwrite) continue;
+    if(dst && overwrite){ toDelete.push(dst); }
+    toCreate.push({
+      id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+      staffId: targetId, date: iso,
+      role: src.role, start: src.start, end: src.end, hours: src.hours,
+      // rate is per-staff — don't carry across
+      rate: null, notes: src.notes, dirty: true,
+    });
+  }
+  if(toCreate.length === 0){
+    alert('Nothing to copy — the source has no shifts this week, or the target is already filled (tick "Overwrite" to replace).');
+    return;
+  }
+  const targetName = (staff.find(s=>s.id===targetId)||{}).name || '';
+  const srcName    = (staff.find(s=>s.id===srcId)||{}).name || '';
+  if(!confirm(`Copy ${toCreate.length} shift(s) from ${srcName} into ${targetName}?${toDelete.length?` ${toDelete.length} existing shift(s) will be replaced.`:''}`)) return;
+  closeCloneModal();
+  // Apply locally first so UI updates
+  for(const d of toDelete) shifts = shifts.filter(x => x.id !== d.id);
+  shifts.push(...toCreate);
+  renderMatrix();
+  setStatus(`Cloning ${toCreate.length} shifts…`);
+  let fails = 0;
+  for(const d of toDelete){ try{ await deleteShiftRemote(d.id); }catch(e){ fails++; console.error(e); } }
+  for(const sh of toCreate){ try{ await pushShift(sh); }catch(e){ fails++; console.error(e); } }
+  setStatus(fails ? `Cloned with ${fails} failure(s)` : `Cloned ${toCreate.length} shifts`, fails?'err':'sync');
+  renderMatrix();
+}
+
+async function copyFromPrevWeek(){
+  const prev = addDays(weekStart, -7);
+  const srcIsos = []; for(let i=0;i<7;i++) srcIsos.push(isoDate(addDays(prev,i)));
+  const dstIsos = []; for(let i=0;i<7;i++) dstIsos.push(isoDate(addDays(weekStart,i)));
+  const list = filteredStaff();
+  const toCreate = [];
+  for(const s of list){
+    for(let i=0;i<7;i++){
+      const src = cellFor(s.id, srcIsos[i]);
+      const dst = cellFor(s.id, dstIsos[i]);
+      if(src && !dst){
+        toCreate.push({
+          id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+          staffId: s.id, date: dstIsos[i],
+          role: src.role, start: src.start, end: src.end, hours: src.hours,
+          rate: src.rate, notes: src.notes, dirty: true,
+        });
+      }
+    }
+  }
+  if(toCreate.length === 0){ alert('Nothing to copy (previous week has nothing, or this week is already populated for the current filter).'); return; }
+  if(!confirm(`Copy ${toCreate.length} shift(s) from ${fmtDay(prev)} week into ${fmtDay(weekStart)} week?`)) return;
+  shifts.push(...toCreate);
+  renderMatrix();
+  setStatus(`Copying ${toCreate.length} shifts…`);
+  let fails = 0;
+  for(const sh of toCreate){
+    try{ await pushShift(sh); }catch(e){ fails++; console.error(e); }
+  }
+  setStatus(fails ? `Copied with ${fails} failure(s)` : `Copied ${toCreate.length} shifts`, fails?'err':'sync');
+  renderMatrix();
+}
+
+/* ========== Modal ========== */
+function openShift(id){
+  const sh = shifts.find(x => x.id === id);
+  if(!sh) return;
+  const sf = staff.find(x => x.id === sh.staffId);
+  editingShiftId = id;
+  editingStaffId = sh.staffId;
+  editingDate = sh.date;
+  document.getElementById('smTitle').textContent = sf ? sf.name : 'Shift';
+  document.getElementById('smSub').textContent = new Date(sh.date).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('smRole').value  = sh.role || '';
+  document.getElementById('smStart').value = sh.start || '';
+  document.getElementById('smEnd').value   = sh.end || '';
+  document.getElementById('smHrs').value   = sh.hours || 0;
+  document.getElementById('smRate').value  = sh.rate || '';
+  document.getElementById('smNotes').value = sh.notes || '';
+  document.getElementById('smDelete').style.display = 'inline-block';
+  document.getElementById('shiftModal').classList.add('show');
+  recomputeHours();
+}
+
+function openNew(staffId, iso){
+  editingShiftId = null;
+  editingStaffId = staffId;
+  editingDate = iso;
+  const sf = staff.find(x => x.id === staffId);
+  document.getElementById('smTitle').textContent = sf ? sf.name : 'New shift';
+  document.getElementById('smSub').textContent = new Date(iso).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('smRole').value  = '';
+  document.getElementById('smStart').value = '';
+  document.getElementById('smEnd').value   = '';
+  document.getElementById('smHrs').value   = 0;
+  document.getElementById('smRate').value  = '';
+  document.getElementById('smNotes').value = '';
+  document.getElementById('smDelete').style.display = 'none';
+  document.getElementById('shiftModal').classList.add('show');
+}
+
+function closeModal(){
+  document.getElementById('shiftModal').classList.remove('show');
+  editingShiftId = null;
+}
+
+function recomputeHours(){
+  const role = document.getElementById('smRole').value;
+  const s = document.getElementById('smStart').value;
+  const e = document.getElementById('smEnd').value;
+  const h = BLOCK_ROLES.includes(role) ? 0 : diffHours(s,e);
+  document.getElementById('smHrs').value = h;
+  // Hide times for block roles
+  document.getElementById('smTimesRow').style.display = BLOCK_ROLES.includes(role) ? 'none' : 'flex';
+}
+
+async function saveShift(){
+  const role = document.getElementById('smRole').value;
+  if(!role){ alert('Pick a role (or use Delete to remove the shift)'); return; }
+  const start = document.getElementById('smStart').value || null;
+  const end   = document.getElementById('smEnd').value || null;
+  const hours = BLOCK_ROLES.includes(role) ? 0 : diffHours(start, end);
+  const rateRaw = document.getElementById('smRate').value;
+  const rate = rateRaw === '' ? null : parseFloat(rateRaw);
+  const notes = document.getElementById('smNotes').value.trim();
+
+  let sh;
+  if(editingShiftId){
+    sh = shifts.find(x => x.id === editingShiftId);
+    Object.assign(sh, {role,start,end,hours,rate,notes,dirty:true});
+  }else{
+    sh = {
+      id: 'local_' + Date.now(),
+      staffId: editingStaffId,
+      date: editingDate,
+      role, start, end, hours, rate, notes, dirty: true
+    };
+    shifts.push(sh);
+  }
+  closeModal();
+  renderMatrix();
+  setStatus('Saving…');
+  try{
+    await pushShift(sh);
+    setStatus(`Saved at ${new Date().toLocaleTimeString('en-GB')}`, 'sync');
+    renderMatrix();
+  }catch(e){
+    setStatus('Save failed: ' + e.message, 'err');
+  }
+}
+
+async function deleteShift(){
+  if(!editingShiftId) return;
+  if(!confirm('Delete this shift?')) return;
+  const id = editingShiftId;
+  shifts = shifts.filter(s => s.id !== id);
+  closeModal();
+  renderMatrix();
+  try{
+    await deleteShiftRemote(id);
+    setStatus(`Deleted at ${new Date().toLocaleTimeString('en-GB')}`, 'sync');
+  }catch(e){
+    setStatus('Delete failed: ' + e.message, 'err');
+  }
+}
+
+async function copyWeek(){
+  const next = addDays(weekStart, 7);
+  const srcIsos = []; for(let i=0;i<7;i++) srcIsos.push(isoDate(addDays(weekStart,i)));
+  const dstIsos = []; for(let i=0;i<7;i++) dstIsos.push(isoDate(addDays(next,i)));
+  const list = filteredStaff();
+  const toCreate = [];
+  for(const s of list){
+    for(let i=0;i<7;i++){
+      const src = cellFor(s.id, srcIsos[i]);
+      const dst = cellFor(s.id, dstIsos[i]);
+      if(src && !dst){
+        toCreate.push({
+          id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+          staffId: s.id, date: dstIsos[i],
+          role: src.role, start: src.start, end: src.end, hours: src.hours,
+          rate: src.rate, notes: src.notes, dirty: true,
+        });
+      }
+    }
+  }
+  if(toCreate.length === 0){ alert('Nothing to copy (next week already populated or source week empty for this filter).'); return; }
+  if(!confirm(`Copy ${toCreate.length} shift(s) into week starting ${fmtDay(next)}?`)) return;
+  shifts.push(...toCreate);
+  weekStart = next;
+  renderMatrix();
+  setStatus(`Copying ${toCreate.length} shifts…`);
+  let fails = 0;
+  for(const sh of toCreate){
+    try{ await pushShift(sh); }catch(e){ fails++; console.error(e); }
+  }
+  setStatus(fails ? `Copied with ${fails} failure(s)` : `Copied ${toCreate.length} shifts`, fails?'err':'sync');
+  renderMatrix();
+}
+
+/* ========== Wiring ========== */
+async function refresh(){
+  try{
+    setStatus('Loading staff…');
+    if(staff.length === 0) await fetchStaff();
+    setStatus('Loading shifts…');
+    await fetchShifts();
+    renderRoleChips();
+    renderMatrix();
+    setStatus(`Updated ${new Date().toLocaleTimeString('en-GB')} · ${staff.length} staff, ${shifts.length} shift(s)`,'sync');
+  }catch(e){
+    console.error('refresh failed:', e);
+    setStatus('Error: '+e.message,'err');
+  }
+}
+
+document.getElementById('navPrev').addEventListener('click', () => { weekStart = addDays(weekStart,-7); renderMatrix(); });
+document.getElementById('navNext').addEventListener('click', () => { weekStart = addDays(weekStart, 7); renderMatrix(); });
+document.getElementById('navToday').addEventListener('click', () => { weekStart = mondayOf(todayDate()); renderMatrix(); });
+document.getElementById('refreshBtn').addEventListener('click', refresh);
+document.getElementById('copyWeekBtn').addEventListener('click', copyWeek);
+document.getElementById('copyPrevBtn').addEventListener('click', copyFromPrevWeek);
+document.getElementById('cloneCancel').addEventListener('click', closeCloneModal);
+document.getElementById('cloneGo').addEventListener('click', runClone);
+document.getElementById('cloneModal').addEventListener('click', e => { if(e.target.id === 'cloneModal') closeCloneModal(); });
+
+document.getElementById('smRole').addEventListener('change', recomputeHours);
+document.getElementById('smStart').addEventListener('change', recomputeHours);
+document.getElementById('smEnd').addEventListener('change', recomputeHours);
+document.getElementById('smCancel').addEventListener('click', closeModal);
+document.getElementById('smSave').addEventListener('click', saveShift);
+document.getElementById('smDelete').addEventListener('click', deleteShift);
+document.getElementById('shiftModal').addEventListener('click', e => { if(e.target.id === 'shiftModal') closeModal(); });
+
+// Quick-fill buttons
+document.querySelectorAll('.quick-block button').forEach(b => b.addEventListener('click', () => {
+  document.getElementById('smRole').value = b.dataset.qr || '';
+  document.getElementById('smStart').value = b.dataset.qs || '';
+  document.getElementById('smEnd').value = b.dataset.qe || '';
+  recomputeHours();
+}));
+
+/* ========== PIN ========== */
+async function sha256(s){
+  const buf = new TextEncoder().encode(s);
+  const h = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+
+async function tryPin(val){
+  const err = document.getElementById('pinErr');
+  const h = await sha256(val);
+  if(h === PIN_HASH){
+    sessionStorage.setItem('bh-mgmt','1');
+    document.getElementById('pinOverlay').classList.add('hide');
+    document.getElementById('app').classList.remove('hide');
+    refresh();
+  }else{
+    err.textContent = 'Incorrect PIN';
+    document.getElementById('pinInput').value = '';
+  }
+}
+
+document.getElementById('pinInput').addEventListener('input', e => {
+  if(e.target.value.length === 6) tryPin(e.target.value);
+});
+document.getElementById('pinInput').addEventListener('keydown', e => {
+  if(e.key === 'Enter' && e.target.value.length > 0) tryPin(e.target.value);
+});
+
+// Auto-unlock if already authed this session
+if(sessionStorage.getItem('bh-mgmt') === '1'){
+  document.getElementById('pinOverlay').classList.add('hide');
+  document.getElementById('app').classList.remove('hide');
+  refresh();
+}else{
+  document.getElementById('pinInput').focus();
+}
+
+// SW register
+if('serviceWorker' in navigator){
+  navigator.serviceWorker.register('sw.js').catch(()=>{});
+}
+</script>
+</body>
+</html>

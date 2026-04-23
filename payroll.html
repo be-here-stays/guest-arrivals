@@ -1,0 +1,574 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#272F2E">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Payroll — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --gold:#AF926A; --cream:#F3E3C3;
+    --ink:#272F2E; --muted:#7b7a71; --line:rgba(39,47,46,.15);
+    --ok:#2a7f4f; --warn:#a9434a;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Instrument Sans',system-ui,sans-serif}
+  body{min-height:100vh;min-height:100svh}
+  a{color:inherit}
+  .hide{display:none!important}
+
+  .top{position:sticky;top:0;z-index:20;background:var(--dark);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .top a.home{color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:6px 10px;border:1px solid rgba(255,255,255,.25);border-radius:8px}
+  .top h1{margin:0;font-size:18px;font-weight:700;flex:1;min-width:0}
+  .top h1 small{font-weight:500;color:var(--cream);font-size:12px;margin-left:6px}
+  button.btn{background:var(--sage);color:#fff;border:0;border-radius:8px;padding:8px 14px;font:inherit;font-size:13px;cursor:pointer;font-weight:600}
+  button.btn.gold{background:var(--gold)}
+  button.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff}
+  button.btn:disabled{opacity:.5;cursor:not-allowed}
+  .pill{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 10px;border-radius:999px;font-size:12px;cursor:pointer;user-select:none}
+  .pill.on{background:var(--gold);border-color:var(--gold);color:#fff}
+
+  .sub{background:var(--cream);padding:10px 14px;display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+  .sub input[type=date]{padding:6px 8px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:13px;background:#fff}
+  .sub label{font-size:12px;color:var(--muted);font-weight:600}
+  .status-bar{margin-left:auto;font-size:12px;color:var(--muted)}
+  .status-bar .sync{color:var(--sage);font-weight:700}
+  .status-bar .err{color:var(--warn);font-weight:700}
+
+  .wrap{padding:14px;padding-bottom:60px}
+  .summary{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .sum-card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:130px;flex:1}
+  .sum-card .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+  .sum-card .val{font-size:22px;font-weight:700;color:var(--dark);margin-top:2px}
+  .sum-card .val small{font-size:12px;color:var(--muted);font-weight:500}
+
+  table.pr{width:100%;border-collapse:collapse;background:#fff;border-radius:10px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,.04)}
+  table.pr th,table.pr td{padding:8px 10px;text-align:left;font-size:13px;border-bottom:1px solid var(--line)}
+  table.pr th{background:var(--dark);color:#fff;font-weight:600;font-size:12px;letter-spacing:.3px;text-transform:uppercase;position:sticky;top:0}
+  table.pr tbody tr:hover{background:var(--cream)}
+  table.pr .num{text-align:right;font-variant-numeric:tabular-nums}
+  table.pr .nm{font-weight:700;color:var(--dark)}
+  table.pr .rl{color:var(--muted);font-size:11px;display:block}
+  table.pr tfoot td{background:#f6f2e6;font-weight:700}
+  table.pr tfoot td.num{color:var(--dark)}
+  table.pr input.rate{width:70px;padding:4px 6px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:13px;text-align:right}
+  table.pr tr.zero td{color:var(--muted)}
+
+  details.person{margin-top:8px;background:#fff;border:1px solid var(--line);border-radius:8px}
+  details.person summary{padding:8px 10px;cursor:pointer;font-weight:600;font-size:13px;color:var(--dark);list-style:none}
+  details.person summary::-webkit-details-marker{display:none}
+  details.person summary::before{content:'▶';font-size:10px;margin-right:6px;color:var(--muted)}
+  details.person[open] summary::before{content:'▼'}
+  details.person .body{padding:8px 14px 12px;font-size:12px;color:var(--dark)}
+  details.person table{width:100%;border-collapse:collapse;margin-top:6px}
+  details.person table td,details.person table th{padding:4px 6px;border-bottom:1px solid var(--line);font-size:12px;text-align:left}
+  details.person table th{color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.3px;font-size:10px}
+  details.person table td.num{text-align:right;font-variant-numeric:tabular-nums}
+
+  /* PIN */
+  .pin-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+  .pin-card{background:#fff;border-radius:14px;padding:28px 22px;width:100%;max-width:320px;box-shadow:0 12px 40px rgba(0,0,0,.18);text-align:center}
+  .pin-card h2{margin:0 0 6px;color:var(--dark);font-size:18px}
+  .pin-card p{margin:0 0 14px;color:var(--muted);font-size:13px}
+  .pin-card input{width:100%;padding:14px;border:2px solid var(--line);border-radius:10px;font-size:22px;text-align:center;letter-spacing:10px;font-family:inherit;font-weight:700}
+  .pin-card input:focus{outline:none;border-color:var(--gold)}
+  .pin-err{color:var(--warn);font-size:13px;margin-top:8px;min-height:18px}
+
+  @media (max-width:640px){
+    .top h1{font-size:16px}
+    .summary .sum-card{min-width:48%}
+    table.pr{font-size:12px}
+    table.pr th,table.pr td{padding:6px 6px}
+  }
+</style>
+</head>
+<body>
+
+<div id="pinOverlay" class="pin-overlay">
+  <div class="pin-card">
+    <h2>Payroll</h2>
+    <p>Manager PIN required</p>
+    <input id="pinInput" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••••">
+    <div id="pinErr" class="pin-err"></div>
+  </div>
+</div>
+
+<div id="app" class="hide">
+
+  <div class="top">
+    <a href="hub.html" class="home">← Hub</a>
+    <h1>Payroll <small id="rangeTitle"></small></h1>
+    <button class="pill" id="weekBtn">This week</button>
+    <button class="pill" id="prevWeekBtn">Last week</button>
+    <button class="pill" id="monthBtn">This month</button>
+    <button class="btn gold" id="refreshBtn">↻ Refresh</button>
+    <button class="btn" id="exportBtn">⬇ CSV</button>
+  </div>
+
+  <div class="sub">
+    <label>From</label>
+    <input type="date" id="fromDate">
+    <label>To</label>
+    <input type="date" id="toDate">
+    <label style="margin-left:10px"><input type="checkbox" id="showZero"> Show zero-hour staff</label>
+    <div class="status-bar" id="statusBar">Loading…</div>
+  </div>
+
+  <div class="wrap">
+    <div class="summary" id="summary"></div>
+    <table class="pr" id="payTable">
+      <thead>
+        <tr>
+          <th>Staff</th>
+          <th class="num">Clean hrs</th>
+          <th class="num">Check hrs</th>
+          <th class="num">Shift hrs</th>
+          <th class="num">Total hrs</th>
+          <th class="num">Rate (£/h)</th>
+          <th class="num">Pay (£)</th>
+        </tr>
+      </thead>
+      <tbody id="payBody"><tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">Loading…</td></tr></tbody>
+      <tfoot id="payFoot"></tfoot>
+    </table>
+    <div id="detailList" style="margin-top:14px"></div>
+  </div>
+
+</div>
+
+<script>
+/* ========== Config ========== */
+const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const MONDAY_URL = 'https://api.monday.com/v2';
+
+const STAFF_BOARD   = '5095127554';
+const CLEANS_BOARD  = '5095134636';
+const SHIFTS_BOARD  = '5095155773';
+
+// Staff columns
+const ST_ROLE     = 'color_mm2psadz';
+const ST_STATUS   = 'color_mm2psvh2';
+const ST_CONTRACT = 'numeric_mm2pc978';
+const ST_DEFRATE  = 'numeric_mm2p4pme';
+
+// Cleans columns
+const CL_DATE     = 'date_mm2pphc';
+const CL_START    = 'hour_mm2pskhh';
+const CL_HRS      = 'numeric_mm2pmqdt';
+const CL_PRIMARY  = 'dropdown_mm2pntvm';
+const CL_PARTNER  = 'dropdown_mm2pbcnq';
+const CL_CHECKER  = 'dropdown_mm2p9qd3';
+const CL_STATUS   = 'color_mm2prq2f';
+const CL_PROP     = 'board_relation_mm2psy0b';
+
+// Shifts columns
+const SH_STAFF = 'text_mm2p1gqx';
+const SH_DATE  = 'date_mm2phk9q';
+const SH_ROLE  = 'color_mm2pcrmp';
+const SH_HOURS = 'numeric_mm2pawya';
+const SH_RATE  = 'numeric_mm2pqva0';
+
+// Checker hours per clean (fixed default — checking is a short quality pass)
+const CHECK_HOURS_PER_CLEAN = 0.5;
+
+const PIN_HASH = 'df8d602b7bcaf41725409b83af2a3df79722be244d9f33b5f128b81a269b955e';
+const ROLE_ORDER = ['Housekeeper','A Team','Checker','Van driver','Manager','Owner'];
+const EXCLUDE_STATUSES = ['Inactive'];
+const LOCAL_RATE_KEY = 'payroll_rateOverrides_v1';
+
+/* ========== State ========== */
+let fromDate = '';
+let toDate = '';
+let staff = [];
+let cleans = [];
+let shifts = [];
+let rateOverrides = {};   // staffId -> rate (number)
+let showZero = false;
+
+/* ========== Helpers ========== */
+function todayDate(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
+function mondayOf(d){ const x=new Date(d); const day=x.getDay(); const diff = (day===0?-6:1-day); x.setDate(x.getDate()+diff); x.setHours(0,0,0,0); return x; }
+function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+function isoDate(d){ return d.toISOString().slice(0,10); }
+function fmtDay(d){ return d.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short'}); }
+function fmtRange(aISO,bISO){
+  const a = new Date(aISO+'T12:00'), b = new Date(bISO+'T12:00');
+  return a.toLocaleDateString('en-GB',{day:'numeric',month:'short'}) + ' – ' + b.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});
+}
+function money(n){ return '£' + (Math.round(n*100)/100).toFixed(2); }
+function setStatus(txt, cls){
+  const el = document.getElementById('statusBar');
+  el.innerHTML = txt;
+  el.className = 'status-bar' + (cls?' '+cls:'');
+}
+function pj(v){ try{ return typeof v === 'string' ? JSON.parse(v) : v; }catch(e){ return null; } }
+function toLabelList(colValue, colText){
+  const v = pj(colValue);
+  if (v?.labels && Array.isArray(v.labels)) return v.labels;
+  if (colText) return colText.split(',').map(s=>s.trim()).filter(Boolean);
+  return [];
+}
+
+/* ========== Monday API ========== */
+async function mondayQuery(q, vars){
+  const r = await fetch(MONDAY_URL,{
+    method:'POST',
+    headers:{'Authorization':TOKEN,'Content-Type':'application/json','API-Version':'2024-01'},
+    body:JSON.stringify(vars ? {query:q,variables:vars} : {query:q})
+  });
+  if(!r.ok){ throw new Error(`HTTP ${r.status}`); }
+  const j = await r.json();
+  if(j.errors){ throw new Error(j.errors[0].message); }
+  return j.data;
+}
+
+async function fetchStaff(){
+  const q = `{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:500){ items{ id name column_values(ids:["${ST_ROLE}","${ST_STATUS}","${ST_CONTRACT}","${ST_DEFRATE}"]){ id text value } } } } }`;
+  const d = await mondayQuery(q);
+  staff = d.boards[0].items_page.items.map(it => {
+    const cv = Object.fromEntries(it.column_values.map(c=>[c.id,c]));
+    return {
+      id: it.id,
+      name: it.name,
+      role: cv[ST_ROLE]?.text || '',
+      status: cv[ST_STATUS]?.text || 'Active',
+      contractHrs: parseFloat(cv[ST_CONTRACT]?.text || '0') || 0,
+      defaultRate: parseFloat(cv[ST_DEFRATE]?.text || '0') || 0,
+    };
+  }).filter(s => !EXCLUDE_STATUSES.includes(s.status))
+    .sort((a,b) => {
+      const ai = ROLE_ORDER.indexOf(a.role); const bi = ROLE_ORDER.indexOf(b.role);
+      if(ai !== bi) return (ai<0?99:ai) - (bi<0?99:bi);
+      return a.name.localeCompare(b.name);
+    });
+}
+
+async function fetchCleansInRange(){
+  // Use items_page_by_column_values to narrow by date range. Fallback: fetch all and filter.
+  const colIds = `["${CL_DATE}","${CL_START}","${CL_HRS}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_STATUS}","${CL_PROP}"]`;
+  let items = []; let cursor = null;
+  do {
+    const q = cursor
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${colIds}){ id text value } } } }`
+      : `{ boards(ids:[${CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id text value } } } } }`;
+    const d = await mondayQuery(q);
+    const page = cursor ? d.next_items_page : d.boards[0].items_page;
+    items = items.concat(page.items);
+    cursor = page.cursor;
+  } while (cursor);
+  cleans = items.map(it => {
+    const cv = Object.fromEntries(it.column_values.map(c=>[c.id,c]));
+    const dateObj = pj(cv[CL_DATE]?.value);
+    const day = dateObj?.date || '';
+    const hrs = parseFloat(pj(cv[CL_HRS]?.value)) || 0;
+    return {
+      id: it.id, name: it.name, day, hoursTotal: hrs,
+      primary: toLabelList(cv[CL_PRIMARY]?.value, cv[CL_PRIMARY]?.text)[0] || '',
+      partner: toLabelList(cv[CL_PARTNER]?.value, cv[CL_PARTNER]?.text)[0] || '',
+      checker: toLabelList(cv[CL_CHECKER]?.value, cv[CL_CHECKER]?.text)[0] || '',
+      property: cv[CL_PROP]?.text || '',
+      status: cv[CL_STATUS]?.text || '',
+    };
+  }).filter(c => c.day >= fromDate && c.day <= toDate);
+}
+
+async function fetchShiftsInRange(){
+  const colIds = `["${SH_STAFF}","${SH_DATE}","${SH_ROLE}","${SH_HOURS}","${SH_RATE}"]`;
+  let items = []; let cursor = null;
+  do {
+    const q = cursor
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id column_values(ids:${colIds}){ id text value } } } }`
+      : `{ boards(ids:[${SHIFTS_BOARD}]){ items_page(limit:500){ cursor items{ id column_values(ids:${colIds}){ id text value } } } } }`;
+    const d = await mondayQuery(q);
+    const page = cursor ? d.next_items_page : d.boards[0].items_page;
+    items = items.concat(page.items);
+    cursor = page.cursor;
+  } while (cursor);
+  shifts = items.map(it => {
+    const cv = Object.fromEntries(it.column_values.map(c=>[c.id,c]));
+    return {
+      id: it.id,
+      staffId: cv[SH_STAFF]?.text || '',
+      date:    cv[SH_DATE]?.text || '',
+      role:    cv[SH_ROLE]?.text || '',
+      hours:   parseFloat(cv[SH_HOURS]?.text || '0') || 0,
+      rate:    parseFloat(cv[SH_RATE]?.text || '0') || 0,
+    };
+  }).filter(s => s.date >= fromDate && s.date <= toDate);
+}
+
+/* ========== Aggregation ========== */
+function computeRows(){
+  // Build per-name clean aggregates (Cleans uses dropdown labels = staff names)
+  const byName = new Map();    // name -> { cleanHrs, checkHrs, details:[] }
+  const getN = n => {
+    if (!byName.has(n)) byName.set(n, { cleanHrs:0, checkHrs:0, details:[] });
+    return byName.get(n);
+  };
+  for (const c of cleans) {
+    if (c.status === 'Cancelled') continue;
+    const hasPartner = !!c.partner;
+    const share = hasPartner ? c.hoursTotal/2 : c.hoursTotal;
+    if (c.primary) {
+      getN(c.primary).cleanHrs += share;
+      getN(c.primary).details.push({ day:c.day, kind:'Primary', prop:c.property, hrs:share });
+    }
+    if (c.partner) {
+      getN(c.partner).cleanHrs += c.hoursTotal/2;
+      getN(c.partner).details.push({ day:c.day, kind:'Partner', prop:c.property, hrs:c.hoursTotal/2 });
+    }
+    if (c.checker) {
+      getN(c.checker).checkHrs += CHECK_HOURS_PER_CLEAN;
+      getN(c.checker).details.push({ day:c.day, kind:'Checker', prop:c.property, hrs:CHECK_HOURS_PER_CLEAN });
+    }
+  }
+
+  // Shifts by staffId
+  const byId = new Map();
+  for (const s of shifts) {
+    if (!s.staffId || !s.hours) continue;
+    if (!byId.has(s.staffId)) byId.set(s.staffId, { shiftHrs:0, shiftPay:0, details:[] });
+    const bucket = byId.get(s.staffId);
+    const rate = s.rate || 0;
+    bucket.shiftHrs += s.hours;
+    bucket.shiftPay += s.hours * rate;  // shift-level rate overrides if set
+    bucket.details.push({ day:s.date, kind:'Shift — '+s.role, prop:'', hrs:s.hours, rate });
+  }
+
+  // Fuse by staff id
+  const rows = [];
+  for (const st of staff) {
+    const cleanRec = byName.get(st.name) || { cleanHrs:0, checkHrs:0, details:[] };
+    const shiftRec = byId.get(st.id) || { shiftHrs:0, shiftPay:0, details:[] };
+    const totalHrs = cleanRec.cleanHrs + cleanRec.checkHrs + shiftRec.shiftHrs;
+    const rate = rateOverrides[st.id] != null ? rateOverrides[st.id] : st.defaultRate;
+    // Pay: use per-shift rate for shift hours when non-zero; else use staff rate for all hours
+    let pay = 0;
+    if (shiftRec.shiftPay > 0) {
+      pay += shiftRec.shiftPay;
+      // remaining shift hours (rate=0) use staff rate
+      const paidShiftHrs = shiftRec.details.reduce((a,d)=>a + (d.rate>0?d.hrs:0), 0);
+      const unpaidShiftHrs = Math.max(0, shiftRec.shiftHrs - paidShiftHrs);
+      pay += unpaidShiftHrs * rate;
+    } else {
+      pay += shiftRec.shiftHrs * rate;
+    }
+    pay += (cleanRec.cleanHrs + cleanRec.checkHrs) * rate;
+
+    rows.push({
+      id: st.id, name: st.name, role: st.role,
+      cleanHrs: cleanRec.cleanHrs,
+      checkHrs: cleanRec.checkHrs,
+      shiftHrs: shiftRec.shiftHrs,
+      totalHrs, rate, pay,
+      defaultRate: st.defaultRate,
+      details: [...cleanRec.details, ...shiftRec.details].sort((a,b)=> a.day.localeCompare(b.day)),
+    });
+  }
+  return rows.sort((a,b)=>{
+    const ai = ROLE_ORDER.indexOf(a.role); const bi = ROLE_ORDER.indexOf(b.role);
+    if(ai !== bi) return (ai<0?99:ai) - (bi<0?99:bi);
+    return a.name.localeCompare(b.name);
+  });
+}
+
+function render(){
+  const rows = computeRows();
+  const totals = rows.reduce((acc,r)=>{
+    acc.cleanHrs += r.cleanHrs; acc.checkHrs += r.checkHrs;
+    acc.shiftHrs += r.shiftHrs; acc.totalHrs += r.totalHrs; acc.pay += r.pay;
+    return acc;
+  },{cleanHrs:0,checkHrs:0,shiftHrs:0,totalHrs:0,pay:0});
+
+  // Summary cards
+  document.getElementById('summary').innerHTML = `
+    <div class="sum-card"><div class="lbl">Period</div><div class="val">${fmtRange(fromDate,toDate)}</div></div>
+    <div class="sum-card"><div class="lbl">Total hours</div><div class="val">${totals.totalHrs.toFixed(1)} <small>h</small></div></div>
+    <div class="sum-card"><div class="lbl">Total pay</div><div class="val">${money(totals.pay)}</div></div>
+    <div class="sum-card"><div class="lbl">Active staff</div><div class="val">${rows.filter(r=>r.totalHrs>0).length} <small>/ ${rows.length}</small></div></div>
+  `;
+
+  // Body
+  const body = document.getElementById('payBody');
+  const visible = rows.filter(r => showZero || r.totalHrs > 0);
+  if (!visible.length) {
+    body.innerHTML = `<tr><td colspan="7" style="text-align:center;padding:20px;color:var(--muted)">No hours logged in this period.</td></tr>`;
+  } else {
+    body.innerHTML = visible.map(r => `
+      <tr class="${r.totalHrs===0?'zero':''}" data-id="${r.id}">
+        <td><span class="nm">${escHTML(r.name)}</span><small class="rl">${escHTML(r.role||'—')}</small></td>
+        <td class="num">${r.cleanHrs.toFixed(2)}</td>
+        <td class="num">${r.checkHrs.toFixed(2)}</td>
+        <td class="num">${r.shiftHrs.toFixed(2)}</td>
+        <td class="num"><b>${r.totalHrs.toFixed(2)}</b></td>
+        <td class="num"><input class="rate" type="number" step="0.01" min="0" value="${r.rate.toFixed(2)}" data-id="${r.id}"></td>
+        <td class="num">${money(r.pay)}</td>
+      </tr>
+    `).join('');
+  }
+
+  // Foot
+  document.getElementById('payFoot').innerHTML = `
+    <tr>
+      <td>Totals</td>
+      <td class="num">${totals.cleanHrs.toFixed(2)}</td>
+      <td class="num">${totals.checkHrs.toFixed(2)}</td>
+      <td class="num">${totals.shiftHrs.toFixed(2)}</td>
+      <td class="num">${totals.totalHrs.toFixed(2)}</td>
+      <td></td>
+      <td class="num">${money(totals.pay)}</td>
+    </tr>`;
+
+  // Detail blocks (collapsed by default)
+  document.getElementById('detailList').innerHTML = visible.map(r => `
+    <details class="person">
+      <summary>${escHTML(r.name)} — ${r.totalHrs.toFixed(2)} h · ${money(r.pay)}</summary>
+      <div class="body">
+        ${r.details.length
+          ? `<table><thead><tr><th>Date</th><th>Kind</th><th>Property</th><th class="num">Hours</th><th class="num">Rate</th></tr></thead><tbody>${
+              r.details.map(d => `<tr><td>${d.day}</td><td>${escHTML(d.kind)}</td><td>${escHTML(d.prop||'')}</td><td class="num">${(d.hrs||0).toFixed(2)}</td><td class="num">${money((d.rate&&d.rate>0)?d.rate:r.rate)}</td></tr>`).join('')
+            }</tbody></table>`
+          : '<em style="color:var(--muted)">No entries</em>'}
+      </div>
+    </details>
+  `).join('');
+
+  // Wire up rate inputs
+  body.querySelectorAll('input.rate').forEach(inp => {
+    inp.addEventListener('change', e => {
+      const id = e.target.dataset.id;
+      const v = parseFloat(e.target.value) || 0;
+      rateOverrides[id] = v;
+      try { localStorage.setItem(LOCAL_RATE_KEY, JSON.stringify(rateOverrides)); } catch(e){}
+      render();
+    });
+  });
+
+  document.getElementById('rangeTitle').textContent = fmtRange(fromDate,toDate);
+}
+
+function escHTML(s){ return String(s||'').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]); }
+
+/* ========== CSV Export ========== */
+function exportCSV(){
+  const rows = computeRows().filter(r => showZero || r.totalHrs > 0);
+  const header = ['Name','Role','Clean hrs','Check hrs','Shift hrs','Total hrs','Rate (£/h)','Pay (£)'];
+  const lines = [header.join(',')];
+  for (const r of rows) {
+    lines.push([
+      '"'+r.name.replace(/"/g,'""')+'"',
+      '"'+(r.role||'').replace(/"/g,'""')+'"',
+      r.cleanHrs.toFixed(2),
+      r.checkHrs.toFixed(2),
+      r.shiftHrs.toFixed(2),
+      r.totalHrs.toFixed(2),
+      r.rate.toFixed(2),
+      r.pay.toFixed(2),
+    ].join(','));
+  }
+  const blob = new Blob([lines.join('\n')], {type:'text/csv'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = `payroll_${fromDate}_to_${toDate}.csv`;
+  document.body.appendChild(a); a.click(); a.remove();
+}
+
+/* ========== Load ========== */
+async function loadAll(){
+  setStatus('Loading…');
+  try{
+    await Promise.all([fetchStaff(), fetchCleansInRange(), fetchShiftsInRange()]);
+    render();
+    setStatus('<span class="sync">Synced</span> ' + new Date().toLocaleTimeString());
+  }catch(e){
+    console.error(e);
+    setStatus('<span class="err">Error: '+escHTML(e.message)+'</span>');
+  }
+}
+
+function setDefaultRange(kind){
+  const today = todayDate();
+  if (kind === 'week'){
+    fromDate = isoDate(mondayOf(today));
+    toDate   = isoDate(addDays(mondayOf(today), 6));
+  } else if (kind === 'prev'){
+    fromDate = isoDate(addDays(mondayOf(today), -7));
+    toDate   = isoDate(addDays(mondayOf(today), -1));
+  } else if (kind === 'month'){
+    const d = new Date(today.getFullYear(), today.getMonth(), 1);
+    const e = new Date(today.getFullYear(), today.getMonth()+1, 0);
+    fromDate = isoDate(d); toDate = isoDate(e);
+  }
+  document.getElementById('fromDate').value = fromDate;
+  document.getElementById('toDate').value = toDate;
+}
+
+/* ========== PIN ========== */
+async function sha256(t){
+  const buf = new TextEncoder().encode(t);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+async function checkPin(v){
+  const h = await sha256(v);
+  return h === PIN_HASH;
+}
+function setupPin(){
+  const inp = document.getElementById('pinInput');
+  const err = document.getElementById('pinErr');
+  const overlay = document.getElementById('pinOverlay');
+  const app = document.getElementById('app');
+  if (sessionStorage.getItem('payroll_pin_ok') === '1') {
+    overlay.classList.add('hide'); app.classList.remove('hide');
+    return;
+  }
+  setTimeout(()=>inp.focus(), 100);
+  inp.addEventListener('input', async e => {
+    const v = e.target.value;
+    if (v.length !== 6) { err.textContent=''; return; }
+    if (await checkPin(v)) {
+      sessionStorage.setItem('payroll_pin_ok','1');
+      overlay.classList.add('hide'); app.classList.remove('hide');
+      init();
+    } else {
+      err.textContent = 'Wrong PIN';
+      inp.value = '';
+    }
+  });
+}
+
+/* ========== Init ========== */
+function init(){
+  // Load cached rate overrides
+  try { rateOverrides = JSON.parse(localStorage.getItem(LOCAL_RATE_KEY) || '{}') || {}; } catch(e){ rateOverrides = {}; }
+
+  setDefaultRange('week');
+
+  document.getElementById('weekBtn').addEventListener('click', ()=>{ setDefaultRange('week'); loadAll(); });
+  document.getElementById('prevWeekBtn').addEventListener('click', ()=>{ setDefaultRange('prev'); loadAll(); });
+  document.getElementById('monthBtn').addEventListener('click', ()=>{ setDefaultRange('month'); loadAll(); });
+  document.getElementById('refreshBtn').addEventListener('click', loadAll);
+  document.getElementById('exportBtn').addEventListener('click', exportCSV);
+  document.getElementById('fromDate').addEventListener('change', e => { fromDate = e.target.value; loadAll(); });
+  document.getElementById('toDate').addEventListener('change', e => { toDate = e.target.value; loadAll(); });
+  document.getElementById('showZero').addEventListener('change', e => { showZero = e.target.checked; render(); });
+
+  loadAll();
+}
+
+/* ========== Boot ========== */
+setupPin();
+
+// Register SW
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>

@@ -2,7 +2,7 @@
 // Caches app shell for fast loading and offline UI.
 // Monday.com API calls are always fetched from the network.
 
-const CACHE    = 'be-here-v12';
+const CACHE    = 'be-here-v27';
 const PRECACHE = [
   '/guest-arrivals/hub.html',
   '/guest-arrivals/index.html',
@@ -18,6 +18,10 @@ const PRECACHE = [
   '/guest-arrivals/waiver.html',
   '/guest-arrivals/linen-returns.html',
   '/guest-arrivals/linen-stock.html',
+  '/guest-arrivals/laundry-rota.html',
+  '/guest-arrivals/rota-planner.html',
+  '/guest-arrivals/staff-shifts.html',
+  '/guest-arrivals/payroll.html',
   '/guest-arrivals/manifest.json',
   '/guest-arrivals/icon.svg',
   '/guest-arrivals/icon-192.png',
@@ -46,9 +50,11 @@ self.addEventListener('activate', e => {
 self.addEventListener('fetch', e => {
   const url = e.request.url;
 
-  // Always hit the network for Monday API
+  // Always hit the network for Monday API & fonts — explicit passthrough
+  // (Safari PWAs sometimes mangle `return;` without respondWith, so we proxy explicitly)
   if (url.includes('api.monday.com') || url.includes('fonts.googleapis.com') || url.includes('fonts.gstatic.com')) {
-    return; // let browser handle normally
+    e.respondWith(fetch(e.request));
+    return;
   }
 
   e.respondWith(

@@ -1,0 +1,2041 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Clean Rota — Be Here</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#272F2E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --bg: #D5D0C4; --dark: #272F2E; --sage: #646955; --sage-light: #eaede4;
+      --gold: #AF926A; --gold-light: #faf3e8; --cream: #F3E3C3;
+      --text: #1a1a1a; --muted: #888; --border: #e0ddd6; --card: #fff;
+      --sameday: #c0392b; --sameday-light: #fde8e8;
+      --early: #1a6fba; --early-light: #ddeeff;
+      --local: #9a8e7a; --local-light: #eae5dc;
+    }
+    body { font-family: 'Instrument Sans', system-ui, sans-serif;
+           background: var(--bg); color: var(--text); min-height: 100vh;
+           padding-bottom: 60px; overflow-x: hidden; }
+
+    /* ── PIN GATE ── */
+    #pinGate { position: fixed; inset: 0; background: var(--dark);
+               display: flex; flex-direction: column; align-items: center; justify-content: center;
+               z-index: 9999; padding: 20px; }
+    #pinGate h2 { color: #fff; font-size: 20px; font-weight: 600; margin-bottom: 20px; }
+    #pinGate input { width: 240px; padding: 12px; font-size: 20px; text-align: center;
+                     border-radius: 8px; border: none; background: rgba(255,255,255,0.12);
+                     color: #fff; font-family: inherit; letter-spacing: 8px; }
+    #pinGate input::placeholder { color: rgba(255,255,255,0.5); letter-spacing: normal; }
+    #pinGate .pin-err { color: #ff8a80; font-size: 13px; margin-top: 10px; min-height: 18px; }
+
+    /* ── HEADER ── */
+    #header { height: 52px; background: var(--dark); display: flex; align-items: center;
+              padding: 0 12px; gap: 10px; position: sticky; top: 0; z-index: 100; }
+    .back-btn, .header-btn { background: rgba(255,255,255,0.12); border: none; color: #fff;
+              padding: 6px 12px; border-radius: 7px; font-size: 12px;
+              font-family: inherit; cursor: pointer; text-decoration: none;
+              display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .back-btn:hover, .header-btn:hover { background: rgba(255,255,255,0.22); }
+    .header-title { color: #fff; font-size: 15px; font-weight: 600; flex: 1; }
+    .header-btn.saving { background: var(--gold); }
+    .header-btn.dirty { background: var(--gold); }
+
+    /* ── LOADING BAR ── */
+    #loadingBar { display: none; height: 3px; background: linear-gradient(90deg, var(--sage), var(--gold)); animation: loadpulse 1.2s infinite; }
+    @keyframes loadpulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+    /* ── WEEK NAV ── */
+    .week-nav { display: flex; align-items: center; gap: 8px;
+                background: var(--dark); padding: 0 12px 10px; }
+    .week-arrow { background: rgba(255,255,255,0.12); border: none; color: #fff;
+                  width: 32px; height: 32px; border-radius: 8px; font-size: 16px; cursor: pointer; }
+    .week-arrow:hover { background: rgba(255,255,255,0.25); }
+    #weekLabel { flex: 1; text-align: center; color: #fff; font-size: 13px; font-weight: 600; }
+    .today-btn { background: rgba(255,255,255,0.12); border: none; color: rgba(255,255,255,0.75);
+                 padding: 5px 10px; border-radius: 7px; font-size: 11px; font-weight: 600;
+                 font-family: inherit; cursor: pointer; }
+
+    /* ── CONTROLS ── */
+    .controls-row { display: flex; align-items: center; gap: 16px;
+                    background: rgba(0,0,0,0.18); padding: 8px 12px; flex-wrap: wrap;
+                    border-top: 1px solid rgba(255,255,255,0.08); }
+    .ctrl { display: flex; align-items: center; gap: 8px; color: #fff; font-size: 12px; font-weight: 600; }
+    .toggle-wrap { position: relative; width: 38px; height: 20px; flex-shrink: 0; }
+    .toggle-wrap input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-slider { position: absolute; inset: 0; background: rgba(255,255,255,0.25);
+                     border-radius: 20px; cursor: pointer; transition: background 0.2s; }
+    .toggle-slider::before { content: ''; position: absolute; width: 14px; height: 14px;
+                              left: 3px; top: 3px; background: #fff; border-radius: 50%;
+                              transition: transform 0.2s; }
+    .toggle-wrap input:checked + .toggle-slider { background: var(--sage); }
+    .toggle-wrap input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+    /* ── DATE STRIP ── */
+    .date-strip-wrap { background: var(--dark); padding: 0 8px 10px; }
+    .date-strip { display: flex; gap: 5px; align-items: center; overflow-x: auto;
+                  padding: 4px 4px 6px; scrollbar-width: thin; }
+    .date-strip::-webkit-scrollbar { height: 4px; }
+    .date-strip::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.25); border-radius: 2px; }
+    .dps-btn { background: rgba(255,255,255,0.12); border: none; color: #fff;
+               width: 28px; height: 44px; border-radius: 6px; cursor: pointer; font-size: 14px;
+               font-family: inherit; flex-shrink: 0; display: flex; align-items: center; justify-content: center; }
+    .dps-btn:hover { background: rgba(255,255,255,0.22); }
+    .date-pill { display: flex; flex-direction: column; align-items: center; justify-content: center;
+                 padding: 4px 6px; border-radius: 7px; cursor: pointer;
+                 background: rgba(255,255,255,0.08); color: rgba(255,255,255,0.7);
+                 min-width: 40px; flex-shrink: 0; border: 1.5px solid transparent; transition: all 0.15s; }
+    .date-pill:hover { background: rgba(255,255,255,0.2); color: #fff; }
+    .date-pill.is-today { background: var(--sage); color: #fff; border-color: var(--sage); }
+    .date-pill.in-view { border-color: rgba(255,255,255,0.4); color: #fff; }
+    .dp-dow { font-size: 9px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px; opacity: 0.85; }
+    .dp-d { font-size: 13px; font-weight: 700; }
+    .dp-mo { font-size: 8px; opacity: 0.7; text-transform: uppercase; }
+
+    /* ── VIEW TOGGLE ── */
+    .view-toggle { display: inline-flex; background: rgba(0,0,0,0.22); border-radius: 7px; padding: 2px; }
+    .view-toggle button { background: transparent; border: none; color: rgba(255,255,255,0.65);
+                          padding: 5px 12px; border-radius: 5px; font-size: 12px;
+                          font-family: inherit; font-weight: 600; cursor: pointer; }
+    .view-toggle button.active { background: var(--sage); color: #fff; }
+
+    /* ── ROLE FILTER ── */
+    .role-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 8px; }
+    .role-chip { background: rgba(0,0,0,0.06); border: 1px solid transparent;
+                 padding: 3px 8px; border-radius: 10px; font-size: 10px; font-weight: 700;
+                 color: var(--sage); cursor: pointer; font-family: inherit;
+                 text-transform: uppercase; letter-spacing: 0.3px; }
+    .role-chip.active { background: var(--sage); color: #fff; border-color: var(--sage); }
+    .role-chip:hover:not(.active) { border-color: var(--sage); }
+
+    /* ── MAIN LAYOUT ── */
+    .main-layout { display: grid; grid-template-columns: 220px 1fr; gap: 8px;
+                   padding: 8px; align-items: start; }
+    @media (max-width: 720px) {
+      .main-layout { grid-template-columns: 1fr; }
+      .staff-panel { position: sticky; top: 52px; z-index: 50; }
+      .staff-list { display: flex; overflow-x: auto; flex-direction: row; gap: 6px; }
+      .staff-chip { min-width: 130px; flex-shrink: 0; }
+    }
+
+    /* ── STAFF PANEL ── */
+    .staff-panel { background: rgba(255,255,255,0.5); border-radius: 10px;
+                   padding: 10px; position: sticky; top: 60px; max-height: calc(100vh - 80px); overflow-y: auto; }
+    .staff-panel h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+                      color: var(--sage); margin-bottom: 8px; font-weight: 700; }
+    .staff-list { display: flex; flex-direction: column; gap: 5px; }
+    .staff-chip { background: #fff; border-radius: 7px; padding: 7px 9px;
+                  border-left: 3px solid var(--sage); cursor: grab; font-size: 12px;
+                  user-select: none; transition: transform 0.1s; }
+    .staff-chip:active { cursor: grabbing; transform: scale(0.97); }
+    .staff-chip.dragging { opacity: 0.4; }
+    .staff-chip.over-hours { opacity: 0.35; border-left-color: var(--muted); }
+    .staff-chip.off { opacity: 0.25; border-left-color: #ddd; cursor: not-allowed; }
+    .staff-name { font-weight: 700; font-size: 12px; color: var(--dark); }
+    .staff-meta { font-size: 10px; color: var(--muted); margin-top: 2px;
+                  display: flex; justify-content: space-between; align-items: center; }
+    .staff-role { background: var(--sage-light); color: var(--sage); padding: 1px 5px;
+                  border-radius: 3px; font-weight: 600; font-size: 9px; text-transform: uppercase; }
+    .staff-role.ateam   { background: #fde8b5; color: #7a5a00; }
+    .staff-role.owner   { background: #e8e4f8; color: #5a4a9a; }
+    .staff-role.manager { background: #e8e4f8; color: #5a4a9a; }
+    .staff-role.checker { background: #d8edd4; color: #3a6a2a; }
+    .staff-role.van     { background: #ddeeff; color: var(--early); }
+    .staff-hrs { font-weight: 700; font-size: 10px; color: var(--sage); }
+    .staff-hrs.over { color: var(--sameday); }
+    .hrs-bar { height: 3px; background: rgba(0,0,0,0.08); border-radius: 2px; margin-top: 4px; overflow: hidden; }
+    .hrs-bar-fill { height: 100%; background: var(--sage); transition: width 0.2s; }
+    .hrs-bar-fill.over { background: var(--sameday); }
+
+    /* ── PLANNER CONTENT ── */
+    .planner-content { min-width: 0; overflow-x: auto; }
+    .week-grid { display: grid; grid-template-columns: repeat(7, minmax(130px, 1fr));
+                 gap: 5px; }
+    @media (max-width: 900px) {
+      .week-grid { grid-template-columns: repeat(7, minmax(110px, 1fr)); }
+    }
+
+    /* ── DAY COLUMN ── */
+    .day-col { background: rgba(255,255,255,0.35); border-radius: 8px;
+               padding: 7px 5px; min-width: 0; min-height: 80px; }
+    .day-col.day-past { opacity: 0.6; }
+    .day-col.day-today { background: rgba(255,255,255,0.7); box-shadow: 0 0 0 2px var(--sage); }
+    .day-col-hdr { font-size: 10px; font-weight: 700; color: var(--dark);
+                   margin-bottom: 6px; padding-bottom: 4px;
+                   border-bottom: 1.5px solid rgba(0,0,0,0.08);
+                   display: flex; justify-content: space-between; align-items: center; }
+    .day-col.day-today .day-col-hdr { color: var(--sage); }
+    .day-col.day-past .day-col-hdr { color: var(--muted); }
+    .day-count { font-size: 9px; color: var(--muted); font-weight: 600; }
+    .day-cap { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center;
+               font-size: 9px; padding: 2px 4px; margin-bottom: 5px;
+               border-radius: 4px; background: rgba(255,255,255,0.55); font-weight: 600; }
+    .day-cap-empty { color: #bbb; font-style: italic; font-weight: 500; }
+    .day-cap.ok    { color: var(--sage); box-shadow: inset 2px 0 0 var(--sage); }
+    .day-cap.tight { color: #a67a2a; box-shadow: inset 2px 0 0 var(--gold); background: var(--gold-light); }
+    .day-cap.over  { color: var(--sameday); box-shadow: inset 2px 0 0 var(--sameday); background: var(--sameday-light); }
+    .day-cap-num b { font-size: 10px; }
+    .day-cap-rem   { opacity: 0.85; }
+    .day-cap-early { background: var(--early-light); color: var(--early);
+                     padding: 1px 4px; border-radius: 3px; font-size: 8.5px; }
+    .day-empty { font-size: 10px; color: #bbb; font-style: italic; padding: 4px 2px; text-align: center; }
+    .add-btn { background: rgba(0,0,0,0.06); border: 1px dashed rgba(0,0,0,0.18);
+               color: var(--muted); width: 100%; padding: 4px; border-radius: 5px;
+               font-size: 11px; font-weight: 700; cursor: pointer; margin-top: 3px;
+               font-family: inherit; }
+    .add-btn:hover { background: rgba(0,0,0,0.1); color: var(--dark); }
+
+    /* ── LODGE VIEW ── */
+    .lodge-grid { display: grid; grid-template-columns: 150px repeat(7, minmax(100px, 1fr));
+                  gap: 3px; min-width: 860px; }
+    .lg-hdr { font-size: 10px; font-weight: 700; color: var(--dark);
+              padding: 6px 4px; background: rgba(255,255,255,0.5); border-radius: 4px;
+              text-align: center; }
+    .lg-hdr.today { background: var(--sage); color: #fff; }
+    .lg-prop { font-size: 11px; font-weight: 700; color: var(--dark);
+               padding: 6px 8px; background: rgba(255,255,255,0.75); border-radius: 4px;
+               display: flex; flex-direction: column; justify-content: center;
+               overflow: hidden; min-width: 0; }
+    .lg-prop .prop-meta { font-size: 9px; color: var(--muted); font-weight: 500;
+                          margin-top: 2px; text-transform: none; letter-spacing: 0; }
+    .lg-cell { background: rgba(255,255,255,0.3); border-radius: 4px; padding: 3px;
+               min-height: 46px; font-size: 10px; min-width: 0; }
+    .lg-cell.today { background: rgba(255,255,255,0.55); box-shadow: inset 0 0 0 1.5px var(--sage); }
+    .lg-cell.past { opacity: 0.55; }
+    .lg-cell.drop-ready { box-shadow: inset 0 0 0 2px var(--sage); background: rgba(100,105,85,0.15); }
+    .lg-mini { background: #fff; border-left: 3px solid var(--sage); border-radius: 3px;
+               padding: 3px 5px; margin-bottom: 2px; font-size: 10px; cursor: pointer;
+               line-height: 1.3; }
+    .lg-mini.same-day { border-left-color: var(--sameday); background: var(--sameday-light); }
+    .lg-mini.early { border-left-color: var(--early); background: var(--early-light); }
+    .lg-mini.local { border-left-color: var(--local); background: var(--local-light); opacity: 0.6; }
+    .lg-mini.local.override { opacity: 1; border-left-color: var(--gold); background: var(--gold-light); }
+    .lg-mini.unplanned { border-left-style: dashed; opacity: 0.75; font-style: italic; background: rgba(255,255,255,0.6); }
+    .lg-mini-staff { font-size: 9px; color: var(--muted); margin-top: 1px; font-weight: 500;
+                     overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .lg-mini-staff.assigned { color: var(--sage); font-weight: 600; }
+
+    /* ── STAFF VIEW ── */
+    .staff-grid { display: grid; grid-template-columns: 150px repeat(7, minmax(100px, 1fr)) 70px;
+                  gap: 3px; min-width: 930px; }
+    .sg-total { font-size: 11px; font-weight: 700; color: var(--sage);
+                padding: 6px 4px; background: rgba(255,255,255,0.7); border-radius: 4px;
+                text-align: center; display: flex; flex-direction: column; align-items: center; justify-content: center; }
+    .sg-total.over { color: var(--sameday); }
+    .sg-total small { font-size: 8px; font-weight: 500; color: var(--muted); text-transform: uppercase; }
+    .sg-cell { background: rgba(255,255,255,0.3); border-radius: 4px; padding: 3px;
+               min-height: 46px; font-size: 10px; }
+    .sg-cell.today { background: rgba(255,255,255,0.55); box-shadow: inset 0 0 0 1.5px var(--sage); }
+    .sg-cell.past { opacity: 0.55; }
+
+    /* ── CLEAN CARDS ── */
+    .clean-card { background: #fff; border-radius: 6px; margin-bottom: 4px;
+                  border-left: 3px solid var(--sage); font-size: 11px;
+                  padding: 5px 6px; cursor: pointer;
+                  transition: transform 0.1s, box-shadow 0.1s;
+                  position: relative; }
+    .clean-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.1); transform: translateY(-1px); }
+    .clean-card.same-day { border-left-color: var(--sameday); background: var(--sameday-light); }
+    .clean-card.early    { border-left-color: var(--early); background: var(--early-light); }
+    .clean-card.local    { border-left-color: var(--local); background: var(--local-light); opacity: 0.5; }
+    .clean-card.local.override { opacity: 1; border-left-color: var(--gold); background: var(--gold-light); }
+    .clean-card.planned  { border-left-width: 5px; }
+    .clean-card.drag-over { box-shadow: 0 0 0 2px var(--sage); }
+    .clean-card.non-managed { border-left-style: dashed; }
+    .cc-top { display: flex; justify-content: space-between; align-items: flex-start; gap: 4px; }
+    .cc-name { font-weight: 700; color: var(--dark); font-size: 11px;
+               overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+               flex: 1; min-width: 0; }
+    .cc-badges { display: flex; gap: 2px; flex-shrink: 0; }
+    .cc-badge { font-size: 9px; font-weight: 700; padding: 1px 4px; border-radius: 3px;
+                text-transform: uppercase; letter-spacing: 0.3px; }
+    .cc-badge.t { background: var(--sameday); color: #fff; }
+    .cc-badge.e { background: var(--early); color: #fff; }
+    .cc-badge.l { background: var(--local); color: #fff; }
+    .cc-badge.n { background: var(--gold); color: #fff; }
+    .cc-badge.qc { background: #6b4a9a; color: #fff; }          /* Quality Check (checker pill) */
+    .cc-badge.gr { background: #3a6a2a; color: #fff; }          /* Guest Ready */
+    /* Subtle green accent on Guest Ready cards so they're easy to spot */
+    .clean-card.gr { box-shadow: inset 3px 0 0 #3a6a2a; }
+    .lg-mini.gr    { border-left-color: #3a6a2a !important; }
+    .cc-meta { font-size: 10px; color: var(--muted); margin-top: 2px;
+               display: flex; gap: 6px; flex-wrap: wrap; }
+    .cc-staff { margin-top: 3px; display: flex; gap: 3px; flex-wrap: wrap; }
+    .cc-staff-pill { background: var(--sage); color: #fff; font-size: 10px;
+                      padding: 1px 6px; border-radius: 8px; font-weight: 600;
+                      display: inline-flex; align-items: center; gap: 3px; }
+    .cc-staff-pill .x { opacity: 0.7; cursor: pointer; font-size: 9px; }
+    .cc-staff-empty { font-size: 10px; color: #c0c0c0; font-style: italic; }
+    .cc-notes { font-size: 10px; color: var(--sage); margin-top: 2px;
+                 padding: 2px 5px; background: var(--sage-light); border-radius: 3px; }
+
+    /* ── MODAL ── */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+                     display: none; align-items: center; justify-content: center;
+                     z-index: 1000; padding: 20px; }
+    .modal-overlay.open { display: flex; }
+    .modal-box { background: #fff; border-radius: 12px; padding: 20px;
+                 max-width: 420px; width: 100%; max-height: 85vh; overflow-y: auto; }
+    .modal-title { font-size: 16px; font-weight: 700; color: var(--dark);
+                   display: flex; justify-content: space-between; align-items: center;
+                   margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+    .modal-close { background: none; border: none; font-size: 18px; cursor: pointer;
+                   color: var(--muted); padding: 0 4px; }
+    .modal-row { margin-bottom: 12px; }
+    .modal-label { font-size: 11px; font-weight: 700; text-transform: uppercase;
+                   letter-spacing: 0.6px; color: var(--muted); margin-bottom: 5px; display: block; }
+    .modal-input, .modal-select { width: 100%; padding: 8px 10px; font-size: 13px;
+                   border-radius: 6px; border: 1px solid var(--border);
+                   font-family: inherit; background: #fff; }
+    .modal-row-inline { display: flex; gap: 8px; }
+    .modal-row-inline > * { flex: 1; }
+    .modal-btns { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .modal-btn { padding: 8px 14px; border-radius: 6px; border: none;
+                 font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+                 flex: 1; min-width: 80px; }
+    .modal-btn.primary { background: var(--sage); color: #fff; }
+    .modal-btn.danger { background: #fde8e8; color: var(--sameday); }
+    .modal-btn.secondary { background: var(--border); color: var(--dark); }
+    .modal-chk { display: flex; align-items: center; gap: 8px; font-size: 13px;
+                 padding: 5px 0; cursor: pointer; }
+    .modal-chk input { width: 16px; height: 16px; }
+
+    /* ── TOAST ── */
+    #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+             background: var(--dark); color: #fff; padding: 10px 18px; border-radius: 8px;
+             font-size: 13px; font-weight: 600; opacity: 0; transition: opacity 0.3s;
+             pointer-events: none; z-index: 2000; }
+    #toast.show { opacity: 1; }
+
+    /* ── DRAG HINT ── */
+    .drop-target-hint { background: rgba(100,105,85,0.1); box-shadow: inset 0 0 0 2px var(--sage); }
+  </style>
+</head>
+<body>
+
+<!-- ── PIN GATE ── -->
+<div id="pinGate">
+  <h2>Clean Rota</h2>
+  <input type="password" id="pinInput" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+  <div class="pin-err" id="pinErr"></div>
+</div>
+
+<!-- ── APP ── -->
+<div id="app" style="display:none">
+
+  <div id="header">
+    <a class="back-btn" href="hub.html">← Hub</a>
+    <div class="header-title">Clean Rota</div>
+    <button class="header-btn" onclick="refreshAll()" title="Reload from Monday">↻</button>
+    <button class="header-btn" id="saveBtn" onclick="saveToMonday()" title="Save changes to Monday">☁ Save</button>
+  </div>
+
+  <div id="loadingBar"></div>
+
+  <div class="date-strip-wrap">
+    <div class="date-strip" id="dateStrip"></div>
+  </div>
+
+  <div class="controls-row">
+    <div class="view-toggle" id="viewToggle">
+      <button data-view="day" class="active" onclick="setView('day')">Day</button>
+      <button data-view="lodge" onclick="setView('lodge')">By lodge</button>
+      <button data-view="staff" onclick="setView('staff')">By housekeeper</button>
+    </div>
+    <label class="ctrl">
+      <span>Hide planned</span>
+      <div class="toggle-wrap"><input type="checkbox" id="hidePlannedToggle" onchange="render()"><span class="toggle-slider"></span></div>
+    </label>
+    <label class="ctrl">
+      <span>Local cleaners</span>
+      <div class="toggle-wrap"><input type="checkbox" id="showLocalToggle" checked onchange="render()"><span class="toggle-slider"></span></div>
+    </label>
+    <label class="ctrl">
+      <span>Early window</span>
+      <div class="toggle-wrap"><input type="checkbox" id="showEarlyToggle" checked onchange="render()"><span class="toggle-slider"></span></div>
+    </label>
+    <button class="header-btn" onclick="showBookingModal()">+ Manual booking</button>
+    <button class="header-btn" onclick="showManagerModal()">Manage non-managed</button>
+  </div>
+
+  <div class="main-layout">
+    <aside class="staff-panel">
+      <h3>Staff — drag to assign</h3>
+      <div class="role-chips" id="roleChips"></div>
+      <div class="staff-list" id="staffList"></div>
+    </aside>
+    <main class="planner-content">
+      <div id="viewContent"></div>
+    </main>
+  </div>
+
+</div>
+
+<!-- ── CLEAN EDIT MODAL ── -->
+<div class="modal-overlay" id="cleanModal" onclick="overlayClose(event,'cleanModal')">
+  <div class="modal-box">
+    <div class="modal-title"><span id="cmTitle">Clean</span><button class="modal-close" onclick="closeModal('cleanModal')">✕</button></div>
+
+    <div class="modal-row">
+      <span class="modal-label">Day</span>
+      <select class="modal-select" id="cmDay"></select>
+    </div>
+
+    <div class="modal-row modal-row-inline">
+      <div>
+        <span class="modal-label">Start</span>
+        <input type="time" class="modal-input" id="cmStart">
+      </div>
+      <div>
+        <span class="modal-label">Hours (total)</span>
+        <input type="number" class="modal-input" id="cmHours" step="0.25" min="0">
+      </div>
+    </div>
+
+    <div class="modal-row">
+      <span class="modal-label">Primary cleaner</span>
+      <select class="modal-select" id="cmPrimary"><option value="">—</option></select>
+    </div>
+
+    <div class="modal-row">
+      <span class="modal-label">Partner (optional)</span>
+      <select class="modal-select" id="cmPartner"><option value="">—</option></select>
+    </div>
+
+    <div class="modal-row">
+      <span class="modal-label">Checker (optional)</span>
+      <select class="modal-select" id="cmChecker"><option value="">—</option></select>
+    </div>
+
+    <div class="modal-row modal-row-inline">
+      <div>
+        <span class="modal-label">Laundry run</span>
+        <select class="modal-select" id="cmLaundry">
+          <option value="">—</option>
+          <option value="Laundry van">Laundry van</option>
+          <option value="Maintenance team">Maintenance team</option>
+          <option value="Staff car">Staff car</option>
+        </select>
+      </div>
+      <div id="cmLaunDrvWrap" style="display:none">
+        <span class="modal-label">Driver</span>
+        <select class="modal-select" id="cmLaunDriver"><option value="">—</option></select>
+      </div>
+    </div>
+
+    <div class="modal-row">
+      <label class="modal-chk"><input type="checkbox" id="cmSameDay"><span>Same-day changeover (T)</span></label>
+      <label class="modal-chk"><input type="checkbox" id="cmEarly"><span>Early (done between stays, before checkout)</span></label>
+      <label class="modal-chk"><input type="checkbox" id="cmGuestReady"><span>Guest Ready (no quality check needed)</span></label>
+      <label class="modal-chk" id="cmOverrideRow" style="display:none"><input type="checkbox" id="cmLocalOverride"><span>We're stepping in (local cleaner can't)</span></label>
+    </div>
+
+    <div class="modal-row">
+      <span class="modal-label">Notes</span>
+      <textarea class="modal-input" id="cmNotes" rows="2" style="resize:vertical"></textarea>
+    </div>
+
+    <div class="modal-btns">
+      <button class="modal-btn primary" onclick="saveClean()">Save</button>
+      <button class="modal-btn secondary" onclick="closeModal('cleanModal')">Cancel</button>
+      <button class="modal-btn danger" onclick="deleteClean()">Delete</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADD MANUAL BOOKING MODAL ── -->
+<div class="modal-overlay" id="bookingModal" onclick="overlayClose(event,'bookingModal')">
+  <div class="modal-box">
+    <div class="modal-title"><span>Add manual booking</span><button class="modal-close" onclick="closeModal('bookingModal')">✕</button></div>
+    <div class="modal-row">
+      <span class="modal-label">Property</span>
+      <select class="modal-select" id="bmProp"></select>
+    </div>
+    <div class="modal-row modal-row-inline">
+      <div>
+        <span class="modal-label">Check-out</span>
+        <input type="date" class="modal-input" id="bmOut">
+      </div>
+      <div>
+        <span class="modal-label">Next check-in</span>
+        <input type="date" class="modal-input" id="bmIn">
+      </div>
+    </div>
+    <div class="modal-row">
+      <label class="modal-chk"><input type="checkbox" id="bmSameDay"><span>Same-day changeover (T)</span></label>
+    </div>
+    <div class="modal-btns">
+      <button class="modal-btn primary" onclick="saveBooking()">Add</button>
+      <button class="modal-btn secondary" onclick="closeModal('bookingModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── ADD CLEAN ON DAY MODAL ── -->
+<div class="modal-overlay" id="addDayModal" onclick="overlayClose(event,'addDayModal')">
+  <div class="modal-box">
+    <div class="modal-title"><span id="adTitle">Add clean</span><button class="modal-close" onclick="closeModal('addDayModal')">✕</button></div>
+    <div class="modal-row">
+      <span class="modal-label">Property</span>
+      <select class="modal-select" id="adProp"></select>
+    </div>
+    <div class="modal-row">
+      <label class="modal-chk"><input type="checkbox" id="adSameDay"><span>Same-day changeover (T)</span></label>
+      <label class="modal-chk"><input type="checkbox" id="adEarly"><span>Early (between stays)</span></label>
+    </div>
+    <div class="modal-btns">
+      <button class="modal-btn primary" onclick="saveAddOnDay()">Add</button>
+      <button class="modal-btn secondary" onclick="closeModal('addDayModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── MANAGE NON-MANAGED MODAL ── -->
+<div class="modal-overlay" id="managerModal" onclick="overlayClose(event,'managerModal')">
+  <div class="modal-box">
+    <div class="modal-title"><span>Non-managed properties & bookings</span><button class="modal-close" onclick="closeModal('managerModal')">✕</button></div>
+    <div style="font-size:12px;color:var(--muted);margin-bottom:10px">
+      These are fed from external spreadsheets. Add them here and enter bookings manually.
+    </div>
+    <div id="managerList"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   CONFIG
+   ═══════════════════════════════════════════════════════════════════ */
+const MONDAY_API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+
+const LODGE_STATUS_BOARD = '1928673949';  // current + next checkin/checkout
+const PROP_CONFIG_BOARD  = '5094466278';  // property metadata
+const STAFF_BOARD        = '5095127554';
+const CLEANS_BOARD       = '5095134636';
+const SHIFTS_BOARD       = '5095155773';  // Staff Shifts (rostered hours per person per day)
+
+// Lodge Status columns
+const LS_CURR_IN  = 'date4';
+const LS_CURR_OUT = 'date_mkqaea46';
+const LS_NEXT_IN  = 'date_mkqwfyfx';
+const LS_NEXT_OUT = 'date_mkqw4cf6';
+const LS_TODAY    = 'color_mkqs71ry';
+
+// Property Config columns
+const PC_STD_HRS     = 'numeric_mm2pbsy1';
+const PC_DEF_CHECKIN = 'hour_mm2pbbnf';
+const PC_MANAGED     = 'boolean_mm2pjb1';
+const PC_LOCAL       = 'boolean_mm2p7m8p';
+
+// Staff columns
+const ST_ROLE     = 'color_mm2psadz';
+const ST_STATUS   = 'color_mm2psvh2';
+const ST_CONTRACT = 'numeric_mm2pc978';
+
+// Cleans columns
+const CL_DATE       = 'date_mm2pphc';      // current scheduled clean day (movable)
+const CL_CHECKIN    = 'date_mm2p6tck';     // key check-in day (immovable anchor)
+const CL_EARLIEST   = 'date_mm2phd58';     // earliest movable day (previous check-out)
+const CL_DAY        = 'color_mm2p8vtq';
+const CL_PROP       = 'board_relation_mm2psy0b';
+const CL_START      = 'hour_mm2pskhh';
+const CL_END        = 'hour_mm2pct11';
+const CL_HRS        = 'numeric_mm2pmqdt';
+const CL_PRIMARY    = 'dropdown_mm2pntvm';
+const CL_PARTNER    = 'dropdown_mm2pbcnq';
+const CL_CHECKER    = 'dropdown_mm2p9qd3';
+const CL_LAUNDRY    = 'color_mm2pnast';    // status: Laundry van, Maintenance team, Staff car
+const CL_LAUN_DRV   = 'dropdown_mm2ptbe7';
+const CL_SAMEDAY    = 'boolean_mm2p2v4n';
+const CL_LINEN_DAY  = 'color_mm2pj7e4';
+const CL_STATUS     = 'color_mm2prq2f';
+const CL_NOTES      = 'long_text_mm2pedn3';
+const CL_CHECKTYPE  = 'color_mm2pznw1';   // Guest Ready (idx 1, green) | Quality Check (idx 4, purple)
+
+// Staff Shifts columns (read-only from here — staff-shifts.html is the editor)
+const SH_STAFF = 'text_mm2p1gqx';   // Staff item id as plain text
+const SH_DATE  = 'date_mm2phk9q';
+const SH_ROLE  = 'color_mm2pcrmp';
+const SH_HOURS = 'numeric_mm2pawya';
+
+// Which roles count toward cleaning capacity (HK-only as Barry requested)
+const HK_CAPACITY_ROLES = new Set(['Housekeeper','A Team','A-Team','Housekeeping']);
+
+const LAUNDRY_OPTIONS = ['Laundry van','Maintenance team','Staff car'];
+
+const PIN_HASH = 'df8d602b7bcaf41725409b83af2a3df79722be244d9f33b5f128b81a269b955e';
+const STORE_KEY = 'rotaPlanner_v1';
+const EXT_KEY = 'rotaPlanner_extBookings_v1';
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════════════════ */
+let viewStart = todayDate();           // first visible day (was windowStart)
+let viewMode = 'day';                  // 'day' | 'lodge' | 'staff'
+let roleFilter = 'All';                // staff panel filter
+let properties = {};
+let staff = [];
+let bookings = [];
+let cleans = [];
+let shifts = [];
+let dragData = null;
+let editingCleanId = null;
+
+function todayDate() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+
+/* ═══════════════════════════════════════════════════════════════════
+   UTILITIES
+   ═══════════════════════════════════════════════════════════════════ */
+function localStr(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+function startOfWeek(d) { const r = new Date(d); r.setHours(0,0,0,0); const dow = r.getDay(); r.setDate(r.getDate() - (dow === 0 ? 6 : dow - 1)); return r; }
+function daysBetween(a, b) { return Math.round((new Date(b) - new Date(a)) / 86400000); }
+function uid() { return 'tmp_' + Math.random().toString(36).slice(2) + Date.now().toString(36); }
+function toast(msg, ms=2200) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._h); toast._h = setTimeout(()=>t.classList.remove('show'), ms); }
+function pj(v) { try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; } }
+
+function roleKey(label) {
+  const l = (label||'').toLowerCase();
+  if (l.includes('a team') || l.includes('a-team')) return 'ateam';
+  if (l.includes('owner')) return 'owner';
+  if (l.includes('manager')) return 'manager';
+  if (l.includes('checker')) return 'checker';
+  if (l.includes('van')) return 'van';
+  return '';
+}
+
+function isStaffAvailable(s) {
+  const st = (s.status||'').toLowerCase();
+  return !['annual leave','sick','off','training'].some(x => st.includes(x));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PIN GATE
+   ═══════════════════════════════════════════════════════════════════ */
+async function sha256(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function checkPin(v) {
+  if ((await sha256(v)) === PIN_HASH) {
+    sessionStorage.setItem('bh-mgmt', '1');
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    boot();
+  } else {
+    document.getElementById('pinErr').textContent = 'Incorrect PIN — try again';
+    document.getElementById('pinInput').value = '';
+    document.getElementById('pinInput').focus();
+  }
+}
+document.getElementById('pinInput').addEventListener('input', e => {
+  const v = e.target.value.trim();
+  if (v.length === 6) checkPin(v);
+});
+document.getElementById('pinInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const v = e.target.value.trim();
+    if (v.length >= 4) checkPin(v);
+  }
+});
+if (sessionStorage.getItem('bh-mgmt') === '1') {
+  document.getElementById('pinGate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  window.addEventListener('DOMContentLoaded', boot);
+} else {
+  setTimeout(() => document.getElementById('pinInput').focus(), 100);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MONDAY API
+   ═══════════════════════════════════════════════════════════════════ */
+async function mondayFetch(query, variables) {
+  const r = await fetch('https://api.monday.com/v2', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'Authorization':MONDAY_API_TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query })
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+function setLoading(on) { document.getElementById('loadingBar').style.display = on ? 'block' : 'none'; }
+
+async function fetchProperties() {
+  const data = await mondayFetch(`{ boards(ids:[${PROP_CONFIG_BOARD}]){ items_page(limit:200){ items{
+    id name column_values(ids:["${PC_STD_HRS}","${PC_DEF_CHECKIN}","${PC_MANAGED}","${PC_LOCAL}"]){ id value text }
+  } } } }`);
+  properties = {};
+  for (const it of data.boards[0].items_page.items) {
+    const cv = {};
+    for (const c of it.column_values) cv[c.id] = { value: c.value, text: c.text };
+    const std = parseFloat(pj(cv[PC_STD_HRS]?.value)) || null;
+    const chk = pj(cv[PC_DEF_CHECKIN]?.value);
+    const checkinStr = chk ? `${String(chk.hour||0).padStart(2,'0')}:${String(chk.minute||0).padStart(2,'0')}` : '15:00';
+    const managed = !!(pj(cv[PC_MANAGED]?.value)?.checked);
+    const local = !!(pj(cv[PC_LOCAL]?.value)?.checked);
+    properties[it.name] = { itemId: it.id, stdHrs: std, defCheckin: checkinStr, managed, local };
+  }
+}
+
+async function fetchStaff() {
+  const data = await mondayFetch(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:200){ items{
+    id name column_values(ids:["${ST_ROLE}","${ST_STATUS}","${ST_CONTRACT}"]){ id value text }
+  } } } }`);
+  staff = [];
+  for (const it of data.boards[0].items_page.items) {
+    const cv = {};
+    for (const c of it.column_values) cv[c.id] = { value: c.value, text: c.text };
+    staff.push({
+      id: it.id,
+      name: it.name,
+      role: cv[ST_ROLE]?.text || '',
+      status: cv[ST_STATUS]?.text || 'Active',
+      contractHrs: parseFloat(pj(cv[ST_CONTRACT]?.value)) || 0,
+    });
+  }
+  // Order: active first, by role weight
+  const roleOrder = { owner:0, manager:1, ateam:2, checker:3, van:4 };
+  staff.sort((a,b) => {
+    const av = isStaffAvailable(a) ? 0 : 1, bv = isStaffAvailable(b) ? 0 : 1;
+    if (av !== bv) return av - bv;
+    const ar = roleOrder[roleKey(a.role)] ?? 9, br = roleOrder[roleKey(b.role)] ?? 9;
+    if (ar !== br) return ar - br;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+async function fetchBookings() {
+  const data = await mondayFetch(`{ boards(ids:[${LODGE_STATUS_BOARD}]){ items_page(limit:200){ items{
+    id name column_values(ids:["${LS_CURR_IN}","${LS_CURR_OUT}","${LS_NEXT_IN}","${LS_NEXT_OUT}","${LS_TODAY}"]){ id value text }
+  } } } }`);
+  bookings = [];
+  for (const it of data.boards[0].items_page.items) {
+    const cv = {};
+    for (const c of it.column_values) cv[c.id] = { value: c.value, text: c.text };
+    const currIn = pj(cv[LS_CURR_IN]?.value)?.date || null;
+    const currOut = pj(cv[LS_CURR_OUT]?.value)?.date || null;
+    const nextIn = pj(cv[LS_NEXT_IN]?.value)?.date || null;
+    const nextOut = pj(cv[LS_NEXT_OUT]?.value)?.date || null;
+    const todayStatus = cv[LS_TODAY]?.text || '';
+    if (!currIn && !currOut && !nextIn && !nextOut) continue;
+    bookings.push({
+      property: it.name,
+      currIn, currOut, nextIn, nextOut,
+      todayStatus,
+      source: 'monday',
+    });
+  }
+  // Merge manual bookings (non-managed properties)
+  const ext = loadExt();
+  for (const b of ext) bookings.push({ ...b, source: 'manual' });
+}
+
+// Fall-back parser for when the Cleans board item has no board_relation link
+// to the property (a Monday API quirk means board_relation values don't
+// persist reliably for us). Item names follow two conventions:
+//   "Sat 25 · Egret"        (bulk-loaded: <Dow> <D> · <name>)
+//   "Sat 25 · CL Egret"     (bulk-loaded variant: CL prefix for light touch-up)
+//   "Egret — 2026-04-25"    (created by this app via saveToMonday)
+function parsePropertyFromItemName(name) {
+  if (!name) return '';
+  let n = name.trim();
+  // "Egret — 2026-04-25" → "Egret"
+  const emIdx = n.indexOf(' — ');
+  if (emIdx >= 0) n = n.slice(0, emIdx).trim();
+  // "Sat 25 · Egret" → "Egret"
+  const bulletMatch = n.match(/^[A-Za-z]{3}\s+\d{1,2}\s+·\s+(.+)$/);
+  if (bulletMatch) n = bulletMatch[1].trim();
+  // Strip "CL " prefix if present
+  n = n.replace(/^CL\s+/i, '').trim();
+  return n;
+}
+
+async function fetchCleans() {
+  // Fetch cleans in a window around the current view (+/- 2 weeks)
+  const data = await mondayFetch(`{ boards(ids:[${CLEANS_BOARD}]){ items_page(limit:500){ items{
+    id name column_values(ids:["${CL_DATE}","${CL_CHECKIN}","${CL_EARLIEST}","${CL_PROP}","${CL_START}","${CL_END}","${CL_HRS}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_LAUNDRY}","${CL_LAUN_DRV}","${CL_SAMEDAY}","${CL_STATUS}","${CL_NOTES}","${CL_CHECKTYPE}"]){ id value text }
+  } } } }`);
+
+  // Merge with in-memory state: keep dirty local edits; overwrite others.
+  const localById = {};
+  for (const c of cleans) if (c.mondayId) localById[c.mondayId] = c;
+
+  const fresh = [];
+  for (const it of data.boards[0].items_page.items) {
+    const cv = {};
+    for (const c of it.column_values) cv[c.id] = { value: c.value, text: c.text };
+    const dateObj = pj(cv[CL_DATE]?.value);
+    if (!dateObj?.date) continue;
+    const checkinObj = pj(cv[CL_CHECKIN]?.value);
+    const earliestObj = pj(cv[CL_EARLIEST]?.value);
+    const checkinDate = checkinObj?.date || dateObj.date;
+    const earliestDate = earliestObj?.date || checkinDate;
+    const propRel = pj(cv[CL_PROP]?.value);
+    const propText = cv[CL_PROP]?.text || '';
+    const startObj = pj(cv[CL_START]?.value);
+    const start = startObj ? `${String(startObj.hour||0).padStart(2,'0')}:${String(startObj.minute||0).padStart(2,'0')}` : '';
+    const hrs = parseFloat(pj(cv[CL_HRS]?.value)) || 0;
+    const primaryRaw = pj(cv[CL_PRIMARY]?.value);
+    const partnerRaw = pj(cv[CL_PARTNER]?.value);
+    const primaryLabels = cv[CL_PRIMARY]?.text || '';
+    const partnerLabels = cv[CL_PARTNER]?.text || '';
+    const sameDay = !!(pj(cv[CL_SAMEDAY]?.value)?.checked);
+    const notes = pj(cv[CL_NOTES]?.value)?.text || cv[CL_NOTES]?.text || '';
+    const status = cv[CL_STATUS]?.text || '';
+
+    const local = localById[it.id];
+    if (local && local.dirty) {
+      fresh.push(local);
+      continue;
+    }
+
+    const checkerLabels = cv[CL_CHECKER]?.text || '';
+    const launDrvLabels = cv[CL_LAUN_DRV]?.text || '';
+    const laundry = cv[CL_LAUNDRY]?.text || '';
+    const checkType = cv[CL_CHECKTYPE]?.text || '';  // 'Guest Ready' | 'Quality Check' | ''
+    fresh.push({
+      id: local?.id || uid(),
+      mondayId: it.id,
+      property: propText || parsePropertyFromItemName(it.name),
+      day: dateObj.date,
+      checkinDate,
+      earliestDate,
+      start: start || '09:00',
+      hoursTotal: hrs,
+      primary: primaryLabels.split(',').map(s=>s.trim()).filter(Boolean)[0] || '',
+      partner: partnerLabels.split(',').map(s=>s.trim()).filter(Boolean)[0] || '',
+      checker: checkerLabels.split(',').map(s=>s.trim()).filter(Boolean)[0] || '',
+      laundry,
+      laundryDriver: launDrvLabels.split(',').map(s=>s.trim()).filter(Boolean)[0] || '',
+      sameDay,
+      early: false,       // not stored on Monday yet; purely local flag
+      localOverride: false,
+      notes,
+      status,
+      checkType,
+      dirty: false,
+      new: false,
+    });
+  }
+
+  // Keep any local "new" cleans that haven't been saved yet
+  for (const c of cleans) if (c.new && !c.deleted) fresh.push(c);
+
+  cleans = fresh;
+  persistLocal();
+}
+
+async function fetchShifts() {
+  // Paginate Staff Shifts so capacity stays accurate even as the board grows.
+  const colIds = `["${SH_STAFF}","${SH_DATE}","${SH_ROLE}","${SH_HOURS}"]`;
+  let cursor = null;
+  let items = [];
+  do {
+    const q = cursor
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id column_values(ids:${colIds}){ id text value } } } }`
+      : `{ boards(ids:[${SHIFTS_BOARD}]){ items_page(limit:500){ cursor items{ id column_values(ids:${colIds}){ id text value } } } } }`;
+    const d = await mondayFetch(q);
+    const page = cursor ? d.next_items_page : d.boards[0].items_page;
+    items = items.concat(page.items);
+    cursor = page.cursor;
+  } while (cursor);
+  shifts = items.map(it => {
+    const cv = Object.fromEntries(it.column_values.map(c=>[c.id,c]));
+    return {
+      id: it.id,
+      staffId: cv[SH_STAFF]?.text || '',
+      date:    cv[SH_DATE]?.text || '',
+      role:    cv[SH_ROLE]?.text || '',
+      hours:   parseFloat(cv[SH_HOURS]?.text || '0') || 0,
+    };
+  }).filter(s => s.date && s.hours > 0);
+}
+
+async function refreshAll() {
+  setLoading(true);
+  try {
+    await Promise.all([fetchProperties(), fetchStaff(), fetchBookings(), fetchShifts()]);
+    await fetchCleans();
+    render();
+    toast('Refreshed');
+  } catch (e) {
+    console.error(e);
+    toast('Refresh failed: ' + e.message, 3500);
+  }
+  setLoading(false);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DERIVE CLEAN-NEEDED CARDS from bookings
+   For each property booking: a clean is needed between currOut and nextIn.
+   - If currOut == nextIn → same-day (locked to that date)
+   - If gap > 0 → clean default on currOut date; movable forward up to day before nextIn
+   - If currOut only (no nextIn) → clean on currOut date
+   ═══════════════════════════════════════════════════════════════════ */
+function derivedCleans() {
+  const out = [];
+  for (const b of bookings) {
+    // The "turn" we care about is between currOut and nextIn
+    if (!b.currOut) continue;
+    const sameDay = b.nextIn && b.currOut === b.nextIn;
+    const windowEnd = b.nextIn ? addDays(new Date(b.nextIn), -1) : null; // inclusive, or null = open
+    out.push({
+      key: `${b.property}|${b.currOut}`,
+      property: b.property,
+      checkout: b.currOut,
+      nextIn: b.nextIn,
+      sameDay,
+      windowStart: b.currOut,
+      windowEnd: windowEnd ? localStr(windowEnd) : b.currOut,
+      source: b.source,
+      todayStatus: b.todayStatus,
+    });
+  }
+  return out;
+}
+
+/* Planned clean exists for a booking? match by property+windowStart (checkout date or within the window) */
+function findPlannedClean(d) {
+  // Match by property and day in [windowStart..windowEnd]
+  return cleans.find(c => !c.deleted && c.property === d.property &&
+    c.day >= d.windowStart && c.day <= (d.windowEnd || d.windowStart));
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   HOURS TRACKERS
+   ═══════════════════════════════════════════════════════════════════ */
+function visibleDays() {
+  return Array.from({length:7}, (_,i) => addDays(viewStart, i));
+}
+function hoursForStaffInRange(name, fromStr, toStr) {
+  let total = 0;
+  for (const c of cleans) {
+    if (c.deleted) continue;
+    if (c.day < fromStr || c.day > toStr) continue;
+    const each = c.partner ? (c.hoursTotal||0) / 2 : (c.hoursTotal||0);
+    if (c.primary === name) total += each;
+    if (c.partner === name) total += each;
+  }
+  return total;
+}
+function weekHoursForStaff(name) {
+  const days = visibleDays();
+  return hoursForStaffInRange(name, localStr(days[0]), localStr(days[6]));
+}
+function hoursForStaffOnDay(name, dayStr) {
+  return hoursForStaffInRange(name, dayStr, dayStr);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER DISPATCH
+   ═══════════════════════════════════════════════════════════════════ */
+function render() {
+  renderDateStrip();
+  const vc = document.getElementById('viewContent');
+  vc.className = 'view-' + viewMode;
+  if (viewMode === 'day') vc.innerHTML = renderDayView();
+  else if (viewMode === 'lodge') vc.innerHTML = renderLodgeView();
+  else if (viewMode === 'staff') vc.innerHTML = renderStaffView();
+  renderStaffPanel();
+  updateSaveBtn();
+}
+
+function setView(mode) {
+  viewMode = mode;
+  document.querySelectorAll('#viewToggle button').forEach(b => b.classList.toggle('active', b.dataset.view === mode));
+  render();
+  persistLocal();
+}
+
+function renderDateStrip() {
+  const today = todayDate();
+  const todayStr = localStr(today);
+  const visStart = localStr(viewStart);
+  const visEnd = localStr(addDays(viewStart, 6));
+  // Show 28 days anchored near today
+  const stripStart = addDays(today, -7);
+  const days = Array.from({length:28}, (_,i) => addDays(stripStart, i));
+  const pills = days.map(d => {
+    const s = localStr(d);
+    const cls = [
+      'date-pill',
+      s === todayStr ? 'is-today' : '',
+      (s >= visStart && s <= visEnd) ? 'in-view' : '',
+    ].filter(Boolean).join(' ');
+    return `<div class="${cls}" onclick="anchorTo('${s}')">
+      <span class="dp-dow">${d.toLocaleDateString('en-GB',{weekday:'short'})}</span>
+      <span class="dp-d">${d.getDate()}</span>
+      <span class="dp-mo">${d.toLocaleDateString('en-GB',{month:'short'})}</span>
+    </div>`;
+  }).join('');
+  document.getElementById('dateStrip').innerHTML =
+    `<button class="dps-btn" onclick="slideDays(-7)" title="Back a week">«</button>` +
+    `<button class="dps-btn" onclick="slideDays(-1)" title="Back a day">‹</button>` +
+    `<button class="dps-btn" onclick="goToday()" title="Today">⦿</button>` +
+    pills +
+    `<button class="dps-btn" onclick="slideDays(1)" title="Forward a day">›</button>` +
+    `<button class="dps-btn" onclick="slideDays(7)" title="Forward a week">»</button>`;
+  // Auto-scroll so today is visible on first render
+  const stripEl = document.getElementById('dateStrip');
+  const todayPill = stripEl.querySelector('.date-pill.is-today');
+  if (todayPill && !stripEl._scrolled) {
+    stripEl.scrollLeft = Math.max(0, todayPill.offsetLeft - 80);
+    stripEl._scrolled = true;
+  }
+}
+
+function anchorTo(dayStr) {
+  viewStart = new Date(dayStr + 'T12:00');
+  viewStart.setHours(0,0,0,0);
+  persistLocal();
+  render();
+}
+function slideDays(n) { viewStart = addDays(viewStart, n); persistLocal(); render(); }
+function goToday() { viewStart = todayDate(); persistLocal(); render(); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   DAY VIEW
+   ═══════════════════════════════════════════════════════════════════ */
+function renderDayView() {
+  const today = todayDate();
+  const todayStr = localStr(today);
+  const hidePlanned = document.getElementById('hidePlannedToggle')?.checked;
+  const showLocal = document.getElementById('showLocalToggle')?.checked ?? true;
+  const showEarly = document.getElementById('showEarlyToggle')?.checked ?? true;
+
+  const days = visibleDays();
+  const derived = derivedCleans();
+
+  const plannedByDay = {};
+  for (const c of cleans) {
+    if (c.deleted) continue;
+    (plannedByDay[c.day] = plannedByDay[c.day] || []).push(c);
+  }
+
+  const cols = days.map(day => {
+    const dayStr = localStr(day);
+    const isPast = day < today;
+    const isToday = dayStr === todayStr;
+    const hdr = day.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+
+    const unplanned = derived.filter(d => {
+      if (findPlannedClean(d)) return false;
+      if (d.windowStart === dayStr) return true;
+      if (showEarly && dayStr > d.windowStart && dayStr <= d.windowEnd && !d.sameDay) return true;
+      return false;
+    });
+
+    const planned = (plannedByDay[dayStr] || []);
+    const cards = [];
+    for (const c of planned) {
+      if (hidePlanned && c.primary) continue;
+      if (!cleanVisibleForRoleFilter(c)) continue;
+      cards.push(renderPlannedCard(c, dayStr));
+    }
+    for (const d of unplanned) {
+      const prop = properties[d.property];
+      if (prop?.local && !showLocal) continue;
+      if (!derivedVisibleForRoleFilter(d)) continue;
+      cards.push(renderUnplannedCard(d, dayStr));
+    }
+
+    const countTxt = cards.length ? `${cards.length}` : '';
+    const inner = cards.length ? cards.join('') : '<div class="day-empty">—</div>';
+
+    return `
+      <div class="day-col ${isPast?'day-past':''} ${isToday?'day-today':''}" data-day="${dayStr}"
+           ondragover="event.preventDefault();this.classList.add('drop-target-hint')"
+           ondragleave="this.classList.remove('drop-target-hint')"
+           ondrop="onDropDay(event,'${dayStr}')">
+        <div class="day-col-hdr"><span>${isToday?'📍 ':''}${hdr}</span><span class="day-count">${countTxt}</span></div>
+        ${renderDayCapacityBar(dayStr)}
+        ${inner}
+        <button class="add-btn" onclick="showAddCleanOnDay('${dayStr}')">+ Add clean</button>
+      </div>`;
+  }).join('');
+
+  return `<div class="week-grid">${cols}</div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   LODGE VIEW — rows = properties, cols = days
+   ═══════════════════════════════════════════════════════════════════ */
+function renderLodgeView() {
+  const today = todayDate();
+  const todayStr = localStr(today);
+  const hidePlanned = document.getElementById('hidePlannedToggle')?.checked;
+  const showLocal = document.getElementById('showLocalToggle')?.checked ?? true;
+  const showEarly = document.getElementById('showEarlyToggle')?.checked ?? true;
+  const days = visibleDays();
+
+  const derived = derivedCleans();
+  // Collect set of properties with any activity in this window (or any clean planned)
+  const propSet = new Set();
+  for (const d of derived) {
+    if (!derivedVisibleForRoleFilter(d)) continue;
+    for (const day of days) {
+      const s = localStr(day);
+      if (s >= d.windowStart && s <= d.windowEnd) { propSet.add(d.property); break; }
+    }
+  }
+  for (const c of cleans) {
+    if (c.deleted) continue;
+    if (!cleanVisibleForRoleFilter(c)) continue;
+    if (c.day >= localStr(days[0]) && c.day <= localStr(days[6])) propSet.add(c.property);
+  }
+  // If none yet, show all managed properties (unless the Checker filter hides them all)
+  if (propSet.size === 0 && roleFilter !== 'Checker') {
+    for (const n of Object.keys(properties)) if (properties[n].managed) propSet.add(n);
+  }
+  const propList = [...propSet].sort();
+
+  // Header row
+  let html = '<div class="lodge-grid">';
+  html += '<div class="lg-hdr">Property</div>';
+  for (const day of days) {
+    const s = localStr(day);
+    const isToday = s === todayStr;
+    html += `<div class="lg-hdr ${isToday?'today':''}">
+      <div>${day.toLocaleDateString('en-GB',{weekday:'short',day:'numeric'})}</div>
+      ${renderDayCapacityBar(s)}
+    </div>`;
+  }
+
+  // Property rows
+  for (const propName of propList) {
+    const prop = properties[propName] || {};
+    if (prop.local && !showLocal) continue;
+    const meta = [];
+    if (prop.stdHrs) meta.push(`${prop.stdHrs}h`);
+    if (prop.local) meta.push('local');
+    if (prop.managed === false) meta.push('ext');
+    html += `<div class="lg-prop" title="${escapeAttr(propName)}">
+      <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${propName}</div>
+      ${meta.length ? `<div class="prop-meta">${meta.join(' · ')}</div>` : ''}
+    </div>`;
+    for (const day of days) {
+      const dayStr = localStr(day);
+      const isPast = day < today;
+      const isToday = dayStr === todayStr;
+      const mines = [];
+
+      // Planned cleans on this property/day
+      const pc = cleans.filter(c => !c.deleted && c.property === propName && c.day === dayStr);
+      for (const c of pc) {
+        if (hidePlanned && c.primary) continue;
+        if (!cleanVisibleForRoleFilter(c)) continue;
+        mines.push(renderLodgeMini(c, false));
+      }
+      // Unplanned suggestions
+      const dc = derived.filter(d => d.property === propName &&
+        (d.windowStart === dayStr || (showEarly && dayStr > d.windowStart && dayStr <= d.windowEnd && !d.sameDay)) &&
+        !findPlannedClean(d) && derivedVisibleForRoleFilter(d));
+      for (const d of dc) mines.push(renderLodgeMiniDerived(d, dayStr));
+
+      html += `<div class="lg-cell ${isPast?'past':''} ${isToday?'today':''}" data-day="${dayStr}" data-prop="${escapeAttr(propName)}"
+                 ondragover="event.preventDefault();this.classList.add('drop-ready')"
+                 ondragleave="this.classList.remove('drop-ready')"
+                 ondrop="onDropLodgeCell(event,'${escapeAttr(propName)}','${dayStr}')">
+        ${mines.join('') || '<div style="opacity:0.3;font-size:9px;text-align:center;padding:10px 0">·</div>'}
+      </div>`;
+    }
+  }
+  html += '</div>';
+  return html;
+}
+
+function renderLodgeMini(c, isDerived) {
+  const prop = properties[c.property] || {};
+  const isLocal = prop.local && !c.localOverride;
+  const isGR = c.checkType === 'Guest Ready';
+  const cls = ['lg-mini', c.sameDay?'same-day':'', c.early?'early':'', isLocal?'local':'', c.localOverride?'override':'', isGR?'gr':''].filter(Boolean).join(' ');
+  const badges = [];
+  if (c.sameDay) badges.push('<span class="cc-badge t">T</span>');
+  if (c.early) badges.push('<span class="cc-badge e">E</span>');
+  if (isGR) badges.push('<span class="cc-badge gr">GR</span>');
+  const staffParts = [];
+  if (c.primary) staffParts.push(c.primary);
+  if (c.partner) staffParts.push(c.partner);
+  const staffLine = staffParts.length
+    ? `<div class="lg-mini-staff assigned">${staffParts.join(' + ')}</div>`
+    : `<div class="lg-mini-staff">drag staff →</div>`;
+  const extras = [];
+  if (c.checker) extras.push(`✓ ${c.checker}`);
+  if (c.laundry) extras.push(`🧺 ${c.laundry === 'Staff car' && c.laundryDriver ? c.laundryDriver : c.laundry.split(' ')[0]}`);
+  const extraLine = extras.length ? `<div class="lg-mini-staff">${extras.join(' · ')}</div>` : '';
+  return `<div class="${cls}" data-id="${c.id}" draggable="true"
+            ondragstart="onCleanDragStart(event,'${c.id}')"
+            onclick="openCleanModal('${c.id}')">
+    <div style="display:flex;justify-content:space-between;gap:4px"><b>${c.hoursTotal||'?'}h</b><span>${badges.join('')}</span></div>
+    ${staffLine}
+    ${extraLine}
+  </div>`;
+}
+
+function renderLodgeMiniDerived(d, dayStr) {
+  const prop = properties[d.property] || {};
+  const isLocal = prop.local;
+  const cls = ['lg-mini','unplanned', d.sameDay?'same-day':'',
+    (dayStr !== d.windowStart && !d.sameDay)?'early':'', isLocal?'local':''].filter(Boolean).join(' ');
+  const badges = [];
+  if (d.sameDay) badges.push('<span class="cc-badge t">T</span>');
+  if (dayStr !== d.windowStart && !d.sameDay) badges.push('<span class="cc-badge e">E</span>');
+  if (isLocal) badges.push('<span class="cc-badge l">L</span>');
+  return `<div class="${cls}" onclick="planNewClean('${escapeAttr(d.key)}','${dayStr}')">
+    <div style="display:flex;justify-content:space-between;gap:4px"><span>plan</span><span>${badges.join('')}</span></div>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STAFF VIEW — rows = staff, cols = days, total col at end
+   ═══════════════════════════════════════════════════════════════════ */
+function renderStaffView() {
+  const today = todayDate();
+  const todayStr = localStr(today);
+  const days = visibleDays();
+  const filtered = filteredStaff();
+
+  let html = '<div class="staff-grid">';
+  html += '<div class="lg-hdr">Staff</div>';
+  for (const day of days) {
+    const s = localStr(day);
+    const isToday = s === todayStr;
+    html += `<div class="lg-hdr ${isToday?'today':''}">
+      <div>${day.toLocaleDateString('en-GB',{weekday:'short',day:'numeric'})}</div>
+      ${renderDayCapacityBar(s)}
+    </div>`;
+  }
+  html += '<div class="lg-hdr">Week</div>';
+
+  for (const sMember of filtered) {
+    const roleCls = roleKey(sMember.role);
+    html += `<div class="lg-prop">
+      <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sMember.name}</div>
+      <div class="prop-meta"><span class="staff-role ${roleCls}">${sMember.role||'—'}</span></div>
+    </div>`;
+
+    let weekTotal = 0;
+    for (const day of days) {
+      const dayStr = localStr(day);
+      const isPast = day < today;
+      const isToday = dayStr === todayStr;
+      // Find cleans where this staff is primary, partner, or checker on this day
+      const own = cleans.filter(c => !c.deleted && c.day === dayStr &&
+        (c.primary === sMember.name || c.partner === sMember.name || c.checker === sMember.name) &&
+        cleanVisibleForRoleFilter(c));
+      let dayHrs = 0;
+      const mines = own.map(c => {
+        const isChecker = (c.checker === sMember.name) && (c.primary !== sMember.name) && (c.partner !== sMember.name);
+        const each = isChecker ? 0.25 : (c.partner ? c.hoursTotal/2 : c.hoursTotal);
+        dayHrs += each || 0;
+        const isGR = c.checkType === 'Guest Ready';
+        const badges = [];
+        if (c.sameDay) badges.push('<span class="cc-badge t">T</span>');
+        if (c.early) badges.push('<span class="cc-badge e">E</span>');
+        if (isChecker) badges.push('<span class="cc-badge qc">QC</span>');
+        else if (isGR) badges.push('<span class="cc-badge gr">GR</span>');
+        const partnerLabel = isChecker ? ' (checker)' : ((c.primary === sMember.name && c.partner) ? ` + ${c.partner}` : '');
+        return `<div class="lg-mini ${c.sameDay?'same-day':''} ${c.early?'early':''} ${isGR?'gr':''}"
+                     data-id="${c.id}" draggable="true"
+                     ondragstart="onCleanDragStart(event,'${c.id}')"
+                     onclick="openCleanModal('${c.id}')">
+          <div style="display:flex;justify-content:space-between;gap:4px">
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${c.property}</span>
+            <span>${badges.join('')}</span></div>
+          <div class="lg-mini-staff">${(each||'?')}h${partnerLabel}</div>
+        </div>`;
+      }).join('');
+      weekTotal += dayHrs;
+      html += `<div class="sg-cell ${isPast?'past':''} ${isToday?'today':''}">
+        ${mines || '<div style="opacity:0.3;font-size:9px;text-align:center;padding:10px 0">·</div>'}
+      </div>`;
+    }
+
+    const contract = sMember.contractHrs;
+    const over = contract && weekTotal >= contract;
+    html += `<div class="sg-total ${over?'over':''}">
+      <div>${weekTotal.toFixed(1)}h</div>
+      ${contract ? `<small>/ ${contract}h</small>` : '<small>no target</small>'}
+    </div>`;
+  }
+  html += '</div>';
+  if (filtered.length === 0) html += '<div class="day-empty" style="padding:20px">No staff match this filter.</div>';
+  return html;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STAFF DROPS in lodge view
+   ═══════════════════════════════════════════════════════════════════ */
+function onDropLodgeCell(e, propName, dayStr) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drop-ready');
+  if (!dragData) return;
+  if (dragData.type === 'staff') {
+    // Find existing planned clean on this prop+day, else plan a new one from derived
+    let c = cleans.find(x => !x.deleted && x.property === propName && x.day === dayStr);
+    if (!c) {
+      // Try to find matching derived and plan it
+      const d = derivedCleans().find(x => x.property === propName &&
+        dayStr >= x.windowStart && dayStr <= x.windowEnd);
+      if (d) {
+        planNewClean(d.key, dayStr);
+        c = cleans.find(x => !x.deleted && x.property === propName && x.day === dayStr && x.new);
+        // Close modal immediately — we want fast drop-assign
+        closeModal('cleanModal');
+      } else {
+        // Create an ad-hoc clean
+        const prop = properties[propName] || {};
+        c = {
+          id: uid(), mondayId: null, property: propName, day: dayStr,
+          start: prop.defCheckin ? shiftTime(prop.defCheckin, -2) : '09:00',
+          hoursTotal: prop.stdHrs || 1.5,
+          primary: '', partner: '', sameDay: false, early: false,
+          localOverride: !!prop.local, notes: '', status: 'Planned',
+          dirty: true, new: true,
+        };
+        cleans.push(c);
+      }
+    }
+    if (c) {
+      if (!c.primary) c.primary = dragData.name;
+      else if (c.primary !== dragData.name && !c.partner) c.partner = dragData.name;
+      else if (c.primary !== dragData.name) c.partner = dragData.name;
+      c.dirty = true;
+      persistLocal();
+      render();
+    }
+  } else if (dragData.type === 'clean') {
+    // Move clean to this day (property must match AND be in window)
+    const c = cleans.find(x => x.id === dragData.id);
+    if (c && c.property === propName) {
+      if (!canMoveCleanTo(c, dayStr)) {
+        const w = dragWindowFor(c);
+        toast(`Can only move between ${w.start} and ${w.end}`, 2500);
+      } else {
+        c.day = dayStr; enforceTimeRules(c); c.dirty = true; persistLocal(); render();
+      }
+    }
+  }
+  dragData = null;
+}
+
+function renderUnplannedCard(d, dayStr) {
+  const prop = properties[d.property] || {};
+  const isLocal = prop.local;
+  const isSameDay = d.sameDay;
+  const isEarly = dayStr !== d.windowStart && !isSameDay;
+  const cls = [
+    'clean-card','unplanned',
+    isSameDay ? 'same-day' : '',
+    isEarly ? 'early' : '',
+    isLocal ? 'local' : '',
+    d.source === 'manual' ? 'non-managed' : '',
+  ].filter(Boolean).join(' ');
+
+  const badges = [];
+  if (isSameDay) badges.push('<span class="cc-badge t">T</span>');
+  if (isEarly) badges.push('<span class="cc-badge e">Early</span>');
+  if (isLocal) badges.push('<span class="cc-badge l">Local</span>');
+  if (d.source === 'manual') badges.push('<span class="cc-badge n">Ext</span>');
+
+  const meta = [];
+  if (prop.stdHrs) meta.push(`${prop.stdHrs}h`);
+  if (prop.defCheckin) meta.push(`in ${prop.defCheckin}`);
+  if (d.nextIn && !isSameDay) meta.push(`next ${shortDate(d.nextIn)}`);
+
+  return `<div class="${cls}" data-key="${escapeAttr(d.key)}"
+            onclick="planNewClean('${escapeAttr(d.key)}','${dayStr}')">
+    <div class="cc-top"><span class="cc-name" title="${escapeAttr(d.property)}">${d.property}</span>
+      <div class="cc-badges">${badges.join('')}</div></div>
+    <div class="cc-meta">${meta.join(' · ')}</div>
+    <div class="cc-staff-empty">Tap to plan${isLocal ? ' (override local)' : ''}</div>
+  </div>`;
+}
+
+function renderPlannedCard(c, dayStr) {
+  const prop = properties[c.property] || {};
+  const isLocal = prop.local && !c.localOverride;
+  const isGR = c.checkType === 'Guest Ready';
+  const cls = [
+    'clean-card','planned',
+    c.sameDay ? 'same-day' : '',
+    c.early ? 'early' : '',
+    isLocal ? 'local' : '',
+    c.localOverride ? 'override' : '',
+    isGR ? 'gr' : '',
+  ].filter(Boolean).join(' ');
+
+  const badges = [];
+  if (c.sameDay) badges.push('<span class="cc-badge t">T</span>');
+  if (c.early) badges.push('<span class="cc-badge e">Early</span>');
+  if (c.localOverride) badges.push('<span class="cc-badge n">Us</span>');
+  if (isLocal) badges.push('<span class="cc-badge l">Local</span>');
+  if (isGR) badges.push('<span class="cc-badge gr" title="Guest Ready — no quality check needed">GR</span>');
+
+  const meta = [];
+  if (c.start) meta.push(c.start);
+  if (c.hoursTotal) {
+    const each = c.partner ? c.hoursTotal/2 : c.hoursTotal;
+    meta.push(c.partner ? `${c.hoursTotal}h (${each}×2)` : `${c.hoursTotal}h`);
+  }
+
+  const staffHtml = [];
+  if (c.primary) staffHtml.push(`<span class="cc-staff-pill">${c.primary}<span class="x" onclick="event.stopPropagation();removeStaffFromClean('${c.id}','primary')">✕</span></span>`);
+  if (c.partner) staffHtml.push(`<span class="cc-staff-pill">${c.partner}<span class="x" onclick="event.stopPropagation();removeStaffFromClean('${c.id}','partner')">✕</span></span>`);
+  if (c.checker) staffHtml.push(`<span class="cc-staff-pill" style="background:var(--gold);">✓ ${c.checker}<span class="x" onclick="event.stopPropagation();removeStaffFromClean('${c.id}','checker')">✕</span></span>`);
+  const staffLine = staffHtml.length ? staffHtml.join('') : '<span class="cc-staff-empty">No cleaners yet — drag staff here</span>';
+
+  // Laundry run line
+  const laundryHtml = c.laundry ? `<div class="cc-meta" style="margin-top:2px">🧺 ${c.laundry}${c.laundry==='Staff car' && c.laundryDriver?` (${c.laundryDriver})`:''}</div>` : '';
+
+  const noteHtml = c.notes ? `<div class="cc-notes">${escapeHtml(c.notes)}</div>` : '';
+
+  return `<div class="${cls}" data-id="${c.id}" draggable="true"
+            ondragstart="onCleanDragStart(event,'${c.id}')"
+            ondragover="event.preventDefault();event.stopPropagation();this.classList.add('drag-over')"
+            ondragleave="this.classList.remove('drag-over')"
+            ondrop="onDropClean(event,'${c.id}')"
+            onclick="openCleanModal('${c.id}')">
+    <div class="cc-top"><span class="cc-name" title="${escapeAttr(c.property)}">${c.property}</span>
+      <div class="cc-badges">${badges.join('')}</div></div>
+    <div class="cc-meta">${meta.join(' · ')}</div>
+    <div class="cc-staff">${staffLine}</div>
+    ${laundryHtml}
+    ${noteHtml}
+  </div>`;
+}
+
+function availableRoles() {
+  const set = new Set();
+  for (const s of staff) if (s.role) set.add(s.role);
+  const roleOrder = ['Housekeeper','A Team','Checker','Van driver','Manager','Owner'];
+  const list = [...set].sort((a,b) => {
+    const ai = roleOrder.indexOf(a), bi = roleOrder.indexOf(b);
+    if (ai === -1 && bi === -1) return a.localeCompare(b);
+    if (ai === -1) return 1;
+    if (bi === -1) return -1;
+    return ai - bi;
+  });
+  return ['All', ...list];
+}
+function filteredStaff() {
+  if (roleFilter === 'All') return staff;
+  return staff.filter(s => (s.role||'—') === roleFilter);
+}
+// "Needs Quality Check" = anything NOT explicitly marked Guest Ready.
+// That matches the UI: the checkbox is opt-in — unticked (or never set) means
+// a quality visit needs to take place.
+function cleanNeedsQC(c) { return c.checkType !== 'Guest Ready'; }
+
+// When the Checker filter chip is active, the main grid should only show
+// cleans that need a quality visit, so the checker workload is obvious.
+function cleanVisibleForRoleFilter(c) {
+  if (roleFilter !== 'Checker') return true;
+  return cleanNeedsQC(c);
+}
+// Unplanned/derived suggestions haven't been classified either way; treat
+// them as "needs QC" (the default) so they show up under the Checker filter.
+function derivedVisibleForRoleFilter(d) {
+  return true;
+}
+function setRoleFilter(r) { roleFilter = r; persistLocal(); render(); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   DAILY HK CAPACITY
+   ═══════════════════════════════════════════════════════════════════ */
+// Capacity = sum of HK + A-Team shift hours for that date.
+function hkCapacityForDay(dayStr) {
+  let cap = 0;
+  for (const s of shifts) {
+    if (s.date !== dayStr) continue;
+    if (!HK_CAPACITY_ROLES.has(s.role)) continue;
+    cap += s.hours || 0;
+  }
+  return cap;
+}
+// Allocated HK hours = sum of hoursTotal over cleans on that day.
+// Checker allocation is excluded — it's light oversight, not HK labour.
+function hkAllocatedForDay(dayStr) {
+  let total = 0;
+  for (const c of cleans) {
+    if (c.deleted) continue;
+    if (c.day !== dayStr) continue;
+    total += c.hoursTotal || 0;
+  }
+  return total;
+}
+// Cleans flagged "early" (between-stays) free up the primary earlier in the day.
+// Surface that as available redeployment hours for sickness cover / last-min bookings.
+function earlyOpportunityHours(dayStr) {
+  let hrs = 0;
+  for (const c of cleans) {
+    if (c.deleted) continue;
+    if (c.day !== dayStr) continue;
+    if (!c.early) continue;
+    hrs += c.hoursTotal || 0;
+  }
+  return hrs;
+}
+
+function renderDayCapacityBar(dayStr) {
+  const cap = hkCapacityForDay(dayStr);
+  const alloc = hkAllocatedForDay(dayStr);
+  const rem = cap - alloc;
+  const early = earlyOpportunityHours(dayStr);
+  if (!cap && !alloc) {
+    return `<div class="day-cap day-cap-empty">no shifts</div>`;
+  }
+  const cls = rem < 0 ? 'over' : (rem < 2 ? 'tight' : 'ok');
+  const earlyHtml = early > 0
+    ? `<span class="day-cap-early" title="Hours freed by early cleans — available to redeploy for sickness cover or last-minute bookings">⚡ ${early.toFixed(1)}h free</span>`
+    : '';
+  return `<div class="day-cap ${cls}" title="HK capacity · Allocated · Remaining">
+    <span class="day-cap-num"><b>${alloc.toFixed(1)}</b>/${cap.toFixed(1)}h</span>
+    <span class="day-cap-rem">${rem >= 0 ? rem.toFixed(1)+'h left' : Math.abs(rem).toFixed(1)+'h over'}</span>
+    ${earlyHtml}
+  </div>`;
+}
+
+function renderStaffPanel() {
+  // Role chips
+  const roles = availableRoles();
+  document.getElementById('roleChips').innerHTML = roles.map(r =>
+    `<button class="role-chip ${r===roleFilter?'active':''}" onclick="setRoleFilter('${escapeAttr(r)}')">${r}</button>`
+  ).join('');
+
+  const list = document.getElementById('staffList');
+  const filtered = filteredStaff();
+  const chips = filtered.map(s => {
+    const avail = isStaffAvailable(s);
+    const hrs = weekHoursForStaff(s.name);
+    const over = s.contractHrs && hrs >= s.contractHrs;
+    const pct = s.contractHrs ? Math.min(100, (hrs/s.contractHrs)*100) : 0;
+    const cls = ['staff-chip', !avail?'off':'', (over && avail)?'over-hours':''].filter(Boolean).join(' ');
+    const roleCls = roleKey(s.role);
+    const remain = s.contractHrs ? Math.max(0, s.contractHrs - hrs) : null;
+    return `<div class="${cls}" draggable="${avail?'true':'false'}" data-name="${escapeAttr(s.name)}"
+              ondragstart="onStaffDragStart(event,'${escapeAttr(s.name)}')"
+              ondragend="onStaffDragEnd(event)"
+              title="Allocated ${hrs.toFixed(1)}h this week${s.contractHrs?' of '+s.contractHrs+'h contract ('+remain.toFixed(1)+'h remaining)':''}">
+      <div class="staff-name">${s.name}</div>
+      <div class="staff-meta">
+        <span class="staff-role ${roleCls}">${s.role || '—'}</span>
+        <span class="staff-hrs ${over?'over':''}">
+          <b>${hrs.toFixed(1)}h</b>${s.contractHrs?` / ${s.contractHrs}h`:''}
+        </span>
+      </div>
+      ${s.contractHrs ? `<div class="hrs-bar"><div class="hrs-bar-fill ${over?'over':''}" style="width:${pct}%"></div></div>` : ''}
+      ${s.contractHrs ? `<div style="font-size:9px;color:var(--muted);margin-top:2px;display:flex;justify-content:space-between">
+        <span>Allocated</span><span>${remain.toFixed(1)}h ${over?'over':'left'}</span>
+      </div>` : ''}
+      ${!avail ? `<div style="font-size:9px;color:var(--muted);margin-top:3px;font-style:italic">${s.status}</div>` : ''}
+    </div>`;
+  }).join('');
+  list.innerHTML = chips || '<div class="day-empty" style="padding:10px">No staff match this filter.</div>';
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   ACTIONS — plan, drag, edit
+   ═══════════════════════════════════════════════════════════════════ */
+function planNewClean(key, dayStr) {
+  const d = derivedCleans().find(x => x.key === key);
+  if (!d) return;
+  const prop = properties[d.property] || {};
+  const c = {
+    id: uid(),
+    mondayId: null,
+    property: d.property,
+    day: dayStr,
+    start: prop.defCheckin ? shiftTime(prop.defCheckin, -2) : '09:00',
+    hoursTotal: prop.stdHrs || 1.5,
+    primary: '',
+    partner: '',
+    sameDay: !!d.sameDay,
+    early: dayStr !== d.windowStart && !d.sameDay,
+    localOverride: !!prop.local, // if local, default to "we're stepping in" when user taps it
+    notes: '',
+    status: 'Planned',
+    checkType: '',
+    dirty: true,
+    new: true,
+  };
+  cleans.push(c);
+  persistLocal();
+  render();
+  openCleanModal(c.id);
+}
+
+function shiftTime(hhmm, deltaHrs) {
+  const [h,m] = hhmm.split(':').map(Number);
+  const tot = (h*60 + (m||0)) + deltaHrs*60;
+  const nh = Math.max(0, Math.min(23, Math.floor(tot/60)));
+  return `${String(nh).padStart(2,'0')}:${String((tot%60+60)%60).padStart(2,'0')}`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DRAG-WINDOW / TIME CONSTRAINTS
+   Rules (Barry):
+   - Checkin date (CL_CHECKIN) is the default anchor.
+   - Drag back allowed to previous check-out (CL_EARLIEST).
+   - On check-out day (earliestDate): start no earlier than 10:00.
+   - On check-in day (checkinDate): finish by 16:00 (hard cap), ideally 15:00.
+   - In-between days: no time restriction.
+   ═══════════════════════════════════════════════════════════════════ */
+function dragWindowFor(c) {
+  // Prefer stored check-in/earliest (post bulk-import). Fallback to derived booking window.
+  if (c.checkinDate) {
+    return { start: c.earliestDate || c.checkinDate, end: c.checkinDate };
+  }
+  const d = derivedCleans().find(x => x.property === c.property &&
+    c.day >= x.windowStart && c.day <= (x.windowEnd || x.windowStart));
+  if (d) return { start: d.windowStart, end: d.windowEnd || d.windowStart };
+  return { start: c.day, end: c.day };
+}
+
+function canMoveCleanTo(c, dayStr) {
+  const w = dragWindowFor(c);
+  return dayStr >= w.start && dayStr <= w.end;
+}
+
+function enforceTimeRules(c) {
+  // Clamp start/end based on which day of the window this clean sits on.
+  if (!c.start || !c.hoursTotal) return;
+  const [sh, sm] = c.start.split(':').map(Number);
+  const startMin = sh*60 + (sm||0);
+  const isCheckoutDay = c.earliestDate && c.day === c.earliestDate && c.day !== c.checkinDate;
+  const isCheckinDay  = c.checkinDate  && c.day === c.checkinDate;
+  const each = c.partner ? c.hoursTotal/2 : c.hoursTotal;
+
+  if (isCheckoutDay && startMin < 10*60) {
+    c.start = '10:00';
+  }
+  if (isCheckinDay) {
+    // must finish by 16:00
+    const [eh, em] = shiftTime(c.start, each).split(':').map(Number);
+    const endMin = eh*60 + em;
+    if (endMin > 16*60) {
+      const latestStart = 16*60 - Math.round(each*60);
+      const fh = Math.max(0, Math.floor(latestStart/60));
+      const fm = ((latestStart%60)+60)%60;
+      c.start = `${String(fh).padStart(2,'0')}:${String(fm).padStart(2,'0')}`;
+    }
+  }
+}
+
+function onStaffDragStart(e, name) {
+  dragData = { type:'staff', name };
+  e.dataTransfer.effectAllowed = 'move';
+  e.currentTarget.classList.add('dragging');
+}
+function onStaffDragEnd(e) {
+  document.querySelectorAll('.dragging').forEach(el => el.classList.remove('dragging'));
+  document.querySelectorAll('.drop-target-hint').forEach(el => el.classList.remove('drop-target-hint'));
+  document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
+}
+function onCleanDragStart(e, id) {
+  e.stopPropagation();
+  dragData = { type:'clean', id };
+  e.dataTransfer.effectAllowed = 'move';
+}
+function onDropDay(e, dayStr) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drop-target-hint');
+  if (!dragData) return;
+  if (dragData.type === 'clean') {
+    const c = cleans.find(x => x.id === dragData.id);
+    if (c && c.day !== dayStr) {
+      if (!canMoveCleanTo(c, dayStr)) {
+        const w = dragWindowFor(c);
+        toast(`Can only move between ${w.start} and ${w.end}`, 2500);
+      } else {
+        c.day = dayStr; enforceTimeRules(c); c.dirty = true; persistLocal(); render();
+      }
+    }
+  }
+  dragData = null;
+}
+function onDropClean(e, cleanId) {
+  e.preventDefault();
+  e.stopPropagation();
+  e.currentTarget.classList.remove('drag-over');
+  if (!dragData) return;
+  const c = cleans.find(x => x.id === cleanId);
+  if (!c) return;
+  if (dragData.type === 'staff') {
+    if (!c.primary) c.primary = dragData.name;
+    else if (c.primary !== dragData.name && !c.partner) c.partner = dragData.name;
+    else if (c.primary !== dragData.name) { c.partner = dragData.name; }
+    c.dirty = true; persistLocal(); render();
+  } else if (dragData.type === 'clean' && dragData.id !== cleanId) {
+    // Drop clean onto clean = just move to same day as target
+    const moving = cleans.find(x => x.id === dragData.id);
+    if (moving) {
+      if (!canMoveCleanTo(moving, c.day)) {
+        const w = dragWindowFor(moving);
+        toast(`Can only move between ${w.start} and ${w.end}`, 2500);
+      } else {
+        moving.day = c.day; enforceTimeRules(moving); moving.dirty = true; persistLocal(); render();
+      }
+    }
+  }
+  dragData = null;
+}
+
+function removeStaffFromClean(id, which) {
+  const c = cleans.find(x => x.id === id);
+  if (!c) return;
+  c[which] = '';
+  c.dirty = true;
+  persistLocal();
+  render();
+}
+
+function openCleanModal(id) {
+  const c = cleans.find(x => x.id === id);
+  if (!c) return;
+  editingCleanId = id;
+  document.getElementById('cmTitle').textContent = c.property;
+
+  // Day select: span window of the underlying booking if exists
+  const daySelect = document.getElementById('cmDay');
+  const days = buildDayOptions(c);
+  daySelect.innerHTML = days.map(d =>
+    `<option value="${d}" ${d===c.day?'selected':''}>${new Date(d+'T12:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}</option>`
+  ).join('');
+
+  document.getElementById('cmStart').value = c.start || '09:00';
+  document.getElementById('cmHours').value = c.hoursTotal || (properties[c.property]?.stdHrs || 1.5);
+
+  const options = ['<option value="">—</option>']
+    .concat(staff.filter(isStaffAvailable).map(s => `<option value="${escapeAttr(s.name)}">${s.name}</option>`)).join('');
+  document.getElementById('cmPrimary').innerHTML = options;
+  document.getElementById('cmPartner').innerHTML = options;
+  document.getElementById('cmChecker').innerHTML = options;
+  document.getElementById('cmLaunDriver').innerHTML = options;
+  document.getElementById('cmPrimary').value = c.primary || '';
+  document.getElementById('cmPartner').value = c.partner || '';
+  document.getElementById('cmChecker').value = c.checker || '';
+  document.getElementById('cmLaundry').value = c.laundry || '';
+  document.getElementById('cmLaunDriver').value = c.laundryDriver || '';
+  document.getElementById('cmLaunDrvWrap').style.display = c.laundry === 'Staff car' ? 'block' : 'none';
+  document.getElementById('cmSameDay').checked = !!c.sameDay;
+  document.getElementById('cmEarly').checked = !!c.early;
+  document.getElementById('cmNotes').value = c.notes || '';
+
+  const isLocalProp = properties[c.property]?.local;
+  document.getElementById('cmOverrideRow').style.display = isLocalProp ? 'flex' : 'none';
+  document.getElementById('cmLocalOverride').checked = !!c.localOverride;
+
+  document.getElementById('cmGuestReady').checked = c.checkType === 'Guest Ready';
+  document.getElementById('cleanModal').classList.add('open');
+}
+
+function buildDayOptions(c) {
+  // Prefer stored checkin/earliest window if present; else derive from booking.
+  let start, end, sameDay = false;
+  if (c.checkinDate) {
+    start = c.earliestDate || c.checkinDate;
+    end = c.checkinDate;
+    sameDay = start === end;
+  } else {
+    const d = derivedCleans().find(x => x.property === c.property &&
+      c.day >= x.windowStart && c.day <= (x.windowEnd || x.windowStart));
+    start = d ? d.windowStart : c.day;
+    end = d ? (d.windowEnd || d.windowStart) : c.day;
+    sameDay = !!(d && d.sameDay);
+  }
+  if (sameDay) return [start];
+  const s = new Date(start);
+  const e = new Date(end);
+  const out = [];
+  for (let x = new Date(s); x <= e; x = addDays(x, 1)) out.push(localStr(x));
+  if (!out.includes(c.day)) out.unshift(c.day);
+  return [...new Set(out)].sort();
+}
+
+function saveClean() {
+  const c = cleans.find(x => x.id === editingCleanId);
+  if (!c) return;
+  c.day = document.getElementById('cmDay').value;
+  c.start = document.getElementById('cmStart').value;
+  c.hoursTotal = parseFloat(document.getElementById('cmHours').value) || 0;
+  c.primary = document.getElementById('cmPrimary').value;
+  c.partner = document.getElementById('cmPartner').value;
+  if (c.primary && c.primary === c.partner) c.partner = '';
+  c.checker = document.getElementById('cmChecker').value;
+  c.laundry = document.getElementById('cmLaundry').value;
+  c.laundryDriver = c.laundry === 'Staff car' ? document.getElementById('cmLaunDriver').value : '';
+  c.sameDay = document.getElementById('cmSameDay').checked;
+  c.early = document.getElementById('cmEarly').checked;
+  c.localOverride = document.getElementById('cmLocalOverride').checked;
+  c.notes = document.getElementById('cmNotes').value.trim();
+  c.checkType = document.getElementById('cmGuestReady').checked ? 'Guest Ready' : 'Quality Check';
+  enforceTimeRules(c);
+  c.dirty = true;
+  persistLocal();
+  closeModal('cleanModal');
+  render();
+}
+
+// Toggle driver selector when laundry dropdown changes
+document.addEventListener('change', e => {
+  if (e.target && e.target.id === 'cmLaundry') {
+    document.getElementById('cmLaunDrvWrap').style.display = e.target.value === 'Staff car' ? 'block' : 'none';
+  }
+});
+
+function deleteClean() {
+  const c = cleans.find(x => x.id === editingCleanId);
+  if (!c) return;
+  if (!confirm(`Delete clean for ${c.property} on ${c.day}?`)) return;
+  if (c.mondayId) { c.deleted = true; c.dirty = true; }
+  else { cleans = cleans.filter(x => x.id !== c.id); }
+  persistLocal();
+  closeModal('cleanModal');
+  render();
+}
+
+let addingOnDay = null;
+function showAddCleanOnDay(dayStr) {
+  addingOnDay = dayStr;
+  const opts = Object.keys(properties).sort().map(n =>
+    `<option value="${escapeAttr(n)}">${n}${properties[n].managed?'':' (ext)'}${properties[n].local?' (local)':''}</option>`
+  ).join('');
+  const sel = document.getElementById('adProp');
+  sel.innerHTML = opts || '<option value="">No properties loaded</option>';
+  document.getElementById('adTitle').textContent = 'Add clean on ' + new Date(dayStr+'T12:00').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'});
+  document.getElementById('adSameDay').checked = false;
+  document.getElementById('adEarly').checked = false;
+  document.getElementById('addDayModal').classList.add('open');
+}
+
+function saveAddOnDay() {
+  const name = document.getElementById('adProp').value;
+  const dayStr = addingOnDay;
+  if (!name || !dayStr) { closeModal('addDayModal'); return; }
+  const prop = properties[name];
+  const c = {
+    id: uid(),
+    mondayId: null,
+    property: name,
+    day: dayStr,
+    start: prop.defCheckin ? shiftTime(prop.defCheckin, -2) : '09:00',
+    hoursTotal: prop.stdHrs || 1.5,
+    primary: '', partner: '',
+    sameDay: document.getElementById('adSameDay').checked,
+    early: document.getElementById('adEarly').checked,
+    localOverride: !!prop.local,
+    notes: '', status: 'Planned',
+    checkType: '',
+    dirty: true, new: true,
+  };
+  cleans.push(c);
+  persistLocal();
+  closeModal('addDayModal');
+  render();
+  openCleanModal(c.id);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MANUAL BOOKINGS (non-managed)
+   ═══════════════════════════════════════════════════════════════════ */
+function loadExt() { try { return JSON.parse(localStorage.getItem(EXT_KEY) || '[]'); } catch { return []; } }
+function saveExt(arr) { localStorage.setItem(EXT_KEY, JSON.stringify(arr)); }
+
+function showBookingModal() {
+  // Non-managed property list (properties with managed:false) + manually added ones
+  const list = Object.keys(properties).filter(n => !properties[n].managed).sort();
+  document.getElementById('bmProp').innerHTML = list.length
+    ? list.map(n => `<option value="${escapeAttr(n)}">${n}</option>`).join('')
+    : '<option value="">No non-managed properties — tag some in Property Config</option>';
+  document.getElementById('bmOut').value = '';
+  document.getElementById('bmIn').value = '';
+  document.getElementById('bmSameDay').checked = false;
+  document.getElementById('bookingModal').classList.add('open');
+}
+
+function saveBooking() {
+  const prop = document.getElementById('bmProp').value;
+  const out = document.getElementById('bmOut').value;
+  const nextIn = document.getElementById('bmIn').value;
+  const sameDay = document.getElementById('bmSameDay').checked;
+  if (!prop || !out) { toast('Property and check-out required'); return; }
+  const ext = loadExt();
+  ext.push({ property: prop, currIn: null, currOut: out, nextIn: sameDay ? out : (nextIn || null), nextOut: null, todayStatus: sameDay ? 'SameDay' : '' });
+  saveExt(ext);
+  // Append to bookings in memory
+  bookings.push({ property: prop, currIn: null, currOut: out, nextIn: sameDay ? out : (nextIn || null), nextOut: null, todayStatus: sameDay ? 'SameDay' : '', source:'manual' });
+  closeModal('bookingModal');
+  render();
+  toast('Booking added');
+}
+
+function showManagerModal() {
+  const ext = loadExt();
+  const rows = ext.length ? ext.map((b, i) => `
+    <div style="display:flex;gap:8px;align-items:center;padding:6px 0;border-bottom:1px solid var(--border)">
+      <div style="flex:1;font-size:13px"><b>${b.property}</b> — out ${b.currOut}${b.nextIn?` → in ${b.nextIn}`:''}${b.todayStatus==='SameDay'?' (T)':''}</div>
+      <button class="modal-btn danger" style="flex:0;padding:4px 8px;font-size:11px" onclick="removeExt(${i})">✕</button>
+    </div>
+  `).join('') : '<div class="day-empty">No manual bookings yet.</div>';
+  document.getElementById('managerList').innerHTML = rows;
+  document.getElementById('managerModal').classList.add('open');
+}
+
+function removeExt(i) {
+  const ext = loadExt();
+  ext.splice(i,1);
+  saveExt(ext);
+  // Remove from in-memory bookings too
+  bookings = bookings.filter(b => b.source !== 'manual');
+  for (const b of ext) bookings.push({ ...b, source:'manual' });
+  showManagerModal();
+  render();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   SAVE TO MONDAY
+   ═══════════════════════════════════════════════════════════════════ */
+function updateSaveBtn() {
+  const dirty = cleans.some(c => c.dirty || c.new || c.deleted);
+  const btn = document.getElementById('saveBtn');
+  btn.textContent = dirty ? '☁ Save*' : '☁ Saved';
+  btn.classList.toggle('dirty', dirty);
+}
+
+function buildColumnValues(c) {
+  const cv = {};
+  cv[CL_DATE] = { date: c.day };
+  if (c.checkinDate)  cv[CL_CHECKIN]  = { date: c.checkinDate };
+  if (c.earliestDate) cv[CL_EARLIEST] = { date: c.earliestDate };
+  if (c.start) {
+    const [h,m] = c.start.split(':').map(Number);
+    cv[CL_START] = { hour: h, minute: m||0 };
+    if (c.hoursTotal) {
+      const each = c.partner ? c.hoursTotal/2 : c.hoursTotal;
+      const [eh, em] = shiftTime(c.start, each).split(':').map(Number);
+      cv[CL_END] = { hour: eh, minute: em };
+    }
+  }
+  cv[CL_HRS] = String(c.hoursTotal || 0);
+  if (c.primary) cv[CL_PRIMARY] = { labels: [c.primary] };
+  if (c.partner) cv[CL_PARTNER] = { labels: [c.partner] };
+  if (c.checker) cv[CL_CHECKER] = { labels: [c.checker] };
+  if (c.laundry) cv[CL_LAUNDRY] = { label: c.laundry };
+  if (c.laundryDriver) cv[CL_LAUN_DRV] = { labels: [c.laundryDriver] };
+  cv[CL_SAMEDAY] = { checked: !!c.sameDay };
+  cv[CL_STATUS] = { label: c.status || (c.primary ? 'Planned' : 'Unassigned') };
+  if (c.checkType) cv[CL_CHECKTYPE] = { label: c.checkType };
+  if (c.notes) cv[CL_NOTES] = c.notes;
+  // Link to property via board_relation (best-effort: if prop has itemId)
+  const pId = properties[c.property]?.itemId;
+  if (pId) cv[CL_PROP] = { item_ids: [parseInt(pId)] };
+  return cv;
+}
+
+async function saveToMonday() {
+  const toCreate = cleans.filter(c => c.new && !c.deleted);
+  const toUpdate = cleans.filter(c => !c.new && !c.deleted && c.dirty && c.mondayId);
+  const toDelete = cleans.filter(c => c.deleted && c.mondayId);
+
+  if (!toCreate.length && !toUpdate.length && !toDelete.length) {
+    toast('Nothing to save'); return;
+  }
+
+  setLoading(true);
+  const btn = document.getElementById('saveBtn');
+  btn.classList.add('saving');
+  btn.textContent = '☁ Saving…';
+
+  try {
+    // Create
+    for (const c of toCreate) {
+      const cv = buildColumnValues(c);
+      const cvStr = JSON.stringify(JSON.stringify(cv));
+      const itemName = `${c.property} — ${c.day}`;
+      const q = `mutation { create_item(board_id:${CLEANS_BOARD}, item_name:${JSON.stringify(itemName)}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
+      const r = await mondayFetch(q);
+      c.mondayId = r.create_item.id;
+      c.new = false; c.dirty = false;
+    }
+    // Update
+    for (const c of toUpdate) {
+      const cv = buildColumnValues(c);
+      const cvStr = JSON.stringify(JSON.stringify(cv));
+      const q = `mutation { change_multiple_column_values(board_id:${CLEANS_BOARD}, item_id:${c.mondayId}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
+      await mondayFetch(q);
+      c.dirty = false;
+    }
+    // Delete
+    for (const c of toDelete) {
+      await mondayFetch(`mutation { delete_item(item_id:${c.mondayId}) { id } }`);
+    }
+    cleans = cleans.filter(c => !(c.deleted && c.mondayId));
+    persistLocal();
+    render();
+    toast(`Saved ${toCreate.length + toUpdate.length + toDelete.length} change${toCreate.length+toUpdate.length+toDelete.length===1?'':'s'}`);
+  } catch (e) {
+    console.error(e);
+    toast('Save failed: ' + e.message, 4000);
+  }
+  btn.classList.remove('saving');
+  setLoading(false);
+  updateSaveBtn();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   PERSIST / MISC
+   ═══════════════════════════════════════════════════════════════════ */
+function persistLocal() {
+  localStorage.setItem(STORE_KEY, JSON.stringify({
+    cleans,
+    viewStart: localStr(viewStart),
+    viewMode,
+    roleFilter,
+  }));
+}
+function restoreLocal() {
+  try {
+    const raw = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
+    if (Array.isArray(raw.cleans)) cleans = raw.cleans;
+    if (raw.viewStart) { viewStart = new Date(raw.viewStart + 'T12:00'); viewStart.setHours(0,0,0,0); }
+    if (raw.viewMode) viewMode = raw.viewMode;
+    if (raw.roleFilter) roleFilter = raw.roleFilter;
+    // Reflect persisted view mode in toggle buttons
+    const btn = document.querySelector(`#viewToggle button[data-view="${viewMode}"]`);
+    if (btn) { document.querySelectorAll('#viewToggle button').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }
+  } catch {}
+}
+
+function shortDate(s) { return new Date(s+'T12:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'}); }
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+function overlayClose(e, id) { if (e.target.id === id) closeModal(id); }
+
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   BOOT
+   ═══════════════════════════════════════════════════════════════════ */
+async function boot() {
+  restoreLocal();
+  render();
+  await refreshAll();
+}
+
+// Service worker
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>

@@ -270,6 +270,17 @@
     .clean-card.rf-earlier    { border-left-color: #fdab3d !important; box-shadow: inset 3px 0 0 #fdab3d; }
     .clean-card.rf-later      { border-left-color: #579bfc !important; box-shadow: inset 3px 0 0 #579bfc; }
     .clean-card.rf-lastmin    { border-left-color: #9d50dd !important; box-shadow: inset 3px 0 0 #9d50dd; }
+    /* Linked-pair absorbed: later clean of a same-phone stretch is a
+       ghost — stays visible but struck-through and does not consume HK hours. */
+    .clean-card.absorbed { opacity: .55; background: repeating-linear-gradient(135deg, #fff 0 8px, #f3efe4 8px 16px); }
+    .clean-card.absorbed .cc-name { text-decoration: line-through; }
+    /* Completed — tick + green tint, primary reassurance for the rota planner. */
+    .clean-card.completed { background: #edf7f2; border-left-color: #52b788 !important; box-shadow: inset 3px 0 0 #52b788; }
+    .clean-card.completed .cc-name::before { content: '✓ '; color: #2d6a4f; font-weight: 700; }
+    .cc-linked-note { font-size: 11px; color: var(--gold); background:#fdf5e8; padding:3px 7px; border-radius: 5px; margin-top:4px; font-weight:600; }
+    .cc-completed-line { font-size: 11px; color: #2d6a4f; font-weight: 700; margin-top:4px; }
+    .cc-badge.comp { background: #2d6a4f; color: #fff; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; }
+    .cc-badge.link { background: var(--gold); color: #fff; font-size:10px; font-weight:700; padding:2px 6px; border-radius:4px; }
     /* Banner shown at top of clean modal when Review flag is set */
     .cm-review-banner { border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
     .cm-review-banner.rf-cancelled { background: #fbe8ec; border: 1px solid #bb3354; }
@@ -648,6 +659,14 @@ const CL_NOTES      = 'long_text_mm2pedn3';
 const CL_CHECKTYPE  = 'color_mm2pznw1';   // Guest Ready (idx 1, green) | Quality Check (idx 4, purple)
 const CL_REVIEW     = 'color_mm2q5qzp';   // Review flag (set by booking-watch scenarios)
 const CL_REVIEW_NT  = 'text_mm2qbgrt';    // Review note (breadcrumb from scenario)
+// Orphan-night linking — when a guest extends by buying the night next door
+// we get two booking refs but still only one clean. The Make watcher writes
+// the partner clean's Monday item id into CL_LINKED_REF on both rows, plus
+// a human-readable note. The row with the LATER check-in is the "absorbed"
+// ghost (guest is still in situ) and is suppressed from totals.
+const CL_LINKED_REF = 'text_mm2qh78j';    // partner Cleans row's Monday item id
+const CL_LINKED_NT  = 'long_text_mm2qp4ay'; // human-readable link note
+const CL_COMPLETED  = 'date_mm2qxh4a';    // Completion date (set by staff changeover submit)
 
 // Staff Shifts columns (read-only from here — staff-shifts.html is the editor)
 const SH_STAFF = 'text_mm2p1gqx';   // Staff item id as plain text
@@ -853,7 +872,7 @@ function parsePropertyFromItemName(name) {
 
 async function fetchCleans() {
   // Paginate the Cleans board — it runs well past 500 items in a busy season.
-  const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_EARLIEST}","${CL_CHECKOUT}","${CL_PROP}","${CL_START}","${CL_END}","${CL_HRS}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_LAUNDRY}","${CL_LAUN_DRV}","${CL_LINEN_MTHD}","${CL_LINEN_DRV}","${CL_LINEN_DATE}","${CL_LINEN_SRC}","${CL_DIRT_MTHD}","${CL_DIRT_DRV}","${CL_SAMEDAY}","${CL_STATUS}","${CL_NOTES}","${CL_CHECKTYPE}","${CL_REVIEW}","${CL_REVIEW_NT}"]`;
+  const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_EARLIEST}","${CL_CHECKOUT}","${CL_PROP}","${CL_START}","${CL_END}","${CL_HRS}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_LAUNDRY}","${CL_LAUN_DRV}","${CL_LINEN_MTHD}","${CL_LINEN_DRV}","${CL_LINEN_DATE}","${CL_LINEN_SRC}","${CL_DIRT_MTHD}","${CL_DIRT_DRV}","${CL_SAMEDAY}","${CL_STATUS}","${CL_NOTES}","${CL_CHECKTYPE}","${CL_REVIEW}","${CL_REVIEW_NT}","${CL_LINKED_REF}","${CL_LINKED_NT}","${CL_COMPLETED}"]`;
   let cursor = null;
   let allItems = [];
   do {
@@ -907,6 +926,9 @@ async function fetchCleans() {
     const checkType = cv[CL_CHECKTYPE]?.text || '';  // 'Guest Ready' | 'Quality Check' | ''
     const reviewFlag = cv[CL_REVIEW]?.text || '';    // '' | 'Cancelled — review' | 'Moved earlier' | 'Moved later' | 'Last minute'
     const reviewNote = pj(cv[CL_REVIEW_NT]?.value) || cv[CL_REVIEW_NT]?.text || '';
+    const linkedRef  = cv[CL_LINKED_REF]?.text || '';
+    const linkedNote = pj(cv[CL_LINKED_NT]?.value)?.text || cv[CL_LINKED_NT]?.text || '';
+    const completedAt = pj(cv[CL_COMPLETED]?.value)?.date || '';
 
     // New laundry model (Linen-in + Dirties-out). Fall back to legacy Laundry run for old rows.
     const linenMethod = cv[CL_LINEN_MTHD]?.text || laundry || '';
@@ -951,6 +973,9 @@ async function fetchCleans() {
       checkType,
       reviewFlag,
       reviewNote,
+      linkedRef,        // partner clean Monday item id
+      linkedNote,       // human-readable note describing the link
+      completedAt,      // yyyy-mm-dd when changeover-form was submitted
       partnerHours: null,   // explicit partner-cleaner split; null means 50/50
       partnerStart: null,   // explicit partner start time; null means match primary
       dirty: false,
@@ -1088,20 +1113,6 @@ function render() {
   // it lives or dies based on whether day < check-in day.
   for (const c of cleans) {
     if (c.deleted) continue;
-    // Back-fill checkoutDate from Lodge Status when Monday's CL_CHECKOUT was
-    // blank — without this the same-day detector falls through and T-badge
-    // never fires. Drag logic already relies on this data, so keeping it all
-    // in sync avoids silent divergence.
-    if (!c.checkoutDate && c.property) {
-      const norm = s => String(s || '').toLowerCase().replace(/[\s'`"']/g, '');
-      const cNorm = norm(c.property);
-      const all = derivedCleans();
-      const d = all.find(x => x.property === c.property &&
-        c.day >= x.windowStart && c.day <= (x.windowEnd || x.windowStart))
-        || all.find(x => norm(x.property) === cNorm &&
-        c.day >= x.windowStart && c.day <= (x.windowEnd || x.windowStart));
-      if (d && d.checkout) c.checkoutDate = d.checkout;
-    }
     const autoSame = computeSameDay(c);
     const autoEarly = computeEarly({ ...c, sameDay: autoSame });
     if (c.sameDay !== autoSame || c.early !== autoEarly) {
@@ -1621,6 +1632,8 @@ function renderPlannedCard(c, dayStr) {
   const isLocal = prop.local && !c.localOverride;
   const isGR = c.checkType === 'Guest Ready';
   const rfCls = reviewFlagClass(c.reviewFlag);
+  const absorbed = cleanIsAbsorbed(c);
+  const completed = !!c.completedAt;
   const cls = [
     'clean-card','planned',
     c.sameDay ? 'same-day' : '',
@@ -1629,9 +1642,14 @@ function renderPlannedCard(c, dayStr) {
     c.localOverride ? 'override' : '',
     isGR ? 'gr' : '',
     rfCls ? `rf-${rfCls}` : '',
+    absorbed ? 'absorbed' : '',
+    completed ? 'completed' : '',
   ].filter(Boolean).join(' ');
 
   const badges = [];
+  if (completed) badges.push(`<span class="cc-badge comp" title="Completed ${escapeAttr(c.completedAt||'')}">Done</span>`);
+  if (absorbed) badges.push('<span class="cc-badge link" title="Linked — clean absorbed into the earlier booking">Linked</span>');
+  else if (c.linkedRef) badges.push('<span class="cc-badge link" title="Linked with a sibling booking — treat as contiguous">Linked</span>');
   if (c.reviewFlag) badges.push(reviewFlagBadge(c.reviewFlag, c.reviewNote));
   if (c.sameDay) badges.push('<span class="cc-badge t">T</span>');
   if (c.early) badges.push('<span class="cc-badge e">Early</span>');
@@ -1680,6 +1698,12 @@ function renderPlannedCard(c, dayStr) {
   const laundryHtml = linenLine + dirtyLine;
 
   const noteHtml = c.notes ? `<div class="cc-notes">${escapeHtml(c.notes)}</div>` : '';
+  const linkedHtml = c.linkedNote
+    ? `<div class="cc-linked-note">🔗 ${escapeHtml(c.linkedNote)}</div>`
+    : (c.linkedRef ? '<div class="cc-linked-note">🔗 Linked booking — treat as contiguous break</div>' : '');
+  const completedHtml = completed
+    ? `<div class="cc-completed-line">✓ Completed ${escapeHtml(c.completedAt)}</div>`
+    : '';
 
   return `<div class="${cls}" data-id="${c.id}" draggable="true"
             ondragstart="onCleanDragStart(event,'${c.id}')"
@@ -1692,8 +1716,27 @@ function renderPlannedCard(c, dayStr) {
     <div class="cc-meta">${meta.join(' · ')}</div>
     <div class="cc-staff">${staffLine}</div>
     ${laundryHtml}
+    ${linkedHtml}
     ${noteHtml}
+    ${completedHtml}
   </div>`;
+}
+
+/* Orphan-night linking: the Make watcher writes the partner Cleans row's
+   Monday item id into linkedRef on BOTH rows. Whichever row has the LATER
+   check-in is the absorbed "ghost" — guest is already in situ, no clean
+   needed. We keep the row visible (faded + struck-through) so the planner
+   still sees it, but exclude its hours from HK capacity totals. */
+function cleanIsAbsorbed(c) {
+  if (!c.linkedRef) return false;
+  const partner = cleans.find(o => o.mondayId === c.linkedRef);
+  if (!partner || partner.deleted) return false;
+  // Tie-break: if check-ins match (shouldn't happen, but be safe), fall
+  // back to Monday id comparison so exactly one of the pair is absorbed.
+  if (c.checkinDate && partner.checkinDate && c.checkinDate !== partner.checkinDate) {
+    return c.checkinDate > partner.checkinDate;
+  }
+  return String(c.mondayId) > String(partner.mondayId);
 }
 
 function availableRoles() {
@@ -1746,11 +1789,14 @@ function hkCapacityForDay(dayStr) {
 }
 // Allocated HK hours = sum of hoursTotal over cleans on that day.
 // Checker allocation is excluded — it's light oversight, not HK labour.
+// Absorbed (linked-pair ghost) cleans are excluded — the guest is still in
+// situ so no clean is actually required on that day.
 function hkAllocatedForDay(dayStr) {
   let total = 0;
   for (const c of cleans) {
     if (c.deleted) continue;
     if (c.day !== dayStr) continue;
+    if (cleanIsAbsorbed(c)) continue;
     total += c.hoursTotal || 0;
   }
   return total;
@@ -1907,10 +1953,18 @@ function computeEarly(c) {
  * recompute when the planner drags or edits the day.
  */
 function computeSameDay(c) {
-  if (!c || !c.property) return !!c?.sameDay;
-  if (c.checkoutDate && c.checkinDate) return c.checkoutDate === c.checkinDate;
-  // Property-name fuzzy match: Monday item names sometimes drift (apostrophes,
-  // trailing whitespace) between Lodge Status and Cleans boards.
+  if (!c || !c.property || !c.checkinDate) return !!c?.sameDay;
+  // Same-day turnover semantics: the PRIOR sibling clean's guest departs on
+  // this clean's check-in day. On each clean row, CL_CHECKOUT is that clean's
+  // own guest's departure — so we look for any other clean at this property
+  // whose checkoutDate equals this clean's checkinDate.
+  for (const s of cleans) {
+    if (s === c || s.deleted) continue;
+    if (s.property !== c.property) continue;
+    if (!s.checkoutDate) continue;
+    if (s.checkoutDate === c.checkinDate) return true;
+  }
+  // Fallback to Lodge Status (currOut/nextIn equality on the property).
   const norm = s => String(s || '').toLowerCase().replace(/[\s'`"']/g, '');
   const cNorm = norm(c.property);
   const all = derivedCleans();
@@ -1937,7 +1991,14 @@ function computeSameDay(c) {
 function hasCheckoutOn(c) {
   if (!c || !c.day) return false;
   if (c.sameDay) return true;
-  if (c.checkoutDate && c.checkoutDate === c.day) return true;
+  // A guest is leaving this property on c.day if some prior sibling clean's
+  // guest-departure (CL_CHECKOUT) lands on c.day. That's the "outgoing guest
+  // at 10:00" moment, after which this clean can begin.
+  for (const s of cleans) {
+    if (s === c || s.deleted) continue;
+    if (s.property !== c.property) continue;
+    if (s.checkoutDate && s.checkoutDate === c.day) return true;
+  }
   return false;
 }
 

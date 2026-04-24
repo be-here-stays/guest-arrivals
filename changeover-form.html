@@ -253,6 +253,21 @@ const SUPPLIES_BOARD = 1615688857;
 const SUP_GROUP      = 'topics';
 const CHARGEABLE_GROUP = 'new_group64916__1';
 const RESTOCKED_IDX  = 2; // index of "Restocked" in ACTIVITIES
+const CLEANED_IDX    = 0; // index of "House Cleaned" in ACTIVITIES
+
+// Cleans board (for marking a clean "Completed" when launched from staff.html)
+const CLEANS_BOARD   = 5095134636;
+const CL_COMPLETED   = 'date_mm2qxh4a';
+
+// URL params (set when a staff member taps "Mark complete" on staff.html).
+// If present, we pre-fill date / property / name / activity and write the
+// CL_COMPLETED timestamp back to the matching Cleans row on submit.
+const urlParams      = new URLSearchParams(location.search);
+const preCleanId     = urlParams.get('clean_id') || '';
+const prePropertyQS  = urlParams.get('property')  || '';
+const preDateQS      = urlParams.get('date')      || '';
+const preNameQS      = urlParams.get('name')      || '';
+const preActQS       = (urlParams.get('act')      || '').toLowerCase();
 
 let supplyItems = []; // outstanding items for current property
 
@@ -280,9 +295,12 @@ const PROPERTIES = [
 let selProperty = null;
 let selAct = null;
 
-// Default date = today
+// Default date = today (or pre-filled from ?date=yyyy-mm-dd)
 const todayStr = new Date().toISOString().split('T')[0];
-document.getElementById('date-input').value = todayStr;
+document.getElementById('date-input').value = /^\d{4}-\d{2}-\d{2}$/.test(preDateQS) ? preDateQS : todayStr;
+
+// Pre-fill name if passed (staff.html launcher sets ?name=)
+if (preNameQS) document.getElementById('name-input').value = preNameQS;
 
 // ── Property search ──────────────────────────────────────────
 const propInput = document.getElementById('prop-input');
@@ -315,6 +333,26 @@ function pickProp(name) {
   propPill.style.display = 'flex';
   if (selAct === RESTOCKED_IDX) loadSupplyItems(name);
 }
+
+// Pre-fill property from URL if it matches a known one. Try exact (case-
+// insensitive) first, then "property starts with or contains" so we tolerate
+// e.g. "Kingfisher Lodge" vs the canonical "Kingfisher".
+if (prePropertyQS) {
+  const pq = prePropertyQS.toLowerCase();
+  const match = PROPERTIES.find(p => p.toLowerCase() === pq)
+             || PROPERTIES.find(p => pq.startsWith(p.toLowerCase()) || p.toLowerCase().startsWith(pq))
+             || PROPERTIES.find(p => pq.includes(p.toLowerCase()));
+  if (match) pickProp(match);
+}
+
+// Pre-select activity from URL (?act=cleaned|laundry|restocked|checked|outside)
+(function preselectAct(){
+  if (!preActQS) return;
+  const map = { cleaned:0, clean:0, laundry:1, laundrydropped:1, 'laundry-dropped':1,
+                restocked:2, restock:2, checked:3, check:3, outside:4, outsideclean:4 };
+  const idx = map[preActQS.replace(/\s+/g,'')];
+  if (typeof idx === 'number') setTimeout(() => selectAct(idx), 0);
+})();
 
 function resetProperty() {
   selProperty = null;
@@ -432,6 +470,21 @@ async function submitLog() {
     const json = await res.json();
     if (json.errors) throw new Error(json.errors[0].message);
 
+    // If launched from staff.html as a "Mark complete" for a specific clean,
+    // write CL_COMPLETED = the chosen date on the Cleans row. This is what
+    // makes the rota-planner + staff page show the ✓ Done badge.
+    if (preCleanId && selAct === CLEANED_IDX) {
+      try {
+        const cv = JSON.stringify({ [CL_COMPLETED]: { date } });
+        const q = `mutation { change_multiple_column_values(board_id:${CLEANS_BOARD}, item_id:${preCleanId}, column_values:${JSON.stringify(cv)}){ id } }`;
+        await fetch('https://api.monday.com/v2', {
+          method: 'POST',
+          headers: { 'Content-Type':'application/json','Authorization':API_TOKEN,'API-Version':'2024-01' },
+          body: JSON.stringify({ query: q })
+        });
+      } catch (e) { /* non-fatal — the changeover log already saved */ }
+    }
+
     // If Restocked, also mark checked supply items as delivered
     if (selAct === RESTOCKED_IDX && supplyItems.length) {
       const checkedIds = supplyItems
@@ -460,6 +513,9 @@ async function submitLog() {
     document.querySelectorAll('.act-btn').forEach(b => b.classList.remove('sel'));
     document.getElementById('delivery-field').style.display = 'none';
     document.getElementById('delivery-list').innerHTML = '<div class="delivery-loading">Select a property first…</div>';
+
+    // If launched from staff.html ("Mark complete"), hop back there after a beat.
+    if (preCleanId) setTimeout(() => { location.href = 'staff.html'; }, 1400);
   } catch (err) {
     toast('Error: ' + err.message, 'err');
   } finally {

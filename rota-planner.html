@@ -304,6 +304,11 @@
     .modal-chk { display: flex; align-items: center; gap: 8px; font-size: 13px;
                  padding: 5px 0; cursor: pointer; }
     .modal-chk input { width: 16px; height: 16px; }
+    .modal-section-hdr { font-size: 11px; font-weight: 800; text-transform: uppercase;
+                         letter-spacing: 0.8px; color: var(--sage); margin: 14px 0 8px;
+                         padding-bottom: 4px; border-bottom: 1px dashed var(--border); }
+    .modal-row.cm-required .modal-label::after { content: ' *'; color: var(--sameday); }
+    .modal-row.cm-warn .modal-label { color: var(--sameday); }
 
     /* ── TOAST ── */
     #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
@@ -333,6 +338,8 @@
     <div class="header-title">Clean Rota</div>
     <button class="header-btn" onclick="refreshAll()" title="Reload from Monday">↻</button>
     <button class="header-btn" id="saveBtn" onclick="saveToMonday()" title="Save changes to Monday">☁ Save</button>
+    <button class="header-btn" onclick="sendDayToCleaners()" title="Email each cleaner their day sheet">✉ Send day</button>
+    <button class="header-btn" onclick="WorkDispatch.showSettings()" title="Webhook settings">⚙</button>
   </div>
 
   <div id="loadingBar"></div>
@@ -407,24 +414,54 @@
       <select class="modal-select" id="cmPartner"><option value="">—</option></select>
     </div>
 
-    <div class="modal-row">
-      <span class="modal-label">Checker (optional)</span>
+    <div class="modal-row" id="cmCheckerRow">
+      <span class="modal-label" id="cmCheckerLabel">Checker</span>
       <select class="modal-select" id="cmChecker"><option value="">—</option></select>
     </div>
 
+    <div class="modal-section-hdr">🧺 Clean linen in</div>
     <div class="modal-row modal-row-inline">
       <div>
-        <span class="modal-label">Laundry run</span>
-        <select class="modal-select" id="cmLaundry">
+        <span class="modal-label">Method</span>
+        <select class="modal-select" id="cmLinenMethod">
           <option value="">—</option>
           <option value="Laundry van">Laundry van</option>
           <option value="Maintenance team">Maintenance team</option>
-          <option value="Staff car">Staff car</option>
+          <option value="Management">Management</option>
+          <option value="Cleaner">Cleaner</option>
         </select>
       </div>
-      <div id="cmLaunDrvWrap" style="display:none">
-        <span class="modal-label">Driver</span>
-        <select class="modal-select" id="cmLaunDriver"><option value="">—</option></select>
+      <div id="cmLinenDrvWrap" style="display:none">
+        <span class="modal-label">Named driver</span>
+        <select class="modal-select" id="cmLinenDriver"><option value="">—</option></select>
+      </div>
+    </div>
+    <div class="modal-row modal-row-inline">
+      <div>
+        <span class="modal-label">Delivery date</span>
+        <input type="date" class="modal-input" id="cmLinenDate">
+      </div>
+      <div>
+        <span class="modal-label">Source property (if dropped elsewhere)</span>
+        <select class="modal-select" id="cmLinenSource"><option value="">—</option></select>
+      </div>
+    </div>
+
+    <div class="modal-section-hdr">🧺 Dirties out</div>
+    <div class="modal-row modal-row-inline">
+      <div>
+        <span class="modal-label">Method</span>
+        <select class="modal-select" id="cmDirtiesMethod">
+          <option value="">—</option>
+          <option value="Laundry van">Laundry van</option>
+          <option value="Maintenance team">Maintenance team</option>
+          <option value="Management">Management</option>
+          <option value="Cleaner">Cleaner</option>
+        </select>
+      </div>
+      <div id="cmDirtiesDrvWrap" style="display:none">
+        <span class="modal-label">Named driver</span>
+        <select class="modal-select" id="cmDirtiesDriver"><option value="">—</option></select>
       </div>
     </div>
 
@@ -508,6 +545,7 @@
 
 <div id="toast"></div>
 
+<script src="work-dispatch.js"></script>
 <script>
 /* ═══════════════════════════════════════════════════════════════════
    CONFIG
@@ -541,7 +579,8 @@ const ST_CONTRACT = 'numeric_mm2pc978';
 // Cleans columns
 const CL_DATE       = 'date_mm2pphc';      // current scheduled clean day (movable)
 const CL_CHECKIN    = 'date_mm2p6tck';     // key check-in day (immovable anchor)
-const CL_EARLIEST   = 'date_mm2phd58';     // earliest movable day (previous check-out)
+const CL_EARLIEST   = 'date_mm2phd58';     // DEPRECATED earliest (pre-Guesty). Kept as fallback.
+const CL_CHECKOUT   = 'date_mm2pb8rs';     // current booking's check-out day (drives NEXT clean's earliest)
 const CL_DAY        = 'color_mm2p8vtq';
 const CL_PROP       = 'board_relation_mm2psy0b';
 const CL_START      = 'hour_mm2pskhh';
@@ -550,8 +589,14 @@ const CL_HRS        = 'numeric_mm2pmqdt';
 const CL_PRIMARY    = 'dropdown_mm2pntvm';
 const CL_PARTNER    = 'dropdown_mm2pbcnq';
 const CL_CHECKER    = 'dropdown_mm2p9qd3';
-const CL_LAUNDRY    = 'color_mm2pnast';    // status: Laundry van, Maintenance team, Staff car
-const CL_LAUN_DRV   = 'dropdown_mm2ptbe7';
+const CL_LAUNDRY    = 'color_mm2pnast';    // LEGACY: old "Laundry run" column; not written anymore
+const CL_LAUN_DRV   = 'dropdown_mm2ptbe7'; // LEGACY: old "Laundry driver" column
+const CL_LINEN_MTHD = 'color_mm2pgdm5';    // Linen-in method (van/maint/mgmt/cleaner)
+const CL_LINEN_DRV  = 'dropdown_mm2pmr0f'; // Linen-in driver
+const CL_LINEN_DATE = 'date_mm2phz49';     // Linen-in date (may be earlier than clean day)
+const CL_DIRT_MTHD  = 'color_mm2pd9tb';    // Dirties-out method
+const CL_DIRT_DRV   = 'dropdown_mm2pwdwg'; // Dirties-out driver
+const CL_LINEN_SRC  = 'board_relation_mm2pke5q'; // Linen source property (sibling drop-off)
 const CL_SAMEDAY    = 'boolean_mm2p2v4n';
 const CL_LINEN_DAY  = 'color_mm2pj7e4';
 const CL_STATUS     = 'color_mm2prq2f';
@@ -687,18 +732,20 @@ async function fetchProperties() {
 
 async function fetchStaff() {
   const data = await mondayFetch(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:200){ items{
-    id name column_values(ids:["${ST_ROLE}","${ST_STATUS}","${ST_CONTRACT}"]){ id value text }
+    id name column_values(ids:["${ST_ROLE}","${ST_STATUS}","${ST_CONTRACT}","email_mm2pa071"]){ id value text }
   } } } }`);
   staff = [];
   for (const it of data.boards[0].items_page.items) {
     const cv = {};
     for (const c of it.column_values) cv[c.id] = { value: c.value, text: c.text };
+    const emailObj = pj(cv['email_mm2pa071']?.value);
     staff.push({
       id: it.id,
       name: it.name,
       role: cv[ST_ROLE]?.text || '',
       status: cv[ST_STATUS]?.text || 'Active',
       contractHrs: parseFloat(pj(cv[ST_CONTRACT]?.value)) || 0,
+      email: (emailObj && emailObj.email) || cv['email_mm2pa071']?.text || '',
     });
   }
   // Order: active first, by role weight
@@ -759,25 +806,36 @@ function parsePropertyFromItemName(name) {
 }
 
 async function fetchCleans() {
-  // Fetch cleans in a window around the current view (+/- 2 weeks)
-  const data = await mondayFetch(`{ boards(ids:[${CLEANS_BOARD}]){ items_page(limit:500){ items{
-    id name column_values(ids:["${CL_DATE}","${CL_CHECKIN}","${CL_EARLIEST}","${CL_PROP}","${CL_START}","${CL_END}","${CL_HRS}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_LAUNDRY}","${CL_LAUN_DRV}","${CL_SAMEDAY}","${CL_STATUS}","${CL_NOTES}","${CL_CHECKTYPE}"]){ id value text }
-  } } } }`);
+  // Paginate the Cleans board — it runs well past 500 items in a busy season.
+  const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_EARLIEST}","${CL_CHECKOUT}","${CL_PROP}","${CL_START}","${CL_END}","${CL_HRS}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_LAUNDRY}","${CL_LAUN_DRV}","${CL_LINEN_MTHD}","${CL_LINEN_DRV}","${CL_LINEN_DATE}","${CL_LINEN_SRC}","${CL_DIRT_MTHD}","${CL_DIRT_DRV}","${CL_SAMEDAY}","${CL_STATUS}","${CL_NOTES}","${CL_CHECKTYPE}"]`;
+  let cursor = null;
+  let allItems = [];
+  do {
+    const q = cursor
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${colIds}){ id value text } } } }`
+      : `{ boards(ids:[${CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id value text } } } } }`;
+    const d = await mondayFetch(q);
+    const page = cursor ? d.next_items_page : d.boards[0].items_page;
+    allItems = allItems.concat(page.items);
+    cursor = page.cursor;
+  } while (cursor);
 
   // Merge with in-memory state: keep dirty local edits; overwrite others.
   const localById = {};
   for (const c of cleans) if (c.mondayId) localById[c.mondayId] = c;
 
   const fresh = [];
-  for (const it of data.boards[0].items_page.items) {
+  for (const it of allItems) {
     const cv = {};
     for (const c of it.column_values) cv[c.id] = { value: c.value, text: c.text };
     const dateObj = pj(cv[CL_DATE]?.value);
     if (!dateObj?.date) continue;
     const checkinObj = pj(cv[CL_CHECKIN]?.value);
     const earliestObj = pj(cv[CL_EARLIEST]?.value);
+    const checkoutObj = pj(cv[CL_CHECKOUT]?.value);
     const checkinDate = checkinObj?.date || dateObj.date;
     const earliestDate = earliestObj?.date || checkinDate;
+    const checkoutDate = checkoutObj?.date || '';
     const propRel = pj(cv[CL_PROP]?.value);
     const propText = cv[CL_PROP]?.text || '';
     const startObj = pj(cv[CL_START]?.value);
@@ -801,6 +859,16 @@ async function fetchCleans() {
     const launDrvLabels = cv[CL_LAUN_DRV]?.text || '';
     const laundry = cv[CL_LAUNDRY]?.text || '';
     const checkType = cv[CL_CHECKTYPE]?.text || '';  // 'Guest Ready' | 'Quality Check' | ''
+
+    // New laundry model (Linen-in + Dirties-out). Fall back to legacy Laundry run for old rows.
+    const linenMethod = cv[CL_LINEN_MTHD]?.text || laundry || '';
+    const linenDriver = (cv[CL_LINEN_DRV]?.text || launDrvLabels || '').split(',').map(s=>s.trim()).filter(Boolean)[0] || '';
+    const linenDateObj = pj(cv[CL_LINEN_DATE]?.value);
+    const linenDate = linenDateObj?.date || '';
+    const dirtiesMethod = cv[CL_DIRT_MTHD]?.text || '';
+    const dirtiesDriver = (cv[CL_DIRT_DRV]?.text || '').split(',').map(s=>s.trim()).filter(Boolean)[0] || '';
+    const linenSrcText = cv[CL_LINEN_SRC]?.text || '';
+
     fresh.push({
       id: local?.id || uid(),
       mondayId: it.id,
@@ -808,13 +876,22 @@ async function fetchCleans() {
       day: dateObj.date,
       checkinDate,
       earliestDate,
+      checkoutDate,
       start: start || '09:00',
       hoursTotal: hrs,
       primary: primaryLabels.split(',').map(s=>s.trim()).filter(Boolean)[0] || '',
       partner: partnerLabels.split(',').map(s=>s.trim()).filter(Boolean)[0] || '',
       checker: checkerLabels.split(',').map(s=>s.trim()).filter(Boolean)[0] || '',
+      // Legacy single-field laundry (kept for backwards-compat reads only)
       laundry,
       laundryDriver: launDrvLabels.split(',').map(s=>s.trim()).filter(Boolean)[0] || '',
+      // New two-event laundry model
+      linenMethod,
+      linenDriver,
+      linenDate,
+      linenSource: linenSrcText,  // property name text; resolved to id on save
+      dirtiesMethod,
+      dirtiesDriver,
       sameDay,
       early: false,       // not stored on Monday yet; purely local flag
       localOverride: false,
@@ -885,16 +962,23 @@ function derivedCleans() {
   for (const b of bookings) {
     // The "turn" we care about is between currOut and nextIn
     if (!b.currOut) continue;
-    const sameDay = b.nextIn && b.currOut === b.nextIn;
-    const windowEnd = b.nextIn ? addDays(new Date(b.nextIn), -1) : null; // inclusive, or null = open
+    // Ignore nextIn if it's not strictly after currOut — the Lodge Status board
+    // mirrors the current booking into the next-booking fields when there's no
+    // future booking loaded yet, which would produce an inverted window and
+    // break the planned-clean match below (duplicating property rows).
+    const nextIn = (b.nextIn && b.nextIn > b.currOut) ? b.nextIn
+                 : (b.nextIn && b.nextIn === b.currOut) ? b.nextIn
+                 : null;
+    const sameDay = nextIn && nextIn === b.currOut;
+    const windowEndDate = (nextIn && nextIn > b.currOut) ? addDays(new Date(nextIn), -1) : null;
     out.push({
       key: `${b.property}|${b.currOut}`,
       property: b.property,
       checkout: b.currOut,
-      nextIn: b.nextIn,
+      nextIn,
       sameDay,
       windowStart: b.currOut,
-      windowEnd: windowEnd ? localStr(windowEnd) : b.currOut,
+      windowEnd: windowEndDate ? localStr(windowEndDate) : b.currOut,
       source: b.source,
       todayStatus: b.todayStatus,
     });
@@ -904,9 +988,11 @@ function derivedCleans() {
 
 /* Planned clean exists for a booking? match by property+windowStart (checkout date or within the window) */
 function findPlannedClean(d) {
-  // Match by property and day in [windowStart..windowEnd]
+  // Match by property and day in [windowStart..windowEnd]. Guard against an
+  // inverted window (windowEnd < windowStart) which would silently match nothing.
+  const winEnd = (d.windowEnd && d.windowEnd >= d.windowStart) ? d.windowEnd : d.windowStart;
   return cleans.find(c => !c.deleted && c.property === d.property &&
-    c.day >= d.windowStart && c.day <= (d.windowEnd || d.windowStart));
+    c.day >= d.windowStart && c.day <= winEnd);
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -1043,6 +1129,11 @@ function renderDayView() {
     for (const d of unplanned) {
       const prop = properties[d.property];
       if (prop?.local && !showLocal) continue;
+      // Managed properties are fully driven by the Cleans board — every turnover
+      // has a planned row with a booking reference. Suppress Lodge-Status-derived
+      // phantoms for managed houses so they can't appear as "Tap to plan" cards.
+      // Only non-managed (external) properties can legitimately surface here.
+      if (prop?.managed) continue;
       if (!derivedVisibleForRoleFilter(d)) continue;
       cards.push(renderUnplannedCard(d, dayStr));
     }
@@ -1169,7 +1260,11 @@ function renderLodgeMini(c, isDerived) {
     : `<div class="lg-mini-staff">drag staff →</div>`;
   const extras = [];
   if (c.checker) extras.push(`✓ ${c.checker}`);
-  if (c.laundry) extras.push(`🧺 ${c.laundry === 'Staff car' && c.laundryDriver ? c.laundryDriver : c.laundry.split(' ')[0]}`);
+  // Show new linen-in method (or legacy laundry). One glyph, short.
+  const linM = c.linenMethod || c.laundry;
+  const linD = c.linenDriver || c.laundryDriver;
+  if (linM) extras.push(`🧺 ${linM !== 'Laundry van' && linD ? linD : linM.split(' ')[0]}`);
+  if (c.dirtiesMethod) extras.push(`🧺→ ${c.dirtiesMethod !== 'Laundry van' && c.dirtiesDriver ? c.dirtiesDriver : c.dirtiesMethod.split(' ')[0]}`);
   const extraLine = extras.length ? `<div class="lg-mini-staff">${extras.join(' · ')}</div>` : '';
   return `<div class="${cls}" data-id="${c.id}" draggable="true"
             ondragstart="onCleanDragStart(event,'${c.id}')"
@@ -1394,7 +1489,16 @@ function renderPlannedCard(c, dayStr) {
   const staffLine = staffHtml.length ? staffHtml.join('') : '<span class="cc-staff-empty">No cleaners yet — drag staff here</span>';
 
   // Laundry run line
-  const laundryHtml = c.laundry ? `<div class="cc-meta" style="margin-top:2px">🧺 ${c.laundry}${c.laundry==='Staff car' && c.laundryDriver?` (${c.laundryDriver})`:''}</div>` : '';
+  // Laundry display: prefer new split model, fall back to legacy single field.
+  const _linM = c.linenMethod || c.laundry;
+  const _linD = c.linenDriver || c.laundryDriver;
+  const linenLine = _linM
+    ? `<div class="cc-meta" style="margin-top:2px">🧺 in: ${_linM}${_linM !== 'Laundry van' && _linD ? ` (${_linD})` : ''}${c.linenDate && c.linenDate !== c.day ? ` · ${c.linenDate}` : ''}${c.linenSource ? ` · from ${c.linenSource}` : ''}</div>`
+    : '';
+  const dirtyLine = c.dirtiesMethod
+    ? `<div class="cc-meta" style="margin-top:2px">🧺 out: ${c.dirtiesMethod}${c.dirtiesMethod !== 'Laundry van' && c.dirtiesDriver ? ` (${c.dirtiesDriver})` : ''}</div>`
+    : '';
+  const laundryHtml = linenLine + dirtyLine;
 
   const noteHtml = c.notes ? `<div class="cc-notes">${escapeHtml(c.notes)}</div>` : '';
 
@@ -1583,16 +1687,39 @@ function shiftTime(hhmm, deltaHrs) {
 /* ═══════════════════════════════════════════════════════════════════
    DRAG-WINDOW / TIME CONSTRAINTS
    Rules (Barry):
-   - Checkin date (CL_CHECKIN) is the default anchor.
-   - Drag back allowed to previous check-out (CL_EARLIEST).
+   - Check-in date (CL_CHECKIN) is the anchor — the right end of the window.
+   - Earliest day is derived from the PRIOR sibling clean at the same property,
+     using that sibling's check-out (CL_CHECKOUT). A clean can't be dragged
+     back into the previous guest's stay.
+   - Fallback chain for earliest: prior sibling's checkoutDate
+     → own stored CL_EARLIEST (legacy pre-Guesty) → own checkinDate.
    - On check-out day (earliestDate): start no earlier than 10:00.
    - On check-in day (checkinDate): finish by 16:00 (hard cap), ideally 15:00.
    - In-between days: no time restriction.
    ═══════════════════════════════════════════════════════════════════ */
+function earliestFor(c) {
+  // Find the most recent prior clean at the same property whose scheduled day
+  // is strictly before this one's check-in. If found and its checkoutDate is
+  // populated, that's the earliest this clean can be dragged back to.
+  if (c.property && c.checkinDate) {
+    const anchor = c.checkinDate;
+    let best = null;
+    for (const s of cleans) {
+      if (s === c || s.deleted) continue;
+      if (s.property !== c.property) continue;
+      if (!s.day || s.day >= anchor) continue;
+      if (!best || s.day > best.day) best = s;
+    }
+    if (best && best.checkoutDate) return best.checkoutDate;
+  }
+  // Legacy fallback: column stored during the Excel/spreadsheet phase.
+  if (c.earliestDate) return c.earliestDate;
+  return c.checkinDate || c.day;
+}
+
 function dragWindowFor(c) {
-  // Prefer stored check-in/earliest (post bulk-import). Fallback to derived booking window.
   if (c.checkinDate) {
-    return { start: c.earliestDate || c.checkinDate, end: c.checkinDate };
+    return { start: earliestFor(c), end: c.checkinDate };
   }
   const d = derivedCleans().find(x => x.property === c.property &&
     c.day >= x.windowStart && c.day <= (x.windowEnd || x.windowStart));
@@ -1610,8 +1737,9 @@ function enforceTimeRules(c) {
   if (!c.start || !c.hoursTotal) return;
   const [sh, sm] = c.start.split(':').map(Number);
   const startMin = sh*60 + (sm||0);
-  const isCheckoutDay = c.earliestDate && c.day === c.earliestDate && c.day !== c.checkinDate;
-  const isCheckinDay  = c.checkinDate  && c.day === c.checkinDate;
+  const earliest = earliestFor(c);
+  const isCheckoutDay = earliest && c.day === earliest && c.day !== c.checkinDate;
+  const isCheckinDay  = c.checkinDate && c.day === c.checkinDate;
   const each = c.partner ? c.hoursTotal/2 : c.hoursTotal;
 
   if (isCheckoutDay && startMin < 10*60) {
@@ -1719,13 +1847,29 @@ function openCleanModal(id) {
   document.getElementById('cmPrimary').innerHTML = options;
   document.getElementById('cmPartner').innerHTML = options;
   document.getElementById('cmChecker').innerHTML = options;
-  document.getElementById('cmLaunDriver').innerHTML = options;
+  document.getElementById('cmLinenDriver').innerHTML = options;
+  document.getElementById('cmDirtiesDriver').innerHTML = options;
   document.getElementById('cmPrimary').value = c.primary || '';
   document.getElementById('cmPartner').value = c.partner || '';
   document.getElementById('cmChecker').value = c.checker || '';
-  document.getElementById('cmLaundry').value = c.laundry || '';
-  document.getElementById('cmLaunDriver').value = c.laundryDriver || '';
-  document.getElementById('cmLaunDrvWrap').style.display = c.laundry === 'Staff car' ? 'block' : 'none';
+
+  // Linen-in
+  const linenMethod = c.linenMethod || c.laundry || '';
+  document.getElementById('cmLinenMethod').value = linenMethod;
+  document.getElementById('cmLinenDriver').value = c.linenDriver || c.laundryDriver || '';
+  document.getElementById('cmLinenDrvWrap').style.display = (linenMethod && linenMethod !== 'Laundry van') ? 'block' : 'none';
+  document.getElementById('cmLinenDate').value = c.linenDate || '';
+  const propOptions = ['<option value="">—</option>']
+    .concat(Object.keys(properties).sort().map(p => `<option value="${escapeAttr(p)}">${p}</option>`)).join('');
+  const linenSrc = document.getElementById('cmLinenSource');
+  linenSrc.innerHTML = propOptions;
+  linenSrc.value = c.linenSource || '';
+
+  // Dirties-out
+  document.getElementById('cmDirtiesMethod').value = c.dirtiesMethod || '';
+  document.getElementById('cmDirtiesDriver').value = c.dirtiesDriver || '';
+  document.getElementById('cmDirtiesDrvWrap').style.display = (c.dirtiesMethod && c.dirtiesMethod !== 'Laundry van') ? 'block' : 'none';
+
   document.getElementById('cmSameDay').checked = !!c.sameDay;
   document.getElementById('cmEarly').checked = !!c.early;
   document.getElementById('cmNotes').value = c.notes || '';
@@ -1735,14 +1879,38 @@ function openCleanModal(id) {
   document.getElementById('cmLocalOverride').checked = !!c.localOverride;
 
   document.getElementById('cmGuestReady').checked = c.checkType === 'Guest Ready';
+  updateCheckerRequired();
   document.getElementById('cleanModal').classList.add('open');
 }
 
+/**
+ * Update Checker field label/required state based on Guest Ready toggle.
+ * Guest Ready ticked  → "Checker (not required)" — field hidden.
+ * Guest Ready unticked → Quality Check → Checker REQUIRED — field visible with red asterisk.
+ */
+function updateCheckerRequired() {
+  const guestReady = document.getElementById('cmGuestReady')?.checked;
+  const row = document.getElementById('cmCheckerRow');
+  const label = document.getElementById('cmCheckerLabel');
+  const sel = document.getElementById('cmChecker');
+  if (!row || !label || !sel) return;
+  if (guestReady) {
+    row.style.display = 'none';
+    row.classList.remove('cm-required', 'cm-warn');
+    label.textContent = 'Checker';
+  } else {
+    row.style.display = '';
+    label.textContent = 'Checker (required)';
+    row.classList.add('cm-required');
+    row.classList.toggle('cm-warn', !sel.value);
+  }
+}
+
 function buildDayOptions(c) {
-  // Prefer stored checkin/earliest window if present; else derive from booking.
+  // Prefer sibling-derived window if present; else derive from booking.
   let start, end, sameDay = false;
   if (c.checkinDate) {
-    start = c.earliestDate || c.checkinDate;
+    start = earliestFor(c);
     end = c.checkinDate;
     sameDay = start === end;
   } else {
@@ -1764,20 +1932,46 @@ function buildDayOptions(c) {
 function saveClean() {
   const c = cleans.find(x => x.id === editingCleanId);
   if (!c) return;
+
+  const guestReady = document.getElementById('cmGuestReady').checked;
+  const checker = document.getElementById('cmChecker').value;
+
+  // Rule: Quality Check cleans MUST have a checker assigned. Block save.
+  if (!guestReady && !checker) {
+    toast('Quality Check cleans need a checker assigned.', 3200);
+    const row = document.getElementById('cmCheckerRow');
+    if (row) { row.classList.add('cm-warn'); row.scrollIntoView({block:'center', behavior:'smooth'}); }
+    return;
+  }
+
   c.day = document.getElementById('cmDay').value;
   c.start = document.getElementById('cmStart').value;
   c.hoursTotal = parseFloat(document.getElementById('cmHours').value) || 0;
   c.primary = document.getElementById('cmPrimary').value;
   c.partner = document.getElementById('cmPartner').value;
   if (c.primary && c.primary === c.partner) c.partner = '';
-  c.checker = document.getElementById('cmChecker').value;
-  c.laundry = document.getElementById('cmLaundry').value;
-  c.laundryDriver = c.laundry === 'Staff car' ? document.getElementById('cmLaunDriver').value : '';
+  c.checker = checker;
+
+  // Linen-in
+  c.linenMethod = document.getElementById('cmLinenMethod').value;
+  // Driver is only meaningful for methods other than "Laundry van" (which has no named driver)
+  c.linenDriver = (c.linenMethod && c.linenMethod !== 'Laundry van') ? document.getElementById('cmLinenDriver').value : '';
+  c.linenDate = document.getElementById('cmLinenDate').value || '';
+  c.linenSource = document.getElementById('cmLinenSource').value || '';
+
+  // Dirties-out
+  c.dirtiesMethod = document.getElementById('cmDirtiesMethod').value;
+  c.dirtiesDriver = (c.dirtiesMethod && c.dirtiesMethod !== 'Laundry van') ? document.getElementById('cmDirtiesDriver').value : '';
+
+  // Clear legacy single-field laundry so it doesn't fight the new model on save
+  c.laundry = '';
+  c.laundryDriver = '';
+
   c.sameDay = document.getElementById('cmSameDay').checked;
   c.early = document.getElementById('cmEarly').checked;
   c.localOverride = document.getElementById('cmLocalOverride').checked;
   c.notes = document.getElementById('cmNotes').value.trim();
-  c.checkType = document.getElementById('cmGuestReady').checked ? 'Guest Ready' : 'Quality Check';
+  c.checkType = guestReady ? 'Guest Ready' : 'Quality Check';
   enforceTimeRules(c);
   c.dirty = true;
   persistLocal();
@@ -1785,10 +1979,15 @@ function saveClean() {
   render();
 }
 
-// Toggle driver selector when laundry dropdown changes
+// Toggle driver selectors when method dropdowns change; toggle checker requirement on Guest Ready change.
 document.addEventListener('change', e => {
-  if (e.target && e.target.id === 'cmLaundry') {
-    document.getElementById('cmLaunDrvWrap').style.display = e.target.value === 'Staff car' ? 'block' : 'none';
+  if (!e.target) return;
+  if (e.target.id === 'cmLinenMethod') {
+    document.getElementById('cmLinenDrvWrap').style.display = (e.target.value && e.target.value !== 'Laundry van') ? 'block' : 'none';
+  } else if (e.target.id === 'cmDirtiesMethod') {
+    document.getElementById('cmDirtiesDrvWrap').style.display = (e.target.value && e.target.value !== 'Laundry van') ? 'block' : 'none';
+  } else if (e.target.id === 'cmGuestReady' || e.target.id === 'cmChecker') {
+    updateCheckerRequired();
   }
 });
 
@@ -1916,6 +2115,7 @@ function buildColumnValues(c) {
   cv[CL_DATE] = { date: c.day };
   if (c.checkinDate)  cv[CL_CHECKIN]  = { date: c.checkinDate };
   if (c.earliestDate) cv[CL_EARLIEST] = { date: c.earliestDate };
+  if (c.checkoutDate) cv[CL_CHECKOUT] = { date: c.checkoutDate };
   if (c.start) {
     const [h,m] = c.start.split(':').map(Number);
     cv[CL_START] = { hour: h, minute: m||0 };
@@ -1929,8 +2129,19 @@ function buildColumnValues(c) {
   if (c.primary) cv[CL_PRIMARY] = { labels: [c.primary] };
   if (c.partner) cv[CL_PARTNER] = { labels: [c.partner] };
   if (c.checker) cv[CL_CHECKER] = { labels: [c.checker] };
+  // Legacy single-field laundry — only written if still populated (old rows)
   if (c.laundry) cv[CL_LAUNDRY] = { label: c.laundry };
   if (c.laundryDriver) cv[CL_LAUN_DRV] = { labels: [c.laundryDriver] };
+  // New split laundry model
+  if (c.linenMethod)   cv[CL_LINEN_MTHD] = { label: c.linenMethod };
+  if (c.linenDriver)   cv[CL_LINEN_DRV]  = { labels: [c.linenDriver] };
+  if (c.linenDate)     cv[CL_LINEN_DATE] = { date: c.linenDate };
+  if (c.dirtiesMethod) cv[CL_DIRT_MTHD]  = { label: c.dirtiesMethod };
+  if (c.dirtiesDriver) cv[CL_DIRT_DRV]   = { labels: [c.dirtiesDriver] };
+  if (c.linenSource) {
+    const srcId = properties[c.linenSource]?.itemId;
+    if (srcId) cv[CL_LINEN_SRC] = { item_ids: [parseInt(srcId)] };
+  }
   cv[CL_SAMEDAY] = { checked: !!c.sameDay };
   cv[CL_STATUS] = { label: c.status || (c.primary ? 'Planned' : 'Unassigned') };
   if (c.checkType) cv[CL_CHECKTYPE] = { label: c.checkType };
@@ -2022,6 +2233,80 @@ function overlayClose(e, id) { if (e.target.id === id) closeModal(id); }
 
 function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 function escapeAttr(s) { return escapeHtml(s).replace(/'/g, '&#39;'); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   SEND DAY TO CLEANERS (email day-sheets via Make webhook)
+   ═══════════════════════════════════════════════════════════════════ */
+function _staffEmail(name) {
+  if (!name) return '';
+  const s = staff.find(x => x.name.toLowerCase() === name.toLowerCase());
+  return s?.email || '';
+}
+function sendDayToCleaners() {
+  const dayISO = localStr(viewStart);
+  const dayLabel = new Date(dayISO + 'T12:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+  // Group today's cleans by cleaner (primary + partner).
+  const byName = new Map();
+  for (const c of cleans) {
+    if (c.deleted || c.status === 'Cancelled') continue;
+    if (c.day !== dayISO) continue;
+    const people = [c.primary, c.partner].filter(Boolean);
+    if (!people.length) continue;
+    for (const p of people) {
+      if (!byName.has(p)) byName.set(p, []);
+      byName.get(p).push(c);
+    }
+  }
+  if (!byName.size) {
+    toast('No assigned cleans for ' + dayLabel, 3000);
+    return;
+  }
+  const drafts = [];
+  for (const [name, rows] of byName.entries()) {
+    rows.sort((a, b) => (a.start || '99').localeCompare(b.start || '99') || (a.property||'').localeCompare(b.property||''));
+    const email = _staffEmail(name);
+    const subject = `Your day — ${dayLabel}`;
+    const textLines = [`Hi ${name},`, '', `Your cleans for ${dayLabel}:`, ''];
+    for (const r of rows) {
+      const prop = r.property || r.name || '—';
+      const t = r.start || '—';
+      const hrs = r.hoursTotal ? ` (${r.hoursTotal}h)` : '';
+      const partner = (r.primary === name) ? r.partner : r.primary;
+      const withWho = partner ? ` with ${partner}` : '';
+      const note = r.notes ? `   · ${r.notes.replace(/\s+/g,' ').slice(0,120)}` : '';
+      textLines.push(`• ${t}  ${prop}${hrs}${withWho}${note}`);
+    }
+    textLines.push('', 'Thanks,', 'Be Here Stays');
+    const bodyHtml = `
+      <p>Hi ${escapeHtml(name)},</p>
+      <p>Your cleans for <strong>${escapeHtml(dayLabel)}</strong>:</p>
+      <table style="border-collapse:collapse;margin:8px 0" cellpadding="6">
+        <thead><tr style="background:#f6f4ee;color:#7b7a71;font-size:11px;text-transform:uppercase">
+          <th align="left">Time</th><th align="left">Property</th><th align="left">Hrs</th><th align="left">With</th><th align="left">Notes</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => {
+            const prop = r.property || r.name || '—';
+            const partner = (r.primary === name) ? r.partner : r.primary;
+            return `<tr style="border-bottom:1px solid #e5e4df">
+              <td><strong>${escapeHtml(r.start||'—')}</strong></td>
+              <td>${escapeHtml(prop)}</td>
+              <td>${r.hoursTotal ? r.hoursTotal+'h' : '—'}</td>
+              <td>${escapeHtml(partner||'')}</td>
+              <td style="color:#646955">${escapeHtml((r.notes||'').replace(/\s+/g,' ').slice(0,120))}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <p>Thanks,<br>Be Here Stays</p>`;
+    drafts.push({ to: email, name, subject, bodyHtml, bodyText: textLines.join('\n') });
+  }
+  WorkDispatch.showPreview({
+    title: `Day sheet — ${dayLabel}`,
+    kind: 'cleaners',
+    drafts,
+  });
+}
 
 /* ═══════════════════════════════════════════════════════════════════
    BOOT

@@ -370,7 +370,7 @@
     <a class="back-btn" href="hub.html">← Hub</a>
     <div class="header-title">Clean Rota</div>
     <button class="header-btn" onclick="refreshAll()" title="Reload from Monday">↻</button>
-    <button class="header-btn" id="saveBtn" onclick="saveToMonday()" title="Save changes to Monday">☁ Save</button>
+    <button class="header-btn" id="saveBtn" onclick="saveButtonClick()" title="Save changes to Monday">☁ Save</button>
     <button class="header-btn" onclick="sendDayToCleaners()" title="Email each cleaner their day sheet">✉ Send day</button>
     <button class="header-btn" onclick="WorkDispatch.showSettings()" title="Webhook settings">⚙</button>
   </div>
@@ -607,6 +607,11 @@
 /* ═══════════════════════════════════════════════════════════════════
    CONFIG
    ═══════════════════════════════════════════════════════════════════ */
+// Bumped alongside sw.js — look for this in devtools to confirm the
+// freshest build is actually running (service workers can be sticky).
+const PLANNER_BUILD = 'rota-planner v50 (board_relation writes removed)';
+console.log(`%c${PLANNER_BUILD}`, 'color:#2c7;font-weight:bold');
+
 const MONDAY_API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
 
 const LODGE_STATUS_BOARD = '1928673949';  // current + next checkin/checkout
@@ -2592,7 +2597,26 @@ let _autosaveTimer  = null;
 let _savingInFlight = false;
 let _saveAgainWanted = false;
 let _lastSaveError  = null;
+let _lastSaveFailures = [];   // [{ ref, reason }] — surfaced on retry-click
 const AUTOSAVE_DELAY_MS = 2500;
+
+// Surface the list of failed rows when the button is in error state, then
+// retry. One click = diagnose + attempt again. Barry doesn't need the
+// dev console to see what's wrong.
+function saveButtonClick() {
+  if (_lastSaveError && _lastSaveFailures.length) {
+    const lines = _lastSaveFailures.slice(0, 12).map(f =>
+      `• ${f.ref}\n   → ${f.reason}`
+    );
+    const extra = _lastSaveFailures.length > 12 ? `\n\n…and ${_lastSaveFailures.length - 12} more.` : '';
+    alert(
+      `${_lastSaveFailures.length} row${_lastSaveFailures.length===1?'':'s'} failed to save:\n\n` +
+      lines.join('\n\n') + extra +
+      '\n\nClicking OK will retry.'
+    );
+  }
+  saveToMonday();
+}
 
 function isDirty() {
   return cleans.some(c => c.dirty || c.new || c.deleted);
@@ -2671,30 +2695,72 @@ function buildColumnValues(c) {
   if (c.linenDate)     cv[CL_LINEN_DATE] = { date: c.linenDate };
   if (c.dirtiesMethod) cv[CL_DIRT_MTHD]  = { label: c.dirtiesMethod };
   if (c.dirtiesDriver) cv[CL_DIRT_DRV]   = { labels: [c.dirtiesDriver] };
-  if (c.linenSource) {
-    const srcId = properties[c.linenSource]?.itemId;
-    if (srcId) cv[CL_LINEN_SRC] = { item_ids: [parseInt(srcId)] };
-  }
+  // NB: CL_LINEN_SRC and CL_PROP are both board_relation columns whose
+  // connected-board settings don't match where rota-planner sources its
+  // property metadata (planner reads board 5094466278 "Property Config",
+  // but CL_PROP links to board 5095127707 "Properties", and CL_LINEN_SRC
+  // has no connected board configured). Writing wrong item_ids makes
+  // Monday reject the ENTIRE mutation with "There are items that are not
+  // in the connected boards" — taking down the whole save. The property
+  // name is already in the item title and staff.html reads it from the
+  // text column, so skipping these writes costs nothing.
   cv[CL_SAMEDAY] = { checked: !!c.sameDay };
   cv[CL_STATUS] = { label: c.status || (c.primary ? 'Planned' : 'Unassigned') };
   if (c.checkType) cv[CL_CHECKTYPE] = { label: c.checkType };
   if (c.notes) cv[CL_NOTES] = c.notes;
-  // Link to property via board_relation (best-effort: if prop has itemId)
-  const pId = properties[c.property]?.itemId;
-  if (pId) cv[CL_PROP] = { item_ids: [parseInt(pId)] };
   return cv;
+}
+
+// Belt-and-braces safety net: Monday's board_relation columns only accept
+// item_ids that live on the column's connected board(s). When a mutation
+// includes a board_relation column that's misconfigured (mismatched board,
+// or no connected board at all), Monday rejects the ENTIRE mutation with
+// "There are items that are not in the connected boards" — even if the
+// offending column is a no-op for us. buildColumnValues already avoids
+// writing board_relation columns, but this strip catches any regression
+// or future caller that forgets. Logs once per offending key so a silent
+// bug can't hide.
+const _blockedKeys = new Set(['board_relation_mm2psy0b', 'board_relation_mm2pke5q']);
+function stripUnsafeColumns(cv) {
+  for (const k of Object.keys(cv)) {
+    if (_blockedKeys.has(k)) {
+      console.warn(`stripUnsafeColumns: removed ${k} from save payload`);
+      delete cv[k];
+    }
+  }
+  return cv;
+}
+
+// Tiny helper: run a Monday mutation with one retry on transient errors.
+// Monday's API returns 500 / "Internal server error" relatively often during
+// bursts, especially when create_labels_if_missing has to reconcile new
+// dropdown values. A single retry after a short pause clears almost all of
+// these. Anything else bubbles up to the caller.
+async function mondayFetchWithRetry(q) {
+  try {
+    return await mondayFetch(q);
+  } catch (e) {
+    const msg = (e.message || '').toLowerCase();
+    const transient = msg.includes('internal server') || msg.includes('500') || msg.includes('timeout') || msg.includes('rate');
+    if (!transient) throw e;
+    await new Promise(r => setTimeout(r, 1200));
+    return await mondayFetch(q);
+  }
 }
 
 async function saveToMonday(opts = {}) {
   const silent = !!opts.silent;
 
-  // Manual click after an autosave failure clears the error and retries.
-  if (!silent) _lastSaveError = null;
+  // Clear the error state at entry — it'll be re-set if this attempt also
+  // fails. This means a successful save (even a silent one) always wipes
+  // the red "retry" indicator.
+  _lastSaveError = null;
 
   // Re-entrancy: if a save is in progress, mark that another pass is wanted
   // and bail out — the in-flight save will re-trigger on completion.
   if (_savingInFlight) {
     _saveAgainWanted = true;
+    if (!silent) toast('Save already in progress…', 1500);
     return;
   }
 
@@ -2711,55 +2777,94 @@ async function saveToMonday(opts = {}) {
   _saveAgainWanted = false;
   if (!silent) setLoading(true);
   const btn = document.getElementById('saveBtn');
-  btn.classList.add('saving');
-  btn.textContent = '☁ Saving…';
+  if (btn) {
+    btn.classList.add('saving');
+    btn.textContent = '☁ Saving…';
+  }
 
+  // Throttle between mutations so Monday doesn't rate-limit or 500 mid-batch.
+  // At 150ms we're well under their 5000/min allowance even if the whole
+  // rota is dirty.
+  const GAP_MS = 150;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  let ok = 0;
+  const failed = [];   // { ref, reason }
+
+  // Wrap the whole body in try/finally so _savingInFlight ALWAYS resets,
+  // even if render()/persistLocal() throws at the end. Without this a single
+  // crash leaves the flag stuck and all future clicks silently bail at the
+  // re-entrancy guard.
   try {
     // Create
     for (const c of toCreate) {
-      const cv = buildColumnValues(c);
-      const cvStr = JSON.stringify(JSON.stringify(cv));
-      const itemName = `${c.property} — ${c.day}`;
-      const q = `mutation { create_item(board_id:${CLEANS_BOARD}, item_name:${JSON.stringify(itemName)}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
-      const r = await mondayFetch(q);
-      c.mondayId = r.create_item.id;
-      c.new = false; c.dirty = false;
+      try {
+        const cv = stripUnsafeColumns(buildColumnValues(c));
+        const cvStr = JSON.stringify(JSON.stringify(cv));
+        const itemName = `${c.property} — ${c.day}`;
+        const q = `mutation { create_item(board_id:${CLEANS_BOARD}, item_name:${JSON.stringify(itemName)}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
+        const r = await mondayFetchWithRetry(q);
+        c.mondayId = r.create_item.id;
+        c.new = false; c.dirty = false;
+        ok++;
+      } catch (e) {
+        console.error('create failed', c, e);
+        failed.push({ ref: `${c.property} ${c.day}`, reason: e.message });
+      }
+      await sleep(GAP_MS);
     }
     // Update
     for (const c of toUpdate) {
-      const cv = buildColumnValues(c);
-      const cvStr = JSON.stringify(JSON.stringify(cv));
-      const q = `mutation { change_multiple_column_values(board_id:${CLEANS_BOARD}, item_id:${c.mondayId}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
-      await mondayFetch(q);
-      c.dirty = false;
+      try {
+        const cv = stripUnsafeColumns(buildColumnValues(c));
+        const cvStr = JSON.stringify(JSON.stringify(cv));
+        const q = `mutation { change_multiple_column_values(board_id:${CLEANS_BOARD}, item_id:${c.mondayId}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
+        await mondayFetchWithRetry(q);
+        c.dirty = false;
+        ok++;
+      } catch (e) {
+        console.error('update failed', c, e);
+        failed.push({ ref: `${c.property} ${c.day}`, reason: e.message });
+      }
+      await sleep(GAP_MS);
     }
     // Delete
     for (const c of toDelete) {
-      await mondayFetch(`mutation { delete_item(item_id:${c.mondayId}) { id } }`);
+      try {
+        await mondayFetchWithRetry(`mutation { delete_item(item_id:${c.mondayId}) { id } }`);
+        ok++;
+      } catch (e) {
+        console.error('delete failed', c, e);
+        failed.push({ ref: `${c.property} ${c.day}`, reason: e.message });
+      }
+      await sleep(GAP_MS);
     }
-    cleans = cleans.filter(c => !(c.deleted && c.mondayId));
-    _lastSaveError = null;
-    persistLocal();
-    render();
-    if (!silent) {
-      const n = toCreate.length + toUpdate.length + toDelete.length;
-      toast(`Saved ${n} change${n===1?'':'s'}`);
-    }
-  } catch (e) {
-    console.error(e);
-    _lastSaveError = e.message || 'unknown error';
-    // Leave .dirty/.new/.deleted flags intact so the next edit (or manual
-    // retry) tries again. Don't toast on silent failures — the red button
-    // state is the indicator.
-    if (!silent) toast('Save failed: ' + e.message, 4000);
-  }
-  btn.classList.remove('saving');
-  if (!silent) setLoading(false);
-  _savingInFlight = false;
-  updateSaveBtn();
 
-  // If new edits landed during the save, run again.
-  if (_saveAgainWanted && isDirty() && !_lastSaveError) {
+    cleans = cleans.filter(c => !(c.deleted && c.mondayId && !c.dirty));
+
+    if (failed.length) {
+      _lastSaveError = `${failed.length} row${failed.length===1?'':'s'} failed`;
+      _lastSaveFailures = failed;
+      if (!silent) toast(`Saved ${ok}, ${failed.length} failed — click ☁ Save (retry) for details`, 6000);
+      console.warn('Rota save: failed rows', failed);
+    } else {
+      _lastSaveError = null;
+      _lastSaveFailures = [];
+      if (!silent && ok) toast(`Saved ${ok} change${ok===1?'':'s'}`);
+    }
+
+    try { persistLocal(); } catch (e) { console.error('persistLocal threw', e); }
+    try { render();       } catch (e) { console.error('render threw', e); }
+  } finally {
+    if (btn) btn.classList.remove('saving');
+    if (!silent) setLoading(false);
+    _savingInFlight = false;
+    try { updateSaveBtn(); } catch (e) { console.error('updateSaveBtn threw', e); }
+  }
+
+  // If new edits landed during the save — or the save partly failed and
+  // there's still dirty work — run again after the normal debounce.
+  if ((_saveAgainWanted || isDirty()) && !_lastSaveError) {
     scheduleAutoSave();
   }
 }

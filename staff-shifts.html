@@ -49,6 +49,8 @@
   .role-chips{display:flex;gap:6px;flex-wrap:wrap}
   .role-chip{background:#fff;border:1px solid var(--line);padding:4px 10px;border-radius:999px;font-size:12px;cursor:pointer;color:var(--dark)}
   .role-chip.on{background:var(--sage);color:#fff;border-color:var(--sage)}
+  .zero-toggle{display:flex;align-items:center;gap:6px;font-size:12px;color:var(--dark);background:#fff;border:1px solid var(--line);padding:4px 10px;border-radius:999px;cursor:pointer;user-select:none}
+  .zero-toggle input{margin:0;cursor:pointer}
   .status-bar{margin-left:auto;font-size:12px;color:var(--muted)}
   .status-bar .sync{color:var(--sage);font-weight:700}
   .status-bar .err{color:#a9434a;font-weight:700}
@@ -156,6 +158,9 @@
     </div>
     <div class="week-label" id="weekLabel">—</div>
     <div class="role-chips" id="roleChips"></div>
+    <label class="zero-toggle" title="Hide staff with no rostered hours this week">
+      <input type="checkbox" id="hideZeroToggle"> Hide 0h staff
+    </label>
     <div class="status-bar" id="statusBar">Loading…</div>
   </div>
 
@@ -288,13 +293,30 @@ const ROLE_ORDER = ['Housekeeper','A Team','Checker','Van driver','Manager','Own
 const BLOCK_ROLES = ['Off','Leave','Sick'];   // lines that block out a day
 
 /* ========== State ========== */
+const STORE_KEY_SS = 'be-here-staff-shifts-prefs';
 let weekStart = mondayOf(todayDate());
 let roleFilter = 'All';
+let hideZero = false;
 let staff = [];
 let shifts = [];        // {id, staffId, date, role, start, end, hours, rate, notes, dirty}
 let editingShiftId = null;
 let editingStaffId = null;
 let editingDate = null;
+
+function persistPrefs(){
+  try{
+    localStorage.setItem(STORE_KEY_SS, JSON.stringify({ roleFilter, hideZero }));
+  }catch(e){}
+}
+function restorePrefs(){
+  try{
+    const raw = localStorage.getItem(STORE_KEY_SS);
+    if(!raw) return;
+    const p = JSON.parse(raw);
+    if(typeof p.roleFilter === 'string') roleFilter = p.roleFilter;
+    if(typeof p.hideZero === 'boolean') hideZero = p.hideZero;
+  }catch(e){}
+}
 
 /* ========== Helpers ========== */
 function todayDate(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
@@ -471,7 +493,7 @@ function renderRoleChips(){
     `<span class="role-chip ${r===roleFilter?'on':''}" data-role="${r}">${r}</span>`
   ).join('');
   el.querySelectorAll('.role-chip').forEach(c => c.addEventListener('click', () => {
-    roleFilter = c.dataset.role; renderMatrix(); renderRoleChips();
+    roleFilter = c.dataset.role; persistPrefs(); renderMatrix(); renderRoleChips();
   }));
 }
 
@@ -491,7 +513,9 @@ function renderMatrix(){
   }
   html += `</div>`;
 
-  const list = filteredStaff();
+  const roleMatched = filteredStaff();
+  const list = hideZero ? roleMatched.filter(s => weekHours(s.id) > 0) : roleMatched;
+  const hiddenByZero = roleMatched.length - list.length;
   for(const s of list){
     const wh = weekHours(s.id);
     const ctr = s.contractHrs || 0;
@@ -520,7 +544,13 @@ function renderMatrix(){
     html += `</div>`;
   }
   if(list.length === 0){
-    html += `<div style="grid-column:1/-1;padding:20px;text-align:center;color:var(--muted)">No staff match this filter.</div>`;
+    if(hideZero && roleMatched.length > 0){
+      html += `<div style="grid-column:1/-1;padding:20px;text-align:center;color:var(--muted)">No staff have rostered hours this week. Turn off <b>Hide 0h staff</b> to see everyone.</div>`;
+    }else{
+      html += `<div style="grid-column:1/-1;padding:20px;text-align:center;color:var(--muted)">No staff match this filter.</div>`;
+    }
+  }else if(hiddenByZero > 0){
+    html += `<div style="grid-column:1/-1;padding:6px 10px;font-size:11px;color:var(--muted);text-align:right">${hiddenByZero} staff with 0h hidden</div>`;
   }
   el.innerHTML = html;
 
@@ -795,6 +825,11 @@ document.getElementById('navPrev').addEventListener('click', () => { weekStart =
 document.getElementById('navNext').addEventListener('click', () => { weekStart = addDays(weekStart, 7); renderMatrix(); });
 document.getElementById('navToday').addEventListener('click', () => { weekStart = mondayOf(todayDate()); renderMatrix(); });
 document.getElementById('refreshBtn').addEventListener('click', refresh);
+document.getElementById('hideZeroToggle').addEventListener('change', e => {
+  hideZero = !!e.target.checked;
+  persistPrefs();
+  renderMatrix();
+});
 document.getElementById('copyWeekBtn').addEventListener('click', copyWeek);
 document.getElementById('copyPrevBtn').addEventListener('click', copyFromPrevWeek);
 document.getElementById('cloneCancel').addEventListener('click', closeCloneModal);
@@ -844,6 +879,10 @@ document.getElementById('pinInput').addEventListener('input', e => {
 document.getElementById('pinInput').addEventListener('keydown', e => {
   if(e.key === 'Enter' && e.target.value.length > 0) tryPin(e.target.value);
 });
+
+// Load saved prefs (roleFilter + hideZero) before first render
+restorePrefs();
+document.getElementById('hideZeroToggle').checked = hideZero;
 
 // Auto-unlock if already authed this session
 if(sessionStorage.getItem('bh-mgmt') === '1'){

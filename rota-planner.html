@@ -260,6 +260,26 @@
     .cc-badge.n { background: var(--gold); color: #fff; }
     .cc-badge.qc { background: #6b4a9a; color: #fff; }          /* Quality Check (checker pill) */
     .cc-badge.gr { background: #3a6a2a; color: #fff; }          /* Guest Ready */
+    /* Review flags set by the Guesty watcher scenarios. Click card to eyeball & clear. */
+    .cc-badge.rf { letter-spacing: .3px; }
+    .cc-badge.rf.rf-cancelled { background: #bb3354; color: #fff; }
+    .cc-badge.rf.rf-earlier   { background: #fdab3d; color: #1a1a1a; }
+    .cc-badge.rf.rf-later     { background: #579bfc; color: #fff; }
+    .cc-badge.rf.rf-lastmin   { background: #9d50dd; color: #fff; }
+    .clean-card.rf-cancelled  { border-left-color: #bb3354 !important; box-shadow: inset 3px 0 0 #bb3354, 0 0 0 1px rgba(187,51,84,.25); background: repeating-linear-gradient(45deg, #fff 0 8px, #fbe8ec 8px 16px); }
+    .clean-card.rf-earlier    { border-left-color: #fdab3d !important; box-shadow: inset 3px 0 0 #fdab3d; }
+    .clean-card.rf-later      { border-left-color: #579bfc !important; box-shadow: inset 3px 0 0 #579bfc; }
+    .clean-card.rf-lastmin    { border-left-color: #9d50dd !important; box-shadow: inset 3px 0 0 #9d50dd; }
+    /* Banner shown at top of clean modal when Review flag is set */
+    .cm-review-banner { border-radius: 8px; padding: 10px 12px; margin-bottom: 10px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+    .cm-review-banner.rf-cancelled { background: #fbe8ec; border: 1px solid #bb3354; }
+    .cm-review-banner.rf-earlier   { background: #fff4e0; border: 1px solid #fdab3d; }
+    .cm-review-banner.rf-later     { background: #e8f1fe; border: 1px solid #579bfc; }
+    .cm-review-banner.rf-lastmin   { background: #f4e8fb; border: 1px solid #9d50dd; }
+    .cm-review-flag  { font-weight: 700; font-size: 13px; }
+    .cm-review-note  { flex: 1 1 100%; font-size: 12px; color: #333; }
+    .cm-review-actions { display: flex; gap: 6px; margin-left: auto; }
+    .cm-review-actions .modal-btn { padding: 4px 10px; font-size: 12px; }
     /* Subtle green accent on Guest Ready cards so they're easy to spot */
     .clean-card.gr { box-shadow: inset 3px 0 0 #3a6a2a; }
     .lg-mini.gr    { border-left-color: #3a6a2a !important; }
@@ -358,13 +378,17 @@
       <span>Hide planned</span>
       <div class="toggle-wrap"><input type="checkbox" id="hidePlannedToggle" onchange="render()"><span class="toggle-slider"></span></div>
     </label>
-    <label class="ctrl">
-      <span>Local cleaners</span>
+    <label class="ctrl" title="Show properties managed by a local cleaner (HK don't clean these). Turn OFF to hide them from the planner.">
+      <span>Local properties</span>
       <div class="toggle-wrap"><input type="checkbox" id="showLocalToggle" checked onchange="render()"><span class="toggle-slider"></span></div>
     </label>
-    <label class="ctrl">
-      <span>Early window</span>
+    <label class="ctrl" title="Show cleans (and unplanned slots) flagged as Early — done on a day before the next guest's check-in. Turn OFF to only see same-day / check-in-day cleans.">
+      <span>Early cleans</span>
       <div class="toggle-wrap"><input type="checkbox" id="showEarlyToggle" checked onchange="render()"><span class="toggle-slider"></span></div>
+    </label>
+    <label class="ctrl" id="hideZeroWrap" style="display:none">
+      <span>Hide 0h staff</span>
+      <div class="toggle-wrap"><input type="checkbox" id="hideZeroToggle" onchange="onHideZeroChange()"><span class="toggle-slider"></span></div>
     </label>
     <button class="header-btn" onclick="showBookingModal()">+ Manual booking</button>
     <button class="header-btn" onclick="showManagerModal()">Manage non-managed</button>
@@ -387,6 +411,15 @@
 <div class="modal-overlay" id="cleanModal" onclick="overlayClose(event,'cleanModal')">
   <div class="modal-box">
     <div class="modal-title"><span id="cmTitle">Clean</span><button class="modal-close" onclick="closeModal('cleanModal')">✕</button></div>
+
+    <div id="cmReviewBanner" class="cm-review-banner" style="display:none">
+      <div class="cm-review-flag" id="cmReviewFlag"></div>
+      <div class="cm-review-note" id="cmReviewNote"></div>
+      <div class="cm-review-actions">
+        <button type="button" class="modal-btn secondary" onclick="clearReviewFlag()" id="cmReviewClearBtn">Clear flag</button>
+        <button type="button" class="modal-btn danger"   onclick="deleteClean()" id="cmReviewDeleteBtn">Delete clean</button>
+      </div>
+    </div>
 
     <div class="modal-row">
       <span class="modal-label">Day</span>
@@ -467,7 +500,7 @@
 
     <div class="modal-row">
       <label class="modal-chk"><input type="checkbox" id="cmSameDay"><span>Same-day changeover (T)</span></label>
-      <label class="modal-chk"><input type="checkbox" id="cmEarly"><span>Early (done between stays, before checkout)</span></label>
+      <label class="modal-chk"><input type="checkbox" id="cmEarly"><span>Early (done before the next guest's check-in day)</span></label>
       <label class="modal-chk"><input type="checkbox" id="cmGuestReady"><span>Guest Ready (no quality check needed)</span></label>
       <label class="modal-chk" id="cmOverrideRow" style="display:none"><input type="checkbox" id="cmLocalOverride"><span>We're stepping in (local cleaner can't)</span></label>
     </div>
@@ -602,6 +635,8 @@ const CL_LINEN_DAY  = 'color_mm2pj7e4';
 const CL_STATUS     = 'color_mm2prq2f';
 const CL_NOTES      = 'long_text_mm2pedn3';
 const CL_CHECKTYPE  = 'color_mm2pznw1';   // Guest Ready (idx 1, green) | Quality Check (idx 4, purple)
+const CL_REVIEW     = 'color_mm2q5qzp';   // Review flag (set by booking-watch scenarios)
+const CL_REVIEW_NT  = 'text_mm2qbgrt';    // Review note (breadcrumb from scenario)
 
 // Staff Shifts columns (read-only from here — staff-shifts.html is the editor)
 const SH_STAFF = 'text_mm2p1gqx';   // Staff item id as plain text
@@ -807,7 +842,7 @@ function parsePropertyFromItemName(name) {
 
 async function fetchCleans() {
   // Paginate the Cleans board — it runs well past 500 items in a busy season.
-  const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_EARLIEST}","${CL_CHECKOUT}","${CL_PROP}","${CL_START}","${CL_END}","${CL_HRS}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_LAUNDRY}","${CL_LAUN_DRV}","${CL_LINEN_MTHD}","${CL_LINEN_DRV}","${CL_LINEN_DATE}","${CL_LINEN_SRC}","${CL_DIRT_MTHD}","${CL_DIRT_DRV}","${CL_SAMEDAY}","${CL_STATUS}","${CL_NOTES}","${CL_CHECKTYPE}"]`;
+  const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_EARLIEST}","${CL_CHECKOUT}","${CL_PROP}","${CL_START}","${CL_END}","${CL_HRS}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_LAUNDRY}","${CL_LAUN_DRV}","${CL_LINEN_MTHD}","${CL_LINEN_DRV}","${CL_LINEN_DATE}","${CL_LINEN_SRC}","${CL_DIRT_MTHD}","${CL_DIRT_DRV}","${CL_SAMEDAY}","${CL_STATUS}","${CL_NOTES}","${CL_CHECKTYPE}","${CL_REVIEW}","${CL_REVIEW_NT}"]`;
   let cursor = null;
   let allItems = [];
   do {
@@ -859,6 +894,8 @@ async function fetchCleans() {
     const launDrvLabels = cv[CL_LAUN_DRV]?.text || '';
     const laundry = cv[CL_LAUNDRY]?.text || '';
     const checkType = cv[CL_CHECKTYPE]?.text || '';  // 'Guest Ready' | 'Quality Check' | ''
+    const reviewFlag = cv[CL_REVIEW]?.text || '';    // '' | 'Cancelled — review' | 'Moved earlier' | 'Moved later' | 'Last minute'
+    const reviewNote = pj(cv[CL_REVIEW_NT]?.value) || cv[CL_REVIEW_NT]?.text || '';
 
     // New laundry model (Linen-in + Dirties-out). Fall back to legacy Laundry run for old rows.
     const linenMethod = cv[CL_LINEN_MTHD]?.text || laundry || '';
@@ -898,6 +935,8 @@ async function fetchCleans() {
       notes,
       status,
       checkType,
+      reviewFlag,
+      reviewNote,
       dirty: false,
       new: false,
     });
@@ -1027,6 +1066,9 @@ function render() {
   renderDateStrip();
   const vc = document.getElementById('viewContent');
   vc.className = 'view-' + viewMode;
+  // Hide 0h toggle only matters in staff view
+  const hz = document.getElementById('hideZeroWrap');
+  if (hz) hz.style.display = (viewMode === 'staff') ? '' : 'none';
   if (viewMode === 'day') vc.innerHTML = renderDayView();
   else if (viewMode === 'lodge') vc.innerHTML = renderLodgeView();
   else if (viewMode === 'staff') vc.innerHTML = renderStaffView();
@@ -1037,6 +1079,11 @@ function render() {
 function setView(mode) {
   viewMode = mode;
   document.querySelectorAll('#viewToggle button').forEach(b => b.classList.toggle('active', b.dataset.view === mode));
+  render();
+  persistLocal();
+}
+
+function onHideZeroChange() {
   render();
   persistLocal();
 }
@@ -1124,6 +1171,9 @@ function renderDayView() {
     for (const c of planned) {
       if (hidePlanned && c.primary) continue;
       if (!cleanVisibleForRoleFilter(c)) continue;
+      const prop = properties[c.property];
+      if (prop?.local && !c.localOverride && !showLocal) continue;
+      if (c.early && !showEarly) continue;
       cards.push(renderPlannedCard(c, dayStr));
     }
     for (const d of unplanned) {
@@ -1223,6 +1273,9 @@ function renderLodgeView() {
       for (const c of pc) {
         if (hidePlanned && c.primary) continue;
         if (!cleanVisibleForRoleFilter(c)) continue;
+        const localProp = properties[c.property]?.local && !c.localOverride;
+        if (localProp && !showLocal) continue;
+        if (c.early && !showEarly) continue;
         mines.push(renderLodgeMini(c, false));
       }
       // Unplanned suggestions
@@ -1310,7 +1363,15 @@ function renderStaffView() {
   }
   html += '<div class="lg-hdr">Week</div>';
 
+  const hideZero = !!document.getElementById('hideZeroToggle')?.checked;
+  let shownCount = 0;
   for (const sMember of filtered) {
+    if (hideZero) {
+      // Pre-check: skip any staff with zero assigned hours this week.
+      const pre = hoursForStaffInRange(sMember.name, localStr(days[0]), localStr(days[6]));
+      if (pre === 0) continue;
+    }
+    shownCount++;
     const roleCls = roleKey(sMember.role);
     html += `<div class="lg-prop">
       <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap">${sMember.name}</div>
@@ -1323,9 +1384,18 @@ function renderStaffView() {
       const isPast = day < today;
       const isToday = dayStr === todayStr;
       // Find cleans where this staff is primary, partner, or checker on this day
-      const own = cleans.filter(c => !c.deleted && c.day === dayStr &&
-        (c.primary === sMember.name || c.partner === sMember.name || c.checker === sMember.name) &&
-        cleanVisibleForRoleFilter(c));
+      const showLocal = document.getElementById('showLocalToggle')?.checked ?? true;
+      const showEarly = document.getElementById('showEarlyToggle')?.checked ?? true;
+      const own = cleans.filter(c => {
+        if (c.deleted) return false;
+        if (c.day !== dayStr) return false;
+        if (c.primary !== sMember.name && c.partner !== sMember.name && c.checker !== sMember.name) return false;
+        if (!cleanVisibleForRoleFilter(c)) return false;
+        const localProp = properties[c.property]?.local && !c.localOverride;
+        if (localProp && !showLocal) return false;
+        if (c.early && !showEarly) return false;
+        return true;
+      });
       let dayHrs = 0;
       const mines = own.map(c => {
         const isChecker = (c.checker === sMember.name) && (c.primary !== sMember.name) && (c.partner !== sMember.name);
@@ -1362,7 +1432,11 @@ function renderStaffView() {
     </div>`;
   }
   html += '</div>';
-  if (filtered.length === 0) html += '<div class="day-empty" style="padding:20px">No staff match this filter.</div>';
+  if (filtered.length === 0) {
+    html += '<div class="day-empty" style="padding:20px">No staff match this filter.</div>';
+  } else if (shownCount === 0 && hideZero) {
+    html += '<div class="day-empty" style="padding:20px">No staff have assigned hours this week. Turn off "Hide 0h staff" to see everyone.</div>';
+  }
   return html;
 }
 
@@ -1415,7 +1489,10 @@ function onDropLodgeCell(e, propName, dayStr) {
         const w = dragWindowFor(c);
         toast(`Can only move between ${w.start} and ${w.end}`, 2500);
       } else {
-        c.day = dayStr; enforceTimeRules(c); c.dirty = true; persistLocal(); render();
+        c.day = dayStr;
+        c.sameDay = computeSameDay(c);
+        c.early = computeEarly(c);
+        enforceTimeRules(c); c.dirty = true; persistLocal(); render();
       }
     }
   }
@@ -1455,10 +1532,31 @@ function renderUnplannedCard(d, dayStr) {
   </div>`;
 }
 
+// Review-flag helpers — keep in one place so Cancelled/Moved/Last-minute all look consistent.
+function reviewFlagClass(flag) {
+  if (!flag) return '';
+  if (flag === 'Cancelled — review') return 'cancelled';
+  if (flag === 'Moved earlier') return 'earlier';
+  if (flag === 'Moved later') return 'later';
+  if (flag === 'Last minute') return 'lastmin';
+  return '';
+}
+function reviewFlagBadge(flag, note) {
+  const short = flag === 'Cancelled — review' ? 'CXL'
+              : flag === 'Moved earlier'      ? '◀ Moved'
+              : flag === 'Moved later'        ? 'Moved ▶'
+              : flag === 'Last minute'        ? 'LATE'
+              : flag;
+  const rfCls = reviewFlagClass(flag);
+  const title = note ? `${flag} — ${note}` : flag;
+  return `<span class="cc-badge rf rf-${rfCls}" title="${escapeAttr(title)}">${short}</span>`;
+}
+
 function renderPlannedCard(c, dayStr) {
   const prop = properties[c.property] || {};
   const isLocal = prop.local && !c.localOverride;
   const isGR = c.checkType === 'Guest Ready';
+  const rfCls = reviewFlagClass(c.reviewFlag);
   const cls = [
     'clean-card','planned',
     c.sameDay ? 'same-day' : '',
@@ -1466,9 +1564,11 @@ function renderPlannedCard(c, dayStr) {
     isLocal ? 'local' : '',
     c.localOverride ? 'override' : '',
     isGR ? 'gr' : '',
+    rfCls ? `rf-${rfCls}` : '',
   ].filter(Boolean).join(' ');
 
   const badges = [];
+  if (c.reviewFlag) badges.push(reviewFlagBadge(c.reviewFlag, c.reviewNote));
   if (c.sameDay) badges.push('<span class="cc-badge t">T</span>');
   if (c.early) badges.push('<span class="cc-badge e">Early</span>');
   if (c.localOverride) badges.push('<span class="cc-badge n">Us</span>');
@@ -1697,6 +1797,37 @@ function shiftTime(hhmm, deltaHrs) {
    - On check-in day (checkinDate): finish by 16:00 (hard cap), ideally 15:00.
    - In-between days: no time restriction.
    ═══════════════════════════════════════════════════════════════════ */
+/**
+ * Auto-derive whether this clean is "Early" — i.e., scheduled on a day
+ * EARLIER than the next guest's check-in day. Same-day turnovers are never
+ * flagged early (they're locked to a single date). For planned cleans with a
+ * checkinDate anchor, use that directly. For ad-hoc cleans without an anchor,
+ * fall back to the booking-derived window (next check-in day).
+ */
+function computeEarly(c) {
+  if (!c || !c.day || c.sameDay) return false;
+  if (c.checkinDate) return c.day < c.checkinDate;
+  const d = derivedCleans().find(x => x.property === c.property &&
+    c.day >= x.windowStart && c.day <= (x.windowEnd || x.windowStart));
+  if (d && !d.sameDay && d.nextIn) return c.day < d.nextIn;
+  return false;
+}
+
+/**
+ * Auto-derive same-day turnover from booking data. A booking is same-day
+ * when the current guest checks out on the same day the next guest checks in.
+ * For cleans loaded from Monday this is read from CL_SAMEDAY; we only
+ * recompute when the planner drags or edits the day.
+ */
+function computeSameDay(c) {
+  if (!c || !c.property) return !!c?.sameDay;
+  if (c.checkoutDate && c.checkinDate) return c.checkoutDate === c.checkinDate;
+  const d = derivedCleans().find(x => x.property === c.property &&
+    c.day >= x.windowStart && c.day <= (x.windowEnd || x.windowStart));
+  if (d) return !!d.sameDay;
+  return !!c.sameDay;
+}
+
 function earliestFor(c) {
   // Find the most recent prior clean at the same property whose scheduled day
   // is strictly before this one's check-in. If found and its checkoutDate is
@@ -1784,7 +1915,10 @@ function onDropDay(e, dayStr) {
         const w = dragWindowFor(c);
         toast(`Can only move between ${w.start} and ${w.end}`, 2500);
       } else {
-        c.day = dayStr; enforceTimeRules(c); c.dirty = true; persistLocal(); render();
+        c.day = dayStr;
+        c.sameDay = computeSameDay(c);
+        c.early = computeEarly(c);
+        enforceTimeRules(c); c.dirty = true; persistLocal(); render();
       }
     }
   }
@@ -1880,13 +2014,55 @@ function openCleanModal(id) {
 
   document.getElementById('cmGuestReady').checked = c.checkType === 'Guest Ready';
   updateCheckerRequired();
+
+  // Review-flag banner (Cancelled / Moved earlier / Moved later / Last minute)
+  const banner = document.getElementById('cmReviewBanner');
+  const rfCls = reviewFlagClass(c.reviewFlag);
+  banner.classList.remove('rf-cancelled','rf-earlier','rf-later','rf-lastmin');
+  if (rfCls) {
+    banner.classList.add(`rf-${rfCls}`);
+    banner.style.display = 'flex';
+    document.getElementById('cmReviewFlag').textContent = `⚑ ${c.reviewFlag}`;
+    document.getElementById('cmReviewNote').textContent = c.reviewNote || '';
+  } else {
+    banner.style.display = 'none';
+  }
+
   document.getElementById('cleanModal').classList.add('open');
 }
 
+// Clear the Review flag locally + on Monday — called from the banner "Clear flag" button.
+async function clearReviewFlag() {
+  const c = cleans.find(x => x.id === editingCleanId);
+  if (!c) return;
+  const was = c.reviewFlag;
+  if (!was) { closeModal('cleanModal'); return; }
+  c.reviewFlag = '';
+  c.reviewNote = '';
+  // Hide banner immediately
+  document.getElementById('cmReviewBanner').style.display = 'none';
+  // Write-through to Monday if this is a live item. No-op for local-only cleans.
+  if (c.mondayId) {
+    try {
+      const itemId = c.mondayId;
+      // Clear a status column by posting {} as column_values for that column.
+      const cv = JSON.stringify({ [CL_REVIEW]: {}, [CL_REVIEW_NT]: '' });
+      await mondayFetch(`mutation{ change_multiple_column_values(board_id:${CLEANS_BOARD}, item_id:${itemId}, column_values:${JSON.stringify(cv)}){ id } }`);
+    } catch (e) {
+      console.error('clearReviewFlag failed', e);
+      alert('Could not clear flag on Monday — refresh and try again.');
+      // Restore so the user knows it didn't stick.
+      c.reviewFlag = was;
+    }
+  }
+  render();
+}
+
 /**
- * Update Checker field label/required state based on Guest Ready toggle.
- * Guest Ready ticked  → "Checker (not required)" — field hidden.
- * Guest Ready unticked → Quality Check → Checker REQUIRED — field visible with red asterisk.
+ * Update Checker field label based on Guest Ready toggle.
+ * Guest Ready ticked   → field hidden (no checker needed).
+ * Guest Ready unticked → Quality Check → field visible. Checker is
+ *   recommended but NOT required — planner can leave blank and assign later.
  */
 function updateCheckerRequired() {
   const guestReady = document.getElementById('cmGuestReady')?.checked;
@@ -1900,9 +2076,9 @@ function updateCheckerRequired() {
     label.textContent = 'Checker';
   } else {
     row.style.display = '';
-    label.textContent = 'Checker (required)';
-    row.classList.add('cm-required');
-    row.classList.toggle('cm-warn', !sel.value);
+    label.textContent = sel.value ? 'Checker' : 'Checker (assign later if unknown)';
+    row.classList.remove('cm-required');
+    row.classList.remove('cm-warn');
   }
 }
 
@@ -1936,12 +2112,11 @@ function saveClean() {
   const guestReady = document.getElementById('cmGuestReady').checked;
   const checker = document.getElementById('cmChecker').value;
 
-  // Rule: Quality Check cleans MUST have a checker assigned. Block save.
+  // Quality Check cleans usually need a checker, but the checker is often
+  // only known later in the week — don't block. Flash a gentle reminder the
+  // first time through so the planner remembers to circle back.
   if (!guestReady && !checker) {
-    toast('Quality Check cleans need a checker assigned.', 3200);
-    const row = document.getElementById('cmCheckerRow');
-    if (row) { row.classList.add('cm-warn'); row.scrollIntoView({block:'center', behavior:'smooth'}); }
-    return;
+    toast('Heads up — no checker on this Quality Check clean yet.', 2400);
   }
 
   c.day = document.getElementById('cmDay').value;
@@ -1967,8 +2142,18 @@ function saveClean() {
   c.laundry = '';
   c.laundryDriver = '';
 
-  c.sameDay = document.getElementById('cmSameDay').checked;
-  c.early = document.getElementById('cmEarly').checked;
+  // Same-day is derived from the booking (can't usefully be toggled), but we
+  // respect a manual override if the planner ticked/unticked it in the modal.
+  const sameDayUi = document.getElementById('cmSameDay').checked;
+  const autoSameDay = computeSameDay(c);
+  c.sameDay = (sameDayUi !== (!!c.sameDay)) ? sameDayUi : autoSameDay;
+
+  // Early is auto-derived from day vs check-in, but again manual override wins
+  // if the planner explicitly toggled it this session.
+  const earlyUi = document.getElementById('cmEarly').checked;
+  const autoEarly = computeEarly(c);
+  c.early = (earlyUi !== (!!c.early)) ? earlyUi : autoEarly;
+
   c.localOverride = document.getElementById('cmLocalOverride').checked;
   c.notes = document.getElementById('cmNotes').value.trim();
   c.checkType = guestReady ? 'Guest Ready' : 'Quality Check';
@@ -1988,6 +2173,16 @@ document.addEventListener('change', e => {
     document.getElementById('cmDirtiesDrvWrap').style.display = (e.target.value && e.target.value !== 'Laundry van') ? 'block' : 'none';
   } else if (e.target.id === 'cmGuestReady' || e.target.id === 'cmChecker') {
     updateCheckerRequired();
+  } else if (e.target.id === 'cmDay') {
+    // Day changed — reflect auto-derived same-day / early in the checkboxes so
+    // the planner sees the flags update live. Preserve the clean's day until
+    // save, though, so we build a lightweight probe object.
+    const c = cleans.find(x => x.id === editingCleanId);
+    if (c) {
+      const probe = { ...c, day: e.target.value };
+      document.getElementById('cmSameDay').checked = computeSameDay(probe);
+      document.getElementById('cmEarly').checked = computeEarly(probe);
+    }
   }
 });
 
@@ -2211,6 +2406,7 @@ function persistLocal() {
     viewStart: localStr(viewStart),
     viewMode,
     roleFilter,
+    hideZero: !!document.getElementById('hideZeroToggle')?.checked,
   }));
 }
 function restoreLocal() {
@@ -2220,6 +2416,10 @@ function restoreLocal() {
     if (raw.viewStart) { viewStart = new Date(raw.viewStart + 'T12:00'); viewStart.setHours(0,0,0,0); }
     if (raw.viewMode) viewMode = raw.viewMode;
     if (raw.roleFilter) roleFilter = raw.roleFilter;
+    if (raw.hideZero) {
+      const hz = document.getElementById('hideZeroToggle');
+      if (hz) hz.checked = true;
+    }
     // Reflect persisted view mode in toggle buttons
     const btn = document.querySelector(`#viewToggle button[data-view="${viewMode}"]`);
     if (btn) { document.querySelectorAll('#viewToggle button').forEach(b => b.classList.remove('active')); btn.classList.add('active'); }

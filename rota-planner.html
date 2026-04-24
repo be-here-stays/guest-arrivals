@@ -382,11 +382,11 @@
       <span>Local properties</span>
       <div class="toggle-wrap"><input type="checkbox" id="showLocalToggle" checked onchange="render()"><span class="toggle-slider"></span></div>
     </label>
-    <label class="ctrl" title="Show cleans (and unplanned slots) flagged as Early — done on a day before the next guest's check-in. Turn OFF to only see same-day / check-in-day cleans.">
-      <span>Early cleans</span>
-      <div class="toggle-wrap"><input type="checkbox" id="showEarlyToggle" checked onchange="render()"><span class="toggle-slider"></span></div>
+    <label class="ctrl" title="Turn ON to show ONLY cleans flagged as Early (done on a day before the next guest's check-in) so you can redeploy that capacity to urgent work. Turn OFF to see everything.">
+      <span>Early only</span>
+      <div class="toggle-wrap"><input type="checkbox" id="showEarlyToggle" onchange="render()"><span class="toggle-slider"></span></div>
     </label>
-    <label class="ctrl" id="hideZeroWrap" style="display:none">
+    <label class="ctrl" id="hideZeroWrap" title="Hide housekeepers with no rostered hours this week (from the staff panel on the right and the staff-view matrix).">
       <span>Hide 0h staff</span>
       <div class="toggle-wrap"><input type="checkbox" id="hideZeroToggle" onchange="onHideZeroChange()"><span class="toggle-slider"></span></div>
     </label>
@@ -1066,9 +1066,10 @@ function render() {
   renderDateStrip();
   const vc = document.getElementById('viewContent');
   vc.className = 'view-' + viewMode;
-  // Hide 0h toggle only matters in staff view
+  // Hide 0h toggle applies to the right-side staff panel in every view, plus
+  // the staff-view matrix — keep it visible at all times.
   const hz = document.getElementById('hideZeroWrap');
-  if (hz) hz.style.display = (viewMode === 'staff') ? '' : 'none';
+  if (hz) hz.style.display = '';
   if (viewMode === 'day') vc.innerHTML = renderDayView();
   else if (viewMode === 'lodge') vc.innerHTML = renderLodgeView();
   else if (viewMode === 'staff') vc.innerHTML = renderStaffView();
@@ -1142,7 +1143,7 @@ function renderDayView() {
   const todayStr = localStr(today);
   const hidePlanned = document.getElementById('hidePlannedToggle')?.checked;
   const showLocal = document.getElementById('showLocalToggle')?.checked ?? true;
-  const showEarly = document.getElementById('showEarlyToggle')?.checked ?? true;
+  const earlyOnly = !!document.getElementById('showEarlyToggle')?.checked;
 
   const days = visibleDays();
   const derived = derivedCleans();
@@ -1161,9 +1162,10 @@ function renderDayView() {
 
     const unplanned = derived.filter(d => {
       if (findPlannedClean(d)) return false;
-      if (d.windowStart === dayStr) return true;
-      if (showEarly && dayStr > d.windowStart && dayStr <= d.windowEnd && !d.sameDay) return true;
-      return false;
+      const isEarlyCard = dayStr > d.windowStart && dayStr <= d.windowEnd && !d.sameDay;
+      const isDefaultCard = d.windowStart === dayStr;
+      if (earlyOnly) return isEarlyCard;
+      return isDefaultCard || isEarlyCard;
     });
 
     const planned = (plannedByDay[dayStr] || []);
@@ -1173,7 +1175,7 @@ function renderDayView() {
       if (!cleanVisibleForRoleFilter(c)) continue;
       const prop = properties[c.property];
       if (prop?.local && !c.localOverride && !showLocal) continue;
-      if (c.early && !showEarly) continue;
+      if (earlyOnly && !c.early) continue;
       cards.push(renderPlannedCard(c, dayStr));
     }
     for (const d of unplanned) {
@@ -1214,7 +1216,7 @@ function renderLodgeView() {
   const todayStr = localStr(today);
   const hidePlanned = document.getElementById('hidePlannedToggle')?.checked;
   const showLocal = document.getElementById('showLocalToggle')?.checked ?? true;
-  const showEarly = document.getElementById('showEarlyToggle')?.checked ?? true;
+  const earlyOnly = !!document.getElementById('showEarlyToggle')?.checked;
   const days = visibleDays();
 
   const derived = derivedCleans();
@@ -1275,13 +1277,19 @@ function renderLodgeView() {
         if (!cleanVisibleForRoleFilter(c)) continue;
         const localProp = properties[c.property]?.local && !c.localOverride;
         if (localProp && !showLocal) continue;
-        if (c.early && !showEarly) continue;
+        if (earlyOnly && !c.early) continue;
         mines.push(renderLodgeMini(c, false));
       }
       // Unplanned suggestions
-      const dc = derived.filter(d => d.property === propName &&
-        (d.windowStart === dayStr || (showEarly && dayStr > d.windowStart && dayStr <= d.windowEnd && !d.sameDay)) &&
-        !findPlannedClean(d) && derivedVisibleForRoleFilter(d));
+      const dc = derived.filter(d => {
+        if (d.property !== propName) return false;
+        if (findPlannedClean(d)) return false;
+        if (!derivedVisibleForRoleFilter(d)) return false;
+        const isEarlyCard = dayStr > d.windowStart && dayStr <= d.windowEnd && !d.sameDay;
+        const isDefaultCard = d.windowStart === dayStr;
+        if (earlyOnly) return isEarlyCard;
+        return isDefaultCard || isEarlyCard;
+      });
       for (const d of dc) mines.push(renderLodgeMiniDerived(d, dayStr));
 
       html += `<div class="lg-cell ${isPast?'past':''} ${isToday?'today':''}" data-day="${dayStr}" data-prop="${escapeAttr(propName)}"
@@ -1385,7 +1393,7 @@ function renderStaffView() {
       const isToday = dayStr === todayStr;
       // Find cleans where this staff is primary, partner, or checker on this day
       const showLocal = document.getElementById('showLocalToggle')?.checked ?? true;
-      const showEarly = document.getElementById('showEarlyToggle')?.checked ?? true;
+      const earlyOnly = !!document.getElementById('showEarlyToggle')?.checked;
       const own = cleans.filter(c => {
         if (c.deleted) return false;
         if (c.day !== dayStr) return false;
@@ -1393,7 +1401,7 @@ function renderStaffView() {
         if (!cleanVisibleForRoleFilter(c)) return false;
         const localProp = properties[c.property]?.local && !c.localOverride;
         if (localProp && !showLocal) return false;
-        if (c.early && !showEarly) return false;
+        if (earlyOnly && !c.early) return false;
         return true;
       });
       let dayHrs = 0;
@@ -1716,7 +1724,11 @@ function renderStaffPanel() {
   ).join('');
 
   const list = document.getElementById('staffList');
-  const filtered = filteredStaff();
+  const hideZero = !!document.getElementById('hideZeroToggle')?.checked;
+  const filteredAll = filteredStaff();
+  const filtered = hideZero
+    ? filteredAll.filter(s => weekHoursForStaff(s.name) > 0)
+    : filteredAll;
   const chips = filtered.map(s => {
     const avail = isStaffAvailable(s);
     const hrs = weekHoursForStaff(s.name);

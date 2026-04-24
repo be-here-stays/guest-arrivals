@@ -453,6 +453,11 @@
       <div id="cmPrimaryHoursHint" style="font-size:11px;color:var(--muted);margin-top:4px"></div>
     </div>
 
+    <div class="modal-row" id="cmPartnerStartRow" style="display:none">
+      <span class="modal-label">Partner start <span style="font-size:10px;color:var(--muted);font-weight:400">(leave blank to match primary)</span></span>
+      <input type="time" class="modal-input" id="cmPartnerStart" placeholder="HH:MM">
+    </div>
+
     <div class="modal-row" id="cmCheckerRow">
       <span class="modal-label" id="cmCheckerLabel">Checker</span>
       <select class="modal-select" id="cmChecker"><option value="">—</option></select>
@@ -947,6 +952,7 @@ async function fetchCleans() {
       reviewFlag,
       reviewNote,
       partnerHours: null,   // explicit partner-cleaner split; null means 50/50
+      partnerStart: null,   // explicit partner start time; null means match primary
       dirty: false,
       new: false,
     });
@@ -1082,11 +1088,32 @@ function render() {
   // it lives or dies based on whether day < check-in day.
   for (const c of cleans) {
     if (c.deleted) continue;
+    // Back-fill checkoutDate from Lodge Status when Monday's CL_CHECKOUT was
+    // blank — without this the same-day detector falls through and T-badge
+    // never fires. Drag logic already relies on this data, so keeping it all
+    // in sync avoids silent divergence.
+    if (!c.checkoutDate && c.property) {
+      const norm = s => String(s || '').toLowerCase().replace(/[\s'`"']/g, '');
+      const cNorm = norm(c.property);
+      const all = derivedCleans();
+      const d = all.find(x => x.property === c.property &&
+        c.day >= x.windowStart && c.day <= (x.windowEnd || x.windowStart))
+        || all.find(x => norm(x.property) === cNorm &&
+        c.day >= x.windowStart && c.day <= (x.windowEnd || x.windowStart));
+      if (d && d.checkout) c.checkoutDate = d.checkout;
+    }
     const autoSame = computeSameDay(c);
     const autoEarly = computeEarly({ ...c, sameDay: autoSame });
     if (c.sameDay !== autoSame || c.early !== autoEarly) {
       c.sameDay = autoSame;
       c.early = autoEarly;
+    }
+    // Start-time clamp: cleans on days with a guest checkout can't begin
+    // before 10:00. Fix loaded cleans that were stored with 09:00 from the
+    // old default, so the planner sees realistic times without a drag.
+    if (c.start && hasCheckoutOn(c)) {
+      const [sh, sm] = c.start.split(':').map(Number);
+      if (sh*60 + (sm||0) < 10*60) c.start = '10:00';
     }
   }
   renderDateStrip();
@@ -1501,7 +1528,7 @@ function onDropLodgeCell(e, propName, dayStr) {
         c = {
           id: uid(), mondayId: null, property: propName, day: dayStr,
           hoursTotal: prop.stdHrs || 1.5,
-          primary: '', partner: '', partnerHours: null,
+          primary: '', partner: '', partnerHours: null, partnerStart: null,
           sameDay: false, early: false,
           localOverride: !!prop.local, notes: '', status: 'Planned',
           dirty: true, new: true,
@@ -1613,7 +1640,15 @@ function renderPlannedCard(c, dayStr) {
   if (isGR) badges.push('<span class="cc-badge gr" title="Guest Ready — no quality check needed">GR</span>');
 
   const meta = [];
-  if (c.start) meta.push(c.start);
+  if (c.start) {
+    if (c.partner) {
+      const ps = partnerStartOf(c);
+      // Show both times explicitly when they diverge (e.g. 10:00/11:00).
+      meta.push(ps && ps !== c.start ? `${c.start}/${ps}` : c.start);
+    } else {
+      meta.push(c.start);
+    }
+  }
   if (c.hoursTotal) {
     if (c.partner) {
       const ph = partnerHoursOf(c);
@@ -1810,6 +1845,7 @@ function planNewClean(key, dayStr) {
     primary: '',
     partner: '',
     partnerHours: null,
+    partnerStart: null,
     checkoutDate: d.checkout || '',
     checkinDate: d.nextIn || '',
     sameDay: !!d.sameDay,
@@ -1873,9 +1909,20 @@ function computeEarly(c) {
 function computeSameDay(c) {
   if (!c || !c.property) return !!c?.sameDay;
   if (c.checkoutDate && c.checkinDate) return c.checkoutDate === c.checkinDate;
-  const d = derivedCleans().find(x => x.property === c.property &&
+  // Property-name fuzzy match: Monday item names sometimes drift (apostrophes,
+  // trailing whitespace) between Lodge Status and Cleans boards.
+  const norm = s => String(s || '').toLowerCase().replace(/[\s'`"']/g, '');
+  const cNorm = norm(c.property);
+  const all = derivedCleans();
+  const d = all.find(x => x.property === c.property &&
+    c.day >= x.windowStart && c.day <= (x.windowEnd || x.windowStart))
+    || all.find(x => norm(x.property) === cNorm &&
     c.day >= x.windowStart && c.day <= (x.windowEnd || x.windowStart));
-  if (d) return !!d.sameDay;
+  if (d) {
+    if (d.sameDay) return true;
+    if (d.todayStatus && /same\s*day/i.test(d.todayStatus)) return true;
+    return false;
+  }
   return !!c.sameDay;
 }
 
@@ -1923,6 +1970,18 @@ function primaryHoursOf(c) {
   const total = +c.hoursTotal || 0;
   if (!c.partner) return total;
   return Math.max(0, total - partnerHoursOf(c));
+}
+
+/**
+ * Per-cleaner start time. Two cleaners don't always start together — e.g.
+ * primary starts at 10:00 when guests check out, partner can arrive at 11:00
+ * to take the second half. c.partnerStart, when set, is the explicit partner
+ * start; otherwise partner matches primary.
+ */
+function partnerStartOf(c) {
+  if (!c || !c.partner) return '';
+  if (c.partnerStart && /^\d{1,2}:\d{2}$/.test(c.partnerStart)) return c.partnerStart;
+  return c.start || '';
 }
 
 function earliestFor(c) {
@@ -1976,6 +2035,11 @@ function enforceTimeRules(c) {
   // lands on the current booking's check-out.
   if (hasCheckoutOn(c) && startMin < 10*60) {
     c.start = '10:00';
+  }
+  // Partner start (if set independently) gets the same 10:00 floor.
+  if (c.partner && c.partnerStart && hasCheckoutOn(c)) {
+    const [ph, pm] = c.partnerStart.split(':').map(Number);
+    if (ph*60 + (pm||0) < 10*60) c.partnerStart = '10:00';
   }
   if (isCheckinDay) {
     // must finish by 16:00
@@ -2091,6 +2155,7 @@ function openCleanModal(id) {
   document.getElementById('cmPartner').value = c.partner || '';
   document.getElementById('cmChecker').value = c.checker || '';
   document.getElementById('cmPartnerHours').value = (c.partnerHours != null && c.partnerHours !== '') ? c.partnerHours : '';
+  document.getElementById('cmPartnerStart').value = c.partnerStart || '';
   updatePartnerHoursRow();
 
   // Linen-in
@@ -2194,10 +2259,11 @@ function updateCheckerRequired() {
  */
 function updatePartnerHoursRow() {
   const partnerSel = document.getElementById('cmPartner');
-  const row = document.getElementById('cmPartnerHoursRow');
-  if (!row) return;
+  const hoursRow = document.getElementById('cmPartnerHoursRow');
+  const startRow = document.getElementById('cmPartnerStartRow');
   const hasPartner = !!(partnerSel && partnerSel.value);
-  row.style.display = hasPartner ? '' : 'none';
+  if (hoursRow) hoursRow.style.display = hasPartner ? '' : 'none';
+  if (startRow) startRow.style.display = hasPartner ? '' : 'none';
   if (hasPartner) updatePrimaryHoursHint();
 }
 
@@ -2270,8 +2336,12 @@ function saveClean() {
   if (c.partner) {
     const raw = document.getElementById('cmPartnerHours').value.trim();
     c.partnerHours = (raw === '' || isNaN(parseFloat(raw))) ? null : parseFloat(raw);
+    // Partner start: blank = match primary; otherwise partner arrives separately.
+    const rawStart = document.getElementById('cmPartnerStart').value.trim();
+    c.partnerStart = (/^\d{1,2}:\d{2}$/.test(rawStart) && rawStart !== c.start) ? rawStart : null;
   } else {
     c.partnerHours = null;
+    c.partnerStart = null;
   }
   c.checker = checker;
 
@@ -2370,7 +2440,7 @@ function saveAddOnDay() {
     property: name,
     day: dayStr,
     hoursTotal: prop.stdHrs || 1.5,
-    primary: '', partner: '', partnerHours: null,
+    primary: '', partner: '', partnerHours: null, partnerStart: null,
     sameDay: document.getElementById('adSameDay').checked,
     early: document.getElementById('adEarly').checked,
     localOverride: !!prop.local,

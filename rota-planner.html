@@ -45,6 +45,8 @@
     .header-title { color: #fff; font-size: 15px; font-weight: 600; flex: 1; }
     .header-btn.saving { background: var(--gold); }
     .header-btn.dirty { background: var(--gold); }
+    .header-btn.save-err { background: #b91c1c; }
+    .header-btn.save-err:hover { background: #dc2626; }
 
     /* ── LOADING BAR ── */
     #loadingBar { display: none; height: 3px; background: linear-gradient(90deg, var(--sage), var(--gold)); animation: loadpulse 1.2s infinite; }
@@ -2575,14 +2577,68 @@ function removeExt(i) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   SAVE TO MONDAY
+   SAVE TO MONDAY  (+ autosave + beforeunload guard)
+   ═══════════════════════════════════════════════════════════════════
+   Autosave fires a silent saveToMonday() ~2.5s after the last edit
+   so you don't have to remember to press ☁ Save. Manual ☁ Save still
+   works for "save now". The beforeunload handler blocks tab-close if
+   there are unsaved changes and the autosave hasn't drained yet.
+   Re-entrancy guard: if an autosave is already in flight, we flag
+   that another pass is needed and re-schedule when the in-flight one
+   completes — so a single long save can't swallow edits made during
+   it.
    ═══════════════════════════════════════════════════════════════════ */
+let _autosaveTimer  = null;
+let _savingInFlight = false;
+let _saveAgainWanted = false;
+let _lastSaveError  = null;
+const AUTOSAVE_DELAY_MS = 2500;
+
+function isDirty() {
+  return cleans.some(c => c.dirty || c.new || c.deleted);
+}
+
 function updateSaveBtn() {
-  const dirty = cleans.some(c => c.dirty || c.new || c.deleted);
   const btn = document.getElementById('saveBtn');
+  if (!btn) return;
+  if (_lastSaveError) {
+    btn.textContent = '☁ Save (retry)';
+    btn.classList.add('save-err');
+    btn.classList.remove('dirty');
+    btn.title = 'Autosave failed: ' + _lastSaveError + ' — click to retry';
+    return;
+  }
+  btn.classList.remove('save-err');
+  btn.title = 'Save changes to Monday';
+  if (_savingInFlight) {
+    btn.textContent = '☁ Saving…';
+    btn.classList.add('dirty');
+    return;
+  }
+  const dirty = isDirty();
   btn.textContent = dirty ? '☁ Save*' : '☁ Saved';
   btn.classList.toggle('dirty', dirty);
 }
+
+function scheduleAutoSave() {
+  if (_autosaveTimer) clearTimeout(_autosaveTimer);
+  _autosaveTimer = setTimeout(() => {
+    _autosaveTimer = null;
+    if (!isDirty()) return;
+    saveToMonday({ silent: true }).catch(()=>{}); // errors handled inside
+  }, AUTOSAVE_DELAY_MS);
+}
+
+// Block tab-close only if there's unsaved work. Browsers show a generic
+// prompt; the returnValue string is a leftover from older specs but still
+// required for Firefox.
+window.addEventListener('beforeunload', e => {
+  if (_savingInFlight || isDirty()) {
+    e.preventDefault();
+    e.returnValue = 'You have unsaved rota changes — stay on the page a moment to let autosave finish.';
+    return e.returnValue;
+  }
+});
 
 function buildColumnValues(c) {
   const cv = {};
@@ -2629,16 +2685,31 @@ function buildColumnValues(c) {
   return cv;
 }
 
-async function saveToMonday() {
+async function saveToMonday(opts = {}) {
+  const silent = !!opts.silent;
+
+  // Manual click after an autosave failure clears the error and retries.
+  if (!silent) _lastSaveError = null;
+
+  // Re-entrancy: if a save is in progress, mark that another pass is wanted
+  // and bail out — the in-flight save will re-trigger on completion.
+  if (_savingInFlight) {
+    _saveAgainWanted = true;
+    return;
+  }
+
   const toCreate = cleans.filter(c => c.new && !c.deleted);
   const toUpdate = cleans.filter(c => !c.new && !c.deleted && c.dirty && c.mondayId);
   const toDelete = cleans.filter(c => c.deleted && c.mondayId);
 
   if (!toCreate.length && !toUpdate.length && !toDelete.length) {
-    toast('Nothing to save'); return;
+    if (!silent) toast('Nothing to save');
+    return;
   }
 
-  setLoading(true);
+  _savingInFlight = true;
+  _saveAgainWanted = false;
+  if (!silent) setLoading(true);
   const btn = document.getElementById('saveBtn');
   btn.classList.add('saving');
   btn.textContent = '☁ Saving…';
@@ -2667,16 +2738,30 @@ async function saveToMonday() {
       await mondayFetch(`mutation { delete_item(item_id:${c.mondayId}) { id } }`);
     }
     cleans = cleans.filter(c => !(c.deleted && c.mondayId));
+    _lastSaveError = null;
     persistLocal();
     render();
-    toast(`Saved ${toCreate.length + toUpdate.length + toDelete.length} change${toCreate.length+toUpdate.length+toDelete.length===1?'':'s'}`);
+    if (!silent) {
+      const n = toCreate.length + toUpdate.length + toDelete.length;
+      toast(`Saved ${n} change${n===1?'':'s'}`);
+    }
   } catch (e) {
     console.error(e);
-    toast('Save failed: ' + e.message, 4000);
+    _lastSaveError = e.message || 'unknown error';
+    // Leave .dirty/.new/.deleted flags intact so the next edit (or manual
+    // retry) tries again. Don't toast on silent failures — the red button
+    // state is the indicator.
+    if (!silent) toast('Save failed: ' + e.message, 4000);
   }
   btn.classList.remove('saving');
-  setLoading(false);
+  if (!silent) setLoading(false);
+  _savingInFlight = false;
   updateSaveBtn();
+
+  // If new edits landed during the save, run again.
+  if (_saveAgainWanted && isDirty() && !_lastSaveError) {
+    scheduleAutoSave();
+  }
 }
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2690,6 +2775,10 @@ function persistLocal() {
     roleFilter,
     hideZero: !!document.getElementById('hideZeroToggle')?.checked,
   }));
+  // Nudge the autosave debounce. No-op if nothing is dirty (saveToMonday
+  // bails out on an empty change set), so view-only persistLocal calls
+  // don't trigger a network round-trip.
+  scheduleAutoSave();
 }
 function restoreLocal() {
   try {
@@ -2797,6 +2886,9 @@ async function boot() {
   restoreLocal();
   render();
   await refreshAll();
+  // If localStorage had dirty rows from before autosave existed (or from a
+  // previous session where the save never completed), drain them to Monday.
+  if (isDirty()) scheduleAutoSave();
 }
 
 // Service worker

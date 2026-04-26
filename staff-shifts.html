@@ -25,7 +25,8 @@
   .hide{display:none!important}
 
   /* ===== Top bar ===== */
-  .top{position:sticky;top:0;z-index:20;background:var(--dark);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .topwrap{position:sticky;top:0;z-index:20;background:var(--dark)}
+  .top{background:var(--dark);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
   .top a.home{color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:6px 10px;border:1px solid rgba(255,255,255,.25);border-radius:8px}
   .top h1{margin:0;font-size:18px;font-weight:700;letter-spacing:.3px;flex:1;min-width:0}
   .top h1 small{font-weight:500;color:var(--cream);font-size:12px;margin-left:6px}
@@ -72,6 +73,21 @@
                       font:inherit;font-size:10px;padding:2px 6px;border-radius:999px;
                       cursor:pointer;margin-top:4px;align-self:flex-start}
   .m-staff .clone-btn:hover{background:var(--cream);color:var(--dark);border-color:var(--gold)}
+  .m-staff .row-btns{display:flex;gap:4px;margin-top:4px;flex-wrap:wrap}
+  .m-staff .row-btn{background:transparent;border:1px solid var(--line);color:var(--muted);
+                    font:inherit;font-size:10px;padding:2px 6px;border-radius:999px;
+                    cursor:pointer;white-space:nowrap}
+  .m-staff .row-btn:hover{background:var(--gold);color:#fff;border-color:var(--gold)}
+  .m-staff .row-btn.prev{}
+  .m-staff .row-btn.next{}
+  .m-staff .nm-row{display:flex;align-items:flex-start;justify-content:space-between;gap:6px}
+  .m-staff .edit-btn{background:transparent;border:none;color:var(--muted);font-size:13px;
+                     cursor:pointer;padding:0 4px;line-height:1;border-radius:4px;flex-shrink:0}
+  .m-staff .edit-btn:hover{background:var(--cream);color:var(--dark)}
+  .m-staff.inactive{opacity:0.55;background:#f7f6f0}
+  .m-staff .badge-inactive{display:inline-block;background:#ddd;color:#555;font-size:9px;
+                            font-weight:700;padding:1px 5px;border-radius:3px;margin-left:4px;
+                            text-transform:uppercase;letter-spacing:0.3px}
   .m-cell{background:#fff;border:1px solid var(--line);border-radius:8px;padding:6px;min-height:72px;cursor:pointer;display:flex;flex-direction:column;gap:3px;font-size:12px;position:relative}
   .m-cell:hover{border-color:var(--gold)}
   .m-cell.today{border-left:3px solid var(--gold)}
@@ -86,12 +102,14 @@
   .m-cell.leave{background:#fff2de;border-color:#ffcfa2}
 
   /* role color map */
+  .role-pill{background:var(--sage)}  /* fallback for any role not styled below */
   .r-Housekeeping{background:var(--r-house)}
   .r-Van{background:var(--r-van)}
   .r-Laundry{background:var(--r-laun)}
   .r-Checker{background:var(--r-check)}
   .r-Office{background:var(--r-office);color:#072a3e}
   .r-Training{background:var(--r-train)}
+  .r-Maintenance{background:#7f5347}     /* pecan — Maintenance team */
   .r-Off{background:var(--r-off);color:#333}
   .r-Leave{background:var(--r-leave);color:#4a2a00}
   .r-Sick{background:var(--r-sick)}
@@ -142,11 +160,13 @@
 
 <div id="app" class="hide">
 
+  <!-- topwrap keeps the header AND the nav/filter bar pinned to the top so
+       the week arrows stay reachable while scrolling deep down the matrix. -->
+  <div class="topwrap">
   <div class="top">
     <a href="hub.html" class="home">← Hub</a>
     <h1>Staff Shifts <small id="wkTitle"></small></h1>
-    <button class="pill" id="copyPrevBtn" title="Copy previous week's shifts into this week">← ⧉ Copy from prev</button>
-    <button class="pill" id="copyWeekBtn" title="Copy this week's shifts into next week">⧉ Copy week →</button>
+    <button class="btn" id="addStaffBtn" title="Add a new staff member to the Staff board">+ Add staff</button>
     <button class="btn gold" id="refreshBtn">↻ Refresh</button>
   </div>
 
@@ -163,6 +183,7 @@
     </label>
     <div class="status-bar" id="statusBar">Loading…</div>
   </div>
+  </div><!-- /topwrap -->
 
   <div class="wrap">
     <div class="matrix" id="matrix"></div>
@@ -194,6 +215,71 @@
   </div>
 </div>
 
+<!-- Add / edit staff modal -->
+<div class="mod" id="addStaffModal">
+  <div class="card">
+    <h2 id="asTitle">Add staff</h2>
+    <div class="sub-cap" id="asSub">Creates a new person on the <b>Staff</b> Monday board. They'll appear in this matrix and in the rota planner straight away.</div>
+
+    <div class="modal-row">
+      <span class="modal-label">Full name *</span>
+      <input type="text" class="modal-input" id="asName" placeholder="e.g. Jane Smith" autocomplete="off">
+    </div>
+
+    <div class="modal-row modal-row-inline">
+      <div>
+        <span class="modal-label">Role</span>
+        <select class="modal-select" id="asRole">
+          <option value="Housekeeper">Housekeeper</option>
+          <option value="A Team">A Team</option>
+          <option value="Checker">Checker</option>
+          <option value="Van driver">Van driver</option>
+          <option value="Maintenance">Maintenance</option>
+          <option value="Manager">Manager</option>
+          <option value="Owner">Owner</option>
+        </select>
+      </div>
+      <div>
+        <span class="modal-label">Status</span>
+        <select class="modal-select" id="asStatus">
+          <option value="Active">Active</option>
+          <option value="Inactive">Inactive</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="modal-row modal-row-inline">
+      <div>
+        <span class="modal-label">Contract hrs / wk</span>
+        <input type="number" step="0.5" min="0" class="modal-input" id="asContract" placeholder="e.g. 20">
+      </div>
+      <div>
+        <span class="modal-label">Default rate £/hr</span>
+        <input type="number" step="0.05" min="0" class="modal-input" id="asRate" placeholder="optional">
+      </div>
+    </div>
+
+    <div class="modal-row modal-row-inline">
+      <div>
+        <span class="modal-label">4-digit code</span>
+        <input type="text" class="modal-input" id="asCode" inputmode="numeric" maxlength="4" placeholder="for staff.html login">
+      </div>
+      <div>
+        <span class="modal-label">Email</span>
+        <input type="email" class="modal-input" id="asEmail" placeholder="optional">
+      </div>
+    </div>
+
+    <div class="mod-actions">
+      <a id="asMondayLink" href="#" target="_blank" rel="noopener" style="font-size:12px;color:var(--sage);text-decoration:none;font-weight:600;align-self:center;display:none">Open in Monday →</a>
+      <div style="display:flex;gap:6px;margin-left:auto">
+        <button class="btn ghost" id="asCancel" style="background:#eee;color:var(--dark);border:0">Cancel</button>
+        <button class="btn gold" id="asSave">Add staff</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- Shift edit modal -->
 <div class="mod" id="shiftModal">
   <div class="card">
@@ -204,15 +290,7 @@
       <span class="modal-label">Role</span>
       <select class="modal-select" id="smRole">
         <option value="">— none —</option>
-        <option value="Housekeeping">Housekeeping</option>
-        <option value="Van">Van</option>
-        <option value="Laundry">Laundry</option>
-        <option value="Checker">Checker</option>
-        <option value="Office">Office</option>
-        <option value="Training">Training</option>
-        <option value="Off">Off</option>
-        <option value="Leave">Leave</option>
-        <option value="Sick">Sick</option>
+        <!-- Options populated dynamically from the Staff Shifts board's Role column. -->
       </select>
     </div>
 
@@ -245,6 +323,7 @@
       <span style="font-size:11px;color:var(--muted);align-self:center;margin-right:4px">Quick:</span>
       <button data-qr="Housekeeping" data-qs="09:00" data-qe="15:00">HK 9–3</button>
       <button data-qr="Housekeeping" data-qs="10:00" data-qe="16:00">HK 10–4</button>
+      <button data-qr="Maintenance" data-qs="09:00" data-qe="17:00">Maint 9–5</button>
       <button data-qr="Van" data-qs="09:00" data-qe="17:00">Van 9–5</button>
       <button data-qr="Checker" data-qs="14:00" data-qe="16:00">Check 2–4</button>
       <button data-qr="Off">Off</button>
@@ -275,6 +354,8 @@ const ST_ROLE       = 'color_mm2psadz';
 const ST_STATUS     = 'color_mm2psvh2';
 const ST_CONTRACT   = 'numeric_mm2pc978';
 const ST_DEFRATE    = 'numeric_mm2p4pme';
+const ST_CODE       = 'text_mm2qd59j';      // 4-digit code for staff.html login
+const ST_EMAIL      = 'email_mm2pa071';
 
 // Shifts board columns
 const SH_STAFF      = 'text_mm2p1gqx';  // StaffID text col (board_relation doesn't persist via API)
@@ -289,7 +370,7 @@ const SH_NOTES      = 'long_text_mm2pped0';
 // PIN (6-digit). Hash of 652318.
 const PIN_HASH = 'df8d602b7bcaf41725409b83af2a3df79722be244d9f33b5f128b81a269b955e';
 
-const ROLE_ORDER = ['Housekeeper','A Team','Checker','Van driver','Manager','Owner'];
+const ROLE_ORDER = ['Housekeeper','A Team','Checker','Van driver','Maintenance','Manager','Owner'];
 const BLOCK_ROLES = ['Off','Leave','Sick'];   // lines that block out a day
 
 /* ========== State ========== */
@@ -373,21 +454,33 @@ async function mondayQuery(q, vars){
 }
 
 async function fetchStaff(){
-  const q = `query ($b:[ID!]){ boards(ids:$b){ items_page(limit:500){ items{ id name column_values(ids:["${ST_ROLE}","${ST_STATUS}","${ST_CONTRACT}","${ST_DEFRATE}"]){ id text value } } } } }`;
+  const q = `query ($b:[ID!]){ boards(ids:$b){ items_page(limit:500){ items{ id name url column_values(ids:["${ST_ROLE}","${ST_STATUS}","${ST_CONTRACT}","${ST_DEFRATE}","${ST_CODE}","${ST_EMAIL}"]){ id text value } } } } }`;
   const d = await mondayQuery(q,{b:[STAFF_BOARD]});
   const items = d.boards[0].items_page.items;
   staff = items.map(it => {
     const cv = Object.fromEntries(it.column_values.map(c=>[c.id,c]));
+    let emailAddr = '';
+    try {
+      const ev = cv[ST_EMAIL]?.value;
+      const obj = ev ? (typeof ev === 'string' ? JSON.parse(ev) : ev) : null;
+      emailAddr = obj?.email || cv[ST_EMAIL]?.text || '';
+    } catch { emailAddr = cv[ST_EMAIL]?.text || ''; }
     return {
       id: it.id,
       name: it.name,
+      url: it.url || '',
       role: cv[ST_ROLE]?.text || '',
       status: cv[ST_STATUS]?.text || 'Active',
       contractHrs: parseFloat(cv[ST_CONTRACT]?.text || '0') || 0,
       defaultRate: parseFloat(cv[ST_DEFRATE]?.text || '0') || 0,
+      code: cv[ST_CODE]?.text || '',
+      email: emailAddr,
     };
-  }).filter(s => s.status !== '' && s.status !== 'Inactive')
-    .sort((a,b) => {
+  }).sort((a,b) => {
+      // Inactive sort to the bottom, otherwise by role then name
+      const aInact = (a.status||'').toLowerCase() === 'inactive';
+      const bInact = (b.status||'').toLowerCase() === 'inactive';
+      if(aInact !== bInact) return aInact ? 1 : -1;
       const ai = ROLE_ORDER.indexOf(a.role); const bi = ROLE_ORDER.indexOf(b.role);
       if(ai !== bi) return (ai<0?99:ai) - (bi<0?99:bi);
       return a.name.localeCompare(b.name);
@@ -521,11 +614,19 @@ function renderMatrix(){
     const ctr = s.contractHrs || 0;
     const over = ctr && wh > ctr;
     html += `<div class="m-row">`;
-    html += `<div class="m-staff">
-      <div class="nm">${s.name}</div>
+    const inactive = (s.status||'').toLowerCase() === 'inactive';
+    html += `<div class="m-staff${inactive?' inactive':''}">
+      <div class="nm-row">
+        <div class="nm">${s.name}${inactive?'<span class="badge-inactive">Inactive</span>':''}</div>
+        <button class="edit-btn" data-edit-staff="${s.id}" title="Edit ${s.name}'s details">✎</button>
+      </div>
       <div class="rl">${s.role||'—'}</div>
       <div class="wt ${over?'over':''}"><b>${wh}h</b>${ctr?` / ${ctr}h`:''}</div>
-      <button class="clone-btn" data-clone-target="${s.id}" title="Copy another staff member's rota for this week into ${s.name}">⧉ copy from…</button>
+      <div class="row-btns">
+        <button class="row-btn prev" data-row-copy-prev="${s.id}" title="Copy ${s.name}'s previous week into this week (only fills empty cells)">← prev wk</button>
+        <button class="row-btn next" data-row-copy-next="${s.id}" title="Copy ${s.name}'s shifts this week into next week (only fills empty cells)">next wk →</button>
+        <button class="clone-btn" data-clone-target="${s.id}" title="Copy another staff member's rota for this week into ${s.name}">⧉ from staff…</button>
+      </div>
     </div>`;
     for(let i=0;i<7;i++){
       const d = addDays(weekStart,i);
@@ -562,6 +663,85 @@ function renderMatrix(){
     e.stopPropagation();
     openClonePicker(b.dataset.cloneTarget);
   }));
+  el.querySelectorAll('.edit-btn').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    openEditStaff(b.dataset.editStaff);
+  }));
+  el.querySelectorAll('[data-row-copy-prev]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    copyRowFromPrevWeek(b.dataset.rowCopyPrev);
+  }));
+  el.querySelectorAll('[data-row-copy-next]').forEach(b => b.addEventListener('click', e => {
+    e.stopPropagation();
+    copyRowToNextWeek(b.dataset.rowCopyNext);
+  }));
+}
+
+/* ========== Per-row copy ========== */
+async function copyRowFromPrevWeek(staffId) {
+  const s = staff.find(x => x.id === staffId);
+  if (!s) return;
+  const prev = addDays(weekStart, -7);
+  const srcIsos = []; for (let i=0;i<7;i++) srcIsos.push(isoDate(addDays(prev, i)));
+  const dstIsos = []; for (let i=0;i<7;i++) dstIsos.push(isoDate(addDays(weekStart, i)));
+  const toCreate = [];
+  for (let i=0;i<7;i++) {
+    const src = cellFor(staffId, srcIsos[i]);
+    const dst = cellFor(staffId, dstIsos[i]);
+    if (src && !dst) {
+      toCreate.push({
+        id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+        staffId, date: dstIsos[i],
+        role: src.role, start: src.start, end: src.end, hours: src.hours,
+        rate: src.rate, notes: src.notes, dirty: true,
+      });
+    }
+  }
+  if (!toCreate.length) { alert(`Nothing to copy for ${s.name} — previous week was empty or this week is already filled.`); return; }
+  if (!confirm(`Copy ${toCreate.length} shift(s) from previous week into ${s.name}'s rota?\n\nOnly empty cells will be filled — existing shifts won't be overwritten.`)) return;
+  shifts.push(...toCreate);
+  renderMatrix();
+  setStatus(`Copying ${toCreate.length} shifts for ${s.name}…`);
+  let fails = 0;
+  for (const sh of toCreate) {
+    try { await pushShift(sh); } catch (e) { fails++; console.error(e); }
+  }
+  if (fails) setStatus(`Copied ${toCreate.length-fails} shifts · ${fails} failed`,'err');
+  else      setStatus(`Copied ${toCreate.length} shifts for ${s.name}`,'sync');
+}
+
+async function copyRowToNextWeek(staffId) {
+  const s = staff.find(x => x.id === staffId);
+  if (!s) return;
+  const next = addDays(weekStart, 7);
+  const srcIsos = []; for (let i=0;i<7;i++) srcIsos.push(isoDate(addDays(weekStart, i)));
+  const dstIsos = []; for (let i=0;i<7;i++) dstIsos.push(isoDate(addDays(next, i)));
+  const toCreate = [];
+  for (let i=0;i<7;i++) {
+    const src = cellFor(staffId, srcIsos[i]);
+    const dst = cellFor(staffId, dstIsos[i]);
+    if (src && !dst) {
+      toCreate.push({
+        id: 'local_' + Date.now() + '_' + Math.random().toString(36).slice(2,7),
+        staffId, date: dstIsos[i],
+        role: src.role, start: src.start, end: src.end, hours: src.hours,
+        rate: src.rate, notes: src.notes, dirty: true,
+      });
+    }
+  }
+  if (!toCreate.length) { alert(`Nothing to copy for ${s.name} — this week was empty or next week is already filled.`); return; }
+  if (!confirm(`Copy ${toCreate.length} shift(s) from this week into ${s.name}'s next week?\n\nOnly empty cells will be filled — existing shifts won't be overwritten.`)) return;
+  shifts.push(...toCreate);
+  // Step the visible week forward so the planner sees the result land.
+  weekStart = next;
+  renderMatrix();
+  setStatus(`Copying ${toCreate.length} shifts for ${s.name}…`);
+  let fails = 0;
+  for (const sh of toCreate) {
+    try { await pushShift(sh); } catch (e) { fails++; console.error(e); }
+  }
+  if (fails) setStatus(`Copied ${toCreate.length-fails} shifts · ${fails} failed`,'err');
+  else      setStatus(`Copied ${toCreate.length} shifts for ${s.name}`,'sync');
 }
 
 /* ========== Clone rota ========== */
@@ -678,7 +858,7 @@ function openShift(id){
   editingDate = sh.date;
   document.getElementById('smTitle').textContent = sf ? sf.name : 'Shift';
   document.getElementById('smSub').textContent = new Date(sh.date).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  document.getElementById('smRole').value  = sh.role || '';
+  populateShiftRoleDropdown(sh.role || '');
   document.getElementById('smStart').value = sh.start || '';
   document.getElementById('smEnd').value   = sh.end || '';
   document.getElementById('smHrs').value   = sh.hours || 0;
@@ -696,7 +876,11 @@ function openNew(staffId, iso){
   const sf = staff.find(x => x.id === staffId);
   document.getElementById('smTitle').textContent = sf ? sf.name : 'New shift';
   document.getElementById('smSub').textContent = new Date(iso).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
-  document.getElementById('smRole').value  = '';
+  // If this is a Maintenance staff member, default the shift role to Maintenance
+  // so they don't have to pick it every time. Otherwise blank.
+  const defaultRole = (sf && sf.role === 'Maintenance' && shiftRoleLabels.includes('Maintenance'))
+    ? 'Maintenance' : '';
+  populateShiftRoleDropdown(defaultRole);
   document.getElementById('smStart').value = '';
   document.getElementById('smEnd').value   = '';
   document.getElementById('smHrs').value   = 0;
@@ -805,13 +989,56 @@ async function copyWeek(){
   renderMatrix();
 }
 
+/* ========== Shift role labels ==========
+   The Role column on the Staff Shifts board is the source of truth for
+   shift roles. We pull labels from Monday at boot and merge with a
+   "fallback" list so newly-created roles like Maintenance work straight
+   away — `create_labels_if_missing:true` on save means Monday persists
+   them on first use. */
+const FALLBACK_SHIFT_ROLES = ['Housekeeping','Maintenance','Van','Laundry','Checker','Office','Training','Off','Leave','Sick'];
+let shiftRoleLabels = FALLBACK_SHIFT_ROLES.slice();  // until first fetch returns
+
+async function fetchShiftRoleLabels(){
+  try{
+    const q = `query { boards(ids:[${SHIFTS_BOARD}]) { columns(ids:["${SH_ROLE}"]) { id settings_str } } }`;
+    const d = await mondayQuery(q);
+    const col = d?.boards?.[0]?.columns?.[0];
+    if(!col?.settings_str){ return; }
+    const settings = JSON.parse(col.settings_str);
+    const labels = settings.labels || {};
+    const positions = settings.labels_positions_v2 || {};
+    // Monday returns labels keyed by id; sort by position so order matches the
+    // status column UI on Monday.
+    const ids = Object.keys(labels).sort((a,b) => (positions[a]||999) - (positions[b]||999));
+    const monday = ids.map(id => labels[id]).filter(Boolean);
+    // Merge with fallback so anything not yet on Monday (e.g. Maintenance
+    // before its first use) still shows in the dropdown — preserve Monday's
+    // ordering, then append any fallback-only entries at the end.
+    const seen = new Set(monday.map(s => s.toLowerCase()));
+    const merged = monday.slice();
+    for(const r of FALLBACK_SHIFT_ROLES){
+      if(!seen.has(r.toLowerCase())){ merged.push(r); seen.add(r.toLowerCase()); }
+    }
+    shiftRoleLabels = merged;
+  }catch(e){
+    console.warn('Could not fetch shift role labels — falling back', e);
+  }
+}
+
+function populateShiftRoleDropdown(currentValue){
+  const sel = document.getElementById('smRole');
+  if(!sel) return;
+  sel.innerHTML = '<option value="">— none —</option>' +
+    shiftRoleLabels.map(r => `<option value="${r}" ${r === currentValue ? 'selected' : ''}>${r}</option>`).join('');
+}
+
 /* ========== Wiring ========== */
 async function refresh(){
   try{
     setStatus('Loading staff…');
     if(staff.length === 0) await fetchStaff();
     setStatus('Loading shifts…');
-    await fetchShifts();
+    await Promise.all([fetchShifts(), fetchShiftRoleLabels()]);
     renderRoleChips();
     renderMatrix();
     setStatus(`Updated ${new Date().toLocaleTimeString('en-GB')} · ${staff.length} staff, ${shifts.length} shift(s)`,'sync');
@@ -830,8 +1057,133 @@ document.getElementById('hideZeroToggle').addEventListener('change', e => {
   persistPrefs();
   renderMatrix();
 });
-document.getElementById('copyWeekBtn').addEventListener('click', copyWeek);
-document.getElementById('copyPrevBtn').addEventListener('click', copyFromPrevWeek);
+// Bulk copy buttons removed — see per-row "← prev wk" / "next wk →" in
+// each m-staff cell, which copies one staff member at a time.
+document.getElementById('addStaffBtn').addEventListener('click', openAddStaffModal);
+document.getElementById('asCancel').addEventListener('click', closeAddStaffModal);
+document.getElementById('asSave').addEventListener('click', saveNewStaff);
+document.getElementById('addStaffModal').addEventListener('click', e => { if(e.target.id === 'addStaffModal') closeAddStaffModal(); });
+
+/* ========== Add / edit staff ==========
+   The same modal handles both. editingStaffItemId === null → ADD mode (create_item).
+   editingStaffItemId === '12345' → EDIT mode (change_multiple_column_values + change_item_name).
+*/
+let editingStaffItemId = null;
+
+function openAddStaffModal(){
+  editingStaffItemId = null;
+  document.getElementById('asTitle').textContent = 'Add staff';
+  document.getElementById('asSub').innerHTML = 'Creates a new person on the <b>Staff</b> Monday board. They\'ll appear in this matrix and in the rota planner straight away.';
+  document.getElementById('asName').value = '';
+  document.getElementById('asName').readOnly = false;
+  document.getElementById('asRole').value = 'Housekeeper';
+  document.getElementById('asStatus').value = 'Active';
+  document.getElementById('asContract').value = '';
+  document.getElementById('asRate').value = '';
+  document.getElementById('asCode').value = '';
+  document.getElementById('asEmail').value = '';
+  document.getElementById('asMondayLink').style.display = 'none';
+  document.getElementById('asSave').textContent = 'Add staff';
+  document.getElementById('addStaffModal').classList.add('show');
+  setTimeout(() => document.getElementById('asName').focus(), 50);
+}
+
+function openEditStaff(staffId){
+  const s = staff.find(x => x.id === staffId);
+  if(!s){ alert('Could not find that staff member'); return; }
+  editingStaffItemId = s.id;
+  document.getElementById('asTitle').textContent = 'Edit ' + s.name;
+  document.getElementById('asSub').innerHTML = 'Updating the <b>Staff</b> Monday record. Set status to <b>Inactive</b> to retire someone (they\'ll fade in this matrix and disappear from the hot tub rota sidebar).';
+  document.getElementById('asName').value = s.name;
+  // Renaming via Monday's API works but isn't always desirable — staff board item
+  // renames cascade through historical shifts. Allow it but warn implicitly via readonly off.
+  document.getElementById('asName').readOnly = false;
+  document.getElementById('asRole').value = s.role || 'Housekeeper';
+  document.getElementById('asStatus').value = (s.status||'').toLowerCase()==='inactive' ? 'Inactive' : 'Active';
+  document.getElementById('asContract').value = s.contractHrs || '';
+  document.getElementById('asRate').value = s.defaultRate || '';
+  document.getElementById('asCode').value = s.code || '';
+  document.getElementById('asEmail').value = s.email || '';
+  const link = document.getElementById('asMondayLink');
+  if(s.url){ link.href = s.url; link.style.display = 'inline-block'; }
+  else { link.style.display = 'none'; }
+  document.getElementById('asSave').textContent = 'Save changes';
+  document.getElementById('addStaffModal').classList.add('show');
+  setTimeout(() => document.getElementById('asName').focus(), 50);
+}
+
+function closeAddStaffModal(){
+  document.getElementById('addStaffModal').classList.remove('show');
+  editingStaffItemId = null;
+}
+
+async function saveNewStaff(){
+  const name = (document.getElementById('asName').value || '').trim();
+  const role = document.getElementById('asRole').value;
+  const status = document.getElementById('asStatus').value;
+  const contract = parseFloat(document.getElementById('asContract').value);
+  const rate = parseFloat(document.getElementById('asRate').value);
+  const code = (document.getElementById('asCode').value || '').trim();
+  const email = (document.getElementById('asEmail').value || '').trim();
+
+  if(!name){ alert('Name is required'); return; }
+  if(code && !/^\d{4}$/.test(code)){ alert('Code must be 4 digits'); return; }
+
+  // Duplicate-name guard (only for ADD or when renaming to an existing name)
+  if(staff.some(s => s.name.toLowerCase() === name.toLowerCase() && s.id !== editingStaffItemId)){
+    alert('Another staff member already uses that name.'); return;
+  }
+
+  const btn = document.getElementById('asSave');
+  const wasLabel = btn.textContent;
+  btn.disabled = true; btn.textContent = 'Saving…';
+  setStatus((editingStaffItemId ? 'Updating ' : 'Adding ') + name + '…');
+
+  try {
+    const cv = {
+      [ST_ROLE]:   { label: role },
+      [ST_STATUS]: { label: status },
+    };
+    if(!isNaN(contract) && contract >= 0) cv[ST_CONTRACT] = contract;
+    if(!isNaN(rate) && rate >= 0) cv[ST_DEFRATE] = rate;
+    // Always send code/email — including blank — so clearing fields persists.
+    cv[ST_CODE]  = code;
+    cv[ST_EMAIL] = email ? { email, text: email } : { email: '', text: '' };
+
+    if(editingStaffItemId){
+      // Update existing item
+      const q = `mutation ($b:ID!,$i:ID!,$v:JSON!){
+        change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id }
+      }`;
+      await mondayQuery(q, { b: STAFF_BOARD, i: editingStaffItemId, v: JSON.stringify(cv) });
+      // If the name changed, update the item name as well
+      const existing = staff.find(s => s.id === editingStaffItemId);
+      if(existing && existing.name !== name){
+        const qn = `mutation ($i:ID!,$n:String!){ change_item_name(board_id:${STAFF_BOARD}, item_id:$i, new_name:$n){ id } }`;
+        await mondayQuery(qn, { i: editingStaffItemId, n: name });
+      }
+    } else {
+      // Create new item. create_labels_if_missing covers Maintenance / new roles.
+      const q = `mutation ($b:ID!,$n:String!,$v:JSON!){
+        create_item(board_id:$b,item_name:$n,column_values:$v,create_labels_if_missing:true){ id }
+      }`;
+      await mondayQuery(q, { b: STAFF_BOARD, n: name, v: JSON.stringify(cv) });
+    }
+
+    closeAddStaffModal();
+    setStatus('Refreshing…');
+    await fetchStaff();
+    renderRoleChips();
+    renderMatrix();
+    setStatus(`${editingStaffItemId ? 'Updated' : 'Added'} ${name}`, 'sync');
+    setTimeout(() => setStatus(''), 2500);
+  } catch (e) {
+    console.error(e);
+    setStatus('Save failed: ' + e.message, 'err');
+    alert('Save failed: ' + e.message);
+  }
+  btn.disabled = false; btn.textContent = wasLabel;
+}
 document.getElementById('cloneCancel').addEventListener('click', closeCloneModal);
 document.getElementById('cloneGo').addEventListener('click', runClone);
 document.getElementById('cloneModal').addEventListener('click', e => { if(e.target.id === 'cloneModal') closeCloneModal(); });

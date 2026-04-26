@@ -181,6 +181,7 @@ const API_TOKEN  = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWl
 const STAFF_BOARD  = 5095127554;
 const CLEANS_BOARD = 5095134636;
 const SHIFTS_BOARD = 5095155773;
+const HT_CLEANS_BOARD = 5095259581; // Hot Tub Cleans (created 2026-04-25)
 
 // Staff columns
 const ST_CODE     = 'text_mm2qd59j';
@@ -218,12 +219,23 @@ const SH_DATE  = 'date_mm2phk9q';
 const SH_ROLE  = 'color_mm2pcrmp';
 const SH_HOURS = 'numeric_mm2pawya';
 
+// Hot Tub Cleans (must stay in sync with hot-tub-rota.html)
+const HC_DATE     = 'date_mm2rvsp9';
+const HC_PROP     = 'board_relation_mm2rjw3';
+const HC_TYPE     = 'color_mm2rr4cv';
+const HC_PERSON   = 'dropdown_mm2rjwkr';
+const HC_START    = 'hour_mm2r90d7';
+const HC_STATUS   = 'color_mm2rqkeq';
+const HC_DURATION = 'numeric_mm2r9e9h';
+const HC_NOTES    = 'long_text_mm2rsrdj';
+
 const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const SESSION_KEY = 'bh.staffCode';
 
 let me = null;          // resolved staff { id, name, role }
 let cleans = [];
 let shifts = [];
+let hotTubCleans = [];  // hot tub cleans assigned to this staff member
 let currentDay = null;  // yyyy-mm-dd
 
 /* ─── Helpers ───────────────────────────────────────────────── */
@@ -246,11 +258,11 @@ function prettyDate(iso) {
   return `${DOW[d.getDay()]} ${d.getDate()} ${mo}`;
 }
 
-async function mondayFetch(query) {
+async function mondayFetch(query, variables) {
   const r = await fetch('https://api.monday.com/v2', {
     method: 'POST',
     headers: { 'Content-Type':'application/json','Authorization':API_TOKEN,'API-Version':'2024-01' },
-    body: JSON.stringify({ query })
+    body: JSON.stringify(variables ? { query, variables } : { query })
   });
   const j = await r.json();
   if (j.errors) throw new Error(j.errors[0].message);
@@ -303,7 +315,7 @@ async function submitCode() {
 
 function logout() {
   sessionStorage.removeItem(SESSION_KEY);
-  me = null; cleans = []; shifts = [];
+  me = null; cleans = []; shifts = []; hotTubCleans = [];
   document.getElementById('dayWrap').style.display = 'none';
   document.getElementById('codeWrap').style.display = '';
   document.getElementById('logoutBtn').style.display = 'none';
@@ -314,18 +326,35 @@ function logout() {
 /* ─── Boot (after auth) ─────────────────────────────────────── */
 async function boot() {
   document.getElementById('codeWrap').style.display = 'none';
-  document.getElementById('dayWrap').style.display = '';
-  document.getElementById('logoutBtn').style.display = '';
+  document.getElementById('dayWrap').style.display = 'block';
+  document.getElementById('logoutBtn').style.display = 'inline-block';
   document.getElementById('greetingName').textContent = `Hi ${me.name}`;
   document.getElementById('greetingDate').textContent = prettyDate(todayISO());
   document.getElementById('dayContent').innerHTML = '<div class="loading"><span class="spin"></span>Loading your day…</div>';
   currentDay = todayISO();
-  try {
-    await Promise.all([loadCleans(), loadShifts()]);
-    renderDayNav();
-    renderDay();
-  } catch (e) {
-    document.getElementById('dayContent').innerHTML = `<div class="empty">⚠️ Could not load your day: ${escapeHtml(e.message)}</div>`;
+  // Run loaders independently so a single failure doesn't blank the whole page.
+  // Promise.allSettled lets us collect partial successes and surface a soft
+  // warning at the top instead of an empty error screen.
+  const results = await Promise.allSettled([loadCleans(), loadShifts(), loadHotTubCleans()]);
+  const labels = ['cleans', 'shifts', 'hot tub cleans'];
+  const failures = results
+    .map((r, i) => r.status === 'rejected' ? { label: labels[i], err: r.reason } : null)
+    .filter(Boolean);
+  if (failures.length === 3) {
+    document.getElementById('dayContent').innerHTML = `<div class="empty">⚠️ Could not load your day: ${escapeHtml(failures[0].err.message || String(failures[0].err))}</div>`;
+    return;
+  }
+  if (failures.length > 0) {
+    console.warn('Some loaders failed:', failures);
+  }
+  renderDayNav();
+  renderDay();
+  if (failures.length > 0) {
+    const msg = failures.map(f => `${f.label}: ${f.err.message || f.err}`).join(' · ');
+    const warn = document.createElement('div');
+    warn.style.cssText = 'background:#fff4e0;border:1px solid #fdab3d;color:#7a5a00;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px';
+    warn.innerHTML = `⚠️ Some data couldn't be loaded — showing what we have. (${escapeHtml(msg)})`;
+    document.getElementById('dayContent').prepend(warn);
   }
 }
 
@@ -334,14 +363,14 @@ async function loadCleans() {
   const startISO = todayISO();
   const endISO   = addDaysISO(startISO, 6);
   const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_CHECKOUT}","${CL_PROP}","${CL_START}","${CL_HRS}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_SAMEDAY}","${CL_LINEN_MTHD}","${CL_LINEN_DRV}","${CL_LINEN_DATE}","${CL_DIRT_MTHD}","${CL_DIRT_DRV}","${CL_LINEN_SRC}","${CL_NOTES}","${CL_CHECKTYPE}","${CL_REVIEW}","${CL_REVIEW_NT}","${CL_LINKED_REF}","${CL_LINKED_NT}","${CL_COMPLETED}"]`;
-  // items_page_by_column_values is restrictive on date ranges; use the general query then filter client-side. Window is small (7 days × ~25 properties = manageable).
   let cursor = null, all = [];
   do {
     const q = cursor
       ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${colIds}){ id value text } } } }`
       : `{ boards(ids:[${CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id value text } } } } }`;
     const data = await mondayFetch(q);
-    const page = cursor ? data.next_items_page : data.boards[0].items_page;
+    const page = cursor ? data?.next_items_page : data?.boards?.[0]?.items_page;
+    if (!page) break;
     cursor = page.cursor;
     all = all.concat(page.items || []);
   } while (cursor);
@@ -407,6 +436,48 @@ async function loadCleans() {
   cleans.sort((a,b) => (a.day+a.start).localeCompare(b.day+b.start));
 }
 
+/* ─── Load Hot Tub Cleans assigned to me (today + 6 days) ──── */
+async function loadHotTubCleans() {
+  const startISO = todayISO();
+  const endISO   = addDaysISO(startISO, 6);
+  const colIds = `["${HC_DATE}","${HC_PROP}","${HC_TYPE}","${HC_PERSON}","${HC_START}","${HC_STATUS}","${HC_DURATION}","${HC_NOTES}"]`;
+  let cursor = null, all = [];
+  do {
+    const q = cursor
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${colIds}){ id value text } } } }`
+      : `{ boards(ids:[${HT_CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id value text } } } } }`;
+    const data = await mondayFetch(q);
+    const page = cursor ? data?.next_items_page : data?.boards?.[0]?.items_page;
+    if (!page) break;
+    cursor = page.cursor;
+    all = all.concat(page.items || []);
+  } while (cursor);
+
+  hotTubCleans = [];
+  for (const it of all) {
+    const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+    const dateObj = pj(cv[HC_DATE]?.value);
+    if (!dateObj?.date) continue;
+    if (dateObj.date < startISO || dateObj.date > endISO) continue;
+    const personText = cv[HC_PERSON]?.text || '';
+    // Filter to only my hot tub cleans
+    if (!personText.split(',').map(s=>s.trim()).includes(me.name)) continue;
+    const startObj = pj(cv[HC_START]?.value);
+    const start = startObj ? `${String(startObj.hour||0).padStart(2,'0')}:${String(startObj.minute||0).padStart(2,'0')}` : '10:00';
+    hotTubCleans.push({
+      id: it.id,
+      property: cv[HC_PROP]?.text || it.name,
+      day: dateObj.date,
+      type: cv[HC_TYPE]?.text || 'Changeover',
+      start,
+      status: cv[HC_STATUS]?.text || 'Scheduled',
+      duration: parseFloat(pj(cv[HC_DURATION]?.value)) || 45,
+      notes: pj(cv[HC_NOTES]?.value)?.text || cv[HC_NOTES]?.text || '',
+    });
+  }
+  hotTubCleans.sort((a,b) => (a.day+a.start).localeCompare(b.day+b.start));
+}
+
 /* ─── Load Shifts in the visible window ─────────────────────── */
 async function loadShifts() {
   const startISO = todayISO();
@@ -418,7 +489,8 @@ async function loadShifts() {
       ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id column_values(ids:${colIds}){ id text value } } } }`
       : `{ boards(ids:[${SHIFTS_BOARD}]){ items_page(limit:500){ cursor items{ id column_values(ids:${colIds}){ id text value } } } } }`;
     const data = await mondayFetch(q);
-    const page = cursor ? data.next_items_page : data.boards[0].items_page;
+    const page = cursor ? data?.next_items_page : data?.boards?.[0]?.items_page;
+    if (!page) break;
     cursor = page.cursor;
     all = all.concat(page.items || []);
   } while (cursor);
@@ -444,7 +516,7 @@ function renderDayNav() {
   const days = [];
   for (let i=0; i<7; i++) days.push(addDaysISO(todayISO(), i));
   nav.innerHTML = days.map(d => {
-    const hasWork = cleans.some(c => c.day === d) || shifts.some(s => s.date === d && s.hours > 0);
+    const hasWork = cleans.some(c => c.day === d) || shifts.some(s => s.date === d && s.hours > 0) || hotTubCleans.some(h => h.day === d);
     const cls = ['day-chip'];
     if (d === currentDay) cls.push('active');
     if (hasWork) cls.push('has-work');
@@ -462,18 +534,27 @@ function setDay(d) {
   renderDay();
 }
 
+/* True if the logged-in staff member is on the Maintenance team. Their day view
+   is tailored: housekeeping sections are hidden so the page focuses on their
+   hot-tub work, with status buttons inline. */
+function isMaintenanceUser() {
+  return (me?.role || '').trim().toLowerCase() === 'maintenance';
+}
+
 /* ─── Day rendering ─────────────────────────────────────────── */
 function renderDay() {
   const day = currentDay;
-  const dayShifts = shifts.filter(s => s.date === day);
-  const dayCleans = cleans.filter(c => c.day === day);
-  const dayLinenDrops = cleans.filter(c => c.linenDate === day && c.linenDate !== c.day); // linen-drop day, clean is another day
+  const dayShifts = (shifts || []).filter(s => s.date === day);
+  const dayCleans = (cleans || []).filter(c => c.day === day);
+  const dayLinenDrops = (cleans || []).filter(c => c.linenDate === day && c.linenDate !== c.day);
+  const dayHotTubs = (hotTubCleans || []).filter(h => h.day === day);
   const container = document.getElementById('dayContent');
+  const maint = isMaintenanceUser();
 
   const parts = [];
   parts.push(`<div style="font-size:13px;color:var(--sage);margin-bottom:12px">${prettyDate(day)}</div>`);
 
-  // Shift
+  // Shift card — show for everyone
   if (dayShifts.length) {
     parts.push('<div class="section-label">Your shift</div>');
     for (const s of dayShifts) {
@@ -490,27 +571,44 @@ function renderDay() {
     parts.push('<div class="section-label">Your shift</div><div class="empty">No shift scheduled.</div>');
   }
 
-  // Cleans for today
+  // Housekeeping cleans — only render for non-maintenance staff to avoid empty
+  // sections / confusion. Maintenance staff don't appear on these rows anyway.
   const cleansMine = dayCleans.filter(c => c.roles.some(r => /cleaner|checker/i.test(r)));
-  if (cleansMine.length) {
+  if (!maint && cleansMine.length) {
     parts.push(`<div class="section-label">Jobs today <span class="count">${cleansMine.length}</span></div>`);
     for (const c of cleansMine) parts.push(renderCleanCard(c));
   }
-
-  // Linen drops on a different day
-  if (dayLinenDrops.length) {
+  if (!maint && dayLinenDrops.length) {
     parts.push(`<div class="section-label">Linen drops <span class="count">${dayLinenDrops.length}</span></div>`);
     for (const c of dayLinenDrops) parts.push(renderLinenDropCard(c));
   }
-
-  // Dirties pickups (happen on clean day; already in cleansMine if I'm also cleaning, otherwise show as own row)
   const dirtiesMine = dayCleans.filter(c => c.dirtDrv === me.name && !c.roles.some(r => /cleaner|checker/i.test(r)));
-  if (dirtiesMine.length) {
+  if (!maint && dirtiesMine.length) {
     parts.push(`<div class="section-label">Dirties pickup <span class="count">${dirtiesMine.length}</span></div>`);
     for (const c of dirtiesMine) parts.push(renderDirtiesCard(c));
   }
 
-  if (!dayShifts.length && !cleansMine.length && !dayLinenDrops.length && !dirtiesMine.length) {
+  // Hot tub work — primary section for maintenance users
+  if (dayHotTubs.length) {
+    const label = maint ? 'Hot tub jobs today' : 'Hot tubs';
+    parts.push(`<div class="section-label">${label} <span class="count">${dayHotTubs.length}</span></div>`);
+    for (const h of dayHotTubs) parts.push(renderHotTubCleanCard(h));
+  }
+
+  // Always-available link to hot-tub.html so staff can drop in to log readings
+  // regardless of whether they have an assigned card today.
+  if (maint) {
+    parts.push(`<div style="margin-top:18px">
+      <a href="hot-tub.html?from=staff" class="cc-btn secondary" style="display:block; text-align:center; padding:12px; font-weight:700; text-decoration:none; border-radius:10px; background:#1a5276; color:#fff">
+        ♨ Open hot tub log (readings & chemicals)
+      </a>
+    </div>`);
+  }
+
+  // Empty state: nothing for me today
+  const nothing = !dayShifts.length && !dayHotTubs.length
+    && (maint || (!cleansMine.length && !dayLinenDrops.length && !dirtiesMine.length));
+  if (nothing) {
     parts.push('<div class="empty">Nothing on your plate — enjoy the break 🌿</div>');
   }
 
@@ -577,6 +675,92 @@ function renderDirtiesCard(c) {
     <div class="cc-top"><div class="cc-prop">🧺 Dirties pickup ← ${escapeHtml(c.property)}</div></div>
     <div class="cc-meta">After clean · ${escapeHtml(c.start||'')}</div>
   </div>`;
+}
+
+/* ─── Hot tub clean card ────────────────────────────────────── */
+function renderHotTubCleanCard(h) {
+  const completed = h.status === 'Completed';
+  const cancelled = h.status === 'Cancelled';
+  const inProgress = h.status === 'In Progress';
+  // Type colour key — Changeover: green, Mid-stay: blue, Mid-vacancy: amber
+  const typeColor = h.type === 'Changeover' ? '#2d6a4f'
+                  : h.type === 'Mid-stay'   ? '#1a5276'
+                  : '#a86c00';
+  const typeBg    = h.type === 'Changeover' ? '#edf7f2'
+                  : h.type === 'Mid-stay'   ? '#eaf4fb'
+                  : '#fdf5e8';
+  const typeLabel = h.type === 'Mid-stay' ? 'Mid-stay (guests in)' : h.type;
+
+  const badges = [];
+  if (completed) badges.push('<span class="cc-badge comp">✓ Done</span>');
+  if (inProgress) badges.push('<span class="cc-badge" style="background:#fdab3d;color:#1a1a1a">⏱ In progress</span>');
+  if (cancelled) badges.push('<span class="cc-badge" style="background:#bb3354;color:#fff">✕ Cancelled</span>');
+
+  // Hot-tub log link, prefilled for this property + date + visit type
+  const visitMap = { 'Changeover':'full', 'Mid-stay':'mid-stay', 'Mid-vacancy':'mid-vac' };
+  const visitParam = visitMap[h.type] || 'full';
+  const formUrl = `hot-tub.html?property=${encodeURIComponent(h.property)}&date=${encodeURIComponent(h.day)}&visit=${visitParam}&from=staff`;
+
+  // Status buttons — Start, Complete, Reset. They write back to Monday immediately.
+  let statusBtns = '';
+  if (cancelled) {
+    statusBtns = '';
+  } else if (completed) {
+    statusBtns = `<button class="cc-btn secondary" onclick="setHotTubStatus('${h.id}','Scheduled', this)" style="background:#eee; color:#555">Reset</button>`;
+  } else if (inProgress) {
+    statusBtns = `<button class="cc-btn primary" onclick="setHotTubStatus('${h.id}','Completed', this)" style="background:#2d6a4f; color:#fff">✓ Mark complete</button>`;
+  } else {
+    statusBtns = `<button class="cc-btn primary" onclick="setHotTubStatus('${h.id}','In Progress', this)" style="background:#fdab3d; color:#1a1a1a">▶ Start</button>
+                  <button class="cc-btn secondary" onclick="setHotTubStatus('${h.id}','Completed', this)" style="background:#2d6a4f; color:#fff">✓ Mark complete</button>`;
+  }
+
+  const logBtn = !cancelled
+    ? `<a class="cc-btn secondary" href="${formUrl}" style="background:#1a5276; color:#fff">♨ Log readings</a>`
+    : '';
+
+  const actions = (statusBtns || logBtn)
+    ? `<div class="cc-actions" data-htid="${h.id}">${statusBtns}${logBtn}</div>`
+    : '';
+
+  return `<div class="clean-card${completed?' completed':''}${cancelled?' absorbed':''}"
+    data-htid="${h.id}"
+    style="border-left-color:${typeColor}; background:${typeBg}">
+    <div class="cc-top">
+      <div class="cc-prop">♨ ${escapeHtml(h.property)}</div>
+      <div class="cc-badges">${badges.join('')}</div>
+    </div>
+    <div class="cc-meta">${escapeHtml(typeLabel)} · earliest ${escapeHtml(h.start)} · ~${h.duration||45}m</div>
+    ${h.notes ? `<div class="cc-notes">${escapeHtml(h.notes)}</div>` : ''}
+    ${actions}
+  </div>`;
+}
+
+/* Update a hot tub clean's status on Monday. Optimistic UI — updates the
+   in-memory hotTubCleans entry and re-renders before awaiting the API,
+   so the staff member sees the click register instantly. */
+async function setHotTubStatus(itemId, newStatus, btnEl) {
+  const h = hotTubCleans.find(x => x.id === itemId);
+  if (!h) return;
+  const prev = h.status;
+  h.status = newStatus;
+  // Visual: disable buttons in this card while in flight to prevent double-tap
+  if (btnEl) {
+    const card = btnEl.closest('.clean-card');
+    if (card) card.querySelectorAll('button, a.cc-btn').forEach(b => { b.style.pointerEvents = 'none'; b.style.opacity = '0.6'; });
+  }
+  renderDay();
+  renderDayNav();
+  try {
+    const q = `mutation { change_simple_column_value(board_id: ${HT_CLEANS_BOARD}, item_id: ${itemId}, column_id: "${HC_STATUS}", value: ${JSON.stringify(newStatus)}) { id } }`;
+    await mondayFetch(q);
+    toast(`Status: ${newStatus}`);
+  } catch (e) {
+    // Revert on failure so the UI doesn't lie
+    h.status = prev;
+    renderDay();
+    renderDayNav();
+    toast('Update failed: ' + e.message, 'err');
+  }
 }
 
 /* Linked-pair suppression — whichever clean has the LATER check-in

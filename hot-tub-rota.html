@@ -1,0 +1,2503 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hot Tub Rota — Be Here</title>
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#272F2E">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
+    :root {
+      --bg: #D5D0C4; --dark: #272F2E; --sage: #646955; --sage-light: #eaede4;
+      --gold: #AF926A; --gold-light: #faf3e8; --cream: #F3E3C3;
+      --text: #1a1a1a; --muted: #888; --border: #e0ddd6; --card: #fff;
+      --co: #2d6a4f; --co-light: #edf7f2;       /* Changeover */
+      --ms: #1a5276; --ms-light: #eaf4fb;       /* Mid-stay */
+      --mv: #a86c00; --mv-light: #fdf5e8;       /* Mid-vacancy */
+      --early: #1a6fba; --early-light: #ddeeff; /* Early / brought-forward Changeover */
+      --done: #52b788; --done-light: #edf7f2;
+      --warn: #c0392b; --warn-light: #fde8e8;
+    }
+    body { font-family: 'Instrument Sans', system-ui, sans-serif;
+           background: var(--bg); color: var(--text); min-height: 100vh;
+           padding-bottom: 60px; overflow-x: hidden; }
+
+    /* ── PIN GATE ── */
+    #pinGate { position: fixed; inset: 0; background: var(--dark);
+               display: flex; flex-direction: column; align-items: center; justify-content: center;
+               z-index: 9999; padding: 20px; }
+    #pinGate h2 { color: #fff; font-size: 20px; font-weight: 600; margin-bottom: 20px; }
+    #pinGate input { width: 240px; padding: 12px; font-size: 20px; text-align: center;
+                     border-radius: 8px; border: none; background: rgba(255,255,255,0.12);
+                     color: #fff; font-family: inherit; letter-spacing: 8px; }
+    #pinGate input::placeholder { color: rgba(255,255,255,0.5); letter-spacing: normal; }
+    #pinGate .pin-err { color: #ff8a80; font-size: 13px; margin-top: 10px; min-height: 18px; }
+
+    /* ── HEADER ── */
+    #header { height: 52px; background: var(--dark); display: flex; align-items: center;
+              padding: 0 12px; gap: 10px; position: sticky; top: 0; z-index: 100; }
+    .back-btn, .header-btn { background: rgba(255,255,255,0.12); border: none; color: #fff;
+              padding: 6px 12px; border-radius: 7px; font-size: 12px;
+              font-family: inherit; cursor: pointer; text-decoration: none;
+              display: inline-flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .back-btn:hover, .header-btn:hover { background: rgba(255,255,255,0.22); }
+    .header-title { color: #fff; font-size: 15px; font-weight: 600; flex: 1; }
+    .header-btn.dirty { background: var(--gold); }
+    .header-btn.saving { background: var(--gold); }
+    .header-btn.save-err { background: #b91c1c; }
+
+    /* ── LOADING BAR ── */
+    #loadingBar { display: none; height: 3px; background: linear-gradient(90deg, var(--sage), var(--gold)); animation: loadpulse 1.2s infinite; }
+    @keyframes loadpulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+    /* ── WEEK NAV ── */
+    .week-nav { display: flex; align-items: center; gap: 8px;
+                background: var(--dark); padding: 0 12px 10px; }
+    .week-arrow { background: rgba(255,255,255,0.12); border: none; color: #fff;
+                  width: 32px; height: 32px; border-radius: 8px; font-size: 16px; cursor: pointer; }
+    .week-arrow:hover { background: rgba(255,255,255,0.25); }
+    #weekLabel { flex: 1; text-align: center; color: #fff; font-size: 13px; font-weight: 600; }
+    .today-btn { background: rgba(255,255,255,0.12); border: none; color: rgba(255,255,255,0.75);
+                 padding: 5px 10px; border-radius: 7px; font-size: 11px; font-weight: 600;
+                 font-family: inherit; cursor: pointer; }
+
+    /* ── CONTROLS ── */
+    .controls-row { display: flex; align-items: center; gap: 16px;
+                    background: rgba(0,0,0,0.18); padding: 8px 12px; flex-wrap: wrap;
+                    border-top: 1px solid rgba(255,255,255,0.08); }
+    .ctrl { display: flex; align-items: center; gap: 8px; color: #fff; font-size: 12px; font-weight: 600; }
+    .toggle-wrap { position: relative; width: 38px; height: 20px; flex-shrink: 0; }
+    .toggle-wrap input { opacity: 0; width: 0; height: 0; position: absolute; }
+    .toggle-slider { position: absolute; inset: 0; background: rgba(255,255,255,0.25);
+                     border-radius: 20px; cursor: pointer; transition: background 0.2s; }
+    .toggle-slider::before { content: ''; position: absolute; width: 14px; height: 14px;
+                              left: 3px; top: 3px; background: #fff; border-radius: 50%;
+                              transition: transform 0.2s; }
+    .toggle-wrap input:checked + .toggle-slider { background: var(--sage); }
+    .toggle-wrap input:checked + .toggle-slider::before { transform: translateX(18px); }
+
+    /* ── MAIN LAYOUT ── */
+    .main-layout { display: grid; grid-template-columns: 220px 1fr; gap: 8px;
+                   padding: 8px; align-items: start; }
+    @media (max-width: 720px) {
+      .main-layout { grid-template-columns: 1fr; }
+      .staff-panel { position: sticky; top: 52px; z-index: 50; }
+      .staff-list { display: flex; overflow-x: auto; flex-direction: row; gap: 6px; }
+      .staff-chip { min-width: 130px; flex-shrink: 0; }
+    }
+
+    /* ── STAFF PANEL ── */
+    .staff-panel { background: rgba(255,255,255,0.5); border-radius: 10px;
+                   padding: 10px; position: sticky; top: 60px; max-height: calc(100vh - 80px); overflow-y: auto; }
+    .staff-panel h3 { font-size: 11px; text-transform: uppercase; letter-spacing: 0.8px;
+                      color: var(--sage); margin-bottom: 8px; font-weight: 700; }
+    .staff-panel-hint { font-size: 10px; color: var(--muted); margin-bottom: 8px; line-height: 1.4; }
+    .staff-panel-hint a { color: var(--sage); }
+    .staff-list { display: flex; flex-direction: column; gap: 5px; }
+    .staff-chip { background: #fff; border-radius: 7px; padding: 7px 9px;
+                  border-left: 3px solid var(--sage); cursor: grab; font-size: 12px;
+                  user-select: none; transition: transform 0.1s; }
+    .staff-chip:active { cursor: grabbing; transform: scale(0.97); }
+    .staff-chip.dragging { opacity: 0.4; }
+    .staff-chip.off { opacity: 0.25; border-left-color: #ddd; cursor: not-allowed; }
+    .staff-chip.busy { border-left-color: var(--gold); background: #fffaf0; }
+    .staff-chip.over { border-left-color: var(--warn); background: #fdf0ec; box-shadow: 0 0 0 1px rgba(192,57,43,0.15); }
+    .staff-name { font-weight: 700; font-size: 12px; color: var(--dark); }
+    .staff-meta { font-size: 10px; color: var(--muted); margin-top: 2px;
+                  display: flex; justify-content: space-between; align-items: center; }
+    .staff-role { background: var(--sage-light); color: var(--sage); padding: 1px 5px;
+                  border-radius: 3px; font-weight: 600; font-size: 9px; text-transform: uppercase; }
+    .staff-count { font-weight: 700; font-size: 10px; color: var(--sage); }
+
+    /* ── VIEW TOGGLE ── */
+    .view-toggle { display: inline-flex; background: rgba(0,0,0,0.22); border-radius: 7px; padding: 2px; margin-right: 8px; }
+    .view-toggle button { background: transparent; border: none; color: rgba(255,255,255,0.65);
+                          padding: 5px 14px; border-radius: 5px; font-size: 12px;
+                          font-family: inherit; font-weight: 700; cursor: pointer; }
+    .view-toggle button.active { background: var(--sage); color: #fff; }
+
+    /* ── DAY VIEW ── */
+    .day-hero { background:#fff; border-radius:12px; padding:14px 16px; margin-bottom:10px;
+                box-shadow:0 1px 4px rgba(39,47,46,.08); }
+    .day-hero-top { display:flex; align-items:flex-start; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+    .day-hero-date { font-size:20px; font-weight:700; color:var(--dark); letter-spacing:-0.3px; }
+    .day-hero-sub { font-size:12px; color:var(--muted); margin-top:2px; }
+    .day-stats { display:flex; gap:10px; flex-wrap:wrap; align-items:center; }
+    .day-stat { background:#f6f4ed; border-radius:8px; padding:6px 10px; font-size:12px; color:var(--dark); font-weight:600; }
+    .day-stat b { font-size:14px; color:var(--sage); margin-right:2px; }
+    .day-stat.warn b { color:var(--warn); }
+    .day-filters { display:flex; gap:8px; flex-wrap:wrap; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border); }
+    .day-filter { display:flex; align-items:center; gap:6px; font-size:11px; color:var(--sage); font-weight:600;
+                  background:#f6f4ed; padding:4px 10px; border-radius:999px; cursor:pointer; user-select:none; border:none; font-family:inherit; }
+    .day-filter input { margin:0; cursor:pointer; }
+    .day-filter.on { background:var(--sage); color:#fff; }
+    .day-section { margin-bottom:12px; }
+    .day-section-hdr { display:flex; align-items:center; gap:8px; margin:14px 0 8px;
+                       font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.6px; color:var(--sage-mid); }
+    .day-section-hdr::after { content:''; flex:1; height:1px; background:var(--border); }
+    .day-section-hdr .pill-co { background:var(--co); color:#fff; padding:2px 8px; border-radius:9px; font-size:10px; }
+    .day-section-hdr .pill-ms { background:var(--ms); color:#fff; padding:2px 8px; border-radius:9px; font-size:10px; }
+    .day-section-hdr .pill-mv { background:var(--mv); color:#fff; padding:2px 8px; border-radius:9px; font-size:10px; }
+    .day-section-hdr .count { color:var(--dark); background:#fff; padding:2px 8px; border-radius:9px; font-size:11px; border:1px solid var(--border); }
+    .day-empty { font-size:13px; color:var(--muted); padding:20px; background:#fff; border-radius:12px; text-align:center; font-style:italic; }
+    .day-row { background:#fff; border-radius:10px; padding:12px 14px; margin-bottom:6px;
+               box-shadow:0 1px 3px rgba(39,47,46,.05); display:grid;
+               grid-template-columns: 1fr auto auto; gap:10px; align-items:center;
+               cursor:pointer; transition:transform 0.1s, box-shadow 0.1s;
+               border-left:4px solid var(--sage); }
+    .day-row:hover { transform: translateY(-1px); box-shadow:0 3px 8px rgba(39,47,46,.10); }
+    .day-row.t-co { border-left-color: var(--co); }
+    .day-row.t-ms { border-left-color: var(--ms); }
+    .day-row.t-mv { border-left-color: var(--mv); }
+    .day-row.t-co.early { border-left-color: var(--early); background: var(--early-light); }
+    .day-row.unlisted { border-left-color: var(--gold); background: var(--gold-light); }
+    .dr-early-badge { display:inline-block; font-size:9px; background:var(--early); color:#fff; padding:1px 6px; border-radius:3px;
+                      margin-left:6px; font-weight:700; letter-spacing:0.3px; vertical-align:middle; text-transform:uppercase; }
+    .dr-unlisted-badge { display:inline-block; font-size:9px; background:var(--gold); color:#fff; padding:1px 6px; border-radius:3px;
+                         margin-left:6px; font-weight:700; letter-spacing:0.3px; vertical-align:middle; text-transform:uppercase; }
+    .day-row.virtual { border-left-style: dashed; background:#fbfaf6; }
+    .day-row.completed { background: var(--done-light); opacity:0.85; }
+    .day-row.completed .dr-prop::before { content:'✓ '; color:var(--co); font-weight:700; }
+    .day-row.dirty { box-shadow:0 0 0 1.5px var(--gold); }
+    .dr-main { min-width:0; }
+    .dr-prop { font-size:15px; font-weight:700; color:var(--dark); }
+    .dr-prop .no-tub { font-size:9px; background:#eee; color:var(--muted); padding:1px 5px; border-radius:3px; margin-left:6px; font-weight:700; letter-spacing:0.3px; vertical-align:middle; }
+    .dr-meta { font-size:12px; color:var(--muted); margin-top:3px; }
+    .dr-context { font-size:11px; color:var(--sage); margin-top:3px; }
+    .dr-time { font-size:13px; color:var(--dark); font-weight:700; white-space:nowrap; text-align:right; }
+    .dr-time small { display:block; color:var(--muted); font-size:10px; font-weight:600; margin-top:1px; }
+    .dr-staff { display:flex; align-items:center; gap:4px; }
+    .dr-staff-pill { background:var(--sage); color:#fff; font-size:11px; padding:3px 8px; border-radius:999px; font-weight:600; white-space:nowrap; }
+    .dr-staff-empty { font-size:11px; color:#c0c0c0; font-style:italic; padding:3px 8px; border:1px dashed var(--border); border-radius:999px; }
+    .dr-suggest { font-size:9px; background:rgba(175,146,106,0.18); color:var(--gold); padding:1px 5px; border-radius:3px; margin-left:5px; font-weight:700; letter-spacing:0.3px; vertical-align:middle; text-transform:uppercase; }
+    .dr-shift-btn { background:rgba(0,0,0,0.04); border:1px dashed rgba(0,0,0,0.18); color:var(--sage);
+                    padding:2px 8px; border-radius:999px; font-size:10px; font-weight:700; cursor:pointer;
+                    font-family:inherit; margin-left:6px; }
+    .dr-shift-btn:hover { background:var(--sage); color:#fff; border-color:var(--sage); border-style:solid; }
+
+    /* ── STAFF WORKLOAD VIEW ── */
+    .sw-hero { background:#fff; border-radius:12px; padding:14px 16px; margin-bottom:10px;
+               box-shadow:0 1px 4px rgba(39,47,46,.08);
+               display:flex; flex-wrap:wrap; gap:14px; align-items:center; justify-content:space-between; }
+    .sw-hero-title { font-size:18px; font-weight:700; color:var(--dark); }
+    .sw-hero-sub { font-size:12px; color:var(--muted); margin-top:2px; }
+    .sw-hero-stats { display:flex; gap:10px; flex-wrap:wrap; }
+    .sw-grid { display:grid; gap:10px; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+    .sw-card { background:#fff; border-radius:12px; padding:14px 16px; box-shadow:0 1px 3px rgba(39,47,46,.06);
+               border-left:4px solid var(--sage); display:flex; flex-direction:column; gap:6px; }
+    .sw-card.empty { opacity:0.55; border-left-color:#d0d0d0; }
+    .sw-card.unassigned { border-left-color:var(--mv); background:var(--mv-light); }
+    .sw-card-hdr { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+    .sw-name { font-size:15px; font-weight:700; color:var(--dark); line-height:1.2; }
+    .sw-role { font-size:10px; color:var(--sage); font-weight:600; text-transform:uppercase; letter-spacing:0.4px; margin-top:2px; }
+    .sw-totals { font-size:11px; color:var(--muted); }
+    .sw-totals b { color:var(--dark); font-size:12px; }
+    .sw-bar { display:flex; gap:2px; margin-top:4px; height:7px; }
+    .sw-bar-cell { flex:1; background:#f0ede4; border-radius:2px; position:relative; overflow:hidden; }
+    .sw-bar-cell.has { background:var(--sage); }
+    .sw-bar-cell.busy { background:var(--gold); }
+    .sw-bar-cell.over { background:var(--warn); }
+    .sw-bar-cell.today { box-shadow: inset 0 0 0 1.5px var(--dark); }
+    .sw-bar-labels { display:flex; gap:2px; font-size:9px; color:var(--muted); margin-top:2px; }
+    .sw-bar-labels span { flex:1; text-align:center; font-weight:600; }
+    .sw-bar-labels span.today { color:var(--dark); font-weight:700; }
+    .sw-card.over { border-left-color:var(--warn); }
+    .sw-alloc-bar { display:flex; height:14px; background:#eee; border-radius:4px; overflow:hidden; margin-top:4px; }
+    .sw-alloc-fill { background:var(--sage); transition:width 0.15s; height:100%; }
+    .sw-alloc-fill.warn { background:var(--gold); }
+    .sw-alloc-fill.over { background:var(--warn); }
+    .sw-day-row { display:grid; grid-template-columns:38px 1fr auto; gap:6px; align-items:center;
+                  font-size:11px; padding:5px 6px; border-radius:6px; margin-bottom:2px;
+                  background:#fafaf5; border-left:3px solid #ddd; }
+    .sw-day-row.busy { border-left-color:var(--gold); background:var(--gold-light); }
+    .sw-day-row.over { border-left-color:var(--warn); background:var(--warn-light); }
+    .sw-day-row.off { border-left-color:#bbb; opacity:0.55; }
+    .sw-day-row.today { box-shadow: inset 0 0 0 1.5px var(--dark); }
+    .sw-day-row .sw-d { font-weight:700; color:var(--sage); font-size:10px; text-transform:uppercase; letter-spacing:0.3px; text-align:center; }
+    .sw-day-row .sw-roster { font-size:10px; color:var(--muted); }
+    .sw-day-row .sw-alloc { font-size:11px; font-weight:700; white-space:nowrap; }
+    .sw-day-row .sw-alloc.warn { color:var(--gold); }
+    .sw-day-row .sw-alloc.over { color:var(--warn); }
+    .sw-day-row .sw-alloc.off { color:var(--muted); font-style:italic; font-weight:500; }
+    .sw-cleans { display:flex; flex-direction:column; gap:4px; margin-top:6px; max-height:280px; overflow-y:auto; }
+    .sw-clean { display:grid; grid-template-columns: 38px 1fr auto; gap:6px; align-items:center;
+                font-size:11px; padding:5px 7px; border-radius:6px; background:#fafaf5; cursor:pointer;
+                border-left:3px solid var(--sage); }
+    .sw-clean:hover { background:#f0ede4; }
+    .sw-clean.t-co { border-left-color:var(--co); }
+    .sw-clean.t-ms { border-left-color:var(--ms); }
+    .sw-clean.t-mv { border-left-color:var(--mv); }
+    .sw-clean.early { border-left-color:var(--early); background:var(--early-light); }
+    .sw-clean.unlisted { border-left-color:var(--gold); background:var(--gold-light); }
+    .sw-clean.completed { opacity:0.6; }
+    .sw-clean-day { font-weight:700; color:var(--sage); font-size:10px; text-align:center; }
+    .sw-clean-prop { font-weight:600; color:var(--dark); overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+    .sw-clean-meta { font-size:10px; color:var(--muted); }
+    .sw-clean-time { font-size:10px; color:var(--dark); font-weight:600; white-space:nowrap; }
+    .sw-empty-msg { font-size:11px; color:var(--muted); font-style:italic; padding:8px 0; }
+
+    /* ── PLANNER GRID ── */
+    .planner-content { min-width: 0; overflow-x: auto; }
+    .rota-grid { display: grid; grid-template-columns: 170px repeat(7, minmax(110px, 1fr));
+                 gap: 3px; min-width: 920px; }
+    .rg-hdr { font-size: 10px; font-weight: 700; color: var(--dark);
+              padding: 6px 4px; background: rgba(255,255,255,0.5); border-radius: 4px;
+              text-align: center; }
+    .rg-hdr.today { background: var(--sage); color: #fff; }
+    .rg-prop { font-size: 11px; font-weight: 700; color: var(--dark);
+               padding: 6px 8px; background: rgba(255,255,255,0.75); border-radius: 4px;
+               display: flex; flex-direction: column; justify-content: center;
+               overflow: hidden; min-width: 0; }
+    .rg-prop .prop-meta { font-size: 9px; color: var(--muted); font-weight: 500;
+                          margin-top: 2px; text-transform: none; letter-spacing: 0; }
+    .rg-prop .prop-loc { color: var(--gold); }
+    .rg-cell { background: rgba(255,255,255,0.3); border-radius: 4px; padding: 3px;
+               min-height: 50px; font-size: 10px; min-width: 0; position: relative; }
+    .rg-cell.today { background: rgba(255,255,255,0.55); box-shadow: inset 0 0 0 1.5px var(--sage); }
+    .rg-cell.past { opacity: 0.55; }
+    .rg-cell.drop-ready { box-shadow: inset 0 0 0 2px var(--sage); background: rgba(100,105,85,0.15); }
+    .rg-cell.occupied { background: rgba(175,146,106,0.10); }
+    .rg-cell.checkout { background: linear-gradient(180deg, rgba(175,146,106,0.10) 0 50%, rgba(255,255,255,0.3) 50% 100%); }
+    .rg-cell.checkin  { background: linear-gradient(180deg, rgba(255,255,255,0.3) 0 50%, rgba(175,146,106,0.10) 50% 100%); }
+
+    .add-mini { background: rgba(0,0,0,0.04); border: 1px dashed rgba(0,0,0,0.18);
+                color: var(--muted); width: 100%; padding: 3px; border-radius: 4px;
+                font-size: 9px; font-weight: 700; cursor: pointer; margin-top: 2px;
+                font-family: inherit; }
+    .add-mini:hover { background: rgba(0,0,0,0.1); color: var(--dark); }
+
+    /* ── CLEAN CARDS ── */
+    .clean-card { background: #fff; border-radius: 5px; margin-bottom: 3px;
+                  border-left: 4px solid var(--sage); font-size: 10px;
+                  padding: 4px 5px; cursor: pointer;
+                  transition: transform 0.1s, box-shadow 0.1s;
+                  position: relative; }
+    .clean-card:hover { box-shadow: 0 2px 6px rgba(0,0,0,0.1); transform: translateY(-1px); }
+    .clean-card.t-co { border-left-color: var(--co); background: var(--co-light); }
+    .clean-card.t-ms { border-left-color: var(--ms); background: var(--ms-light); }
+    .clean-card.t-mv { border-left-color: var(--mv); background: var(--mv-light); }
+    .clean-card.completed { background: var(--done-light); border-left-color: var(--done); opacity: 0.85; }
+    .clean-card.completed .cc-type::before { content: '✓ '; color: var(--co); font-weight: 700; }
+    .clean-card.virtual { border-left-style: dashed; background: rgba(255,255,255,0.7); opacity: 0.85; }
+    .clean-card.dirty { box-shadow: 0 0 0 1.5px var(--gold); }
+    .clean-card.drag-over { box-shadow: 0 0 0 2px var(--sage); }
+    .cc-type { font-weight: 700; font-size: 10px; color: var(--dark);
+               text-transform: uppercase; letter-spacing: 0.3px; }
+    .cc-time { font-size: 9px; color: var(--muted); margin-top: 1px; }
+    .cc-staff { margin-top: 2px; display: flex; gap: 2px; flex-wrap: wrap; }
+    .cc-staff-pill { background: var(--sage); color: #fff; font-size: 9px;
+                     padding: 1px 5px; border-radius: 7px; font-weight: 600; }
+    .cc-staff-empty { font-size: 9px; color: #c0c0c0; font-style: italic; }
+    .cc-tag { display: inline-block; font-size: 8px; padding: 1px 4px; border-radius: 3px;
+              background: rgba(0,0,0,0.06); color: var(--muted); margin-left: 3px; font-weight: 600;
+              text-transform: uppercase; letter-spacing: 0.3px; }
+    .cc-tag.auto { background: rgba(175,146,106,0.18); color: var(--gold); }
+
+    /* ── MODAL ── */
+    .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+                     display: none; align-items: center; justify-content: center;
+                     z-index: 1000; padding: 20px; }
+    .modal-overlay.open { display: flex; }
+    .modal-box { background: #fff; border-radius: 12px; padding: 20px;
+                 max-width: 460px; width: 100%; max-height: 85vh; overflow-y: auto; }
+    .modal-title { font-size: 16px; font-weight: 700; color: var(--dark);
+                   display: flex; justify-content: space-between; align-items: center;
+                   margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid var(--border); }
+    .modal-close { background: none; border: none; font-size: 18px; cursor: pointer;
+                   color: var(--muted); padding: 0 4px; }
+    .modal-row { margin-bottom: 12px; }
+    .modal-label { font-size: 11px; font-weight: 700; text-transform: uppercase;
+                   letter-spacing: 0.6px; color: var(--muted); margin-bottom: 5px; display: block; }
+    .modal-input, .modal-select { width: 100%; padding: 8px 10px; font-size: 13px;
+                   border-radius: 6px; border: 1px solid var(--border);
+                   font-family: inherit; background: #fff; }
+    .modal-row-inline { display: flex; gap: 8px; }
+    .modal-row-inline > * { flex: 1; }
+    .modal-btns { display: flex; gap: 8px; margin-top: 16px; flex-wrap: wrap; }
+    .modal-btn { padding: 8px 14px; border-radius: 6px; border: none;
+                 font-family: inherit; font-size: 13px; font-weight: 600; cursor: pointer;
+                 flex: 1; min-width: 80px; }
+    .modal-btn.primary { background: var(--sage); color: #fff; }
+    .modal-btn.danger { background: #fde8e8; color: var(--warn); }
+    .modal-btn.secondary { background: var(--border); color: var(--dark); }
+    .modal-info { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.4; }
+    .modal-info b { color: var(--dark); }
+
+    /* ── LEGEND ── */
+    .legend { padding: 6px 12px; background: rgba(255,255,255,0.45);
+              display: flex; gap: 14px; flex-wrap: wrap; font-size: 11px;
+              align-items: center; border-radius: 0 0 8px 8px; margin: 0 8px 4px; }
+    .legend-item { display: flex; align-items: center; gap: 5px; color: var(--sage); }
+    .legend-swatch { width: 12px; height: 12px; border-radius: 3px; border-left: 4px solid; background: #fff; }
+    .legend-swatch.t-co { border-left-color: var(--co); background: var(--co-light); }
+    .legend-swatch.t-ms { border-left-color: var(--ms); background: var(--ms-light); }
+    .legend-swatch.t-mv { border-left-color: var(--mv); background: var(--mv-light); }
+    .legend-swatch.early { border-left-color: var(--early); background: var(--early-light); }
+    .legend-swatch.virtual { border-left-style: dashed; }
+
+    /* ── TOAST ── */
+    #toast { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+             background: var(--dark); color: #fff; padding: 10px 18px; border-radius: 8px;
+             font-size: 13px; font-weight: 600; opacity: 0; transition: opacity 0.3s;
+             pointer-events: none; z-index: 2000; }
+    #toast.show { opacity: 1; }
+  </style>
+</head>
+<body>
+
+<!-- ── PIN GATE ── -->
+<div id="pinGate">
+  <h2>Hot Tub Rota</h2>
+  <input type="password" id="pinInput" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+  <div class="pin-err" id="pinErr"></div>
+</div>
+
+<!-- ── APP ── -->
+<div id="app" style="display:none">
+
+  <div id="header">
+    <a class="back-btn" href="hub.html">← Hub</a>
+    <div class="header-title">Hot Tub Rota</div>
+    <button class="header-btn" onclick="refreshAll()" title="Reload from Monday">↻</button>
+    <button class="header-btn" id="discardBtn" onclick="discardChanges()" title="Discard your pending changes and reload from Monday" style="display:none; background:#a9434a">↶ Discard</button>
+    <button class="header-btn" id="saveBtn" onclick="saveAll()" title="Save changes to Monday">☁ Saved</button>
+  </div>
+
+  <div id="loadingBar"></div>
+
+  <div class="week-nav">
+    <button class="week-arrow" onclick="shiftDays(-7)" title="Back 1 week">«</button>
+    <button class="week-arrow" onclick="shiftDays(-1)" title="Back 1 day">‹</button>
+    <div id="weekLabel">—</div>
+    <button class="today-btn" onclick="goToday()">Today</button>
+    <button class="week-arrow" onclick="shiftDays(1)" title="Forward 1 day">›</button>
+    <button class="week-arrow" onclick="shiftDays(7)" title="Forward 1 week">»</button>
+  </div>
+
+  <div class="controls-row">
+    <div class="view-toggle" id="viewToggle">
+      <button data-view="day" class="active" onclick="setView('day')">Day</button>
+      <button data-view="week" onclick="setView('week')">Week</button>
+      <button data-view="staff" onclick="setView('staff')">By staff</button>
+    </div>
+    <button class="header-btn" onclick="openAddClean()" style="background:var(--sage); color:#fff" title="Add a one-off or extra clean">+ Add clean</button>
+    <label class="ctrl">
+      <span>Hide unscheduled</span>
+      <div class="toggle-wrap"><input type="checkbox" id="hideVirtualToggle" onchange="render()"><span class="toggle-slider"></span></div>
+    </label>
+    <label class="ctrl" title="Hide properties that don't have a hot tub (Serenity, Goose Landing, Green Haven). They still need changeover service from Maintenance.">
+      <span>Hide outside-only</span>
+      <div class="toggle-wrap"><input type="checkbox" id="hideNoTubToggle" onchange="render()"><span class="toggle-slider"></span></div>
+    </label>
+    <label class="ctrl" title="Hide maintenance staff with no rostered shifts AND no work assigned in the visible window">
+      <span>Hide off-roster</span>
+      <div class="toggle-wrap"><input type="checkbox" id="hideOffRosterToggle" checked onchange="STATE_staffHide.offRoster = this.checked; render()"><span class="toggle-slider"></span></div>
+    </label>
+    <label class="ctrl" title="Pause auto-save. Changes accumulate until you click Save.">
+      <span>Pause auto-save</span>
+      <div class="toggle-wrap"><input type="checkbox" id="pauseAutoSaveToggle" onchange="onPauseAutoSaveChange()"><span class="toggle-slider"></span></div>
+    </label>
+    <label class="ctrl" title="Hide maintenance staff with no cleans assigned in the visible window">
+      <span>Hide unassigned staff</span>
+      <div class="toggle-wrap"><input type="checkbox" id="hideZeroStaffToggle" onchange="render()"><span class="toggle-slider"></span></div>
+    </label>
+  </div>
+
+  <div class="legend">
+    <span class="legend-item"><span class="legend-swatch t-co"></span> Changeover</span>
+    <span class="legend-item"><span class="legend-swatch early"></span> Early (brought forward)</span>
+    <span class="legend-item"><span class="legend-swatch t-ms"></span> Mid-stay (48h, guests in)</span>
+    <span class="legend-item"><span class="legend-swatch t-mv"></span> Mid-vacancy</span>
+    <span class="legend-item"><span class="legend-swatch virtual"></span> Auto-suggested (click to commit)</span>
+  </div>
+
+  <div class="main-layout">
+    <aside class="staff-panel">
+      <h3>Maintenance staff — drag to assign</h3>
+      <div class="staff-panel-hint">Only staff with role <b>Maintenance</b> show here. Add or change roles in <a href="staff-shifts.html">Staff Shifts</a>.</div>
+      <div class="staff-list" id="staffList"></div>
+    </aside>
+    <main class="planner-content">
+      <div id="rotaGrid"></div>
+    </main>
+  </div>
+</div>
+
+<!-- ── CLEAN EDIT MODAL ── -->
+<div class="modal-overlay" id="cleanModal" onclick="overlayClose(event,'cleanModal')">
+  <div class="modal-box">
+    <div class="modal-title"><span id="cmTitle">Hot Tub Clean</span><button class="modal-close" onclick="closeModal('cleanModal')">✕</button></div>
+
+    <div class="modal-row">
+      <span class="modal-label">Property</span>
+      <select class="modal-select" id="cmPropertySelect" style="display:none" onchange="onPropertySelectChange()"></select>
+      <div id="cmProperty" style="font-weight:700;font-size:14px;color:var(--dark)"></div>
+      <div class="modal-info" id="cmContext"></div>
+    </div>
+
+    <div class="modal-row" id="cmUnlistedRow" style="display:none">
+      <span class="modal-label">Unlisted job description <span style="color:var(--warn)">*</span></span>
+      <input type="text" class="modal-input" id="cmUnlistedDesc" placeholder="e.g. Tub repair at warehouse, deck repair Mayflower">
+      <div class="modal-info">One-off work that isn't tied to a property changeover/booking. Saved as an unlisted entry on the Hot Tub Cleans board.</div>
+    </div>
+
+    <div class="modal-row-inline">
+      <div class="modal-row" style="flex:1">
+        <span class="modal-label">Date</span>
+        <input type="date" class="modal-input" id="cmDate">
+      </div>
+      <div class="modal-row" style="flex:1">
+        <span class="modal-label">Earliest start</span>
+        <input type="time" class="modal-input" id="cmStart">
+      </div>
+    </div>
+
+    <div class="modal-row">
+      <span class="modal-label">Clean type</span>
+      <select class="modal-select" id="cmType">
+        <option value="Changeover">Changeover</option>
+        <option value="Mid-stay">Mid-stay (guests in)</option>
+        <option value="Mid-vacancy">Mid-vacancy</option>
+      </select>
+    </div>
+
+    <div class="modal-row">
+      <span class="modal-label">Assigned to</span>
+      <select class="modal-select" id="cmPerson">
+        <option value="">— unassigned —</option>
+      </select>
+    </div>
+
+    <div class="modal-row-inline">
+      <div class="modal-row" style="flex:1">
+        <span class="modal-label">Status</span>
+        <select class="modal-select" id="cmStatus">
+          <option value="Scheduled">Scheduled</option>
+          <option value="In Progress">In Progress</option>
+          <option value="Completed">Completed</option>
+          <option value="Cancelled">Cancelled</option>
+        </select>
+      </div>
+      <div class="modal-row" style="flex:1">
+        <span class="modal-label">Duration (mins)</span>
+        <input type="number" class="modal-input" id="cmDuration" min="0" step="5">
+      </div>
+    </div>
+
+    <div class="modal-row">
+      <span class="modal-label">Notes</span>
+      <textarea class="modal-input" id="cmNotes" rows="2"></textarea>
+    </div>
+
+    <div class="modal-btns">
+      <button class="modal-btn primary" onclick="saveModal()">Save</button>
+      <button class="modal-btn secondary" onclick="closeModal('cleanModal')">Cancel</button>
+      <button class="modal-btn danger" onclick="deleteFromModal()" id="cmDeleteBtn">Delete</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* ═══════════════════════════════════════════════════════════════════
+   CONFIG — Hot Tub Rota
+   ═══════════════════════════════════════════════════════════════════ */
+const HTROTA_BUILD = 'hot-tub-rota v1.0';
+console.log(`%c${HTROTA_BUILD}`, 'color:#1a5276;font-weight:bold');
+
+const MONDAY_API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+
+// Boards
+const PROP_CONFIG_BOARD  = '5094466278';   // Property Config — master record (which props need maintenance, durations, hasTub)
+const TUB_STATUS_BOARD   = '1918769299';   // Hot Tub Status — last-cleaned anchor + tub readings
+const HT_CLEANS_BOARD    = '5095259581';   // Hot Tub Cleans — scheduled clean rows (created 2026-04-25)
+const LODGE_STATUS_BOARD = '1928673949';   // Lodge Status — booking dates (legacy, fallback)
+const HK_CLEANS_BOARD    = '5095134636';   // Cleans — every upcoming changeover (one row per turnover with check-in + check-out)
+const STAFF_BOARD        = '5095127554';
+
+// Cleans board columns (housekeeping rota — used as the booking timeline source)
+const HK_CL_CHECKIN  = 'date_mm2p6tck';     // The new guest's arrival date
+const HK_CL_CHECKOUT = 'date_mm2pb8rs';     // The new guest's departure date
+const HK_CL_PROP     = 'board_relation_mm2psy0b';  // Linked property (often empty — fall back to item name)
+
+// Property Config columns (master)
+const PC_NEEDS_MAINT  = 'boolean_mm2rvfsv';      // Maintenance clean — drives this rota
+const PC_HAS_TUB      = 'boolean_mm2rpzzh';      // Has hot tub
+const PC_FULL_MINS    = 'numeric_mm2rp0p9';      // Full / Changeover clean duration (mins)
+const PC_MID_MINS     = 'numeric_mm2rcbe6';      // Mid-stay / Mid-vac duration (mins)
+
+// Hot Tub Status columns — only used to read the last-cleaned anchor
+const TS_LAST         = 'date4';                 // Last Cleaned Date
+
+// Lodge Status — used to read the property's lake/area Location.
+const LS_LOCATION     = 'text_mm1gza8p';
+
+// Lodge Status columns
+const LS_CURR_IN  = 'date4';
+const LS_CURR_OUT = 'date_mkqaea46';
+const LS_NEXT_IN  = 'date_mkqwfyfx';
+const LS_NEXT_OUT = 'date_mkqw4cf6';
+
+// Hot Tub Cleans columns (this board's columns)
+const HC_DATE     = 'date_mm2rvsp9';
+const HC_PROP     = 'board_relation_mm2rjw3';
+const HC_TYPE     = 'color_mm2rr4cv';            // Clean Type (status)
+const HC_PERSON   = 'dropdown_mm2rjwkr';         // Person Name (dropdown — staff names)
+const HC_START    = 'hour_mm2r90d7';             // Earliest Start (hour)
+const HC_STATUS   = 'color_mm2rqkeq';
+const HC_DURATION = 'numeric_mm2r9e9h';
+const HC_NOTES    = 'long_text_mm2rsrdj';
+const HC_AUTOGEN  = 'boolean_mm2rcpj4';
+
+// Staff (re-use cleans rota pattern)
+const ST_ROLE   = 'color_mm2psadz';
+const ST_STATUS = 'color_mm2psvh2';
+
+// Staff Shifts board — for rostered hours per staff per day.
+const SHIFTS_BOARD = '5095155773';
+const SH_STAFF = 'text_mm2p1gqx';   // Staff item id stored as plain text
+const SH_DATE  = 'date_mm2phk9q';
+const SH_ROLE  = 'color_mm2pcrmp';
+const SH_HOURS = 'numeric_mm2pawya';
+// Roles that block work (don't count toward capacity)
+const SHIFT_BLOCK_ROLES = new Set(['Off','Leave','Sick']);
+
+// Only staff with this role appear in the hot tub rota's sidebar / assignee list.
+// Add new maintenance staff via staff-shifts.html.
+const ROTA_ROLE = 'Maintenance';
+
+// Look — same PIN as the cleans rota planner
+const PIN_HASH = 'df8d602b7bcaf41725409b83af2a3df79722be244d9f33b5f128b81a269b955e';
+const STORE_KEY = 'hotTubRota_v1';
+
+/* ═══════════════════════════════════════════════════════════════════
+   STATE
+   ═══════════════════════════════════════════════════════════════════ */
+let viewStart = todayDate();
+let viewMode = 'day';   // 'day' | 'week'
+let properties = [];      // hot tub status rows
+let bookings = {};         // keyed by lodge name → { currIn, currOut, nextIn, nextOut }
+let staff = [];
+let cleans = [];           // unified list: existing Monday rows + virtual auto-derived
+let shifts = [];           // [{staffId, date, role, hours}] from Staff Shifts board
+let editingCleanId = null;
+let dragData = null;
+
+function todayDate() { const d = new Date(); d.setHours(0,0,0,0); return d; }
+function startOfWeek(d) { const r = new Date(d); r.setHours(0,0,0,0); const dow = r.getDay(); r.setDate(r.getDate() - (dow === 0 ? 6 : dow - 1)); return r; }
+function localStr(d) { return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0'); }
+function addDays(d, n) { const r = new Date(d); r.setDate(r.getDate()+n); return r; }
+function addDaysISO(iso, n) { const d = new Date(iso+'T00:00:00'); d.setDate(d.getDate()+n); return localStr(d); }
+function daysBetween(a, b) { return Math.round((new Date(b+'T00:00:00') - new Date(a+'T00:00:00')) / 86400000); }
+function uid() { return 'tmp_' + Math.random().toString(36).slice(2) + Date.now().toString(36); }
+function pj(v) { try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; } }
+function escapeHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function toast(msg, ms=2200) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._h); toast._h = setTimeout(()=>t.classList.remove('show'), ms); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   PIN GATE
+   ═══════════════════════════════════════════════════════════════════ */
+async function sha256(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function checkPin(v) {
+  if ((await sha256(v)) === PIN_HASH) {
+    sessionStorage.setItem('bh-mgmt', '1');
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    boot();
+  } else {
+    document.getElementById('pinErr').textContent = 'Incorrect PIN — try again';
+    document.getElementById('pinInput').value = '';
+    document.getElementById('pinInput').focus();
+  }
+}
+document.getElementById('pinInput').addEventListener('input', e => {
+  const v = e.target.value.trim();
+  if (v.length === 6) checkPin(v);
+});
+document.getElementById('pinInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') {
+    const v = e.target.value.trim();
+    if (v.length >= 4) checkPin(v);
+  }
+});
+if (sessionStorage.getItem('bh-mgmt') === '1') {
+  document.getElementById('pinGate').style.display = 'none';
+  document.getElementById('app').style.display = 'block';
+  window.addEventListener('DOMContentLoaded', boot);
+} else {
+  setTimeout(() => document.getElementById('pinInput').focus(), 100);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MONDAY API
+   ═══════════════════════════════════════════════════════════════════ */
+async function mondayFetch(query, variables) {
+  const r = await fetch('https://api.monday.com/v2', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'Authorization':MONDAY_API_TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query })
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+function setLoading(on) { document.getElementById('loadingBar').style.display = on ? 'block' : 'none'; }
+
+async function fetchProperties() {
+  // Property Config is the master record — it holds Maintenance flag,
+  // Has-tub flag, and per-property full/mid clean durations.
+  // Hot Tub Status provides the last-cleaned anchor (and the Hot Tub Cleans
+  // board points at Hot Tub Status rows for the linked Property column),
+  // so we join the two by name and keep both ids per property.
+  const pcCols = `["${PC_NEEDS_MAINT}","${PC_HAS_TUB}","${PC_FULL_MINS}","${PC_MID_MINS}"]`;
+  const tsCols = `["${TS_LAST}"]`;
+  const lsCols = `["${LS_LOCATION}"]`;
+  const [pcData, tsData, lsData] = await Promise.all([
+    mondayFetch(`{ boards(ids:[${PROP_CONFIG_BOARD}]){ items_page(limit:200){ items{
+      id name column_values(ids:${pcCols}){ id value text }
+    } } } }`),
+    mondayFetch(`{ boards(ids:[${TUB_STATUS_BOARD}]){ items_page(limit:200){ items{
+      id name column_values(ids:${tsCols}){ id value text }
+    } } } }`),
+    mondayFetch(`{ boards(ids:[${LODGE_STATUS_BOARD}]){ items_page(limit:200){ items{
+      id name column_values(ids:${lsCols}){ id value text }
+    } } } }`),
+  ]);
+
+  // Build a lookup of Hot Tub Status rows by trimmed name → { id, lastCleaned }.
+  const tsByName = {};
+  const tsItems = tsData?.boards?.[0]?.items_page?.items || [];
+  for (const it of tsItems) {
+    const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));
+    const lastObj = pj(cv[TS_LAST]?.value);
+    tsByName[(it.name || '').trim()] = {
+      id: it.id,
+      lastCleaned: lastObj?.date || null,
+    };
+  }
+  // Lodge Status by name → { location } so we can tag each property with its lake/area.
+  const lsByName = {};
+  const lsItems = lsData?.boards?.[0]?.items_page?.items || [];
+  for (const it of lsItems) {
+    const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));
+    lsByName[(it.name || '').trim()] = {
+      location: (cv[LS_LOCATION]?.text || '').trim() || '',
+    };
+  }
+
+  properties = [];
+  const pcItems = pcData?.boards?.[0]?.items_page?.items || [];
+  for (const it of pcItems) {
+    try {
+      const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));
+      const needsMaint = !!(pj(cv[PC_NEEDS_MAINT]?.value)?.checked);
+      // Skip properties that don't need maintenance — they shouldn't appear in this rota
+      if (!needsMaint) continue;
+      const hasTub = !!(pj(cv[PC_HAS_TUB]?.value)?.checked);
+      const fullMins = parseFloat(pj(cv[PC_FULL_MINS]?.value)) || 45;
+      const midMins  = parseFloat(pj(cv[PC_MID_MINS]?.value))  || 20;
+      const ts = tsByName[(it.name || '').trim()] || {};
+      const ls = lsByName[(it.name || '').trim()] || {};
+      properties.push({
+        id: ts.id || null,             // Hot Tub Status item id (target of Hot Tub Cleans board_relation)
+        configId: it.id,               // Property Config item id (kept for reference)
+        name: it.name || '',
+        hasTub,
+        needsMaintenance: needsMaint,
+        fullDuration: fullMins,
+        midDuration: midMins,
+        duration: fullMins,
+        lastCleaned: ts.lastCleaned || null,
+        location: ls.location || '',   // Lake / area (e.g. "Waters Edge", "Yellowstone")
+      });
+    } catch (e) {
+      console.warn('fetchProperties: skipping item', it?.id, e);
+    }
+  }
+  properties.sort((a,b) => (a.name||'').localeCompare(b.name||''));
+}
+
+// Pick the right per-property duration for a given clean type.
+function durationForType(p, type) {
+  if (!p) return type === 'Changeover' ? 45 : 20;
+  return type === 'Changeover' ? (p.fullDuration || 45) : (p.midDuration || 20);
+}
+
+/* Each Cleans-board row represents one upcoming check-in. We aggregate them
+   per property to build a forward-looking timeline of stays:
+       bookings[propertyName] = [
+         { checkIn: 'YYYY-MM-DD', checkOut: 'YYYY-MM-DD' },
+         { checkIn: ..., checkOut: ... },
+         ...
+       ]
+   This gives full visibility of every booking the housekeeping team has been
+   asked to plan for, not just current+next.
+
+   Fallback: parse property name from item name (e.g. "Mon 27 · Mayflower"
+   → "Mayflower"), since the board_relation column is sometimes empty. */
+function parsePropertyFromCleanItemName(name) {
+  if (!name) return '';
+  let n = name.trim();
+  const emIdx = n.indexOf(' — ');
+  if (emIdx >= 0) n = n.slice(0, emIdx).trim();
+  const bulletMatch = n.match(/^[A-Za-z]{3}\s+\d{1,2}\s+·\s+(.+)$/);
+  if (bulletMatch) n = bulletMatch[1].trim();
+  return n.replace(/^CL\s+/i, '').trim();
+}
+
+async function fetchBookings() {
+  const cols = `["${HK_CL_CHECKIN}","${HK_CL_CHECKOUT}","${HK_CL_PROP}"]`;
+  // Paginate — the Cleans board can run past 500 entries in a busy season.
+  let cursor = null, all = [];
+  do {
+    const q = cursor
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${cols}){ id value text } } } }`
+      : `{ boards(ids:[${HK_CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${cols}){ id value text } } } } }`;
+    const d = await mondayFetch(q);
+    const page = cursor ? d?.next_items_page : d?.boards?.[0]?.items_page;
+    if (!page) break;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+  } while (cursor);
+
+  bookings = {};
+  for (const it of all) {
+    try {
+      const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));
+      const checkIn  = pj(cv[HK_CL_CHECKIN]?.value)?.date  || null;
+      const checkOut = pj(cv[HK_CL_CHECKOUT]?.value)?.date || null;
+      // We need at least the check-in to anchor anything.
+      if (!checkIn) continue;
+      // Property name: prefer the linked board_relation text, fall back to name parsing.
+      const relText = (cv[HK_CL_PROP]?.text || '').trim();
+      const fromName = parsePropertyFromCleanItemName(it.name);
+      const propName = relText || fromName;
+      if (!propName) continue;
+      if (!bookings[propName]) bookings[propName] = [];
+      bookings[propName].push({ checkIn, checkOut });
+    } catch (e) {
+      console.warn('fetchBookings: skipping clean', it?.id, e);
+    }
+  }
+  // Sort each property's stays by check-in date so the algorithm can sweep forward
+  for (const k of Object.keys(bookings)) {
+    bookings[k].sort((a, b) => (a.checkIn || '').localeCompare(b.checkIn || ''));
+  }
+}
+
+/* ───────────── Booking timeline helpers ──────────────────────────── */
+// All return booleans / arrays based on the per-property stay timeline.
+
+function staysFor(propName) {
+  return bookings[(propName||'').trim()] || [];
+}
+function isCheckinOn(stays, dayStr) {
+  return stays.some(s => s.checkIn === dayStr);
+}
+function isCheckoutOn(stays, dayStr) {
+  return stays.some(s => s.checkOut === dayStr);
+}
+// Mid-stay: a stay strictly contains this day midnight-to-midnight
+//   (checkIn < day  AND  checkOut > day)
+function isMidnightToMidnight(stays, dayStr) {
+  return stays.some(s => s.checkIn && s.checkOut && s.checkIn < dayStr && dayStr < s.checkOut);
+}
+// Fully vacant: this day touches no stay at all (not check-in, not check-out, not strictly inside)
+function isFullyVacant(stays, dayStr) {
+  for (const s of stays) {
+    if (s.checkIn === dayStr || s.checkOut === dayStr) return false;
+    if (s.checkIn && s.checkOut && s.checkIn < dayStr && dayStr < s.checkOut) return false;
+  }
+  return true;
+}
+// True if any stay's check-in matches the day after dayStr
+function hasCheckinNextDay(stays, dayStr) {
+  const next = addDaysISO(dayStr, 1);
+  return stays.some(s => s.checkIn === next);
+}
+// Find the previous checkout strictly before dayStr (used to know the earliest
+// the property became vacant, which is the earliest a Changeover can be brought
+// forward to). Returns 'YYYY-MM-DD' or null.
+function previousCheckoutBefore(stays, dayStr) {
+  let best = null;
+  for (const s of stays) {
+    if (s.checkOut && s.checkOut < dayStr) {
+      if (!best || s.checkOut > best) best = s.checkOut;
+    }
+  }
+  return best;
+}
+
+async function fetchStaff() {
+  const data = await mondayFetch(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:200){ items{
+    id name column_values(ids:["${ST_ROLE}","${ST_STATUS}"]){ id value text }
+  } } } }`);
+  staff = [];
+  for (const it of data.boards[0].items_page.items) {
+    const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+    const role = cv[ST_ROLE]?.text || '';
+    const status = cv[ST_STATUS]?.text || 'Active';
+    const offline = /annual leave|sick|off|training/i.test(status);
+    staff.push({
+      id: it.id,
+      name: it.name,
+      role,
+      status,
+      offline,
+    });
+  }
+  staff.sort((a,b) => {
+    if (a.offline !== b.offline) return a.offline ? 1 : -1;
+    return a.name.localeCompare(b.name);
+  });
+}
+
+async function fetchShifts() {
+  // Pull rostered shifts from Staff Shifts board. Paginated — the board
+  // accumulates rows year-on-year. We keep all rows but only consult the
+  // visible window when rendering, so the cost is one fetch per Refresh.
+  const cols = `["${SH_STAFF}","${SH_DATE}","${SH_ROLE}","${SH_HOURS}"]`;
+  let cursor = null, all = [];
+  do {
+    const q = cursor
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id column_values(ids:${cols}){ id text value } } } }`
+      : `{ boards(ids:[${SHIFTS_BOARD}]){ items_page(limit:500){ cursor items{ id column_values(ids:${cols}){ id text value } } } } }`;
+    const d = await mondayFetch(q);
+    const page = cursor ? d?.next_items_page : d?.boards?.[0]?.items_page;
+    if (!page) break;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+  } while (cursor);
+
+  shifts = [];
+  for (const it of all) {
+    try {
+      const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));
+      const staffId = (cv[SH_STAFF]?.text || '').trim();
+      const date = pj(cv[SH_DATE]?.value)?.date || null;
+      if (!staffId || !date) continue;
+      shifts.push({
+        staffId,
+        date,
+        role:  cv[SH_ROLE]?.text || '',
+        hours: parseFloat(pj(cv[SH_HOURS]?.value)) || 0,
+      });
+    } catch (e) {
+      console.warn('fetchShifts: skipping shift', it?.id, e);
+    }
+  }
+}
+
+// Rostered minutes for one staff (Monday item id) on one day.
+// Returns 0 if off/leave/sick or no shift logged.
+function rosteredMinsFor(staffId, dayStr) {
+  if (!staffId || !dayStr) return 0;
+  const id = String(staffId);
+  const sh = shifts.find(s => s.staffId === id && s.date === dayStr);
+  if (!sh) return 0;
+  if (SHIFT_BLOCK_ROLES.has(sh.role)) return 0;
+  return Math.round((sh.hours || 0) * 60);
+}
+function shiftRoleFor(staffId, dayStr) {
+  const sh = shifts.find(s => s.staffId === String(staffId) && s.date === dayStr);
+  return sh ? sh.role : '';
+}
+
+async function fetchCleans() {
+  const cols = `["${HC_DATE}","${HC_PROP}","${HC_TYPE}","${HC_PERSON}","${HC_START}","${HC_STATUS}","${HC_DURATION}","${HC_NOTES}","${HC_AUTOGEN}"]`;
+  let cursor = null, all = [];
+  do {
+    const q = cursor
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${cols}){ id value text } } } }`
+      : `{ boards(ids:[${HT_CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${cols}){ id value text } } } } }`;
+    const d = await mondayFetch(q);
+    const page = cursor ? d?.next_items_page : d?.boards?.[0]?.items_page;
+    if (!page) break;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+  } while (cursor);
+
+  cleans = [];
+  for (const it of all) {
+    try {
+      const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));
+      const dateObj = pj(cv[HC_DATE]?.value);
+      if (!dateObj?.date) continue;
+      const startObj = pj(cv[HC_START]?.value);
+      const start = startObj ? `${String(startObj.hour||0).padStart(2,'0')}:${String(startObj.minute||0).padStart(2,'0')}` : '10:00';
+      const propText = cv[HC_PROP]?.text || '';
+      // Unlisted: item name is "[Unlisted] Description — date". No board_relation property text.
+      const isUnlisted = (it.name || '').startsWith('[Unlisted] ');
+      let propLabel = propText;
+      if (isUnlisted) {
+        // Strip the "[Unlisted] " prefix and the trailing " — date" so the description shows cleanly
+        let n = (it.name || '').replace(/^\[Unlisted\]\s+/, '');
+        const emIdx = n.lastIndexOf(' — ');
+        if (emIdx > 0) n = n.slice(0, emIdx);
+        propLabel = n.trim();
+      }
+      cleans.push({
+        id: it.id,
+        mondayId: it.id,
+        property: propLabel,
+        unlisted: isUnlisted,
+        day: dateObj.date,
+        type: cv[HC_TYPE]?.text || 'Changeover',
+        person: (cv[HC_PERSON]?.text || '').split(',').map(s=>s.trim()).filter(Boolean)[0] || '',
+        start,
+        status: cv[HC_STATUS]?.text || 'Scheduled',
+        duration: parseFloat(pj(cv[HC_DURATION]?.value)) || 45,
+        notes: pj(cv[HC_NOTES]?.value)?.text || cv[HC_NOTES]?.text || '',
+        autoGen: !!(pj(cv[HC_AUTOGEN]?.value)?.checked),
+        virtual: false,
+        dirty: false,
+        isNew: false,
+      });
+    } catch (e) {
+      console.warn('fetchCleans: skipping item', it?.id, e);
+    }
+  }
+}
+
+async function refreshAll() {
+  setLoading(true);
+  try {
+    await Promise.all([fetchProperties(), fetchBookings(), fetchStaff(), fetchShifts()]);
+    await fetchCleans();
+    render();
+    toast('Refreshed');
+  } catch (e) {
+    console.error(e);
+    toast('Refresh failed: ' + e.message, 3500);
+  }
+  setLoading(false);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   AUTO-DERIVE virtual cleans for the visible week
+   Rules (per Barry, 2026-04-25, refined):
+
+   PROPERTY TYPES
+     • Hot Tub property (TS_HOTTUB_FLAG = 'Y'): full 48h cycle — Changeover,
+       Mid-stay, Mid-vacancy. Tub seen every 48h, whether by check-in or
+       a service visit.
+     • Outside-only property (TS_HOTTUB_FLAG = 'N', e.g. Serenity, Goose
+       Landing, Green Haven): Maintenance team services on CHANGEOVER ONLY
+       (cobwebbing / BBQ / deck cleans). No mid-stay or mid-vac.
+
+   CHANGEOVER (turnover)
+     • Always scheduled on a check-in day at 10:00 (old guests checked out).
+     • Maintenance does the FULL property service on a changeover.
+
+   48-HOUR RULE (hot-tub properties only)
+     • Mid-stay during a stay if ≥48h since last visit (occupied, start 10:00).
+     • Mid-vacancy during a vacancy if ≥48h since last visit (vacant, start 09:00).
+
+   BRING-FORWARD (vacant + check-in tomorrow)
+     • If today is vacant and a Mid-vac is due (≥48h) and there's a check-in
+       TOMORROW, promote today's clean to a Changeover (start 09:00) AND
+       suppress tomorrow's check-in Changeover. We do the full clean now
+       instead of returning tomorrow.
+
+   SAME-DAY DOUBLE VISITS (allowed)
+     • If today is OCCUPIED and a Mid-stay is due AND there's a check-in
+       tomorrow (i.e. current guests check out tomorrow morning), do BOTH:
+       Mid-stay today (tub only — guests are in) + Changeover tomorrow.
+       That's an accepted 2-visits-in-2-days case.
+
+   We only emit virtual rows where no real Monday row already covers that
+   property+day. Real rows always win and update the lastClean anchor.
+   ═══════════════════════════════════════════════════════════════════ */
+function autoDeriveCleans() {
+  const out = [];
+  const todayStr = localStr(todayDate());
+  for (const p of properties) {
+    // Walk 14 days so the 48h chain stays consistent across week shifts.
+    const days = [];
+    for (let i = 0; i < 14; i++) days.push(addDaysISO(todayStr, i));
+
+    const stays = staysFor(p.name);
+    let lastClean = p.lastCleaned || addDaysISO(todayStr, -7);
+
+    // Pre-seed lastClean from any already-saved completed cleans before today
+    for (const c of cleans) {
+      if (c.property === p.name && c.day < todayStr && c.status === 'Completed') {
+        if (c.day > lastClean) lastClean = c.day;
+      }
+    }
+
+    // Pre-collect days that will be handled by a brought-forward Changeover.
+    // We do this in a quick first pass so the main loop doesn't have to look
+    // ahead. A bring-forward fires when: today is vacant or a check-out day,
+    // 48h have elapsed since lastClean (rolling), and a check-in lands tomorrow.
+    // We don't actually emit during this pass — we just figure out which
+    // check-in days should be SUPPRESSED by an earlier auto-Changeover so the
+    // main loop emits the bring-forward in the right place.
+    const suppressedCheckins = new Set();    // checkin dates we'll skip
+    const broughtForwardOn   = new Set();    // dates we'll auto-fire bring-forward on
+    {
+      let lc = lastClean;
+      for (const d of days) {
+        const isCheckin  = isCheckinOn(stays, d);
+        const isCheckout = isCheckoutOn(stays, d);
+        const occupied   = isMidnightToMidnight(stays, d);
+        const ds         = daysBetween(lc, d);
+        if (isCheckin)              { lc = d; continue; }
+        if (!p.hasTub)              continue;
+        if (ds < 2)                 continue;
+        if (occupied)               { lc = d; continue; }
+        // Vacant or check-out today, 48h up:
+        if (hasCheckinNextDay(stays, d) && !isCheckout) {
+          // Empty day before a check-in → bring forward Changeover today.
+          broughtForwardOn.add(d);
+          suppressedCheckins.add(addDaysISO(d, 1));
+          lc = d;
+        } else if (hasCheckinNextDay(stays, d) && isCheckout) {
+          // Check-out today and check-in tomorrow → planner can decide:
+          // by default we leave Mid-vac today + Changeover tomorrow as TWO visits
+          // (matches Barry's "we accept 2 visits in 2 days" rule for back-to-back).
+          // The "drag earlier" UI lets the planner consolidate manually if they prefer.
+          lc = d;
+        } else {
+          // Plain mid-vac (no check-in tomorrow)
+          lc = d;
+        }
+      }
+    }
+
+    for (const d of days) {
+      const isCheckin  = isCheckinOn(stays, d);
+      const isCheckout = isCheckoutOn(stays, d);
+      const occupied   = isMidnightToMidnight(stays, d);
+      const checkinTomorrow = hasCheckinNextDay(stays, d);
+
+      const daysSince = daysBetween(lastClean, d);
+      let want = null;
+
+      // ── Phase 1: Changeover on check-in day (always) ─────────────
+      if (isCheckin) {
+        if (suppressedCheckins.has(d)) {
+          // We brought this changeover forward to yesterday — don't double-up.
+          continue;
+        }
+        // Real Changeover on yesterday means a manual bring-forward has already
+        // covered this turnover. Skip the auto-changeover today.
+        const yesterday = addDaysISO(d, -1);
+        const broughtForwardManually = cleans.some(c =>
+          !c.virtual && !c.deleted && c.property === p.name
+          && c.type === 'Changeover' && c.day === yesterday);
+        if (broughtForwardManually) continue;
+        want = { type: 'Changeover', start: '10:00' };
+      }
+
+      // ── Phase 2: 48h rule (hot-tub properties only) ──────────────
+      if (!want && p.hasTub && daysSince >= 2) {
+        if (occupied) {
+          // Mid-stay (guests in midnight-to-midnight — tub-only service)
+          want = { type: 'Mid-stay', start: '10:00' };
+        } else if (broughtForwardOn.has(d)) {
+          // Pre-pass decided this vacant day should host a brought-forward Changeover.
+          want = { type: 'Changeover', start: '09:00' };
+        } else if (isCheckout) {
+          // Vacant from this morning. Mid-vac at 10:00 (after guests leave).
+          want = { type: 'Mid-vacancy', start: '10:00' };
+        } else {
+          // Fully vacant day, 48h up — Mid-vac at 09:00.
+          want = { type: 'Mid-vacancy', start: '09:00' };
+        }
+      }
+
+      if (!want) continue;
+
+      // Real Monday row wins — even if we'd derive something, defer to it.
+      const hasReal = cleans.some(c => c.property === p.name && c.day === d && !c.virtual);
+      if (hasReal) {
+        lastClean = d;
+        // If a real Changeover is sitting on a check-in day, the bring-forward
+        // suppression doesn't apply to it (the planner has explicitly set it).
+        continue;
+      }
+
+      out.push({
+        id: 'virt_' + (p.id || p.configId) + '_' + d,
+        mondayId: null,
+        property: p.name,
+        propertyId: p.id,
+        day: d,
+        type: want.type,
+        person: '',
+        start: want.start,
+        status: 'Scheduled',
+        duration: durationForType(p, want.type),
+        notes: '',
+        autoGen: true,
+        virtual: true,
+        hasTub: p.hasTub,
+        dirty: false,
+        isNew: false,
+      });
+      lastClean = d;
+    }
+  }
+  return out;
+}
+
+function getAllCleansForView(opts) {
+  // Real cleans + virtual ones, restricted to the visible window.
+  // In day view we restrict to the single visible day; in week view to 7 days.
+  const startStr = opts?.startStr || localStr(viewStart);
+  const endStr   = opts?.endStr   || localStr(addDays(viewStart, viewMode === 'day' ? 0 : 6));
+  const real = cleans.filter(c => !c.deleted && c.day >= startStr && c.day <= endStr);
+  const virtual = autoDeriveCleans().filter(c => c.day >= startStr && c.day <= endStr);
+  const hideVirtual = document.getElementById('hideVirtualToggle')?.checked;
+  const virts = hideVirtual ? [] : virtual;
+  return [...real, ...virts];
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   RENDER
+   ═══════════════════════════════════════════════════════════════════ */
+function render() {
+  renderWeekLabel();
+  renderStaffPanel();
+  if (viewMode === 'day') renderDayView();
+  else if (viewMode === 'staff') renderStaffWorkloadView();
+  else renderGrid();
+  updateSaveBtn();
+}
+
+function renderWeekLabel() {
+  const lbl = document.getElementById('weekLabel');
+  if (viewMode === 'day') {
+    const fmt = d => d.toLocaleDateString('en-GB',{weekday:'long', day:'numeric', month:'long'});
+    const todayStr = localStr(todayDate());
+    const visStr = localStr(viewStart);
+    const tag = visStr === todayStr ? '  ·  TODAY'
+              : visStr === addDaysISO(todayStr,1) ? '  ·  TOMORROW'
+              : visStr === addDaysISO(todayStr,-1) ? '  ·  YESTERDAY'
+              : '';
+    lbl.innerHTML = `${fmt(viewStart)}<span style="opacity:0.6;font-weight:500">${tag}</span>`;
+  } else {
+    const a = viewStart;
+    const b = addDays(viewStart, 6);
+    const fmt = d => d.toLocaleDateString('en-GB',{day:'numeric', month:'short'});
+    lbl.textContent = `${fmt(a)} – ${fmt(b)}, ${b.getFullYear()}`;
+  }
+}
+
+function renderStaffPanel() {
+  const list = document.getElementById('staffList');
+  const hideZeroLegacy = document.getElementById('hideZeroStaffToggle')?.checked;
+  // The visible window depends on view mode: 1 day in Day view, 7 days otherwise
+  const span = (viewMode === 'day') ? 1 : 7;
+  const visStart = localStr(viewStart);
+  const visEnd = localStr(addDays(viewStart, span - 1));
+  const cleansVisible = cleans.filter(c => !c.deleted && c.day >= visStart && c.day <= visEnd);
+  const dayStrs = Array.from({length: span}, (_,i) => addDaysISO(visStart, i));
+
+  // Per-person allocated minutes & clean counts in the visible window.
+  const counts = {};
+  const minsByPerson = {};
+  for (const c of cleansVisible) {
+    if (!c.person) continue;
+    counts[c.person] = (counts[c.person] || 0) + 1;
+    minsByPerson[c.person] = (minsByPerson[c.person] || 0) + (c.duration || 45);
+  }
+
+  // Maintenance staff, active only.
+  const maint = staff.filter(s => (s.role || '').trim() === ROTA_ROLE
+                                  && (s.status || '').toLowerCase() !== 'inactive');
+
+  // Build chip data with rostered minutes for each staff member in the window.
+  const chips = maint.map(s => {
+    let rosterMins = 0;
+    let anyBlock = false;
+    for (const d of dayStrs) {
+      rosterMins += rosteredMinsFor(s.id, d);
+      const role = shiftRoleFor(s.id, d);
+      if (role && SHIFT_BLOCK_ROLES.has(role)) anyBlock = true;
+    }
+    const allocMins = minsByPerson[s.name] || 0;
+    return { s, rosterMins, allocMins, anyBlock, count: counts[s.name] || 0 };
+  });
+
+  // Apply filters: off-roster (shared with Staff view) + the legacy hideZero toggle.
+  // "Off-roster" = no rostered hours AND no work assigned in the window.
+  const filtered = chips.filter(({ s, rosterMins, count }) => {
+    if (STATE_staffHide.offRoster && rosterMins === 0 && count === 0) return false;
+    if (hideZeroLegacy && count === 0) return false;
+    return true;
+  });
+
+  // Sort: over-capacity first (urgent), then most allocated, then alphabetical.
+  filtered.sort((a, b) => {
+    const oa = a.rosterMins > 0 && a.allocMins > a.rosterMins ? 1 : 0;
+    const ob = b.rosterMins > 0 && b.allocMins > b.rosterMins ? 1 : 0;
+    if (oa !== ob) return ob - oa;
+    if (a.allocMins !== b.allocMins) return b.allocMins - a.allocMins;
+    return a.s.name.localeCompare(b.s.name);
+  });
+
+  if (!filtered.length) {
+    const hiddenAll = chips.length > 0 && filtered.length === 0;
+    list.innerHTML = hiddenAll
+      ? `<div style="font-size:11px;color:var(--muted);font-style:italic;padding:8px;line-height:1.4">All staff hidden by filter. <button onclick="STATE_staffHide.offRoster=false; document.getElementById('hideZeroStaffToggle').checked=false; render()" style="background:none;border:none;color:var(--sage);text-decoration:underline;cursor:pointer;font:inherit">Show all</button></div>`
+      : `<div style="font-size:11px;color:var(--muted);font-style:italic;padding:8px;line-height:1.4">No staff with role <b>${ROTA_ROLE}</b>. Add one in <a href="staff-shifts.html" style="color:var(--sage)">Staff Shifts</a>.</div>`;
+    return;
+  }
+
+  list.innerHTML = filtered.map(({ s, rosterMins, allocMins, anyBlock, count }) => {
+    const overrun = rosterMins > 0 && allocMins > rosterMins;
+    const orphaned = rosterMins === 0 && allocMins > 0;   // assigned without a shift
+    const nearFull = !overrun && rosterMins > 0 && allocMins >= rosterMins * 0.85;
+    const cls = ['staff-chip', s.offline && 'off', overrun && 'over', nearFull && 'busy'].filter(Boolean).join(' ');
+    // Hours summary in the chip
+    let summary;
+    if (rosterMins === 0 && allocMins === 0) {
+      summary = anyBlock ? 'off-shift' : 'no shift';
+    } else if (rosterMins === 0) {
+      summary = `${fmtMins(allocMins)} ⚠ no shift`;
+    } else {
+      summary = `${fmtMins(allocMins)} of ${fmtMins(rosterMins)}`;
+    }
+    return `<div class="${cls}" draggable="${!s.offline}" data-staff="${escapeHtml(s.name)}"
+                 ondragstart="onStaffDragStart(event,'${escapeHtml(s.name)}')"
+                 ondragend="onStaffDragEnd(event)"
+                 title="${escapeHtml(s.name)} — ${count} clean${count===1?'':'s'}, ${summary}">
+      <div class="staff-name">${escapeHtml(s.name)}</div>
+      <div class="staff-meta">
+        <span class="staff-role">${escapeHtml(s.role || 'Staff')}</span>
+        <span class="staff-count" style="${overrun?'color:var(--warn)':orphaned?'color:var(--warn)':nearFull?'color:var(--gold)':''}">${escapeHtml(summary)}</span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+function renderGrid() {
+  const container = document.getElementById('rotaGrid');
+  const todayStr = localStr(todayDate());
+  const days = Array.from({length:7}, (_,i) => addDays(viewStart, i));
+  const all = getAllCleansForView();
+  const hideNoTub = document.getElementById('hideNoTubToggle')?.checked;
+
+  let html = '<div class="rota-grid">';
+
+  // Header row: Property | Mon | Tue | ... | Sun
+  html += '<div class="rg-hdr" style="text-align:left">Property</div>';
+  for (const d of days) {
+    const ds = localStr(d);
+    const isToday = ds === todayStr;
+    html += `<div class="rg-hdr ${isToday?'today':''}">
+      ${d.toLocaleDateString('en-GB',{weekday:'short'}).toUpperCase()}<br>
+      <span style="font-weight:400;font-size:10px;opacity:0.7">${d.getDate()} ${d.toLocaleDateString('en-GB',{month:'short'})}</span>
+    </div>`;
+  }
+
+  // Rows: one per property — apply tub filter only. Day view is the place to
+  // focus on a single day; week view shows everyone for the big picture.
+  const props = properties.filter(p => !hideNoTub || p.hasTub);
+  if (!props.length) {
+    html += `</div><div style="padding:20px;text-align:center;color:var(--muted)">No properties — refresh to load.</div>`;
+    container.innerHTML = html;
+    return;
+  }
+
+  for (const p of props) {
+    const stays = staysFor(p.name);
+    const lastTxt = p.hasTub
+      ? (p.lastCleaned ? `Tub last: ${p.lastCleaned.slice(5)}` : 'No prior tub visit')
+      : 'Outside-only — changeover service';
+    const tubBadge = p.hasTub
+      ? ''
+      : '<span style="background:#eee;color:var(--muted);padding:1px 4px;border-radius:3px;font-size:8px;margin-top:2px;font-weight:700;letter-spacing:0.3px">NO TUB · CHANGEOVER ONLY</span>';
+    html += `<div class="rg-prop">
+      <div>${escapeHtml(p.name)}</div>
+      <div class="prop-meta">${lastTxt}</div>
+      ${tubBadge}
+    </div>`;
+
+    for (const d of days) {
+      const ds = localStr(d);
+      const isToday = ds === todayStr;
+      const isPast = ds < todayStr;
+      const isCheckin  = isCheckinOn(stays, ds);
+      const isCheckout = isCheckoutOn(stays, ds);
+      const occupied   = isMidnightToMidnight(stays, ds);
+
+      let cellClass = 'rg-cell';
+      if (isToday) cellClass += ' today';
+      if (isPast) cellClass += ' past';
+      if (isCheckin && !isCheckout) cellClass += ' checkin';
+      else if (isCheckout && !isCheckin) cellClass += ' checkout';
+      else if (occupied) cellClass += ' occupied';
+
+      const cellCleans = all.filter(c => c.property === p.name && c.day === ds);
+
+      html += `<div class="${cellClass}"
+        ondragover="onCellDragOver(event)" ondragleave="onCellDragLeave(event)"
+        ondrop="onCellDrop(event,'${escapeHtml(p.name)}','${ds}')">`;
+
+      for (const c of cellCleans) html += renderCleanCard(c);
+      html += `<button class="add-mini" onclick="newCleanFor('${escapeHtml(p.name)}','${ds}')">+ Add</button>`;
+      html += '</div>';
+    }
+  }
+
+  html += '</div>';
+  container.innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DAY VIEW — focused single-day list with per-day filter chips
+   ═══════════════════════════════════════════════════════════════════ */
+function renderDayView() {
+  const container = document.getElementById('rotaGrid');
+  const dayStr = localStr(viewStart);
+  const hideNoTub = document.getElementById('hideNoTubToggle')?.checked;
+  const hideAssigned = !!STATE_dayHide.assigned;
+  const hideCompleted = !!STATE_dayHide.completed;
+  const hideSuggested = !!STATE_dayHide.suggested;
+
+  // Pull just this day's cards
+  const all = getAllCleansForView({ startStr: dayStr, endStr: dayStr });
+
+  // Apply tub-filter at the property level (rows where the property has no tub
+  // are dropped if the toggle is on)
+  const propByName = Object.fromEntries(properties.map(p => [p.name, p]));
+  const visible = all.filter(c => {
+    const p = propByName[c.property];
+    if (hideNoTub && p && !p.hasTub) return false;
+    if (hideAssigned && c.person) return false;
+    if (hideCompleted && c.status === 'Completed') return false;
+    if (hideSuggested && c.virtual) return false;
+    return true;
+  });
+
+  // Stats
+  const totalAll = all.length;
+  const assigned = all.filter(c => c.person).length;
+  const unassigned = all.filter(c => !c.person && c.status !== 'Completed' && c.status !== 'Cancelled').length;
+  const completed = all.filter(c => c.status === 'Completed').length;
+  const totalMins = all.filter(c => c.status !== 'Cancelled').reduce((m,c) => m + (c.duration || 45), 0);
+
+  let html = '';
+  html += `<div class="day-hero">
+    <div class="day-hero-top">
+      <div>
+        <div class="day-hero-date">${viewStart.toLocaleDateString('en-GB',{weekday:'long', day:'numeric', month:'long'})}</div>
+        <div class="day-hero-sub">${viewStart.getFullYear()}${dayStr === localStr(todayDate()) ? ' · today' : ''}</div>
+      </div>
+      <div class="day-stats">
+        <div class="day-stat"><b>${totalAll}</b> total</div>
+        <div class="day-stat ${unassigned>0?'warn':''}"><b>${unassigned}</b> unassigned</div>
+        <div class="day-stat"><b>${assigned}</b> assigned</div>
+        ${completed>0?`<div class="day-stat"><b>${completed}</b> done</div>`:''}
+        <div class="day-stat" title="Total scheduled service minutes (excl. cancelled)"><b>${Math.round(totalMins/60*10)/10}h</b> work</div>
+      </div>
+    </div>
+    <div class="day-filters">
+      <button class="day-filter ${hideAssigned?'on':''}" onclick="toggleDayFilter('assigned')">${hideAssigned?'✓ ':''}Hide assigned</button>
+      <button class="day-filter ${hideCompleted?'on':''}" onclick="toggleDayFilter('completed')">${hideCompleted?'✓ ':''}Hide completed</button>
+      <button class="day-filter ${hideSuggested?'on':''}" onclick="toggleDayFilter('suggested')">${hideSuggested?'✓ ':''}Hide auto-suggested</button>
+      <span style="margin-left:auto; font-size:11px; color:var(--muted); font-weight:600">Group by:</span>
+      <button class="day-filter ${STATE_dayGroup==='type'?'on':''}" onclick="setDayGroup('type')">${STATE_dayGroup==='type'?'✓ ':''}Type</button>
+      <button class="day-filter ${STATE_dayGroup==='lake'?'on':''}" onclick="setDayGroup('lake')">${STATE_dayGroup==='lake'?'✓ ':''}Lake / area</button>
+    </div>
+  </div>`;
+
+  const sorted = (arr) => arr.slice().sort((a,b) => {
+    const t = (a.start||'').localeCompare(b.start||'');
+    return t !== 0 ? t : (a.property||'').localeCompare(b.property||'');
+  });
+
+  let anyShown = 0;
+
+  if (STATE_dayGroup === 'lake') {
+    // ── Group by lake / area ───────────────────────────────────
+    // Build property → location map, then group cleans by that.
+    const locByProp = Object.fromEntries(properties.map(p => [p.name, p.location || '']));
+    const buckets = {};
+    for (const c of visible) {
+      const loc = c.unlisted ? 'Unlisted' : (locByProp[c.property] || '— no location set —');
+      if (!buckets[loc]) buckets[loc] = [];
+      buckets[loc].push(c);
+    }
+    // Order: real lakes alphabetically, no-location next, Unlisted last
+    const keys = Object.keys(buckets).sort((a, b) => {
+      const aU = a === 'Unlisted', bU = b === 'Unlisted';
+      const aN = a === '— no location set —', bN = b === '— no location set —';
+      if (aU !== bU) return aU ? 1 : -1;
+      if (aN !== bN) return aN ? 1 : -1;
+      return a.localeCompare(b);
+    });
+    for (const loc of keys) {
+      const rows = sorted(buckets[loc]);
+      if (!rows.length) continue;
+      anyShown += rows.length;
+      const totalMins = rows.reduce((m, c) => m + (c.duration || 45), 0);
+      const pillStyle = loc === 'Unlisted'
+        ? 'background:var(--gold); color:#fff'
+        : 'background:var(--sage); color:#fff';
+      html += `<div class="day-section">
+        <div class="day-section-hdr">
+          <span style="${pillStyle}; padding:2px 8px; border-radius:9px; font-size:10px">${escapeHtml(loc)}</span>
+          <span>${rows.length} clean${rows.length===1?'':'s'} · ${fmtMins(totalMins)}</span>
+          <span class="count">${rows.length}</span>
+        </div>`;
+      for (const c of rows) html += renderDayRow(c);
+      html += `</div>`;
+    }
+  } else {
+    // ── Group by type (default) ────────────────────────────────
+    const groups = [
+      { type: 'Changeover',  pillCls: 'pill-co', label: 'Changeovers — full property service' },
+      { type: 'Mid-stay',    pillCls: 'pill-ms', label: 'Mid-stays — guests in, tub only' },
+      { type: 'Mid-vacancy', pillCls: 'pill-mv', label: 'Mid-vacancies — empty, tub only' },
+    ];
+
+    for (const g of groups) {
+      const rows = sorted(visible.filter(c => !c.unlisted && c.type === g.type));
+      if (!rows.length) continue;
+      anyShown += rows.length;
+      html += `<div class="day-section">
+        <div class="day-section-hdr">
+          <span class="${g.pillCls}">${g.type}</span>
+          <span>${g.label}</span>
+          <span class="count">${rows.length}</span>
+        </div>`;
+      for (const c of rows) html += renderDayRow(c);
+      html += `</div>`;
+    }
+    const unlistedRows = sorted(visible.filter(c => c.unlisted));
+    if (unlistedRows.length) {
+      anyShown += unlistedRows.length;
+      html += `<div class="day-section">
+        <div class="day-section-hdr">
+          <span style="background:var(--gold); color:#fff; padding:2px 8px; border-radius:9px; font-size:10px">Unlisted</span>
+          <span>One-off jobs (not tied to a booking)</span>
+          <span class="count">${unlistedRows.length}</span>
+        </div>`;
+      for (const c of unlistedRows) html += renderDayRow(c);
+      html += `</div>`;
+    }
+  }
+
+  if (!anyShown) {
+    if (totalAll > 0) {
+      html += `<div class="day-empty">Everything matches your filters — try toggling the chips above.</div>`;
+    } else {
+      html += `<div class="day-empty">Nothing scheduled or suggested for this day.<br>Switch to Week view, or use ‹ › to scan adjacent days.</div>`;
+    }
+  }
+
+  container.innerHTML = html;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   STAFF WORKLOAD VIEW — workload-by-staff for the visible 7 days
+   ═══════════════════════════════════════════════════════════════════ */
+function renderStaffWorkloadView() {
+  const container = document.getElementById('rotaGrid');
+  // Always cover 7 days starting at viewStart so the workload view is consistent
+  // regardless of whether the user landed here from Day or Week view.
+  const startStr = localStr(viewStart);
+  const endStr   = localStr(addDays(viewStart, 6));
+  const days = Array.from({length:7}, (_,i) => addDays(viewStart, i));
+  const dayStrs = days.map(d => localStr(d));
+  const todayStr = localStr(todayDate());
+
+  const all = getAllCleansForView({ startStr, endStr });
+  const maint = staff.filter(s => (s.role || '').trim() === ROTA_ROLE
+                                  && (s.status || '').toLowerCase() !== 'inactive');
+
+  // Group cleans by assignee
+  const byPerson = {};
+  for (const s of maint) byPerson[s.name] = [];
+  const unassigned = [];
+  for (const c of all) {
+    if (c.status === 'Cancelled') continue;
+    if (c.person && byPerson[c.person]) byPerson[c.person].push(c);
+    else if (c.person) {
+      if (!byPerson[c.person]) byPerson[c.person] = [];
+      byPerson[c.person].push(c);
+    } else {
+      unassigned.push(c);
+    }
+  }
+
+  // Compute per-staff totals for the visible window
+  const staffByName = Object.fromEntries(maint.map(s => [s.name, s]));
+  const totals = {};
+  for (const name of Object.keys(byPerson)) {
+    const s = staffByName[name];
+    let rosterMins = 0, allocMins = 0;
+    for (const d of dayStrs) {
+      rosterMins += s ? rosteredMinsFor(s.id, d) : 0;
+      allocMins += byPerson[name].filter(c => c.day === d).reduce((m,c) => m + (c.duration || 45), 0);
+    }
+    totals[name] = { rosterMins, allocMins };
+  }
+
+  // Aggregate hero stats
+  const totalClean = all.filter(c => c.status !== 'Cancelled').length;
+  const totalMins  = all.filter(c => c.status !== 'Cancelled').reduce((m,c) => m + (c.duration || 45), 0);
+  const totalRoster = Object.values(totals).reduce((m,t) => m + t.rosterMins, 0);
+  const overStaff   = Object.entries(totals).filter(([n,t]) => t.rosterMins > 0 && t.allocMins > t.rosterMins).length;
+  const fmt = d => d.toLocaleDateString('en-GB',{day:'numeric',month:'short'});
+
+  let html = '';
+  html += `<div class="sw-hero">
+    <div>
+      <div class="sw-hero-title">Workload by staff</div>
+      <div class="sw-hero-sub">${fmt(days[0])} – ${fmt(days[6])} · 7 days</div>
+    </div>
+    <div class="sw-hero-stats">
+      <div class="day-stat"><b>${totalClean}</b> total cleans</div>
+      <div class="day-stat"><b>${fmtMins(totalMins)}</b> allocated</div>
+      <div class="day-stat"><b>${fmtMins(totalRoster)}</b> rostered</div>
+      <div class="day-stat ${unassigned.length>0?'warn':''}"><b>${unassigned.length}</b> unassigned</div>
+      ${overStaff>0 ? `<div class="day-stat warn"><b>${overStaff}</b> over capacity</div>` : ''}
+      <label class="day-filter ${STATE_staffHide.offRoster?'on':''}" style="cursor:pointer;background:${STATE_staffHide.offRoster?'var(--sage)':'#f6f4ed'};color:${STATE_staffHide.offRoster?'#fff':'var(--sage)'}" onclick="STATE_staffHide.offRoster = !STATE_staffHide.offRoster; render()">${STATE_staffHide.offRoster?'✓ ':''}Hide off-roster</label>
+    </div>
+  </div>`;
+
+  html += '<div class="sw-grid">';
+
+  // Unassigned card always first (no staff lookup, no roster math)
+  if (unassigned.length) {
+    html += renderStaffCard({
+      name: 'Unassigned',
+      role: 'Needs assignment',
+      cardClass: 'unassigned',
+      staffId: null,
+      cleans: unassigned,
+      rosterMins: 0,
+      allocMins: unassigned.reduce((m,c) => m + (c.duration||45), 0),
+      dayStrs, todayStr,
+    });
+  }
+
+  // Sort staff: over-capacity first (urgent), then by allocation desc, then alphabetical
+  const sortedNames = Object.keys(byPerson).sort((a,b) => {
+    const ta = totals[a] || {rosterMins:0, allocMins:0};
+    const tb = totals[b] || {rosterMins:0, allocMins:0};
+    const oa = ta.rosterMins > 0 && ta.allocMins > ta.rosterMins ? 1 : 0;
+    const ob = tb.rosterMins > 0 && tb.allocMins > tb.rosterMins ? 1 : 0;
+    if (oa !== ob) return ob - oa;
+    if (ta.allocMins !== tb.allocMins) return tb.allocMins - ta.allocMins;
+    return a.localeCompare(b);
+  });
+
+  let hiddenOff = 0;
+  for (const name of sortedNames) {
+    const s = staffByName[name];
+    const role = s ? s.role : 'Ex-Maintenance';
+    const ccs = byPerson[name];
+    const t = totals[name] || { rosterMins: 0, allocMins: 0 };
+
+    // Off-roster filter — staff with 0 rostered hours AND no work assigned drop out
+    const isOffRoster = t.rosterMins === 0 && ccs.length === 0;
+    if (STATE_staffHide.offRoster && isOffRoster) { hiddenOff++; continue; }
+
+    let cardClass = '';
+    if (ccs.length === 0 && t.rosterMins > 0) cardClass = 'empty';
+    if (t.rosterMins > 0 && t.allocMins > t.rosterMins) cardClass = 'over';
+
+    html += renderStaffCard({
+      name,
+      role,
+      cardClass,
+      staffId: s ? s.id : null,
+      cleans: ccs,
+      rosterMins: t.rosterMins,
+      allocMins: t.allocMins,
+      dayStrs, todayStr,
+    });
+  }
+
+  html += '</div>';
+  if (hiddenOff > 0) {
+    html += `<div style="padding:10px 4px 0;font-size:11px;color:var(--muted);text-align:center">
+      ${hiddenOff} off-roster staff hidden.
+      <button onclick="STATE_staffHide.offRoster = false; render()" style="background:none;border:none;color:var(--sage);text-decoration:underline;cursor:pointer;font:inherit;font-size:11px">Show all</button>
+    </div>`;
+  }
+  container.innerHTML = html;
+}
+
+function renderStaffCard({ name, role, cardClass, staffId, cleans, rosterMins, allocMins, dayStrs, todayStr }) {
+  const total = cleans.length;
+  const isUnassigned = !staffId && cardClass === 'unassigned';
+
+  // Per-day rows showing rostered hours, allocated minutes, and overrun colour
+  let dayRows = '';
+  for (const d of dayStrs) {
+    const dt = new Date(d+'T00:00:00');
+    const dayLabel = dt.toLocaleDateString('en-GB',{weekday:'short'}) + ' ' + dt.getDate();
+    const dayRoster = staffId ? rosteredMinsFor(staffId, d) : 0;
+    const dayAlloc = cleans.filter(c => c.day === d).reduce((m,c) => m + (c.duration || 45), 0);
+    const role = staffId ? shiftRoleFor(staffId, d) : '';
+    const isOff = role && SHIFT_BLOCK_ROLES.has(role);
+    const isToday = d === todayStr;
+
+    let cls = 'sw-day-row';
+    let allocCls = 'sw-alloc';
+    let allocText = '';
+    let rosterText = '';
+
+    if (isUnassigned) {
+      // Unassigned card: just show how many minutes need a home
+      if (dayAlloc === 0) continue;
+      cls += ' busy';
+      allocText = fmtMins(dayAlloc);
+      rosterText = `${cleans.filter(c => c.day === d).length} unassigned`;
+    } else if (isOff) {
+      cls += ' off';
+      rosterText = role;
+      allocText = dayAlloc > 0 ? fmtMins(dayAlloc) + ' ⚠' : 'off';
+      allocCls += dayAlloc > 0 ? ' over' : ' off';
+    } else if (dayRoster === 0 && dayAlloc === 0) {
+      // Not rostered, no work — skip to keep cards compact
+      continue;
+    } else if (dayRoster === 0 && dayAlloc > 0) {
+      cls += ' over';
+      rosterText = 'no shift';
+      allocText = fmtMins(dayAlloc);
+      allocCls += ' over';
+    } else if (dayAlloc > dayRoster) {
+      cls += ' over';
+      rosterText = `of ${fmtMins(dayRoster)}`;
+      allocText = fmtMins(dayAlloc);
+      allocCls += ' over';
+    } else if (dayAlloc >= dayRoster * 0.85) {
+      cls += ' busy';
+      rosterText = `of ${fmtMins(dayRoster)}`;
+      allocText = fmtMins(dayAlloc);
+      allocCls += ' warn';
+    } else {
+      rosterText = `of ${fmtMins(dayRoster)}`;
+      allocText = dayAlloc > 0 ? fmtMins(dayAlloc) : '—';
+    }
+    if (isToday) cls += ' today';
+
+    dayRows += `<div class="${cls}">
+      <div class="sw-d">${escapeHtml(dayLabel)}</div>
+      <div class="sw-roster">${escapeHtml(rosterText)}</div>
+      <div class="${allocCls}">${escapeHtml(allocText)}</div>
+    </div>`;
+  }
+  if (!dayRows) dayRows = '<div class="sw-empty-msg">No rostered shifts and nothing assigned this week.</div>';
+
+  // Header totals — allocated vs rostered with progress bar
+  let allocBar = '';
+  if (!isUnassigned && rosterMins > 0) {
+    const pct = Math.min(150, Math.round((allocMins / rosterMins) * 100));
+    let fillCls = 'sw-alloc-fill';
+    if (pct > 100) fillCls += ' over';
+    else if (pct >= 85) fillCls += ' warn';
+    allocBar = `<div class="sw-alloc-bar"><div class="${fillCls}" style="width:${Math.min(100, pct)}%"></div></div>`;
+  } else if (!isUnassigned && rosterMins === 0 && allocMins > 0) {
+    allocBar = `<div class="sw-alloc-bar"><div class="sw-alloc-fill over" style="width:100%"></div></div>`;
+  }
+
+  // Headline summary text in top-right
+  let headline = '';
+  if (isUnassigned) {
+    headline = `<div class="sw-totals"><b>${total}</b> clean${total===1?'':'s'}</div>
+                <div class="sw-totals"><b>${fmtMins(allocMins)}</b> to assign</div>`;
+  } else if (rosterMins === 0 && allocMins === 0) {
+    headline = `<div class="sw-totals" style="color:#aaa">Off-roster</div>`;
+  } else {
+    const overrun = allocMins > rosterMins && rosterMins > 0;
+    const cls = overrun ? 'style="color:var(--warn)"' : '';
+    headline = `<div class="sw-totals" ${cls}><b>${fmtMins(allocMins)}</b> ${rosterMins > 0 ? `of ${fmtMins(rosterMins)}` : 'allocated'}</div>
+                <div class="sw-totals">${total} clean${total===1?'':'s'}${overrun?' · OVER':''}</div>`;
+  }
+
+  // Click-to-open list of cleans
+  const sorted = cleans.slice().sort((a,b) => (a.day+a.start).localeCompare(b.day+b.start));
+  let cleanRows = '';
+  for (const c of sorted) {
+    const cls2 = ['sw-clean', typeKey(c.type)];
+    if (c.unlisted) cls2.push('unlisted');
+    if (c.status === 'Completed') cls2.push('completed');
+    const stays = staysFor(c.property);
+    const isEarly = c.type === 'Changeover' && !c.unlisted && !isCheckinOn(stays, c.day);
+    if (isEarly) cls2.push('early');
+    const dt = new Date(c.day+'T00:00:00');
+    const dayLabel = dt.toLocaleDateString('en-GB',{weekday:'short',day:'numeric'}).replace(',','');
+    const typeShort = c.unlisted ? 'Unlisted' : (typeAbbr(c.type));
+    cleanRows += `<div class="${cls2.join(' ')}" onclick="openClean('${c.id}')">
+      <div class="sw-clean-day">${escapeHtml(dayLabel)}</div>
+      <div>
+        <div class="sw-clean-prop">${escapeHtml(c.property)}</div>
+        <div class="sw-clean-meta">${typeShort}${isEarly ? ' · early' : ''}${c.virtual ? ' · suggest' : ''}</div>
+      </div>
+      <div class="sw-clean-time">${escapeHtml(c.start)}<br><span style="color:var(--muted)">${c.duration||45}m</span></div>
+    </div>`;
+  }
+
+  return `<div class="sw-card ${cardClass}">
+    <div class="sw-card-hdr">
+      <div>
+        <div class="sw-name">${escapeHtml(name)}</div>
+        <div class="sw-role">${escapeHtml(role||'')}</div>
+      </div>
+      <div style="text-align:right">${headline}</div>
+    </div>
+    ${allocBar}
+    <div style="display:flex;flex-direction:column;gap:0;margin-top:6px">${dayRows}</div>
+    <div class="sw-cleans">${cleanRows}</div>
+  </div>`;
+}
+
+// Per-day filter state — lives outside Monday since these are pure UI prefs.
+const STATE_dayHide = { assigned: false, completed: false, suggested: false };
+// Staff view filter state.
+const STATE_staffHide = { offRoster: true };
+// Day-view grouping — 'type' or 'lake'.
+let STATE_dayGroup = 'type';
+function setDayGroup(g) { STATE_dayGroup = g; render(); }
+
+function fmtMins(m) {
+  if (!m || m <= 0) return '0';
+  const h = Math.floor(m / 60), mm = m % 60;
+  if (h && mm) return `${h}h ${mm}m`;
+  if (h) return `${h}h`;
+  return `${mm}m`;
+}
+function toggleDayFilter(k) {
+  STATE_dayHide[k] = !STATE_dayHide[k];
+  render();
+}
+
+function renderDayRow(c) {
+  const p = properties.find(x => x.name === c.property);
+  const stays = staysFor(c.property);
+  const cls = ['day-row', typeKey(c.type)];
+  if (c.virtual) cls.push('virtual');
+  if (c.dirty || c.isNew) cls.push('dirty');
+  if (c.status === 'Completed') cls.push('completed');
+
+  // Early Changeover detection — a Changeover sitting BEFORE the check-in
+  // it's serving (manually or auto brought-forward). Tinted blue + Early badge.
+  let isEarly = false;
+  let servingCheckIn = null;
+  if (c.type === 'Changeover') {
+    if (isCheckinOn(stays, c.day)) {
+      // On the actual check-in day — normal Changeover
+      servingCheckIn = c.day;
+    } else {
+      // Find the next future stay's check-in — that's the booking this clean prepares
+      const future = stays.filter(s => s.checkIn && s.checkIn > c.day).sort((a,b) => a.checkIn.localeCompare(b.checkIn));
+      if (future.length) {
+        servingCheckIn = future[0].checkIn;
+        isEarly = true;
+      }
+    }
+  }
+  if (isEarly) cls.push('early');
+
+  if (c.unlisted) cls.push('unlisted');
+  const noTubBadge = (p && !p.hasTub && !c.unlisted) ? '<span class="no-tub">NO TUB</span>' : '';
+  const suggestBadge = c.virtual ? '<span class="dr-suggest">suggest</span>' : '';
+  const earlyBadge = isEarly ? '<span class="dr-early-badge">Early</span>' : '';
+  const unlistedBadge = c.unlisted ? '<span class="dr-unlisted-badge">Unlisted</span>' : '';
+
+  // Booking context — helpful on changeover days
+  let ctx = '';
+  if (c.type === 'Changeover') {
+    const isCheckIn  = isCheckinOn(stays, c.day);
+    const isCheckOut = isCheckoutOn(stays, c.day);
+    if (isCheckIn && isCheckOut) ctx = 'Same-day turnaround';
+    else if (isCheckIn) ctx = 'Guests checking in today';
+    else if (isEarly && servingCheckIn) {
+      const gap = daysBetween(c.day, servingCheckIn);
+      ctx = `Early — ${gap === 1 ? 'guests arrive tomorrow' : `${gap} day${gap===1?'':'s'} ahead of check-in (${servingCheckIn})`}${isCheckOut ? ' · also a checkout today' : ''}`;
+    }
+    else if (isCheckOut) ctx = 'Guests checking out today';
+    else ctx = 'Brought forward';
+  } else if (c.type === 'Mid-stay') {
+    ctx = 'Guests in midnight-to-midnight — tub service only';
+  } else if (c.type === 'Mid-vacancy') {
+    const isCheckOut = isCheckoutOn(stays, c.day);
+    ctx = isCheckOut ? 'Guests checking out — tub service after 10:00' : 'Vacant — tub service only';
+  }
+
+  const personHtml = c.person
+    ? `<span class="dr-staff-pill">${escapeHtml(c.person)}</span>`
+    : `<span class="dr-staff-empty">unassigned</span>`;
+
+  // Bring-forward affordance: shows on a Changeover sitting on the check-in day
+  // when the day before is empty / a checkout. Click → moves it back one day.
+  // Move-back affordance: shows on an Early Changeover. Click → puts it back
+  // on the actual check-in day.
+  let shiftBtn = '';
+  if (c.type === 'Changeover') {
+    if (isEarly && servingCheckIn) {
+      shiftBtn = `<button class="dr-shift-btn" onclick="event.stopPropagation(); shiftCleanToCheckin('${c.id}')" title="Restore to the check-in day (${servingCheckIn})">→ Move back</button>`;
+    } else if (isCheckinOn(stays, c.day)) {
+      const prev = addDaysISO(c.day, -1);
+      const prevIsCheckin = isCheckinOn(stays, prev);
+      const prevIsOccupied = isMidnightToMidnight(stays, prev);
+      if (!prevIsCheckin && !prevIsOccupied) {
+        shiftBtn = `<button class="dr-shift-btn" onclick="event.stopPropagation(); shiftCleanEarlier('${c.id}')" title="Move this Changeover to ${prev} (avoids two visits in two days)">← Bring forward</button>`;
+      }
+    }
+  }
+
+  return `<div class="${cls.join(' ')}"
+    onclick="openClean('${c.id}')"
+    ondragover="onCardDragOver(event)" ondragleave="onCardDragLeave(event)"
+    ondrop="onCardDrop(event,'${c.id}')">
+    <div class="dr-main">
+      <div class="dr-prop">${escapeHtml(c.property)}${noTubBadge}${suggestBadge}${earlyBadge}${unlistedBadge}</div>
+      <div class="dr-meta">${(p && p.location) ? '📍 '+escapeHtml(p.location)+' · ' : ''}${c.duration||45} min${shiftBtn}</div>
+      <div class="dr-context">${ctx}</div>
+    </div>
+    <div class="dr-time">${escapeHtml(c.start)}<small>earliest</small></div>
+    <div class="dr-staff">${personHtml}</div>
+  </div>`;
+}
+
+/* Move a Changeover one day earlier (the bring-forward shortcut).
+   If the card is virtual, commit it first so the change persists on Save. */
+function shiftCleanEarlier(cleanId) {
+  let c = cleans.find(x => x.id === cleanId);
+  if (!c) {
+    const virt = autoDeriveCleans().find(x => x.id === cleanId);
+    if (!virt) return;
+    c = commitVirtual(virt);
+  }
+  const newDay = addDaysISO(c.day, -1);
+  const stays = staysFor(c.property);
+  // Earliest start: if the new day is a check-out day, can't start before 10:00
+  const isCheckout = isCheckoutOn(stays, newDay);
+  c.day = newDay;
+  c.start = isCheckout ? '10:00' : '09:00';
+  c.dirty = true;
+  // Step the visible day with the card so the planner sees it land
+  viewStart = new Date(newDay + 'T00:00:00');
+  toast(`Moved to ${newDay}`);
+  render();
+}
+
+/* Move a brought-forward Changeover BACK to the actual check-in day.
+   Finds the next stay's check-in date in the property timeline and lands the
+   card there at 10:00. Useful for undoing a bring-forward you regret. */
+function shiftCleanToCheckin(cleanId) {
+  let c = cleans.find(x => x.id === cleanId);
+  if (!c) {
+    const virt = autoDeriveCleans().find(x => x.id === cleanId);
+    if (!virt) return;
+    c = commitVirtual(virt);
+  }
+  const stays = staysFor(c.property);
+  const future = stays.filter(s => s.checkIn && s.checkIn > c.day).sort((a,b) => a.checkIn.localeCompare(b.checkIn));
+  if (!future.length) { toast('No upcoming check-in to move this back to'); return; }
+  const target = future[0].checkIn;
+  c.day = target;
+  c.start = '10:00';
+  c.dirty = true;
+  viewStart = new Date(target + 'T00:00:00');
+  toast(`Moved back to ${target}`);
+  render();
+}
+
+function typeKey(t) {
+  if (t === 'Changeover') return 't-co';
+  if (t === 'Mid-stay') return 't-ms';
+  if (t === 'Mid-vacancy') return 't-mv';
+  return '';
+}
+function typeAbbr(t) {
+  if (t === 'Changeover') return 'CO';
+  if (t === 'Mid-stay') return 'MS';
+  if (t === 'Mid-vacancy') return 'MV';
+  return t;
+}
+
+function renderCleanCard(c) {
+  const cls = ['clean-card', typeKey(c.type)];
+  if (c.virtual) cls.push('virtual');
+  if (c.dirty || c.isNew) cls.push('dirty');
+  if (c.status === 'Completed') cls.push('completed');
+  const tagAuto = c.autoGen && !c.virtual ? '<span class="cc-tag auto">auto</span>' : '';
+  const tagVirt = c.virtual ? '<span class="cc-tag auto">suggest</span>' : '';
+  const personHtml = c.person
+    ? `<span class="cc-staff-pill">${escapeHtml(c.person)}</span>`
+    : `<span class="cc-staff-empty">unassigned</span>`;
+  return `<div class="${cls.join(' ')}"
+    draggable="${!c.virtual}"
+    onclick="openClean('${c.id}')"
+    ondragover="onCardDragOver(event)" ondragleave="onCardDragLeave(event)"
+    ondrop="onCardDrop(event,'${c.id}')">
+    <div class="cc-type">${typeAbbr(c.type)}${tagAuto}${tagVirt}</div>
+    <div class="cc-time">${escapeHtml(c.start)} · ${c.duration||45}m</div>
+    <div class="cc-staff">${personHtml}</div>
+  </div>`;
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   AUTO-SAVE — debounced. Every render checks for new/dirty/deleted cleans;
+   when the count goes up we (re)schedule a save 1.5s in the future. The
+   timer resets on each change, so a flurry of edits lands as one save.
+
+   ESCAPE HATCHES:
+   • The "↶ Discard" button (top right, visible when dirty) cancels the
+     pending save and reloads from Monday — local edits thrown away.
+   • "Pause auto-save" toggle in the controls bar stops the timer firing.
+     Edits accumulate until the user clicks ☁ Save explicitly.
+   ═══════════════════════════════════════════════════════════════════ */
+const AUTOSAVE_DELAY_MS = 1500;
+let _autoSaveTimer = null;
+let _lastDirtyCount = 0;
+let _saveInFlight = false;
+let _autoSavePaused = false;
+
+function scheduleAutoSave() {
+  if (_autoSavePaused) return;        // Skip when user has paused
+  if (_autoSaveTimer) clearTimeout(_autoSaveTimer);
+  _autoSaveTimer = setTimeout(() => {
+    _autoSaveTimer = null;
+    if (_saveInFlight) {
+      setTimeout(scheduleAutoSave, 200);
+      return;
+    }
+    saveAll();
+  }, AUTOSAVE_DELAY_MS);
+}
+
+function cancelPendingAutoSave() {
+  if (_autoSaveTimer) { clearTimeout(_autoSaveTimer); _autoSaveTimer = null; }
+}
+
+function onPauseAutoSaveChange() {
+  _autoSavePaused = !!document.getElementById('pauseAutoSaveToggle').checked;
+  if (_autoSavePaused) {
+    cancelPendingAutoSave();
+    toast('Auto-save paused — click Save to commit', 2200);
+  } else {
+    toast('Auto-save resumed', 1500);
+    // If there are pending changes, kick a save now
+    const dirty = cleans.filter(c => c.dirty || c.isNew || c.deleted).length;
+    if (dirty > 0 && !_saveInFlight) scheduleAutoSave();
+  }
+  updateSaveBtn();
+}
+
+/* Discard all pending changes:
+   • cancel any queued auto-save
+   • drop in-memory new/dirty cleans (and unmark deletes)
+   • re-fetch from Monday so the UI reflects the truth on the server */
+async function discardChanges() {
+  const dirty = cleans.filter(c => c.dirty || c.isNew || c.deleted).length;
+  if (!dirty) return;
+  if (!confirm(`Discard ${dirty} unsaved change${dirty===1?'':'s'}? This will reload the rota from Monday.`)) return;
+  cancelPendingAutoSave();
+  // Drop unsaved-new entries; revert dirty/deleted flags. fetchCleans will
+  // overwrite remaining state with the Monday truth.
+  cleans = cleans.filter(c => !(c.isNew && !c.mondayId));
+  for (const c of cleans) { c.dirty = false; c.deleted = false; c.isNew = false; }
+  setLoading(true);
+  try {
+    await fetchCleans();
+    render();
+    toast('Changes discarded — reloaded from Monday', 2000);
+  } catch (e) {
+    console.error(e);
+    toast('Discard failed: ' + e.message, 4000);
+  }
+  setLoading(false);
+}
+
+function updateSaveBtn() {
+  const dirty = cleans.filter(c => c.dirty || c.isNew || c.deleted).length;
+  const btn = document.getElementById('saveBtn');
+  const discard = document.getElementById('discardBtn');
+
+  // Discard button is visible whenever there are pending changes
+  if (discard) discard.style.display = dirty > 0 ? '' : 'none';
+
+  // Schedule auto-save when something new is dirty (count rose) AND not paused
+  if (dirty > _lastDirtyCount && !_saveInFlight && !_autoSavePaused) scheduleAutoSave();
+  _lastDirtyCount = dirty;
+
+  if (_saveInFlight) {
+    btn.textContent = '☁ Saving…';
+    btn.classList.add('saving');
+    btn.classList.remove('dirty', 'save-err');
+  } else if (dirty > 0) {
+    btn.textContent = _autoSavePaused
+      ? `☁ Save (${dirty}) · paused`
+      : `☁ Saving in 1.5s (${dirty})`;
+    btn.classList.add('dirty');
+    btn.classList.remove('saving');
+  } else {
+    btn.textContent = '☁ Saved';
+    btn.classList.remove('dirty', 'saving');
+  }
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   WEEK NAV
+   ═══════════════════════════════════════════════════════════════════ */
+function shiftDays(n) { viewStart = addDays(viewStart, n); render(); }
+function goToday() { viewStart = todayDate(); render(); }
+function setView(mode) {
+  viewMode = mode;
+  document.querySelectorAll('#viewToggle button').forEach(b => b.classList.toggle('active', b.dataset.view === mode));
+  // Tweak the navigation label and shift size depending on view
+  render();
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   DRAG / DROP
+   ═══════════════════════════════════════════════════════════════════ */
+function onStaffDragStart(e, name) {
+  dragData = { type:'staff', name };
+  e.target.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'copyMove';
+  e.dataTransfer.setData('text/plain', name);
+}
+function onStaffDragEnd(e) {
+  e.target.classList.remove('dragging');
+  dragData = null;
+  document.querySelectorAll('.drop-target-hint, .drag-over').forEach(el => el.classList.remove('drop-target-hint', 'drag-over'));
+}
+function onCellDragOver(e) { e.preventDefault(); e.currentTarget.classList.add('drop-ready'); }
+function onCellDragLeave(e) { e.currentTarget.classList.remove('drop-ready'); }
+function onCellDrop(e, propName, day) {
+  e.preventDefault();
+  e.currentTarget.classList.remove('drop-ready');
+  if (!dragData) return;
+  if (dragData.type === 'staff') {
+    // If there's already a card here, assign to most-recent virtual or any unassigned. Otherwise create a Changeover.
+    const cellCleans = getAllCleansForView().filter(c => c.property === propName && c.day === day);
+    let target = cellCleans.find(c => !c.person) || cellCleans[0];
+    if (!target) {
+      target = createNewClean(propName, day);
+      cleans.push(target);
+    } else if (target.virtual) {
+      target = commitVirtual(target);
+    }
+    target.person = dragData.name;
+    target.dirty = true;
+    render();
+  }
+}
+function onCardDragOver(e) { e.preventDefault(); e.stopPropagation(); e.currentTarget.classList.add('drag-over'); }
+function onCardDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function onCardDrop(e, cleanId) {
+  e.preventDefault(); e.stopPropagation();
+  e.currentTarget.classList.remove('drag-over');
+  if (!dragData || dragData.type !== 'staff') return;
+  // Find or commit the target clean
+  let target = cleans.find(c => c.id === cleanId);
+  if (!target) {
+    // Virtual — find in derived list and commit
+    const virt = autoDeriveCleans().find(c => c.id === cleanId);
+    if (!virt) return;
+    target = commitVirtual(virt);
+  }
+  target.person = dragData.name;
+  target.dirty = true;
+  render();
+}
+
+/* Convert a virtual into a real (in-memory new) clean and add to cleans[] */
+function commitVirtual(virt) {
+  const real = { ...virt, id: uid(), virtual: false, isNew: true, dirty: true };
+  cleans.push(real);
+  return real;
+}
+
+function createNewClean(propName, day) {
+  const p = properties.find(x => x.name === propName);
+  const stays = staysFor(propName);
+  // Default type based on day's occupancy
+  let type = 'Mid-vacancy';
+  if (isCheckinOn(stays, day))           type = 'Changeover';
+  else if (isMidnightToMidnight(stays, day)) type = 'Mid-stay';
+  // Non-tub properties only get Changeover service from Maintenance.
+  if (p && !p.hasTub) type = 'Changeover';
+  // Earliest start: 10:00 if guests just left (checkout day), 09:00 if fully vacant
+  const isCheckout = isCheckoutOn(stays, day);
+  const start = (type === 'Mid-vacancy' && !isCheckout) ? '09:00' : '10:00';
+  return {
+    id: uid(),
+    mondayId: null,
+    property: propName,
+    propertyId: p?.id || null,
+    day,
+    type,
+    person: '',
+    start,
+    status: 'Scheduled',
+    duration: durationForType(p, type),
+    notes: '',
+    autoGen: false,
+    virtual: false,
+    hasTub: p?.hasTub ?? true,
+    dirty: false,
+    isNew: true,
+  };
+}
+
+function newCleanFor(propName, day) {
+  const c = createNewClean(propName, day);
+  cleans.push(c);
+  openClean(c.id);
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   MODAL
+   ═══════════════════════════════════════════════════════════════════ */
+/* Open an existing clean (real or virtual) for editing */
+function openClean(id) {
+  let c = cleans.find(x => x.id === id);
+  if (!c) c = autoDeriveCleans().find(x => x.id === id);
+  if (!c) return;
+  editingCleanId = id;
+
+  const p = properties.find(x => x.name === c.property);
+  const isNoTub = p && !p.hasTub;
+  const isUnlisted = !!c.unlisted;
+  document.getElementById('cmTitle').textContent =
+    c.virtual ? 'Suggested clean'
+    : isUnlisted ? 'Unlisted job'
+    : isNoTub ? 'Outside-only clean'
+    : 'Hot Tub Clean';
+
+  // For existing cleans the property is fixed — show as plain text, hide selector
+  document.getElementById('cmProperty').style.display = '';
+  document.getElementById('cmProperty').textContent = c.property;
+  document.getElementById('cmPropertySelect').style.display = 'none';
+  document.getElementById('cmUnlistedRow').style.display = 'none';
+
+  // Booking context
+  const stays = staysFor(c.property);
+  const ctx = [];
+  if (isUnlisted) ctx.push(`<span style="color:var(--gold);font-weight:700">Unlisted</span> — one-off job not tied to a booking.`);
+  else if (isNoTub) ctx.push(`<span style="color:var(--gold);font-weight:700">No hot tub</span> — Maintenance services this property on changeovers only (cobwebbing, BBQ, deck, etc.).`);
+  if (!isUnlisted) {
+    const nearby = stays
+      .filter(s => s.checkOut >= addDaysISO(c.day, -7) && s.checkIn <= addDaysISO(c.day, 21))
+      .slice(0, 4);
+    for (const s of nearby) {
+      const tag = s.checkIn === c.day ? ' <span style="color:var(--co);font-weight:700">← this check-in</span>' : '';
+      ctx.push(`Booking: <b>${s.checkIn}</b> → <b>${s.checkOut||'?'}</b>${tag}`);
+    }
+    if (p?.lastCleaned && !isNoTub) ctx.push(`Last tub visit: <b>${p.lastCleaned}</b>`);
+  }
+  document.getElementById('cmContext').innerHTML = ctx.join('<br>');
+
+  document.getElementById('cmDate').value = c.day;
+  document.getElementById('cmStart').value = c.start;
+  document.getElementById('cmType').value = c.type;
+  document.getElementById('cmStatus').value = c.status;
+  document.getElementById('cmDuration').value = c.duration;
+  document.getElementById('cmNotes').value = c.notes;
+
+  populatePersonDropdown(c.person);
+
+  document.getElementById('cmDeleteBtn').style.display = c.virtual ? 'none' : '';
+  document.getElementById('cleanModal').classList.add('open');
+}
+
+/* Open the modal in ADD mode — no existing clean. Includes Property select with
+   an "Unlisted" option for one-off work that's not tied to a booking. */
+function openAddClean() {
+  editingCleanId = null;
+
+  document.getElementById('cmTitle').textContent = 'Add clean';
+
+  // Property → use the SELECT, hide the static text
+  document.getElementById('cmProperty').style.display = 'none';
+  const sel = document.getElementById('cmPropertySelect');
+  sel.style.display = '';
+  // Build dropdown — properties first (sorted), then Unlisted at the bottom
+  const props = properties.slice().sort((a,b) => a.name.localeCompare(b.name));
+  const opts = ['<option value="" disabled selected>— pick a property —</option>'];
+  for (const p of props) {
+    const tag = p.hasTub ? '' : ' (no tub)';
+    opts.push(`<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}${tag}</option>`);
+  }
+  opts.push('<option value="__UNLISTED__">— Unlisted / one-off —</option>');
+  sel.innerHTML = opts.join('');
+  document.getElementById('cmUnlistedRow').style.display = 'none';
+  document.getElementById('cmUnlistedDesc').value = '';
+  document.getElementById('cmContext').innerHTML = 'Pick a property (or Unlisted for one-off work).';
+
+  // Sensible defaults — today, Mid-vac at 09:00, 20 min, blank notes
+  const today = localStr(viewMode === 'day' ? viewStart : todayDate());
+  document.getElementById('cmDate').value = today;
+  document.getElementById('cmStart').value = '09:00';
+  document.getElementById('cmType').value = 'Changeover';
+  document.getElementById('cmStatus').value = 'Scheduled';
+  document.getElementById('cmDuration').value = 45;
+  document.getElementById('cmNotes').value = '';
+
+  populatePersonDropdown('');
+  document.getElementById('cmDeleteBtn').style.display = 'none';
+  document.getElementById('cleanModal').classList.add('open');
+}
+
+function onPropertySelectChange() {
+  const sel = document.getElementById('cmPropertySelect');
+  const v = sel.value;
+  const isUnlisted = v === '__UNLISTED__';
+  document.getElementById('cmUnlistedRow').style.display = isUnlisted ? '' : 'none';
+  if (isUnlisted) {
+    document.getElementById('cmContext').innerHTML = '<span style="color:var(--gold);font-weight:700">Unlisted</span> — one-off job. Use the description field below to record what the work is. The 48h rule and bring-forward logic don\'t apply.';
+    // Default duration to 60 mins for unlisted (typical for ad-hoc work)
+    if (!document.getElementById('cmDuration').value || document.getElementById('cmDuration').value === '45') {
+      document.getElementById('cmDuration').value = 60;
+    }
+    setTimeout(() => document.getElementById('cmUnlistedDesc').focus(), 50);
+  } else {
+    const p = properties.find(x => x.name === v);
+    if (p) {
+      const stays = staysFor(p.name);
+      const day = document.getElementById('cmDate').value;
+      const ctx = [];
+      const nearby = stays
+        .filter(s => s.checkOut >= addDaysISO(day, -7) && s.checkIn <= addDaysISO(day, 21))
+        .slice(0, 4);
+      for (const s of nearby) {
+        const tag = s.checkIn === day ? ' <span style="color:var(--co);font-weight:700">← this check-in</span>' : '';
+        ctx.push(`Booking: <b>${s.checkIn}</b> → <b>${s.checkOut||'?'}</b>${tag}`);
+      }
+      if (p.lastCleaned) ctx.push(`Last tub visit: <b>${p.lastCleaned}</b>`);
+      if (!p.hasTub) ctx.unshift(`<span style="color:var(--gold);font-weight:700">No hot tub</span> — outside-only service.`);
+      document.getElementById('cmContext').innerHTML = ctx.join('<br>');
+      // Default duration to property's full clean length for Changeover type
+      const typeNow = document.getElementById('cmType').value;
+      document.getElementById('cmDuration').value = durationForType(p, typeNow);
+    }
+  }
+}
+
+function populatePersonDropdown(currentValue) {
+  const sel = document.getElementById('cmPerson');
+  const maint = staff.filter(s => (s.role || '').trim() === ROTA_ROLE
+                                  && (s.status || '').toLowerCase() !== 'inactive');
+  const showStaff = maint.slice();
+  if (currentValue && !showStaff.some(s => s.name === currentValue)) {
+    showStaff.push({ id: '', name: currentValue, role: '', offline: false });
+  }
+  sel.innerHTML = '<option value="">— unassigned —</option>' +
+    showStaff.map(s => `<option value="${escapeHtml(s.name)}" ${s.name === currentValue ? 'selected' : ''}>${escapeHtml(s.name)}${s.offline ? ' (off)' : ''}</option>`).join('');
+}
+
+function saveModal() {
+  let c = cleans.find(x => x.id === editingCleanId);
+  let isAddMode = false;
+
+  if (!c && editingCleanId) {
+    // Editing a virtual — commit it
+    const virt = autoDeriveCleans().find(x => x.id === editingCleanId);
+    if (virt) {
+      c = commitVirtual(virt);
+      editingCleanId = c.id;
+    }
+  }
+
+  // Add mode — no editingCleanId, build a fresh clean from the form
+  if (!c) {
+    isAddMode = true;
+    const sel = document.getElementById('cmPropertySelect').value;
+    if (!sel) { toast('Pick a property (or Unlisted for one-off work)'); return; }
+    if (sel === '__UNLISTED__') {
+      const desc = (document.getElementById('cmUnlistedDesc').value || '').trim();
+      if (!desc) { toast('Describe the unlisted job'); document.getElementById('cmUnlistedDesc').focus(); return; }
+      c = {
+        id: uid(),
+        mondayId: null,
+        property: desc,             // The description doubles as the "property" label
+        propertyId: null,
+        unlisted: true,
+        day: '',
+        type: 'Changeover',
+        person: '',
+        start: '',
+        status: 'Scheduled',
+        duration: 60,
+        notes: '',
+        autoGen: false,
+        virtual: false,
+        hasTub: false,
+        dirty: false,
+        isNew: true,
+      };
+    } else {
+      const p = properties.find(x => x.name === sel);
+      c = {
+        id: uid(),
+        mondayId: null,
+        property: sel,
+        propertyId: p?.id || null,
+        unlisted: false,
+        day: '',
+        type: 'Changeover',
+        person: '',
+        start: '',
+        status: 'Scheduled',
+        duration: durationForType(p, 'Changeover'),
+        notes: '',
+        autoGen: false,
+        virtual: false,
+        hasTub: p?.hasTub ?? true,
+        dirty: false,
+        isNew: true,
+      };
+    }
+    cleans.push(c);
+    editingCleanId = c.id;
+  }
+
+  const oldType = c.type;
+  c.day = document.getElementById('cmDate').value;
+  c.start = document.getElementById('cmStart').value;
+  c.type = document.getElementById('cmType').value;
+  c.person = document.getElementById('cmPerson').value;
+  c.status = document.getElementById('cmStatus').value;
+  let newDur = parseInt(document.getElementById('cmDuration').value, 10);
+  if (c.type !== oldType) {
+    const p = properties.find(x => x.name === c.property);
+    const defaultForOld = durationForType(p, oldType);
+    if (!isNaN(newDur) && newDur === defaultForOld) {
+      newDur = durationForType(p, c.type);
+    }
+  }
+  c.duration = newDur || durationForType(properties.find(x => x.name === c.property), c.type);
+  c.notes = document.getElementById('cmNotes').value;
+  c.dirty = true;
+
+  if (!c.day || !c.start) { toast('Date and start time are required'); return; }
+
+  closeModal('cleanModal');
+  if (isAddMode) {
+    // Jump the day-view anchor to the new clean's date so the planner sees it
+    if (viewMode === 'day') viewStart = new Date(c.day + 'T00:00:00');
+    toast('Clean added — Save to commit to Monday');
+  }
+  render();
+}
+
+function deleteFromModal() {
+  const c = cleans.find(x => x.id === editingCleanId);
+  if (!c) return;
+  if (!confirm(`Delete this ${c.type} clean for ${c.property} on ${c.day}?`)) return;
+  if (c.mondayId) c.deleted = true;     // mark for delete on save
+  else cleans = cleans.filter(x => x.id !== c.id);
+  closeModal('cleanModal');
+  render();
+}
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); editingCleanId = null; }
+function overlayClose(e, id) { if (e.target.id === id) closeModal(id); }
+
+/* ═══════════════════════════════════════════════════════════════════
+   SAVE TO MONDAY
+   ═══════════════════════════════════════════════════════════════════ */
+async function saveAll() {
+  if (_saveInFlight) return;          // Don't pile up concurrent saves
+  _saveInFlight = true;
+  const btn = document.getElementById('saveBtn');
+  btn.classList.add('saving'); btn.textContent = '☁ Saving…';
+  let savedAny = false;
+  try {
+    const toCreate = cleans.filter(c => c.isNew && !c.deleted);
+    const toUpdate = cleans.filter(c => c.dirty && !c.isNew && !c.deleted && c.mondayId);
+    const toDelete = cleans.filter(c => c.deleted && c.mondayId);
+    savedAny = (toCreate.length + toUpdate.length + toDelete.length) > 0;
+
+    for (const c of toCreate) await createMonday(c);
+    for (const c of toUpdate) await updateMonday(c);
+    for (const c of toDelete) await deleteMonday(c);
+
+    cleans = cleans.filter(c => !c.deleted);
+    await fetchCleans();
+    _saveInFlight = false;
+    render();
+    if (savedAny) toast('Saved', 1200);
+  } catch (e) {
+    console.error(e);
+    _saveInFlight = false;
+    btn.classList.add('save-err');
+    toast('Auto-save failed: ' + e.message + ' — retrying', 4500);
+    setTimeout(() => { btn.classList.remove('save-err'); scheduleAutoSave(); }, 4000);
+    render();
+  }
+}
+
+function buildColumnValuesPayload(c) {
+  // For unlisted entries we don't link to a Hot Tub Status property — the
+  // description is stored as the item name on Monday and we don't write
+  // HC_PROP at all.
+  const prop = c.unlisted ? null : properties.find(p => p.name === c.property);
+  const propId = prop?.id;
+  const [hh, mm] = (c.start || '10:00').split(':').map(Number);
+  const cv = {
+    [HC_DATE]:     { date: c.day },
+    [HC_TYPE]:     { label: c.type },
+    [HC_STATUS]:   { label: c.status },
+    [HC_DURATION] : c.duration,
+    [HC_START]:    { hour: hh, minute: mm || 0 },
+    [HC_PERSON]:   c.person ? { labels: [c.person] } : { labels: [] },
+    [HC_NOTES]:    c.notes || '',
+    [HC_AUTOGEN]:  c.autoGen ? { checked: 'true' } : { checked: 'false' },
+  };
+  if (propId) cv[HC_PROP] = { item_ids: [parseInt(propId, 10)] };
+  return cv;
+}
+
+async function createMonday(c) {
+  // Unlisted entries: prefix with "[Unlisted]" so they're easy to spot on the
+  // board and on rehydration we know to mark them unlisted.
+  const itemName = c.unlisted
+    ? `[Unlisted] ${c.property} — ${c.day}`
+    : `${c.property} — ${c.day}`;
+  const cv = buildColumnValuesPayload(c);
+  const q = `mutation($boardId: ID!, $name: String!, $cv: JSON!) {
+    create_item(board_id:$boardId, item_name:$name, column_values:$cv) { id }
+  }`;
+  const data = await mondayFetch(q, { boardId: HT_CLEANS_BOARD, name: itemName, cv: JSON.stringify(cv) });
+  c.mondayId = data.create_item.id;
+  c.isNew = false;
+  c.dirty = false;
+}
+
+async function updateMonday(c) {
+  const cv = buildColumnValuesPayload(c);
+  const q = `mutation($boardId: ID!, $itemId: ID!, $cv: JSON!) {
+    change_multiple_column_values(board_id:$boardId, item_id:$itemId, column_values:$cv) { id }
+  }`;
+  await mondayFetch(q, { boardId: HT_CLEANS_BOARD, itemId: c.mondayId, cv: JSON.stringify(cv) });
+  c.dirty = false;
+}
+
+async function deleteMonday(c) {
+  const q = `mutation($itemId: ID!) { delete_item(item_id:$itemId) { id } }`;
+  await mondayFetch(q, { itemId: c.mondayId });
+}
+
+/* ═══════════════════════════════════════════════════════════════════
+   BOOT
+   ═══════════════════════════════════════════════════════════════════ */
+async function boot() {
+  await refreshAll();
+}
+</script>
+</body>
+</html>

@@ -883,11 +883,15 @@ async function fetchShifts() {
     try {
       const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));
       const staffId = (cv[SH_STAFF]?.text || '').trim();
-      const date = pj(cv[SH_DATE]?.value)?.date || null;
-      if (!staffId || !date) continue;
+      const rawDate = pj(cv[SH_DATE]?.value)?.date || null;
+      if (!staffId || !rawDate) continue;
+      // BST compensation: staff-shifts.html saves dates via toISOString() which
+      // shifts UK clicks one day earlier in summer time. We add 1 day on read
+      // so the rota's calendar lines up with what the planner sees in the
+      // staff-shifts matrix. See the note on isoDate() in staff-shifts.html.
       shifts.push({
         staffId,
-        date,
+        date: addDaysISO(rawDate, 1),
         role:  cv[SH_ROLE]?.text || '',
         hours: parseFloat(pj(cv[SH_HOURS]?.value)) || 0,
       });
@@ -935,12 +939,22 @@ async function fetchCleans() {
       const startObj = pj(cv[HC_START]?.value);
       const start = startObj ? `${String(startObj.hour||0).padStart(2,'0')}:${String(startObj.minute||0).padStart(2,'0')}` : '10:00';
       const propText = cv[HC_PROP]?.text || '';
-      // Unlisted: item name is "[Unlisted] Description — date". No board_relation property text.
+      // Unlisted: item name is "[Unlisted] Description — date".
       const isUnlisted = (it.name || '').startsWith('[Unlisted] ');
-      let propLabel = propText;
+      let propLabel;
       if (isUnlisted) {
-        // Strip the "[Unlisted] " prefix and the trailing " — date" so the description shows cleanly
         let n = (it.name || '').replace(/^\[Unlisted\]\s+/, '');
+        const emIdx = n.lastIndexOf(' — ');
+        if (emIdx > 0) n = n.slice(0, emIdx);
+        propLabel = n.trim();
+      } else if (propText) {
+        propLabel = propText;
+      } else {
+        // Fallback: parse property from item name. Monday's API silently fails
+        // to persist board_relation writes, so the link column is often empty
+        // even when the item was created with a property in mind. The item
+        // name always carries it in the form "Property — YYYY-MM-DD".
+        let n = (it.name || '').trim();
         const emIdx = n.lastIndexOf(' — ');
         if (emIdx > 0) n = n.slice(0, emIdx);
         propLabel = n.trim();
@@ -2469,8 +2483,11 @@ async function createMonday(c) {
     ? `[Unlisted] ${c.property} — ${c.day}`
     : `${c.property} — ${c.day}`;
   const cv = buildColumnValuesPayload(c);
+  // create_labels_if_missing lets Monday auto-add a new dropdown label when
+  // we assign a staff member whose name isn't yet in the Person Name column
+  // (e.g. someone added in staff-shifts after the dropdown was first seeded).
   const q = `mutation($boardId: ID!, $name: String!, $cv: JSON!) {
-    create_item(board_id:$boardId, item_name:$name, column_values:$cv) { id }
+    create_item(board_id:$boardId, item_name:$name, column_values:$cv, create_labels_if_missing:true) { id }
   }`;
   const data = await mondayFetch(q, { boardId: HT_CLEANS_BOARD, name: itemName, cv: JSON.stringify(cv) });
   c.mondayId = data.create_item.id;
@@ -2481,7 +2498,7 @@ async function createMonday(c) {
 async function updateMonday(c) {
   const cv = buildColumnValuesPayload(c);
   const q = `mutation($boardId: ID!, $itemId: ID!, $cv: JSON!) {
-    change_multiple_column_values(board_id:$boardId, item_id:$itemId, column_values:$cv) { id }
+    change_multiple_column_values(board_id:$boardId, item_id:$itemId, column_values:$cv, create_labels_if_missing:true) { id }
   }`;
   await mondayFetch(q, { boardId: HT_CLEANS_BOARD, itemId: c.mondayId, cv: JSON.stringify(cv) });
   c.dirty = false;

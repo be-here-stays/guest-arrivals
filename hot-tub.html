@@ -185,8 +185,34 @@
       <path d="M215.0001,35.1159c0,1.546-1.199,2.9954-2.927,2.9954-1.776,0-3.024-1.4494-3.024-2.9954s1.248-2.8987,3.024-2.8987c1.728,0,2.927,1.3527,2.927,2.8987Z" style="fill:#fff;"/>
     </svg>
   </div>
-  <a href="hub.html" class="hdr-back">‹ Hub</a>
+  <a href="hub.html" id="backLink" class="hdr-back">‹ Hub</a>
 </header>
+<script>
+  // Route the back link to wherever the user came from. Maintenance staff
+  // launching this page from staff.html should land back in their day view,
+  // not the management hub. Driven by ?from=staff in the URL, with a referrer
+  // fallback for other entry points.
+  (function () {
+    try {
+      const params = new URLSearchParams(location.search);
+      const from = params.get('from');
+      const link = document.getElementById('backLink');
+      if (!link) return;
+      if (from === 'staff') {
+        link.href = 'staff.html';
+        link.textContent = '‹ My day';
+      } else if (document.referrer) {
+        try {
+          const ref = new URL(document.referrer);
+          if (ref.pathname.endsWith('/staff.html') || ref.pathname.endsWith('staff.html')) {
+            link.href = 'staff.html';
+            link.textContent = '‹ My day';
+          }
+        } catch (_) {}
+      }
+    } catch (_) {}
+  })();
+</script>
 
 <div class="container">
 
@@ -827,34 +853,14 @@ async function submitForm() {
 }
 
 function resetForm() {
-  // Clear readings
-  ['fInitTemp','fInitTA','fInitPH','fInitBrom','fInitTDS',
-   'fFinalPH','fFinalBrom','fFinalTemp','fFinalTDS','fDuration','fNotes']
-    .forEach(id => { const el = document.getElementById(id); if (el) el.value = ''; });
+  // Reset property & tester selects to first option
+  ['fProperty','fTester'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.selectedIndex = 0;
+  });
 
-  // Reset chemicals to 0
-  ['cPHUp','cPHDown','cAlk','cBromTabs','cBromGran','cNCS',
-   'cBromReduce','cClarifier','cFoamAway','cCS','cPipeLiq','cPipeBomb']
-    .forEach(id => { const el = document.getElementById(id); if (el) el.value = '0'; });
-
-  // Uncheck all task checkboxes
-  document.querySelectorAll('.task-item input[type="checkbox"]')
-    .forEach(cb => { cb.checked = false; cb.closest('.task-item')?.classList.remove('done'); });
-
-  // Reset visit type
-  visitType = null;
-  document.querySelectorAll('.vt-btn').forEach(b => b.classList.remove('active'));
-
-  // Reset water change to none
-  waterChange = 'none';
-  document.querySelectorAll('.wc-btn').forEach(b => b.classList.remove('active'));
-  const noneBtn = document.getElementById('wc_none');
-  if (noneBtn) noneBtn.classList.add('active');
-
-  // Reset flag
-  flagOn = false;
-  const flagBtn = document.getElementById('flagBtn');
-  if (flagBtn) { flagBtn.classList.remove('on'); flagBtn.textContent = '🚩 Flag for required water change'; }
+  // Hide status card
+  document.getElementById('statusCard')?.classList.remove('show');
 
   // Reset datetime to now
   const now = new Date();
@@ -864,10 +870,48 @@ function resetForm() {
   const dtEl = document.getElementById('fDateTime');
   if (dtEl) dtEl.value = dtStr;
 
+  // Clear readings — also trigger rangeCheck to clear indicators
+  [['fInitTA','ta'],['fInitPH','ph'],['fInitBrom','brom'],['fInitTDS','tds'],
+   ['fFinalPH','ph'],['fFinalBrom','brom']].forEach(([id, type]) => {
+    const el = document.getElementById(id);
+    if (el) { el.value = ''; rangeCheck(el, type); }
+  });
+  ['fInitTemp','fFinalTemp','fFinalTDS','fDuration'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.value = '';
+  });
+  const notes = document.getElementById('fNotes');
+  if (notes) notes.value = '';
+
+  // Clear TDS alert
+  const tdsAlertEl = document.getElementById('tdsAlert');
+  if (tdsAlertEl) { tdsAlertEl.className = 'tds-alert'; tdsAlertEl.textContent = ''; }
+
+  // Reset chemicals to 0
+  ['cPHUp','cPHDown','cAlk','cBromTabs','cBromGran','cNCS',
+   'cBromReduce','cClarifier','cFoamAway','cCS','cPipeLiq','cPipeBomb']
+    .forEach(id => { const el = document.getElementById(id); if (el) el.value = '0'; });
+
+  // Uncheck all task checkboxes
+  document.querySelectorAll('.task-item input[type="checkbox"]')
+    .forEach(cb => { cb.checked = false; cb.closest('.task-item')?.classList.remove('on'); });
+
+  // Reset visit type
+  visitType = null;
+  document.querySelectorAll('.vt-btn').forEach(b => b.classList.remove('active'));
+
+  // Reset water change to none
+  waterChange = 'none';
+  document.querySelectorAll('.wc-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('wc_none')?.classList.add('active');
+
+  // Reset flag
+  flagOn = false;
+  document.getElementById('flagPill')?.classList.remove('on');
+  document.getElementById('wcFlag')?.classList.remove('on');
+
   // Re-enable submit
   document.getElementById('submitBtn').disabled = false;
-
-  // Keep property and tester — likely doing multiple tubs in one session
 }
 
 function showMsg(text, type) {

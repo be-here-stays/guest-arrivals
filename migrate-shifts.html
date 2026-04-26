@@ -1,0 +1,201 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>One-off: Shift date migration (BST fix)</title>
+<style>
+  body { font-family: -apple-system, system-ui, sans-serif; background: #f5f4f0; color: #1a1a1a; margin: 0; padding: 24px; }
+  .card { background: #fff; border-radius: 12px; padding: 20px 24px; max-width: 720px; margin: 0 auto; box-shadow: 0 1px 4px rgba(0,0,0,0.08); }
+  h1 { font-size: 22px; margin: 0 0 8px; }
+  .sub { color: #888; font-size: 13px; margin-bottom: 16px; }
+  .panel { background: #faf8f1; border-radius: 8px; padding: 14px 16px; margin: 12px 0; font-size: 13px; line-height: 1.5; }
+  .panel ul { margin: 6px 0; padding-left: 20px; }
+  .panel.warn { background: #fff4e0; color: #7a5a00; }
+  button { background: #2d5a3d; color: #fff; border: 0; padding: 12px 18px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; font-family: inherit; }
+  button:hover { background: #234a30; }
+  button:disabled { opacity: 0.4; cursor: not-allowed; }
+  button.danger { background: #a9434a; }
+  #log { background: #fafaf5; border-radius: 8px; padding: 12px; font-family: ui-monospace, "SF Mono", monospace; font-size: 12px; max-height: 360px; overflow-y: auto; white-space: pre-wrap; margin-top: 14px; }
+  .ok { color: #2d6a4f; }
+  .err { color: #a9434a; }
+  progress { width: 100%; height: 12px; }
+</style>
+</head>
+<body>
+
+<div class="card">
+  <h1>Staff Shifts — date migration</h1>
+  <div class="sub">One-off fix: shifts saved through staff-shifts.html during BST were dated one day too early due to a UTC conversion bug. This page shifts every shift's date forward by 1 day so the data matches what you actually clicked.</div>
+
+  <div class="panel">
+    What this does, in order:
+    <ul>
+      <li>Fetches every row on the <b>Staff Shifts</b> Monday board (id 5095155773)</li>
+      <li>For each, computes <code>new_date = date + 1 day</code></li>
+      <li>Pushes batched <code>change_multiple_column_values</code> mutations</li>
+      <li>Logs every batch's success/failure to the panel below</li>
+    </ul>
+  </div>
+
+  <div class="panel warn">
+    <b>⚠ Run only ONCE.</b> Running twice would shift dates by 2 days. This page records a marker in your browser's localStorage after a successful run and refuses to run again from the same browser. If you ever need to revert, the marker also lets a "rollback −1 day" button appear.
+  </div>
+
+  <div id="status" style="font-size: 14px; font-weight: 700; margin: 12px 0;">Ready.</div>
+  <progress id="bar" value="0" max="100" style="display:none"></progress>
+
+  <div style="display:flex; gap:10px; flex-wrap:wrap; margin-top: 14px;">
+    <button id="dryRun">🔍 Dry run (count only)</button>
+    <button id="run">▶ Run migration (+1 day)</button>
+    <button id="rollback" class="danger" style="display:none">↶ Rollback (−1 day)</button>
+  </div>
+
+  <div id="log"></div>
+</div>
+
+<script>
+const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const BOARD = 5095155773;
+const DATE_COL = 'date_mm2phk9q';
+const URL = 'https://api.monday.com/v2';
+const MARKER_KEY = 'shift-migration-bst-fix-2026';
+const BATCH_SIZE = 50;   // mutations per request
+
+const logEl = document.getElementById('log');
+const statusEl = document.getElementById('status');
+const bar = document.getElementById('bar');
+function log(msg, cls) {
+  const line = document.createElement('div');
+  if (cls) line.className = cls;
+  line.textContent = `[${new Date().toLocaleTimeString('en-GB')}] ${msg}`;
+  logEl.appendChild(line);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+function setStatus(s) { statusEl.textContent = s; }
+
+async function gql(query) {
+  const r = await fetch(URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: TOKEN, 'API-Version': '2024-01' },
+    body: JSON.stringify({ query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+async function fetchAllShifts() {
+  let cursor = null, all = [];
+  do {
+    const q = cursor
+      ? `{ next_items_page(limit: 500, cursor: "${cursor}") { cursor items { id column_values(ids: ["${DATE_COL}"]) { text } } } }`
+      : `{ boards(ids: [${BOARD}]) { items_page(limit: 500) { cursor items { id column_values(ids: ["${DATE_COL}"]) { text } } } } }`;
+    const d = await gql(q);
+    const page = cursor ? d.next_items_page : d.boards[0].items_page;
+    if (!page) break;
+    for (const it of page.items || []) {
+      const date = it.column_values?.[0]?.text || '';
+      if (date) all.push({ id: it.id, date });
+    }
+    cursor = page.cursor;
+  } while (cursor);
+  return all;
+}
+
+function shiftDateBy(iso, days) {
+  const [y, m, d] = iso.split('-').map(Number);
+  const dt = new Date(Date.UTC(y, m - 1, d));
+  dt.setUTCDate(dt.getUTCDate() + days);
+  return dt.toISOString().slice(0, 10);
+}
+
+async function runShift(direction /* +1 or -1 */) {
+  if (direction === 1 && localStorage.getItem(MARKER_KEY)) {
+    if (!confirm('Migration appears to have already run from this browser. Run AGAIN? (Generally a bad idea — would shift another +1 day.)')) return;
+  }
+  document.querySelectorAll('button').forEach(b => b.disabled = true);
+  bar.style.display = '';
+  bar.value = 0;
+
+  log(`Fetching all shifts…`);
+  setStatus('Fetching…');
+  const shifts = await fetchAllShifts();
+  log(`Loaded ${shifts.length} shifts.`, 'ok');
+  setStatus(`Migrating ${shifts.length} shifts…`);
+
+  // Build batches
+  const batches = [];
+  for (let i = 0; i < shifts.length; i += BATCH_SIZE) batches.push(shifts.slice(i, i + BATCH_SIZE));
+  log(`${batches.length} batch(es) of up to ${BATCH_SIZE}.`);
+
+  let done = 0, failed = 0;
+  for (let bi = 0; bi < batches.length; bi++) {
+    const batch = batches[bi];
+    const parts = batch.map((s, j) => {
+      const newDate = shiftDateBy(s.date, direction);
+      const cv = JSON.stringify({ [DATE_COL]: { date: newDate } });
+      const cvEsc = cv.replace(/\\/g, '\\\\').replace(/"/g, '\\"');
+      return `  m${j}: change_multiple_column_values(board_id: ${BOARD}, item_id: ${s.id}, column_values: "${cvEsc}") { id }`;
+    });
+    const mut = 'mutation {\n' + parts.join('\n') + '\n}';
+    try {
+      await gql(mut);
+      done += batch.length;
+      log(`Batch ${bi + 1}/${batches.length}: ${batch.length} updated`, 'ok');
+    } catch (e) {
+      failed += batch.length;
+      log(`Batch ${bi + 1}/${batches.length} FAILED: ${e.message}`, 'err');
+    }
+    bar.value = Math.round(((bi + 1) / batches.length) * 100);
+  }
+
+  setStatus(`Done. ${done} succeeded, ${failed} failed.`);
+  log(`Migration complete. ${done} succeeded, ${failed} failed.`, failed ? 'err' : 'ok');
+
+  if (direction === 1 && failed === 0) {
+    localStorage.setItem(MARKER_KEY, new Date().toISOString());
+    document.getElementById('rollback').style.display = '';
+  } else if (direction === -1) {
+    localStorage.removeItem(MARKER_KEY);
+    document.getElementById('rollback').style.display = 'none';
+  }
+  document.querySelectorAll('button').forEach(b => b.disabled = false);
+}
+
+document.getElementById('dryRun').addEventListener('click', async () => {
+  document.querySelectorAll('button').forEach(b => b.disabled = true);
+  log('Dry run — counting shifts…');
+  setStatus('Counting…');
+  try {
+    const shifts = await fetchAllShifts();
+    setStatus(`${shifts.length} shifts on the board.`);
+    log(`Total shifts: ${shifts.length}`, 'ok');
+    // Show date distribution
+    const counts = {};
+    for (const s of shifts) counts[s.date] = (counts[s.date] || 0) + 1;
+    const dates = Object.keys(counts).sort();
+    log(`Date range: ${dates[0]} → ${dates[dates.length - 1]}`);
+    log(`Unique dates: ${dates.length}`);
+  } catch (e) {
+    log('Failed: ' + e.message, 'err');
+  }
+  document.querySelectorAll('button').forEach(b => b.disabled = false);
+});
+document.getElementById('run').addEventListener('click', () => {
+  if (!confirm('Migrate ALL shifts forward by 1 day? This cannot be undone except by clicking Rollback after.')) return;
+  runShift(+1);
+});
+document.getElementById('rollback').addEventListener('click', () => {
+  if (!confirm('Rollback ALL shifts by 1 day? Run this only if the +1 migration produced wrong results.')) return;
+  runShift(-1);
+});
+
+// Surface the rollback button if a migration marker is present
+if (localStorage.getItem(MARKER_KEY)) {
+  document.getElementById('rollback').style.display = '';
+  log('localStorage marker found — migration appears to have been run already at ' + localStorage.getItem(MARKER_KEY), 'ok');
+}
+</script>
+</body>
+</html>

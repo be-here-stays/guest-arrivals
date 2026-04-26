@@ -466,7 +466,10 @@ async function loadHotTubCleans() {
     const start = startObj ? `${String(startObj.hour||0).padStart(2,'0')}:${String(startObj.minute||0).padStart(2,'0')}` : '10:00';
     hotTubCleans.push({
       id: it.id,
-      property: cv[HC_PROP]?.text || it.name,
+      // Monday's API silently fails board_relation writes, so HC_PROP is often
+      // empty. Fall back to the item name (format: "Property — YYYY-MM-DD")
+      // and strip the trailing date so the property name shows cleanly.
+      property: (cv[HC_PROP]?.text || (function(){ let n=(it.name||'').trim(); const i=n.lastIndexOf(' — '); return i>0 ? n.slice(0,i) : n; })()),
       day: dateObj.date,
       type: cv[HC_TYPE]?.text || 'Changeover',
       start,
@@ -500,8 +503,13 @@ async function loadShifts() {
     const cv = Object.fromEntries(it.column_values.map(c=>[c.id, c]));
     if ((cv[SH_STAFF]?.text || '').trim() !== String(me.id)) continue;
     const dateObj = pj(cv[SH_DATE]?.value);
-    const date = dateObj?.date;
-    if (!date || date < startISO || date > endISO) continue;
+    const rawDate = dateObj?.date;
+    if (!rawDate) continue;
+    // BST compensation: staff-shifts.html saves dates via toISOString() which
+    // shifts the date one day earlier in BST. Add 1 day on read so today's
+    // shift shows on today's chip. See note on isoDate() in staff-shifts.html.
+    const date = addDaysISO(rawDate, 1);
+    if (date < startISO || date > endISO) continue;
     shifts.push({
       date,
       role: cv[SH_ROLE]?.text || '',

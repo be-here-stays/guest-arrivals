@@ -403,6 +403,15 @@ function restorePrefs(){
 function todayDate(){ const d = new Date(); d.setHours(0,0,0,0); return d; }
 function mondayOf(d){ const x=new Date(d); const day=x.getDay(); const diff = (day===0?-6:1-day); x.setDate(x.getDate()+diff); x.setHours(0,0,0,0); return x; }
 function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; }
+// NOTE: This uses toISOString() which converts to UTC. During British Summer
+// Time, midnight local time maps to 23:00 UTC of the day before, so the
+// returned ISO is one day "earlier" than the cell the user clicked. That's
+// the legacy behaviour and the matrix has been working with it consistently
+// (cell label and lookup both go through this function). External readers
+// (hot-tub-rota.html, staff.html) compensate by adding one day to each
+// shift's stored date when loading. If we ever change this, both readers'
+// compensation logic must be removed at the same time AND historic shifts
+// migrated forward by 1 day.
 function isoDate(d){ return d.toISOString().slice(0,10); }
 function fmtDay(d){ return d.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short'}); }
 function fmtDayShort(d){ return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric'}); }

@@ -1,0 +1,431 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#272F2E">
+<title>Report an issue — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:48px; }
+
+  header { background:var(--dark); color:#fff; padding:18px 20px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; }
+  header h1 { font-size:17px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.65; margin-top:2px; }
+  .hdr-back { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; }
+
+  .container { max-width:560px; margin:0 auto; padding:18px 16px; }
+
+  .card { background:var(--surface); border-radius:14px; padding:18px 18px 16px; margin-bottom:14px; box-shadow:0 1px 4px rgba(39,47,46,0.08); }
+
+  .field { margin-bottom:14px; }
+  .field:last-child { margin-bottom:0; }
+  label.lbl { display:block; font-size:12px; font-weight:700; color:var(--sage); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+  label.lbl .req { color:var(--red); margin-left:2px; }
+  .hint { font-size:11px; color:var(--sage-mid); font-weight:400; text-transform:none; letter-spacing:0; margin-top:3px; }
+
+  input[type=text], select, textarea {
+    width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:9px;
+    font-family:inherit; font-size:15px; color:var(--dark); background:#fff; outline:none;
+    transition:border-color 0.15s;
+    -webkit-appearance:none; appearance:none;
+  }
+  input:focus, select:focus, textarea:focus { border-color:var(--dark); }
+  textarea { min-height:90px; resize:vertical; font-size:14px; }
+  select { background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%23272F2E' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>"); background-repeat:no-repeat; background-position:right 12px center; padding-right:32px; }
+
+  /* ── Urgency chips ── */
+  .chip-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .chip {
+    padding:11px 8px; border:2px solid var(--border); border-radius:11px; background:#fff;
+    font-family:inherit; font-size:13px; font-weight:700; color:var(--sage-mid); cursor:pointer;
+    text-align:center; transition:all 0.15s; line-height:1.3;
+  }
+  .chip small { display:block; font-size:11px; font-weight:500; opacity:0.7; margin-top:2px; }
+  .chip:hover { border-color:var(--sage); color:var(--sage); }
+  .chip.active.urgent { border-color:var(--red); background:var(--red-bg); color:var(--red); }
+  .chip.active.high   { border-color:var(--amber); background:var(--amber-bg); color:var(--amber); }
+  .chip.active.normal { border-color:var(--green); background:var(--green-bg); color:var(--green); }
+  .chip.active.low    { border-color:var(--blue); background:var(--blue-bg); color:var(--blue); }
+
+  /* ── Photo ── */
+  .photo-pick { display:flex; flex-direction:column; gap:8px; }
+  .photo-btn {
+    background:var(--sage); color:#fff; border:0; padding:13px; border-radius:10px;
+    font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; text-align:center;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .photo-btn:hover { background:var(--dark); }
+  .photo-btn.secondary { background:#fff; color:var(--sage); border:1.5px solid var(--sage); }
+  .photo-preview { display:none; max-width:100%; border-radius:10px; margin-top:6px; }
+  .photo-meta { font-size:12px; color:var(--sage-mid); }
+  .photo-meta a { color:var(--red); text-decoration:underline; cursor:pointer; }
+  input[type=file] { display:none; }
+
+  /* ── Submit ── */
+  .submit-row { padding:0 16px 24px; }
+  .submit-btn {
+    width:100%; padding:15px; background:var(--sage); color:#fff; border:0; border-radius:12px;
+    font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.1);
+  }
+  .submit-btn:hover { background:var(--dark); }
+  .submit-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .submit-btn.saving { background:var(--gold); }
+
+  /* ── Success state ── */
+  .success { background:var(--green-bg); border:1.5px solid var(--green); border-radius:12px; padding:20px; text-align:center; margin-bottom:14px; }
+  .success-icon { font-size:36px; margin-bottom:8px; }
+  .success-title { font-size:18px; font-weight:700; color:var(--green); margin-bottom:4px; }
+  .success-msg { font-size:13px; color:var(--dark); margin-bottom:14px; }
+  .success-btns { display:flex; gap:8px; }
+  .success-btns a, .success-btns button {
+    flex:1; padding:11px; border-radius:9px; text-align:center;
+    font-family:inherit; font-size:14px; font-weight:700; text-decoration:none; cursor:pointer; border:0;
+  }
+  .success-btns .primary { background:var(--green); color:#fff; }
+  .success-btns .secondary { background:#fff; color:var(--green); border:1.5px solid var(--green); }
+
+  .err {
+    background:var(--red-bg); border:1.5px solid var(--red); border-radius:10px; padding:11px 14px;
+    font-size:13px; color:var(--red); margin-bottom:14px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Report an issue</h1>
+    <div class="sub">Defect, snag, broken thing — log it for maintenance</div>
+  </div>
+  <a href="hub.html" id="backLink" class="hdr-back">‹ Hub</a>
+</header>
+
+<div class="container">
+
+  <div id="successCard" class="success" style="display:none">
+    <div class="success-icon">✓</div>
+    <div class="success-title">Issue logged</div>
+    <div class="success-msg" id="successMsg">It's on the maintenance list now. Thanks for reporting.</div>
+    <div class="success-btns">
+      <button class="primary" onclick="resetForm()">Log another</button>
+      <a href="hub.html" id="successBack" class="secondary">Back to Hub</a>
+    </div>
+  </div>
+
+  <div id="errBox" class="err" style="display:none"></div>
+
+  <form id="form" class="card">
+
+    <div class="field">
+      <label class="lbl" for="propertySel">Property <span class="req">*</span></label>
+      <select id="propertySel" required>
+        <option value="" disabled selected>— pick a property —</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="locationSel">Where in the property <span class="req">*</span></label>
+      <select id="locationSel" required>
+        <option value="" disabled selected>— pick a room / area —</option>
+        <option>Living room</option>
+        <option>Kitchen</option>
+        <option>Dining room</option>
+        <option>Master bedroom</option>
+        <option>Master ensuite</option>
+        <option>Bedroom 2</option>
+        <option>Bedroom 3</option>
+        <option>Bedroom 4</option>
+        <option>Bedroom 5</option>
+        <option>Bathroom</option>
+        <option>Hallway / Stairs</option>
+        <option>Utility room</option>
+        <option>Garden / Decking</option>
+        <option>Hot tub area</option>
+        <option>BBQ area</option>
+        <option>Driveway / Parking</option>
+        <option>Exterior</option>
+        <option>Other</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="lbl">Urgency <span class="req">*</span></label>
+      <div class="chip-row">
+        <button type="button" class="chip" data-urgency="Urgent — fix today">🔴 Urgent<small>fix today</small></button>
+        <button type="button" class="chip" data-urgency="High — before next check-in">🟠 High<small>before next check-in</small></button>
+        <button type="button" class="chip active normal" data-urgency="Normal — next changeover">🟢 Normal<small>next changeover</small></button>
+        <button type="button" class="chip" data-urgency="Low — when convenient">🔵 Low<small>when convenient</small></button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="descArea">What's wrong? <span class="req">*</span></label>
+      <textarea id="descArea" placeholder="e.g. Wardrobe door hinge broken — door swings open by itself" required></textarea>
+      <div class="hint">Be specific. Include enough detail that maintenance can plan tools & parts.</div>
+    </div>
+
+    <div class="field">
+      <label class="lbl">Photo (optional)</label>
+      <div class="photo-pick">
+        <input type="file" id="photoInput" accept="image/*" capture="environment">
+        <button type="button" class="photo-btn" onclick="document.getElementById('photoInput').click()">📷 Take a photo / pick image</button>
+        <img id="photoPreview" class="photo-preview" alt="">
+        <div id="photoMeta" class="photo-meta" style="display:none"></div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="reporterSel">Reported by <span class="req">*</span></label>
+      <select id="reporterSel" required>
+        <option value="" disabled selected>— pick yourself —</option>
+        <option value="__OTHER__">Other (type a name)</option>
+      </select>
+      <input type="text" id="reporterOther" placeholder="Type your name" style="display:none; margin-top:8px">
+    </div>
+
+  </form>
+
+  <div class="submit-row">
+    <button type="button" class="submit-btn" id="submitBtn" onclick="submitIssue()">Log this issue</button>
+  </div>
+
+</div>
+
+<script>
+const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const URL_API = 'https://api.monday.com/v2';
+const URL_FILE = 'https://api.monday.com/v2/file';
+
+const ISSUES_BOARD  = 5095294474;
+const PC_BOARD      = 5094466278;     // Property Config — for property dropdown
+const STAFF_BOARD   = 5095127554;
+const ST_STATUS     = 'color_mm2psvh2';
+
+const IS_PROP     = 'board_relation_mm2smm9b';
+const IS_LOC      = 'dropdown_mm2s6ek3';
+const IS_URGENCY  = 'color_mm2sy0cn';
+const IS_STATUS   = 'color_mm2s9cc9';
+const IS_DESC     = 'long_text_mm2smt15';
+const IS_REPORTER = 'dropdown_mm2s3e8b';
+const IS_REP_DATE = 'date_mm2s8zd1';
+const IS_PHOTO    = 'file_mm2sxvcm';
+
+let urgency = 'Normal — next changeover';
+let pickedFile = null;
+let properties = [];   // [{ id, name }]
+let staff = [];        // active staff names
+
+function gql(query, variables) {
+  return fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: TOKEN, 'API-Version': '2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  }).then(r => r.json()).then(j => {
+    if (j.errors) throw new Error(j.errors[0].message);
+    return j.data;
+  });
+}
+
+function todayISO() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+/* ───── Routing — back link follows referrer if launched from staff.html ───── */
+(function () {
+  const params = new URLSearchParams(location.search);
+  const from = params.get('from');
+  const back = document.getElementById('backLink');
+  const sBack = document.getElementById('successBack');
+  if (from === 'staff') {
+    back.href = sBack.href = 'staff.html';
+    back.textContent = '‹ My day';
+    sBack.textContent = 'Back to My Day';
+  }
+})();
+
+/* ───── Boot — load properties + staff for the dropdowns ───── */
+async function boot() {
+  try {
+    const [pcData, stData] = await Promise.all([
+      gql(`{ boards(ids:[${PC_BOARD}]){ items_page(limit:200){ items{ id name } } } }`),
+      gql(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:200){ items{ id name column_values(ids:["${ST_STATUS}"]){ text } } } } }`),
+    ]);
+    properties = (pcData?.boards?.[0]?.items_page?.items || [])
+      .map(p => ({ id: p.id, name: p.name }))
+      .sort((a,b) => a.name.localeCompare(b.name));
+    const propSel = document.getElementById('propertySel');
+    for (const p of properties) {
+      const o = document.createElement('option'); o.value = p.name; o.textContent = p.name; propSel.appendChild(o);
+    }
+    staff = (stData?.boards?.[0]?.items_page?.items || [])
+      .filter(s => (s.column_values?.[0]?.text || '').toLowerCase() !== 'inactive')
+      .map(s => s.name)
+      .sort();
+    const repSel = document.getElementById('reporterSel');
+    // Insert staff names BEFORE the "Other" option
+    const otherOpt = repSel.querySelector('option[value="__OTHER__"]');
+    for (const name of staff) {
+      const o = document.createElement('option'); o.value = name; o.textContent = name;
+      repSel.insertBefore(o, otherOpt);
+    }
+
+    // Apply URL params if present
+    const params = new URLSearchParams(location.search);
+    const propParam = params.get('property');
+    if (propParam && properties.some(p => p.name === propParam)) propSel.value = propParam;
+    const reporterParam = params.get('reporter');
+    if (reporterParam && staff.includes(reporterParam)) repSel.value = reporterParam;
+  } catch (e) {
+    showErr('Could not load properties / staff: ' + e.message);
+  }
+}
+boot();
+
+/* ───── Urgency chips ───── */
+document.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.chip').forEach(x => x.classList.remove('active','urgent','high','normal','low'));
+  b.classList.add('active');
+  urgency = b.dataset.urgency;
+  // colour the active chip
+  if (urgency.startsWith('Urgent')) b.classList.add('urgent');
+  else if (urgency.startsWith('High')) b.classList.add('high');
+  else if (urgency.startsWith('Normal')) b.classList.add('normal');
+  else b.classList.add('low');
+}));
+
+/* ───── Reporter "Other" toggle ───── */
+document.getElementById('reporterSel').addEventListener('change', e => {
+  const other = document.getElementById('reporterOther');
+  if (e.target.value === '__OTHER__') {
+    other.style.display = '';
+    setTimeout(() => other.focus(), 50);
+  } else {
+    other.style.display = 'none';
+  }
+});
+
+/* ───── Photo capture ───── */
+document.getElementById('photoInput').addEventListener('change', e => {
+  const f = e.target.files?.[0];
+  if (!f) { pickedFile = null; document.getElementById('photoPreview').style.display = 'none'; document.getElementById('photoMeta').style.display = 'none'; return; }
+  pickedFile = f;
+  const img = document.getElementById('photoPreview');
+  img.src = URL.createObjectURL(f);
+  img.style.display = 'block';
+  const meta = document.getElementById('photoMeta');
+  meta.innerHTML = `${f.name} · ${(f.size/1024).toFixed(0)} KB <a onclick="clearPhoto()">remove</a>`;
+  meta.style.display = '';
+});
+function clearPhoto() {
+  pickedFile = null;
+  document.getElementById('photoInput').value = '';
+  document.getElementById('photoPreview').style.display = 'none';
+  document.getElementById('photoMeta').style.display = 'none';
+}
+
+/* ───── Submit ───── */
+function showErr(msg) {
+  const e = document.getElementById('errBox');
+  e.textContent = msg;
+  e.style.display = '';
+  e.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+async function submitIssue() {
+  document.getElementById('errBox').style.display = 'none';
+  const property = document.getElementById('propertySel').value;
+  const location = document.getElementById('locationSel').value;
+  const description = document.getElementById('descArea').value.trim();
+  const reporterSel = document.getElementById('reporterSel').value;
+  const reporter = reporterSel === '__OTHER__'
+    ? document.getElementById('reporterOther').value.trim()
+    : reporterSel;
+
+  if (!property)    return showErr('Pick a property.');
+  if (!location)    return showErr('Pick a room or area.');
+  if (!description) return showErr('Describe what’s wrong.');
+  if (!reporter)    return showErr('Tell us who’s reporting.');
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.classList.add('saving'); btn.textContent = 'Logging…';
+
+  try {
+    // Item name carries the property + a snippet so the row reads cleanly on Monday.
+    const snippet = description.length > 50 ? description.slice(0,50) + '…' : description;
+    const itemName = `${property} · ${snippet}`;
+
+    // The board_relation column on Monday silently rejects writes from external
+    // tools, but the property name in the item name IS reliable (same workaround
+    // we use for the hot tub cleans board).
+    const cv = {
+      [IS_LOC]:      { labels: [location] },
+      [IS_URGENCY]:  { label: urgency },
+      [IS_STATUS]:   { label: 'Open' },
+      [IS_DESC]:     description,
+      [IS_REPORTER]: { labels: [reporter] },
+      [IS_REP_DATE]: { date: todayISO() },
+    };
+
+    const q = `mutation($b:ID!,$n:String!,$v:JSON!){
+      create_item(board_id:$b, item_name:$n, column_values:$v, create_labels_if_missing:true){ id }
+    }`;
+    const data = await gql(q, { b: ISSUES_BOARD, n: itemName, v: JSON.stringify(cv) });
+    const itemId = data.create_item.id;
+
+    // Photo upload — Monday's file API accepts multipart/form-data
+    if (pickedFile) {
+      btn.textContent = 'Uploading photo…';
+      const fileQuery = `mutation($file: File!){ add_file_to_column(item_id:${itemId}, column_id:"${IS_PHOTO}", file:$file){ id } }`;
+      const fd = new FormData();
+      fd.append('query', fileQuery);
+      fd.append('map', '{"image":"variables.file"}');
+      fd.append('image', pickedFile, pickedFile.name);
+      const resp = await fetch(URL_FILE, {
+        method: 'POST',
+        headers: { 'Authorization': TOKEN, 'API-Version': '2024-01' },
+        body: fd,
+      });
+      const j = await resp.json();
+      if (j.errors) throw new Error('Photo upload failed: ' + j.errors[0].message);
+    }
+
+    // Success state
+    document.getElementById('form').style.display = 'none';
+    document.querySelector('.submit-row').style.display = 'none';
+    const sm = document.getElementById('successMsg');
+    sm.textContent = `${property} · ${location} — logged with urgency: ${urgency.split(' — ')[0]}.`;
+    document.getElementById('successCard').style.display = '';
+    window.scrollTo({top:0, behavior:'smooth'});
+  } catch (e) {
+    showErr('Could not log the issue: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.classList.remove('saving'); btn.textContent = 'Log this issue';
+  }
+}
+
+function resetForm() {
+  document.getElementById('successCard').style.display = 'none';
+  document.getElementById('form').style.display = '';
+  document.querySelector('.submit-row').style.display = '';
+  document.getElementById('descArea').value = '';
+  clearPhoto();
+  // keep property + reporter — usually same person logs multiple from same site
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+</script>
+</body>
+</html>

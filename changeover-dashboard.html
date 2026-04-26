@@ -186,6 +186,11 @@ const API_TOKEN        = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxM
 const LODGE_BOARD      = 1928673949;
 const LOG_BOARD        = 5094663022;
 const HOT_TUB_BOARD    = 1918769299;
+const HT_CLEANS_BOARD  = 5095259581;   // Hot Tub Cleans — Maintenance team's records
+// Hot Tub Cleans columns
+const HC_DATE   = 'date_mm2rvsp9';
+const HC_STATUS = 'color_mm2rqkeq';
+const HC_PROP   = 'board_relation_mm2rjw3';
 
 // Properties that have outside clean but NO hot tub
 const OUTSIDE_NO_HT    = new Set(['Green Haven', 'Serenity', 'Goose Landing']);
@@ -246,12 +251,28 @@ async function load() {
       }
     }`;
 
-    const [lodgeRes, logRes, htRes] = await Promise.all([gql(lodgeQ), gql(logQ), gql(htQ)]);
+    // 4. Hot Tub Cleans — completed today → counts as Outside Clean done.
+    //    The Maintenance team's full clean covers cobwebbing/BBQ/decking +
+    //    the tub itself, so a Completed entry here ticks the Outside column.
+    const htCleansQ = `{
+      boards(ids: [${HT_CLEANS_BOARD}]) {
+        items_page(limit: 200) {
+          items {
+            name
+            column_values(ids: ["${HC_DATE}","${HC_STATUS}","${HC_PROP}"]) { id text value }
+          }
+        }
+      }
+    }`;
 
-    // Check for API-level errors
-    if (lodgeRes.errors) throw new Error('Lodge Status: ' + lodgeRes.errors[0].message);
-    if (logRes.errors)   throw new Error('Changeover Log: ' + logRes.errors[0].message);
-    if (htRes.errors)    throw new Error('Hot Tub Status: ' + htRes.errors[0].message);
+    const [lodgeRes, logRes, htRes, htCleansRes] = await Promise.all([
+      gql(lodgeQ), gql(logQ), gql(htQ), gql(htCleansQ)
+    ]);
+
+    if (lodgeRes.errors)    throw new Error('Lodge Status: ' + lodgeRes.errors[0].message);
+    if (logRes.errors)      throw new Error('Changeover Log: ' + logRes.errors[0].message);
+    if (htRes.errors)       throw new Error('Hot Tub Status: ' + htRes.errors[0].message);
+    if (htCleansRes.errors) throw new Error('Hot Tub Cleans: ' + htCleansRes.errors[0].message);
 
     // Filter changeovers: status index 1 (CheckOut) or 0 (SameDay)
     const changeovers = (lodgeRes.data?.boards?.[0]?.items_page?.items || [])
@@ -300,6 +321,32 @@ async function load() {
       if (!actLog[prop]) actLog[prop] = { done: new Set(), times: {} };
       actLog[prop].done.add(actIdx);
       actLog[prop].times[actIdx] = item.created_at;
+    }
+
+    // Merge in Hot Tub Cleans completions for today as Outside Clean (idx 4).
+    // Maintenance team's full clean covers the whole property's outside service.
+    const htCleanItems = htCleansRes.data?.boards?.[0]?.items_page?.items || [];
+    for (const item of htCleanItems) {
+      const cv = Object.fromEntries(item.column_values.map(c => [c.id, c]));
+      let dateVal = '';
+      try { dateVal = JSON.parse(cv[HC_DATE]?.value || 'null')?.date || ''; } catch(_) {}
+      if (dateVal !== todayStr) continue;
+      const status = cv[HC_STATUS]?.text || '';
+      if (status !== 'Completed') continue;
+      // Skip unlisted entries — they aren't tied to a property changeover
+      if ((item.name || '').startsWith('[Unlisted]')) continue;
+      // Monday's API silently fails board_relation writes, so HC_PROP is often
+      // empty. Fall back to the item name's "Property — YYYY-MM-DD" format.
+      let prop = (cv[HC_PROP]?.text || '').trim();
+      if (!prop) {
+        let n = (item.name || '').trim();
+        const i = n.lastIndexOf(' — ');
+        if (i > 0) n = n.slice(0, i);
+        prop = n.trim();
+      }
+      if (!prop) continue;
+      if (!actLog[prop]) actLog[prop] = { done: new Set(), times: {} };
+      actLog[prop].done.add(4);  // Outside Clean
     }
 
     render({ changeovers, hotTubProps, actLog, todayStr });

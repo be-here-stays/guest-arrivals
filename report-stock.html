@@ -1,0 +1,455 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#272F2E">
+<title>Stock shortage — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:48px; }
+
+  header { background:var(--dark); color:#fff; padding:18px 20px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; }
+  header h1 { font-size:17px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.65; margin-top:2px; }
+  .hdr-back { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; }
+
+  .container { max-width:560px; margin:0 auto; padding:18px 16px; }
+  .card { background:var(--surface); border-radius:14px; padding:18px 18px 16px; margin-bottom:14px; box-shadow:0 1px 4px rgba(39,47,46,0.08); }
+
+  .field { margin-bottom:14px; }
+  .field:last-child { margin-bottom:0; }
+  label.lbl { display:block; font-size:12px; font-weight:700; color:var(--sage); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+  label.lbl .req { color:var(--red); margin-left:2px; }
+  .hint { font-size:11px; color:var(--sage-mid); font-weight:400; text-transform:none; letter-spacing:0; margin-top:3px; }
+
+  input[type=text], input[type=search], select, textarea {
+    width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:9px;
+    font-family:inherit; font-size:15px; color:var(--dark); background:#fff; outline:none;
+    transition:border-color 0.15s; -webkit-appearance:none; appearance:none;
+  }
+  input:focus, select:focus, textarea:focus { border-color:var(--dark); }
+  textarea { min-height:70px; resize:vertical; font-size:14px; }
+  select { background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%23272F2E' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>"); background-repeat:no-repeat; background-position:right 12px center; padding-right:32px; }
+
+  /* ── Item picker (search + list) ── */
+  .item-picker { position:relative; }
+  .item-search { padding-right:34px; }
+  .item-clear { position:absolute; right:10px; top:50%; transform:translateY(-50%);
+                background:none; border:0; color:var(--sage-mid); font-size:18px; cursor:pointer;
+                padding:4px 8px; line-height:1; display:none; }
+  .item-clear.show { display:block; }
+  .item-list { position:absolute; left:0; right:0; top:calc(100% + 2px); background:#fff;
+               border:1.5px solid var(--border); border-radius:9px; max-height:240px; overflow-y:auto;
+               z-index:10; display:none; box-shadow:0 4px 14px rgba(0,0,0,0.08); }
+  .item-list.open { display:block; }
+  .item-row { padding:9px 12px; cursor:pointer; font-size:14px; border-bottom:1px solid #f5f3ec; }
+  .item-row:last-child { border-bottom:0; }
+  .item-row:hover, .item-row.kbd { background:var(--cream); }
+  .item-row .meta { font-size:11px; color:var(--sage-mid); margin-top:2px; }
+  .item-picked { background:var(--green-bg); border-color:var(--green); padding:11px 12px; border-radius:9px; font-weight:700; color:var(--green); display:flex; align-items:center; justify-content:space-between; gap:8px; }
+  .item-picked button { background:none; border:0; color:var(--green); font-size:18px; cursor:pointer; padding:0 4px; }
+
+  /* ── Urgency chips ── */
+  .chip-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  .chip {
+    padding:11px 6px; border:2px solid var(--border); border-radius:11px; background:#fff;
+    font-family:inherit; font-size:12px; font-weight:700; color:var(--sage-mid); cursor:pointer;
+    text-align:center; transition:all 0.15s; line-height:1.3;
+  }
+  .chip small { display:block; font-size:10px; font-weight:500; opacity:0.7; margin-top:2px; }
+  .chip:hover { border-color:var(--sage); color:var(--sage); }
+  .chip.active.out  { border-color:var(--red); background:var(--red-bg); color:var(--red); }
+  .chip.active.low  { border-color:var(--amber); background:var(--amber-bg); color:var(--amber); }
+  .chip.active.head { border-color:var(--green); background:var(--green-bg); color:var(--green); }
+
+  /* ── Photo ── */
+  .photo-pick { display:flex; flex-direction:column; gap:8px; }
+  .photo-btn {
+    background:var(--sage); color:#fff; border:0; padding:13px; border-radius:10px;
+    font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; text-align:center;
+    display:flex; align-items:center; justify-content:center; gap:6px;
+  }
+  .photo-btn:hover { background:var(--dark); }
+  .photo-preview { display:none; max-width:100%; border-radius:10px; margin-top:6px; }
+  .photo-meta { font-size:12px; color:var(--sage-mid); }
+  .photo-meta a { color:var(--red); text-decoration:underline; cursor:pointer; }
+  input[type=file] { display:none; }
+
+  /* ── Submit ── */
+  .submit-row { padding:0 16px 24px; }
+  .submit-btn { width:100%; padding:15px; background:var(--sage); color:#fff; border:0; border-radius:12px;
+    font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+  .submit-btn:hover { background:var(--dark); }
+  .submit-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .submit-btn.saving { background:var(--gold); }
+
+  /* ── Success state ── */
+  .success { background:var(--green-bg); border:1.5px solid var(--green); border-radius:12px; padding:20px; text-align:center; margin-bottom:14px; }
+  .success-icon { font-size:36px; margin-bottom:8px; }
+  .success-title { font-size:18px; font-weight:700; color:var(--green); margin-bottom:4px; }
+  .success-msg { font-size:13px; color:var(--dark); margin-bottom:14px; }
+  .success-btns { display:flex; gap:8px; }
+  .success-btns a, .success-btns button { flex:1; padding:11px; border-radius:9px; text-align:center;
+    font-family:inherit; font-size:14px; font-weight:700; text-decoration:none; cursor:pointer; border:0; }
+  .success-btns .primary { background:var(--green); color:#fff; }
+  .success-btns .secondary { background:#fff; color:var(--green); border:1.5px solid var(--green); }
+
+  .err { background:var(--red-bg); border:1.5px solid var(--red); border-radius:10px; padding:11px 14px;
+         font-size:13px; color:var(--red); margin-bottom:14px; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Stock shortage</h1>
+    <div class="sub">Tell the office we're running low on something</div>
+  </div>
+  <a href="hub.html" id="backLink" class="hdr-back">‹ Hub</a>
+</header>
+
+<div class="container">
+
+  <div id="successCard" class="success" style="display:none">
+    <div class="success-icon">✓</div>
+    <div class="success-title">Request logged</div>
+    <div class="success-msg" id="successMsg">Office will pick this up.</div>
+    <div class="success-btns">
+      <button class="primary" onclick="resetForm()">Log another</button>
+      <a href="hub.html" id="successBack" class="secondary">Back to Hub</a>
+    </div>
+  </div>
+
+  <div id="errBox" class="err" style="display:none"></div>
+
+  <form id="form" class="card">
+
+    <div class="field">
+      <label class="lbl" for="propertySel">Property <span class="req">*</span></label>
+      <select id="propertySel" required>
+        <option value="" disabled selected>— pick a property —</option>
+      </select>
+      <div class="hint">Where you noticed the shortage (or where it's needed).</div>
+    </div>
+
+    <div class="field">
+      <label class="lbl">Item <span class="req">*</span></label>
+      <div id="itemPicker" class="item-picker">
+        <input type="search" id="itemSearch" class="item-search" placeholder="Search the stock register — e.g. hot tub net" autocomplete="off">
+        <button type="button" id="itemClear" class="item-clear" onclick="clearItem()">✕</button>
+        <div id="itemList" class="item-list"></div>
+      </div>
+      <div id="itemPicked" class="item-picked" style="display:none"></div>
+      <div class="hint">Type to search 71 stock items. Pick "Other" at the bottom if it's not in the register yet.</div>
+    </div>
+
+    <div class="field">
+      <label class="lbl">Urgency <span class="req">*</span></label>
+      <div class="chip-row">
+        <button type="button" class="chip" data-urgency="Out — need today">🔴 Out<small>need today</small></button>
+        <button type="button" class="chip active low" data-urgency="Low — order this week">🟠 Low<small>this week</small></button>
+        <button type="button" class="chip" data-urgency="Heads up — order soon">🟢 Heads up<small>order soon</small></button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="notesArea">Notes (optional)</label>
+      <textarea id="notesArea" placeholder="e.g. Down to last 2 boxes, ran out at lodge cupboard"></textarea>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="reporterSel">Reported by <span class="req">*</span></label>
+      <select id="reporterSel" required>
+        <option value="" disabled selected>— pick yourself —</option>
+        <option value="__OTHER__">Other (type a name)</option>
+      </select>
+      <input type="text" id="reporterOther" placeholder="Type your name" style="display:none; margin-top:8px">
+    </div>
+
+  </form>
+
+  <div class="submit-row">
+    <button type="button" class="submit-btn" id="submitBtn" onclick="submit()">Send request</button>
+  </div>
+
+</div>
+
+<script>
+const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const URL_API = 'https://api.monday.com/v2';
+const URL_FILE = 'https://api.monday.com/v2/file';
+
+const STOCK_REQ_BOARD = 5095295021;
+const STOCK_WAREHOUSE_BOARD = 5094763973;
+const PC_BOARD = 5094466278;
+const STAFF_BOARD = 5095127554;
+const ST_STATUS = 'color_mm2psvh2';
+
+// Stock Warehouse columns
+const SW_SIZE = 'text_mm2gtrta';
+const SW_DESC = 'text_mm2gby08';
+const SW_CUR  = 'numeric_mm2fmsjb';
+const SW_REORDER = 'numeric_mm2f8xtv';
+
+// Stock Requests columns
+const SR_ITEM       = 'text_mm2s6nnv';
+const SR_PROP       = 'text_mm2sxcq7';
+const SR_URGENCY    = 'color_mm2s7cza';
+const SR_STATUS     = 'color_mm2s7v49';
+const SR_NOTES      = 'long_text_mm2s1x0q';
+const SR_REPORTER   = 'dropdown_mm2skvdv';
+const SR_REP_DATE   = 'date_mm2s1kv1';
+const SR_PHOTO      = 'file_mm2seb5f';
+
+let stockItems = [];        // [{ name, size, desc, cur, reorder }]
+let pickedItem = null;
+let urgency = 'Low — order this week';
+
+function gql(query, variables) {
+  return fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: TOKEN, 'API-Version': '2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  }).then(r => r.json()).then(j => {
+    if (j.errors) throw new Error(j.errors[0].message);
+    return j.data;
+  });
+}
+function todayISO() {
+  const d = new Date();
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+
+/* ─── Routing ─── */
+(function () {
+  const params = new URLSearchParams(location.search);
+  if (params.get('from') === 'staff') {
+    document.getElementById('backLink').href = 'staff.html';
+    document.getElementById('backLink').textContent = '‹ My day';
+    document.getElementById('successBack').href = 'staff.html';
+    document.getElementById('successBack').textContent = 'Back to My Day';
+  }
+})();
+
+/* ─── Boot — fetch properties, stock items, staff for dropdowns ─── */
+async function boot() {
+  try {
+    const [pcData, swData, stData] = await Promise.all([
+      gql(`{ boards(ids:[${PC_BOARD}]){ items_page(limit:200){ items{ id name } } } }`),
+      gql(`{ boards(ids:[${STOCK_WAREHOUSE_BOARD}]){ items_page(limit:200){ items{ id name column_values(ids:["${SW_SIZE}","${SW_DESC}","${SW_CUR}","${SW_REORDER}"]){ id text } } } } }`),
+      gql(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:200){ items{ id name column_values(ids:["${ST_STATUS}"]){ text } } } } }`),
+    ]);
+
+    // Properties dropdown
+    const propSel = document.getElementById('propertySel');
+    const properties = (pcData?.boards?.[0]?.items_page?.items || [])
+      .map(p => p.name).sort();
+    for (const name of properties) {
+      const o = document.createElement('option'); o.value = name; o.textContent = name; propSel.appendChild(o);
+    }
+
+    // Stock items
+    stockItems = (swData?.boards?.[0]?.items_page?.items || []).map(it => {
+      const cv = Object.fromEntries(it.column_values.map(c => [c.id, c.text]));
+      return {
+        name: it.name,
+        size: cv[SW_SIZE] || '',
+        desc: cv[SW_DESC] || '',
+        cur: cv[SW_CUR] || '',
+        reorder: cv[SW_REORDER] || '',
+      };
+    }).sort((a,b) => a.name.localeCompare(b.name));
+
+    // Staff dropdown
+    const staffNames = (stData?.boards?.[0]?.items_page?.items || [])
+      .filter(s => (s.column_values?.[0]?.text || '').toLowerCase() !== 'inactive')
+      .map(s => s.name).sort();
+    const repSel = document.getElementById('reporterSel');
+    const otherOpt = repSel.querySelector('option[value="__OTHER__"]');
+    for (const name of staffNames) {
+      const o = document.createElement('option'); o.value = name; o.textContent = name;
+      repSel.insertBefore(o, otherOpt);
+    }
+
+    // Apply URL params
+    const params = new URLSearchParams(location.search);
+    const propParam = params.get('property');
+    if (propParam && properties.includes(propParam)) propSel.value = propParam;
+    const repParam = params.get('reporter');
+    if (repParam && staffNames.includes(repParam)) repSel.value = repParam;
+
+    // Render initial item list (top 20 by name)
+    renderItemList('');
+  } catch (e) {
+    showErr('Could not load reference data: ' + e.message);
+  }
+}
+boot();
+
+/* ─── Item picker ─── */
+const itemSearch = document.getElementById('itemSearch');
+const itemList = document.getElementById('itemList');
+const itemClear = document.getElementById('itemClear');
+const itemPicked = document.getElementById('itemPicked');
+
+itemSearch.addEventListener('input', () => {
+  itemClear.classList.toggle('show', itemSearch.value.length > 0);
+  renderItemList(itemSearch.value);
+  itemList.classList.add('open');
+});
+itemSearch.addEventListener('focus', () => {
+  renderItemList(itemSearch.value);
+  itemList.classList.add('open');
+});
+document.addEventListener('click', e => {
+  if (!document.getElementById('itemPicker').contains(e.target)) itemList.classList.remove('open');
+});
+
+function renderItemList(query) {
+  const q = query.toLowerCase().trim();
+  const filtered = q
+    ? stockItems.filter(s => s.name.toLowerCase().includes(q) || s.desc.toLowerCase().includes(q))
+    : stockItems;          // show ALL items when no query — list is scrollable
+  let html = filtered.map(s => {
+    const meta = [s.size, s.desc].filter(Boolean).join(' · ');
+    return `<div class="item-row" data-name="${escapeAttr(s.name)}">
+      <div>${escapeHtml(s.name)}</div>
+      ${meta ? `<div class="meta">${escapeHtml(meta)}</div>` : ''}
+    </div>`;
+  }).join('');
+  if (q && !filtered.some(s => s.name.toLowerCase() === q)) {
+    html += `<div class="item-row" data-name="__OTHER__:${escapeAttr(query)}">
+      <div><b>+ Use "${escapeHtml(query)}"</b> as a free-text item</div>
+      <div class="meta">Use this if it's not in the stock register yet</div>
+    </div>`;
+  }
+  itemList.innerHTML = html || '<div class="item-row" style="color:var(--sage-mid);font-style:italic">No matches.</div>';
+  itemList.querySelectorAll('.item-row').forEach(r => r.addEventListener('click', () => {
+    const v = r.dataset.name || '';
+    if (v.startsWith('__OTHER__:')) pickItem({ name: v.slice(10), free: true });
+    else if (v) {
+      const item = stockItems.find(s => s.name === v);
+      if (item) pickItem(item);
+    }
+  }));
+}
+
+function pickItem(item) {
+  pickedItem = item;
+  itemList.classList.remove('open');
+  itemSearch.style.display = 'none';
+  itemClear.style.display = 'none';
+  itemPicked.style.display = '';
+  const meta = [item.size, item.desc, item.free ? 'free text' : ''].filter(Boolean).join(' · ');
+  itemPicked.innerHTML = `<div>
+    <div>${escapeHtml(item.name)}</div>
+    ${meta ? `<div style="font-size:11px; color:var(--sage); font-weight:500; margin-top:2px">${escapeHtml(meta)}</div>` : ''}
+  </div><button type="button" onclick="clearItem()" title="Pick a different item">✕</button>`;
+}
+function clearItem() {
+  pickedItem = null;
+  itemSearch.value = '';
+  itemSearch.style.display = '';
+  itemPicked.style.display = 'none';
+  itemClear.classList.remove('show');
+  setTimeout(() => itemSearch.focus(), 50);
+}
+
+/* ─── Urgency chips ─── */
+document.querySelectorAll('.chip').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.chip').forEach(x => x.classList.remove('active','out','low','head'));
+  b.classList.add('active');
+  urgency = b.dataset.urgency;
+  if (urgency.startsWith('Out')) b.classList.add('out');
+  else if (urgency.startsWith('Low')) b.classList.add('low');
+  else b.classList.add('head');
+}));
+
+/* ─── Reporter "Other" toggle ─── */
+document.getElementById('reporterSel').addEventListener('change', e => {
+  const other = document.getElementById('reporterOther');
+  if (e.target.value === '__OTHER__') {
+    other.style.display = '';
+    setTimeout(() => other.focus(), 50);
+  } else other.style.display = 'none';
+});
+
+/* ─── Submit ─── */
+function showErr(msg) {
+  const e = document.getElementById('errBox');
+  e.textContent = msg;
+  e.style.display = '';
+  e.scrollIntoView({behavior:'smooth', block:'center'});
+}
+function escapeHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function escapeAttr(s) { return escapeHtml(s).replace(/'/g,'&#39;'); }
+
+async function submit() {
+  document.getElementById('errBox').style.display = 'none';
+  const property = document.getElementById('propertySel').value;
+  const notes = document.getElementById('notesArea').value.trim();
+  const reporterSel = document.getElementById('reporterSel').value;
+  const reporter = reporterSel === '__OTHER__'
+    ? document.getElementById('reporterOther').value.trim()
+    : reporterSel;
+
+  if (!property)    return showErr('Pick a property.');
+  if (!pickedItem)  return showErr('Pick a stock item.');
+  if (!reporter)    return showErr('Tell us who is reporting.');
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.classList.add('saving'); btn.textContent = 'Sending…';
+
+  try {
+    const itemName = `${property} · ${pickedItem.name}`;
+    const cv = {
+      [SR_ITEM]:     pickedItem.name,
+      [SR_PROP]:     property,
+      [SR_URGENCY]:  { label: urgency },
+      [SR_STATUS]:   { label: 'Open' },
+      [SR_NOTES]:    notes,
+      [SR_REPORTER]: { labels: [reporter] },
+      [SR_REP_DATE]: { date: todayISO() },
+    };
+    const q = `mutation($b:ID!,$n:String!,$v:JSON!){
+      create_item(board_id:$b, item_name:$n, column_values:$v, create_labels_if_missing:true){ id }
+    }`;
+    await gql(q, { b: STOCK_REQ_BOARD, n: itemName, v: JSON.stringify(cv) });
+
+    document.getElementById('form').style.display = 'none';
+    document.querySelector('.submit-row').style.display = 'none';
+    document.getElementById('successMsg').textContent = `${pickedItem.name} at ${property} — flagged as ${urgency.split(' — ')[0]}.`;
+    document.getElementById('successCard').style.display = '';
+    window.scrollTo({top:0, behavior:'smooth'});
+  } catch (e) {
+    showErr('Could not send the request: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.classList.remove('saving'); btn.textContent = 'Send request';
+  }
+}
+
+function resetForm() {
+  document.getElementById('successCard').style.display = 'none';
+  document.getElementById('form').style.display = '';
+  document.querySelector('.submit-row').style.display = '';
+  clearItem();
+  document.getElementById('notesArea').value = '';
+  // keep property + reporter — same person likely flags multiple items at one site
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+</script>
+</body>
+</html>

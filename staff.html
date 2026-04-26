@@ -183,6 +183,69 @@ const CLEANS_BOARD = 5095134636;
 const SHIFTS_BOARD = 5095155773;
 const HT_CLEANS_BOARD = 5095259581; // Hot Tub Cleans (created 2026-04-25)
 
+/* ─── Other maintenance source boards. Each row is one PROPERTY for the
+       recurring boards (Windows / Decking / PAT) and one TASK for Ad-hoc.
+       Scheduling lives on Scheduled-date + Assigned-to columns added 2026-04-26.
+       Mark-complete writes the "last done" date back to the recurring boards
+       (and clears the scheduling fields), or sets Status=Completed on Ad-hoc. ─── */
+const MAINT_SOURCES = [
+  {
+    key:   'window',
+    label: 'Window clean',
+    icon:  '🪟',
+    color: '#1a6fba',
+    bg:    '#ddeeff',
+    boardId: 1987064628,
+    schedCol:    'date_mm2sn17y',
+    assigneeCol: 'dropdown_mm2se9z7',
+    lastDoneCol: 'date4',
+    completeMode: 'date',     // mark done = set lastDoneCol to today, clear sched + assignee
+  },
+  {
+    key:   'jet',
+    label: 'Jet wash / decking',
+    icon:  '💦',
+    color: '#a86c00',
+    bg:    '#fdf5e8',
+    boardId: 5092955038,
+    schedCol:    'date_mm2s2qpv',
+    assigneeCol: 'dropdown_mm2shyxp',
+    lastDoneCol: 'date4',
+    completeMode: 'date',
+  },
+  {
+    key:   'pat',
+    label: 'PAT test',
+    icon:  '⚡',
+    color: '#9d50dd',
+    bg:    '#f4e8fb',
+    boardId: 5092954987,
+    schedCol:    'date_mm2srjzv',
+    assigneeCol: 'dropdown_mm2sxqvv',
+    lastDoneCol: 'date4',
+    completeMode: 'date',
+  },
+  {
+    key:   'adhoc',
+    label: 'Ad-hoc maintenance',
+    icon:  '🔧',
+    color: '#646955',
+    bg:    '#f6f4ed',
+    boardId: 5095296374,
+    schedCol:    'date_mm2stp44',
+    assigneeCol: 'dropdown_mm2szsp5',
+    statusCol:   'color_mm2sf7a8',
+    propCol:     'text_mm2shvja',
+    descCol:     'long_text_mm2s5dwj',
+    linkedIssueCol: 'text_mm2sqa3f', // Issues board item id when promoted from inbox
+    completeMode: 'status',  // mark done = set status to Completed
+  },
+];
+
+// Issues board (used to close out an Ad-hoc's linked issue when the task is done)
+const ISSUES_BOARD_ID = 5095294474;
+const ISSUES_STATUS_COL = 'color_mm2s9cc9';
+
 // Staff columns
 const ST_CODE     = 'text_mm2qd59j';
 const ST_ROLE     = 'color_mm2psadz';
@@ -236,6 +299,7 @@ let me = null;          // resolved staff { id, name, role }
 let cleans = [];
 let shifts = [];
 let hotTubCleans = [];  // hot tub cleans assigned to this staff member
+let maintTasks = [];    // scheduled work from window/jet/PAT/ad-hoc boards
 let currentDay = null;  // yyyy-mm-dd
 
 /* ─── Helpers ───────────────────────────────────────────────── */
@@ -315,7 +379,7 @@ async function submitCode() {
 
 function logout() {
   sessionStorage.removeItem(SESSION_KEY);
-  me = null; cleans = []; shifts = []; hotTubCleans = [];
+  me = null; cleans = []; shifts = []; hotTubCleans = []; maintTasks = [];
   document.getElementById('dayWrap').style.display = 'none';
   document.getElementById('codeWrap').style.display = '';
   document.getElementById('logoutBtn').style.display = 'none';
@@ -335,12 +399,12 @@ async function boot() {
   // Run loaders independently so a single failure doesn't blank the whole page.
   // Promise.allSettled lets us collect partial successes and surface a soft
   // warning at the top instead of an empty error screen.
-  const results = await Promise.allSettled([loadCleans(), loadShifts(), loadHotTubCleans()]);
-  const labels = ['cleans', 'shifts', 'hot tub cleans'];
+  const results = await Promise.allSettled([loadCleans(), loadShifts(), loadHotTubCleans(), loadMaintenanceTasks()]);
+  const labels = ['cleans', 'shifts', 'hot tub cleans', 'maintenance tasks'];
   const failures = results
     .map((r, i) => r.status === 'rejected' ? { label: labels[i], err: r.reason } : null)
     .filter(Boolean);
-  if (failures.length === 3) {
+  if (failures.length === results.length) {
     document.getElementById('dayContent').innerHTML = `<div class="empty">⚠️ Could not load your day: ${escapeHtml(failures[0].err.message || String(failures[0].err))}</div>`;
     return;
   }
@@ -481,6 +545,54 @@ async function loadHotTubCleans() {
   hotTubCleans.sort((a,b) => (a.day+a.start).localeCompare(b.day+b.start));
 }
 
+/* ─── Load Maintenance Tasks scheduled for me (today + 6 days) ────
+   Pulls scheduled rows from each maintenance source board where Assigned-to
+   matches me.name and Scheduled-date is in window. For Ad-hoc we also skip
+   anything already Completed/Cancelled. */
+async function loadMaintenanceTasks() {
+  const startISO = todayISO();
+  const endISO   = addDaysISO(startISO, 6);
+  maintTasks = [];
+
+  for (const src of MAINT_SOURCES) {
+    try {
+      const colList = [src.schedCol, src.assigneeCol, src.lastDoneCol, src.statusCol, src.propCol, src.descCol, src.linkedIssueCol]
+        .filter(Boolean).map(c => `"${c}"`).join(',');
+      const cols = `[${colList}]`;
+      const q = `{ boards(ids:[${src.boardId}]){ items_page(limit:500){ items{ id name column_values(ids:${cols}){ id text value } } } } }`;
+      const data = await mondayFetch(q);
+      const items = data?.boards?.[0]?.items_page?.items || [];
+      for (const it of items) {
+        const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+        const scheduledDate = pj(cv[src.schedCol]?.value)?.date || null;
+        if (!scheduledDate || scheduledDate < startISO || scheduledDate > endISO) continue;
+        const assignee = (cv[src.assigneeCol]?.text || '').split(',').map(s => s.trim()).filter(Boolean)[0] || '';
+        if (assignee !== me.name) continue;
+        const status = src.statusCol ? (cv[src.statusCol]?.text || '') : '';
+        // For ad-hoc, skip already-finished tasks
+        if (src.completeMode === 'status' && /completed|cancelled/i.test(status)) continue;
+        // Property — for recurring boards the item NAME is the property.
+        // For ad-hoc, prefer the explicit Property text column.
+        const property = src.propCol ? (cv[src.propCol]?.text || it.name) : it.name;
+        const description = src.descCol ? (pj(cv[src.descCol]?.value)?.text || cv[src.descCol]?.text || '') : '';
+        const linkedIssue = src.linkedIssueCol ? (cv[src.linkedIssueCol]?.text || '').trim() : '';
+        maintTasks.push({
+          id: it.id,
+          sourceKey: src.key,
+          property,
+          description,
+          day: scheduledDate,
+          status,
+          linkedIssue,
+        });
+      }
+    } catch (e) {
+      console.warn('loadMaintenanceTasks: skip', src.key, e);
+    }
+  }
+  maintTasks.sort((a,b) => (a.day+a.sourceKey+a.property).localeCompare(b.day+b.sourceKey+b.property));
+}
+
 /* ─── Load Shifts in the visible window ─────────────────────── */
 async function loadShifts() {
   const startISO = todayISO();
@@ -524,7 +636,7 @@ function renderDayNav() {
   const days = [];
   for (let i=0; i<7; i++) days.push(addDaysISO(todayISO(), i));
   nav.innerHTML = days.map(d => {
-    const hasWork = cleans.some(c => c.day === d) || shifts.some(s => s.date === d && s.hours > 0) || hotTubCleans.some(h => h.day === d);
+    const hasWork = cleans.some(c => c.day === d) || shifts.some(s => s.date === d && s.hours > 0) || hotTubCleans.some(h => h.day === d) || maintTasks.some(m => m.day === d);
     const cls = ['day-chip'];
     if (d === currentDay) cls.push('active');
     if (hasWork) cls.push('has-work');
@@ -603,6 +715,13 @@ function renderDay() {
     for (const h of dayHotTubs) parts.push(renderHotTubCleanCard(h));
   }
 
+  // Other maintenance work scheduled for me today (windows / jet / PAT / ad-hoc)
+  const dayMaint = maintTasks.filter(m => m.day === day);
+  if (dayMaint.length) {
+    parts.push(`<div class="section-label">Other maintenance jobs <span class="count">${dayMaint.length}</span></div>`);
+    for (const m of dayMaint) parts.push(renderMaintTaskCard(m));
+  }
+
   // Always-available link to hot-tub.html so staff can drop in to log readings
   // regardless of whether they have an assigned card today.
   if (maint) {
@@ -613,8 +732,19 @@ function renderDay() {
     </div>`);
   }
 
+  // "Report an issue" + "Stock shortage" — visible to ALL staff, not just
+  // maintenance. Anyone on site can flag a defect or low stock in seconds.
+  parts.push(`<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px">
+    <a href="report-issue.html?from=staff&reporter=${encodeURIComponent(me.name)}" class="cc-btn secondary" style="text-align:center; padding:12px; font-weight:700; text-decoration:none; border-radius:10px; background:#a9434a; color:#fff">
+      🚨 Report issue
+    </a>
+    <a href="report-stock.html?from=staff&reporter=${encodeURIComponent(me.name)}" class="cc-btn secondary" style="text-align:center; padding:12px; font-weight:700; text-decoration:none; border-radius:10px; background:#646955; color:#fff">
+      📦 Stock shortage
+    </a>
+  </div>`);
+
   // Empty state: nothing for me today
-  const nothing = !dayShifts.length && !dayHotTubs.length
+  const nothing = !dayShifts.length && !dayHotTubs.length && !dayMaint.length
     && (maint || (!cleansMine.length && !dayLinenDrops.length && !dirtiesMine.length));
   if (nothing) {
     parts.push('<div class="empty">Nothing on your plate — enjoy the break 🌿</div>');
@@ -656,6 +786,12 @@ function renderCleanCard(c) {
     actionsBtns.push(`<a class="cc-btn primary" href="${formUrl}">✓ Mark complete</a>`);
   } else if (c.roles.some(r => /checker/i.test(r))) {
     actionsBtns.push(`<a class="cc-btn secondary" href="checker.html">Open checker</a>`);
+  }
+  // Small "🚨" button — quick way to log a defect found while on this clean.
+  // Pre-fills property + reporter so it's one tap from a logged issue.
+  const issueUrl = `report-issue.html?from=staff&property=${encodeURIComponent(c.property)}&reporter=${encodeURIComponent(me.name)}`;
+  if (!completed && !absorbed) {
+    actionsBtns.push(`<a class="cc-btn secondary" href="${issueUrl}" title="Found something broken? Log it" style="background:#a9434a; color:#fff; flex:0 0 auto; min-width:0; padding-left:12px; padding-right:12px">🚨</a>`);
   }
 
   return `<div class="clean-card${c.sameDay?' same-day':''}${c.early && !c.sameDay?' early':''}${completed?' completed':''}${absorbed?' absorbed':''}">
@@ -726,8 +862,14 @@ function renderHotTubCleanCard(h) {
     ? `<a class="cc-btn secondary" href="${formUrl}" style="background:#1a5276; color:#fff">♨ Log readings</a>`
     : '';
 
-  const actions = (statusBtns || logBtn)
-    ? `<div class="cc-actions" data-htid="${h.id}">${statusBtns}${logBtn}</div>`
+  // Quick issue link — pre-fills the property + reporter so the form is one tap from logged.
+  const issueUrl = `report-issue.html?from=staff&property=${encodeURIComponent(h.property)}&reporter=${encodeURIComponent(me.name)}`;
+  const issueBtn = !cancelled
+    ? `<a class="cc-btn secondary" href="${issueUrl}" title="Found something broken? Log it" style="background:#a9434a; color:#fff; flex:0 0 auto; min-width:0; padding-left:12px; padding-right:12px">🚨</a>`
+    : '';
+
+  const actions = (statusBtns || logBtn || issueBtn)
+    ? `<div class="cc-actions" data-htid="${h.id}">${statusBtns}${logBtn}${issueBtn}</div>`
     : '';
 
   return `<div class="clean-card${completed?' completed':''}${cancelled?' absorbed':''}"
@@ -741,6 +883,76 @@ function renderHotTubCleanCard(h) {
     ${h.notes ? `<div class="cc-notes">${escapeHtml(h.notes)}</div>` : ''}
     ${actions}
   </div>`;
+}
+
+/* ─── Maintenance task card (window / jet / PAT / ad-hoc) ─── */
+function renderMaintTaskCard(m) {
+  const src = MAINT_SOURCES.find(s => s.key === m.sourceKey);
+  if (!src) return '';
+  const issueUrl = `report-issue.html?from=staff&property=${encodeURIComponent(m.property)}&reporter=${encodeURIComponent(me.name)}`;
+  const descBlock = m.description ? `<div class="cc-notes">${escapeHtml(m.description)}</div>` : '';
+  return `<div class="clean-card" data-mid="${m.id}" data-src="${m.sourceKey}"
+    style="border-left-color:${src.color}; background:${src.bg}">
+    <div class="cc-top">
+      <div class="cc-prop">${src.icon} ${escapeHtml(m.property)}</div>
+      <div class="cc-badges"><span class="role-pill">${escapeHtml(src.label)}</span></div>
+    </div>
+    ${descBlock}
+    <div class="cc-actions">
+      <button class="cc-btn primary" onclick="markMaintComplete('${m.id}','${m.sourceKey}', this)" style="background:${src.color}; color:#fff">✓ Mark complete</button>
+      <a class="cc-btn secondary" href="${issueUrl}" title="Found something else broken? Log it" style="background:#a9434a; color:#fff; flex:0 0 auto; min-width:0; padding-left:12px; padding-right:12px">🚨</a>
+    </div>
+  </div>`;
+}
+
+/* Mark a maintenance task complete. Writes back to the source board:
+   • date-based (Windows/Decking/PAT): set lastDoneCol to today, clear sched + assignee
+   • status-based (Ad-hoc):            set Status to "Completed"
+   Optimistic UI — drops the card from the local list before the API replies. */
+async function markMaintComplete(itemId, sourceKey, btnEl) {
+  const src = MAINT_SOURCES.find(s => s.key === sourceKey);
+  const m = maintTasks.find(x => x.id === itemId && x.sourceKey === sourceKey);
+  if (!src || !m) return;
+  if (btnEl) {
+    const card = btnEl.closest('.clean-card');
+    if (card) card.querySelectorAll('button, a.cc-btn').forEach(b => { b.style.pointerEvents = 'none'; b.style.opacity = '0.6'; });
+  }
+  // Optimistically remove from view
+  maintTasks = maintTasks.filter(x => !(x.id === itemId && x.sourceKey === sourceKey));
+  renderDay();
+  renderDayNav();
+  try {
+    let cv = {};
+    if (src.completeMode === 'date') {
+      cv[src.lastDoneCol] = { date: todayISO() };
+      cv[src.schedCol]    = { date: '', cleared: true }; // best-effort clear
+      cv[src.assigneeCol] = { labels: [] };
+    } else {
+      cv[src.statusCol]   = { label: 'Completed' };
+    }
+    const q = `mutation($b:ID!,$i:ID!,$v:JSON!){
+      change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id }
+    }`;
+    await mondayFetch(q, { b: src.boardId, i: itemId, v: JSON.stringify(cv) });
+
+    // If this was an Ad-hoc task that came from an Issue, close that issue too.
+    if (m.linkedIssue) {
+      try {
+        const cv2 = JSON.stringify({ [ISSUES_STATUS_COL]: { label: 'Fixed' } });
+        await mondayFetch(q, { b: ISSUES_BOARD_ID, i: m.linkedIssue, v: cv2 });
+      } catch (issueErr) {
+        console.warn('Could not close linked issue', m.linkedIssue, issueErr);
+      }
+    }
+
+    toast(`✓ ${src.label} marked complete`);
+  } catch (e) {
+    // Revert local state
+    maintTasks.push(m);
+    renderDay();
+    renderDayNav();
+    toast('Update failed: ' + e.message, 'err');
+  }
 }
 
 /* Update a hot tub clean's status on Monday. Optimistic UI — updates the

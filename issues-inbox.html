@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="theme-color" content="#272F2E">
+<title>Issues Inbox — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec; --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2; --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:48px; }
+
+  header { background:var(--dark); color:#fff; padding:14px 20px; display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; }
+  header h1 { font-size:17px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.65; margin-top:2px; }
+  .hdr-back { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; }
+  .hdr-btn { background:rgba(255,255,255,0.15); border:1px solid rgba(255,255,255,0.3); color:#fff; padding:6px 14px; border-radius:8px; font-size:13px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .hdr-btn:hover { background:rgba(255,255,255,0.25); }
+
+  .filter-bar { background:var(--cream); padding:10px 16px; display:flex; gap:8px; flex-wrap:wrap; align-items:center; border-bottom:1px solid var(--border); }
+  .chip { background:#fff; border:1px solid var(--border); padding:5px 11px; border-radius:999px; font-size:12px; cursor:pointer; color:var(--dark); font-family:inherit; font-weight:600; }
+  .chip.on { background:var(--sage); color:#fff; border-color:var(--sage); }
+  .filter-status { margin-left:auto; font-size:12px; color:var(--muted); }
+  .summary { font-size:12px; color:var(--sage); font-weight:600; }
+
+  .container { max-width:920px; margin:0 auto; padding:14px 16px; }
+  .empty-state { text-align:center; padding:60px 20px; color:#888; font-size:14px; }
+  .empty-state .icon { font-size:36px; margin-bottom:8px; }
+
+  .issue {
+    background:var(--surface); border-radius:12px; padding:14px 16px; margin-bottom:10px;
+    box-shadow:0 1px 4px rgba(39,47,46,0.08); border-left:5px solid var(--sage);
+  }
+  .issue.urgent { border-left-color:var(--red); }
+  .issue.high   { border-left-color:#d4731c; }
+  .issue.normal { border-left-color:var(--green); }
+  .issue.low    { border-left-color:var(--blue); }
+  .issue.scheduled { background:#f6f4ed; }
+  .issue.fixed     { opacity:0.45; background:#eef5f0; }
+
+  .iss-top { display:flex; align-items:flex-start; gap:10px; flex-wrap:wrap; }
+  .iss-prop { font-size:16px; font-weight:700; color:var(--dark); flex:1; min-width:0; }
+  .iss-badges { display:flex; gap:6px; flex-wrap:wrap; }
+  .badge { font-size:10px; font-weight:700; padding:2px 8px; border-radius:999px; text-transform:uppercase; letter-spacing:0.4px; }
+  .badge.urgent { background:var(--red-bg); color:var(--red); }
+  .badge.high   { background:#fdf0e0; color:#7c4a13; }
+  .badge.normal { background:var(--green-bg); color:var(--green); }
+  .badge.low    { background:var(--blue-bg); color:var(--blue); }
+  .badge.status { background:#eee; color:#555; }
+  .badge.status.open { background:var(--gold); color:#fff; }
+  .badge.status.inprogress { background:var(--blue); color:#fff; }
+  .badge.status.fixed { background:var(--green); color:#fff; }
+
+  .iss-meta { font-size:12px; color:var(--muted); margin-top:5px; display:flex; gap:10px; flex-wrap:wrap; }
+  .iss-meta b { color:var(--dark); }
+  .iss-desc { font-size:14px; color:var(--dark); margin-top:8px; line-height:1.45; white-space:pre-wrap; }
+  .iss-photo { max-width:200px; max-height:160px; margin-top:8px; border-radius:8px; cursor:pointer; }
+  .iss-actions { display:flex; gap:8px; margin-top:12px; flex-wrap:wrap; }
+  .iss-btn { padding:9px 14px; border:0; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; text-decoration:none; display:inline-flex; align-items:center; gap:5px; }
+  .iss-btn.schedule { background:var(--sage); color:#fff; }
+  .iss-btn.fixed    { background:var(--green); color:#fff; }
+  .iss-btn.cancel   { background:#eee; color:var(--dark); }
+  .iss-btn:hover    { filter:brightness(0.95); }
+  .iss-btn[disabled] { opacity:0.5; cursor:not-allowed; }
+
+  /* ── Modal for Schedule action ── */
+  .mod { position:fixed; inset:0; background:rgba(39,47,46,0.5); display:none; align-items:center; justify-content:center; z-index:50; padding:14px; }
+  .mod.show { display:flex; }
+  .mod .card { background:#fff; border-radius:14px; padding:20px; width:100%; max-width:440px; }
+  .mod h2 { font-size:17px; margin-bottom:6px; }
+  .mod .sub-cap { font-size:12px; color:var(--muted); margin-bottom:14px; }
+  .field { margin-bottom:12px; }
+  .lbl { display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:var(--sage); margin-bottom:5px; }
+  .input, select { width:100%; padding:9px 11px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; background:#fff; }
+  textarea.input { min-height:60px; resize:vertical; }
+  .mod-actions { display:flex; gap:8px; margin-top:14px; justify-content:flex-end; flex-wrap:wrap; }
+
+  #toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--dark); color:#fff; padding:10px 18px; border-radius:8px; font-size:13px; font-weight:600; opacity:0; transition:opacity 0.3s; pointer-events:none; z-index:2000; }
+  #toast.show { opacity:1; }
+  #loadingBar { display:none; height:3px; background:linear-gradient(90deg, var(--sage), var(--gold)); animation:lp 1.2s infinite; }
+  @keyframes lp { 0%,100% { opacity:0.4; } 50% { opacity:1; } }
+</style>
+</head>
+<body>
+
+<header>
+  <a href="hub.html" class="hdr-back">‹ Hub</a>
+  <div style="flex:1; min-width:0">
+    <h1>Issues Inbox</h1>
+    <div class="sub">Triage open issues — schedule into maintenance work or mark fixed</div>
+  </div>
+  <button class="hdr-btn" id="refreshBtn" onclick="loadIssues()">↻ Refresh</button>
+</header>
+<div id="loadingBar"></div>
+
+<div class="filter-bar">
+  <span class="summary" id="summary">Loading…</span>
+  <button class="chip on" data-status="open">Open</button>
+  <button class="chip" data-status="inprogress">In Progress</button>
+  <button class="chip" data-status="fixed">Fixed (recent)</button>
+  <button class="chip" data-status="all">All</button>
+  <span class="filter-status" id="lastRefresh"></span>
+</div>
+
+<div class="container" id="container">
+  <div class="empty-state"><div class="icon">⏳</div>Loading issues…</div>
+</div>
+
+<!-- ── Schedule modal ── -->
+<div class="mod" id="schedModal">
+  <div class="card">
+    <h2 id="schedTitle">Schedule task</h2>
+    <div class="sub-cap" id="schedSub"></div>
+
+    <div class="field">
+      <span class="lbl">When</span>
+      <input type="date" class="input" id="schedDate">
+    </div>
+    <div class="field">
+      <span class="lbl">Assigned to</span>
+      <select class="input" id="schedAssignee">
+        <option value="" disabled selected>— pick a maintenance person —</option>
+      </select>
+    </div>
+    <div class="field">
+      <span class="lbl">Description (defaults to the issue text — edit if needed)</span>
+      <textarea class="input" id="schedDesc"></textarea>
+    </div>
+
+    <div class="mod-actions">
+      <button class="iss-btn cancel" onclick="closeSchedModal()">Cancel</button>
+      <button class="iss-btn schedule" id="schedSaveBtn" onclick="saveSchedule()">▶ Schedule</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+
+const ISSUES_BOARD = 5095294474;
+const ADHOC_BOARD  = 5095296374;
+const STAFF_BOARD  = 5095127554;
+const ST_ROLE      = 'color_mm2psadz';
+
+// Issues columns
+const IS_LOC      = 'dropdown_mm2s6ek3';
+const IS_URGENCY  = 'color_mm2sy0cn';
+const IS_STATUS   = 'color_mm2s9cc9';
+const IS_DESC     = 'long_text_mm2smt15';
+const IS_REPORTER = 'dropdown_mm2s3e8b';
+const IS_REP_DATE = 'date_mm2s8zd1';
+const IS_PHOTO    = 'file_mm2sxvcm';
+
+// Ad-hoc Maintenance columns
+const AH_PROP      = 'text_mm2shvja';
+const AH_DESC      = 'long_text_mm2s5dwj';
+const AH_SCHED     = 'date_mm2stp44';
+const AH_ASSIGNEE  = 'dropdown_mm2szsp5';
+const AH_STATUS    = 'color_mm2sf7a8';
+const AH_CREATED_BY = 'dropdown_mm2sbn87';
+const AH_LINKED_ISS = 'text_mm2sqa3f';
+
+let issues = [];
+let staffNames = [];
+let activeFilter = 'open';
+let editingIssue = null;
+
+function gql(query, variables) {
+  return fetch('https://api.monday.com/v2', {
+    method:'POST',
+    headers:{'Content-Type':'application/json',Authorization:TOKEN,'API-Version':'2024-01'},
+    body:JSON.stringify(variables ? {query,variables} : {query})
+  }).then(r => r.json()).then(j => {
+    if (j.errors) throw new Error(j.errors[0].message);
+    return j.data;
+  });
+}
+function pj(v) { try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; } }
+function escapeHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+function todayISO() { const d = new Date(); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function tomorrowISO() { const d = new Date(); d.setDate(d.getDate()+1); return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); clearTimeout(toast._h); toast._h = setTimeout(()=>t.classList.remove('show'), 2200); }
+function setLoading(on) { document.getElementById('loadingBar').style.display = on ? 'block' : 'none'; }
+
+/* ── Parse property out of Issue item name (since board_relation writes don't persist) ── */
+function parsePropertyFromName(name) {
+  let n = (name || '').trim();
+  const dot = n.indexOf(' · ');
+  if (dot > 0) return n.slice(0, dot).trim();
+  const em = n.lastIndexOf(' — ');
+  if (em > 0) return n.slice(0, em).trim();
+  return n;
+}
+
+/* ── Load issues + maintenance staff for the assignee dropdown ── */
+async function loadIssues() {
+  setLoading(true);
+  document.getElementById('summary').textContent = 'Loading…';
+  try {
+    const [iss, st] = await Promise.all([
+      gql(`{ boards(ids:[${ISSUES_BOARD}]){ items_page(limit:500){ items{ id name created_at column_values(ids:["${IS_LOC}","${IS_URGENCY}","${IS_STATUS}","${IS_DESC}","${IS_REPORTER}","${IS_REP_DATE}","${IS_PHOTO}"]){ id text value } } } } }`),
+      gql(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:200){ items{ id name column_values(ids:["${ST_ROLE}"]){ text } } } } }`),
+    ]);
+
+    issues = (iss?.boards?.[0]?.items_page?.items || []).map(it => {
+      const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+      let photoUrl = null;
+      try {
+        const photos = JSON.parse(cv[IS_PHOTO]?.value || 'null');
+        if (photos?.files?.length) photoUrl = photos.files[0].url || null;
+      } catch (_) {}
+      return {
+        id: it.id,
+        name: it.name,
+        createdAt: it.created_at,
+        property: parsePropertyFromName(it.name),
+        location: cv[IS_LOC]?.text || '',
+        urgency: cv[IS_URGENCY]?.text || '',
+        status:  cv[IS_STATUS]?.text || 'Open',
+        description: pj(cv[IS_DESC]?.value)?.text || cv[IS_DESC]?.text || '',
+        reporter: cv[IS_REPORTER]?.text || '',
+        reportedDate: pj(cv[IS_REP_DATE]?.value)?.date || '',
+        photoUrl,
+      };
+    });
+
+    // Maintenance staff for the schedule dropdown
+    staffNames = (st?.boards?.[0]?.items_page?.items || [])
+      .filter(s => (s.column_values?.[0]?.text || '').trim().toLowerCase() === 'maintenance')
+      .map(s => s.name).sort();
+
+    document.getElementById('lastRefresh').textContent = 'Updated ' + new Date().toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'});
+    render();
+  } catch (e) {
+    document.getElementById('container').innerHTML = `<div class="empty-state"><div class="icon">⚠️</div>Could not load issues: ${escapeHtml(e.message)}</div>`;
+    document.getElementById('summary').textContent = 'Error';
+  }
+  setLoading(false);
+}
+
+document.querySelectorAll('.chip').forEach(c => c.addEventListener('click', () => {
+  document.querySelectorAll('.chip').forEach(x => x.classList.remove('on'));
+  c.classList.add('on');
+  activeFilter = c.dataset.status;
+  render();
+}));
+
+function render() {
+  const container = document.getElementById('container');
+  const sum = document.getElementById('summary');
+
+  // Counts by status (for the summary)
+  const counts = { open: 0, inprogress: 0, fixed: 0 };
+  for (const i of issues) {
+    const s = (i.status || 'Open').toLowerCase();
+    if (s === 'open' || s === 'awaiting parts') counts.open++;
+    else if (s.includes('progress')) counts.inprogress++;
+    else if (s === 'fixed') counts.fixed++;
+  }
+  sum.textContent = `${counts.open} open · ${counts.inprogress} in progress · ${counts.fixed} fixed`;
+
+  // Filter
+  const sevenDaysAgo = (function(){ const d = new Date(); d.setDate(d.getDate()-14); return d.toISOString().slice(0,10); })();
+  let filtered = issues.filter(i => {
+    const s = (i.status || 'Open').toLowerCase();
+    if (activeFilter === 'all') return true;
+    if (activeFilter === 'open')       return s === 'open' || s === 'awaiting parts';
+    if (activeFilter === 'inprogress') return s.includes('progress');
+    if (activeFilter === 'fixed')      return s === 'fixed' && (i.reportedDate || '') >= sevenDaysAgo;
+    return true;
+  });
+
+  // Sort: urgency desc, then most recently reported first
+  const urgOrder = u => /urgent/i.test(u) ? 0 : /high/i.test(u) ? 1 : /normal/i.test(u) ? 2 : 3;
+  filtered.sort((a,b) => {
+    const u = urgOrder(a.urgency) - urgOrder(b.urgency);
+    if (u !== 0) return u;
+    return (b.createdAt || '').localeCompare(a.createdAt || '');
+  });
+
+  if (!filtered.length) {
+    container.innerHTML = `<div class="empty-state"><div class="icon">✓</div>No ${activeFilter === 'all' ? '' : activeFilter+' '}issues. Nice.</div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(renderIssue).join('');
+}
+
+function urgKey(u)   { return /urgent/i.test(u) ? 'urgent' : /high/i.test(u) ? 'high' : /normal/i.test(u) ? 'normal' : 'low'; }
+function urgShort(u) { return (u || 'Normal').split(' — ')[0]; }
+function statusKey(s) { const t = (s||'Open').toLowerCase(); return t.includes('progress') ? 'inprogress' : t === 'fixed' ? 'fixed' : 'open'; }
+
+function renderIssue(i) {
+  const uk = urgKey(i.urgency);
+  const sk = statusKey(i.status);
+  const photoBlock = i.photoUrl ? `<a href="${escapeHtml(i.photoUrl)}" target="_blank" rel="noopener"><img class="iss-photo" src="${escapeHtml(i.photoUrl)}" alt="photo"></a>` : '';
+  const isOpen = sk === 'open';
+  const isFixed = sk === 'fixed';
+  return `<div class="issue ${uk} ${isFixed?'fixed':''} ${sk==='inprogress'?'scheduled':''}" data-id="${i.id}">
+    <div class="iss-top">
+      <div class="iss-prop">${escapeHtml(i.property)}${i.location ? ` <span style="color:var(--sage); font-weight:500; font-size:13px">· ${escapeHtml(i.location)}</span>` : ''}</div>
+      <div class="iss-badges">
+        <span class="badge ${uk}">${escapeHtml(urgShort(i.urgency))}</span>
+        <span class="badge status ${sk}">${escapeHtml(i.status || 'Open')}</span>
+      </div>
+    </div>
+    <div class="iss-meta">
+      ${i.reporter ? `Reported by <b>${escapeHtml(i.reporter)}</b>` : ''}
+      ${i.reportedDate ? ` · ${escapeHtml(i.reportedDate)}` : ''}
+    </div>
+    ${i.description ? `<div class="iss-desc">${escapeHtml(i.description)}</div>` : ''}
+    ${photoBlock}
+    ${(!isFixed) ? `
+      <div class="iss-actions">
+        ${isOpen ? `<button class="iss-btn schedule" onclick="openSched('${i.id}')">▶ Schedule task</button>` : ''}
+        <button class="iss-btn fixed" onclick="markFixed('${i.id}')">✓ Mark fixed</button>
+      </div>
+    ` : ''}
+  </div>`;
+}
+
+/* ── Schedule modal ── */
+function openSched(id) {
+  editingIssue = issues.find(i => i.id === id);
+  if (!editingIssue) return;
+  document.getElementById('schedTitle').textContent = `Schedule: ${editingIssue.property}`;
+  document.getElementById('schedSub').textContent = `${editingIssue.location || ''} — creates an Ad-hoc Maintenance task and sets the issue to In Progress.`;
+  document.getElementById('schedDate').value = tomorrowISO();
+  document.getElementById('schedDesc').value = editingIssue.description || '';
+  // Populate maintenance dropdown
+  const sel = document.getElementById('schedAssignee');
+  sel.innerHTML = '<option value="" disabled selected>— pick a maintenance person —</option>'
+    + staffNames.map(n => `<option>${escapeHtml(n)}</option>`).join('');
+  document.getElementById('schedModal').classList.add('show');
+}
+function closeSchedModal() {
+  document.getElementById('schedModal').classList.remove('show');
+  editingIssue = null;
+}
+async function saveSchedule() {
+  if (!editingIssue) return;
+  const date = document.getElementById('schedDate').value;
+  const assignee = document.getElementById('schedAssignee').value;
+  const desc = document.getElementById('schedDesc').value.trim();
+  if (!date) return alert('Pick a date.');
+  if (!assignee) return alert('Pick a maintenance person.');
+
+  const btn = document.getElementById('schedSaveBtn');
+  btn.disabled = true; btn.textContent = 'Scheduling…';
+  try {
+    // 1. Create Ad-hoc Maintenance row
+    const taskName = `${editingIssue.property} · ${(editingIssue.description || '').slice(0,50)}`;
+    const cv = {
+      [AH_PROP]:       editingIssue.property,
+      [AH_DESC]:       desc,
+      [AH_SCHED]:      { date },
+      [AH_ASSIGNEE]:   { labels: [assignee] },
+      [AH_STATUS]:     { label: 'Scheduled' },
+      [AH_LINKED_ISS]: editingIssue.id,
+      [AH_CREATED_BY]: { labels: ['Issues Inbox'] },
+    };
+    const q = `mutation($b:ID!,$n:String!,$v:JSON!){
+      create_item(board_id:$b, item_name:$n, column_values:$v, create_labels_if_missing:true){ id }
+    }`;
+    await gql(q, { b: ADHOC_BOARD, n: taskName, v: JSON.stringify(cv) });
+
+    // 2. Update Issue status to In Progress
+    const q2 = `mutation($b:ID!,$i:ID!,$v:JSON!){
+      change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v){ id }
+    }`;
+    await gql(q2, { b: ISSUES_BOARD, i: editingIssue.id, v: JSON.stringify({ [IS_STATUS]: { label: 'In Progress' } }) });
+
+    closeSchedModal();
+    toast('✓ Scheduled and assigned');
+    await loadIssues();
+  } catch (e) {
+    alert('Could not schedule: ' + e.message);
+  }
+  btn.disabled = false; btn.textContent = '▶ Schedule';
+}
+
+/* ── Mark fixed inline ── */
+async function markFixed(id) {
+  if (!confirm('Mark this issue as fixed?')) return;
+  try {
+    const q = `mutation($b:ID!,$i:ID!,$v:JSON!){
+      change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v){ id }
+    }`;
+    await gql(q, { b: ISSUES_BOARD, i: id, v: JSON.stringify({ [IS_STATUS]: { label: 'Fixed' } }) });
+    toast('✓ Marked fixed');
+    await loadIssues();
+  } catch (e) {
+    alert('Could not update: ' + e.message);
+  }
+}
+
+document.getElementById('schedModal').addEventListener('click', e => { if (e.target.id === 'schedModal') closeSchedModal(); });
+
+// Boot
+loadIssues();
+</script>
+</body>
+</html>

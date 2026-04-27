@@ -149,7 +149,11 @@
     </a>
     <a href="supplies-field.html" class="stat-card warn">
       <div class="stat-val" id="stSup"><span class="spin"></span></div>
-      <div class="stat-lbl">Pending requests</div>
+      <div class="stat-lbl">Open supply requests</div>
+    </a>
+    <a href="task-backlog.html" class="stat-card danger" id="cardBacklog">
+      <div class="stat-val" id="stBacklog"><span class="spin"></span></div>
+      <div class="stat-lbl">Maint Backlog</div>
     </a>
     <a href="stock.html" class="stat-card danger">
       <div class="stat-val" id="stOut"><span class="spin"></span></div>
@@ -252,6 +256,18 @@
         <div class="card-icon">📥</div>
         <div class="card-name">Issues Inbox</div>
         <div class="card-desc">Triage open issues — schedule a maintenance task with a date and assignee, or mark fixed on the spot. Sets the issue to In Progress until done.</div>
+        <span class="card-badge b-both">📱💻 Any</span>
+      </a>
+      <a href="task-backlog.html" class="tool-card">
+        <div class="card-icon">⏳</div>
+        <div class="card-name">Maint Backlog</div>
+        <div class="card-desc">Monitor overdue, unassigned, or rescheduled maintenance tasks across all boards.</div>
+        <span class="card-badge b-desktop">💻 Desktop</span>
+      </a>
+      <a href="create-task.html" class="tool-card featured">
+        <div class="card-icon">➕</div>
+        <div class="card-name">Create a Task</div>
+        <div class="card-desc">Schedule any maintenance job — window clean, jet wash, PAT test, paddleboard move, or ad-hoc repair. Pick a property, date and person; lands on the right board automatically.</div>
         <span class="card-badge b-both">📱💻 Any</span>
       </a>
       <a href="report-stock.html" class="tool-card featured">
@@ -398,7 +414,7 @@ startClock();
 window.addEventListener('pageshow', e => {
   if (e.persisted) {
     startClock();
-    ['stArr','stNext','stSup','stOut','stLow'].forEach(id => {
+    ['stArr','stNext','stSup','stOut','stLow','stBacklog'].forEach(id => {
       document.getElementById(id).innerHTML = '<span class="spin"></span>';
     });
     loadStats();
@@ -496,6 +512,39 @@ async function loadStats() {
     document.getElementById('stOut').textContent = out;
     document.getElementById('stLow').textContent = low;
   } catch { document.getElementById('stOut').textContent = document.getElementById('stLow').textContent = '—'; }
+
+  // Maintenance Backlog (Overdue + Unassigned)
+  try {
+    const BOARDS = [1987064628, 5092955038, 5092954987, 5095296374];
+    const COLS = ['date_mm2sn17y','dropdown_mm2se9z7','date_mm2s2qpv','dropdown_mm2shyxp','date_mm2srjzv','dropdown_mm2sxqvv','date_mm2stp44','dropdown_mm2szsp5','color_mm2sf7a8'];
+    const colsStr = '[' + COLS.map(c => `"${c}"`).join(',') + ']';
+    
+    let totalBacklog = 0;
+    for (const bid of BOARDS) {
+      const d = await mq(`{ boards(ids:[${bid}]) { items_page(limit:500) { items { column_values(ids:${colsStr}) { id text value } } } } }`);
+      const items = d?.boards?.[0]?.items_page?.items || [];
+      for (const it of items) {
+        const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+        // Find sched date and assignee for THIS board
+        const schedCol = Object.keys(cv).find(k => k.startsWith('date_mm2'));
+        const assCol = Object.keys(cv).find(k => k.startsWith('dropdown_mm2'));
+        const statusCol = 'color_mm2sf7a8'; // adhoc only
+
+        const schedDate = schedCol ? (function(){ try{return JSON.parse(cv[schedCol].value||'null')?.date;}catch{return null;} })() : null;
+        const assignee = assCol ? (cv[assCol].text || '') : '';
+        const status = cv[statusCol] ? (cv[statusCol].text || '') : '';
+
+        if (bid === 5095296374 && /completed|cancelled/i.test(status)) continue;
+
+        const isUnassigned = !assignee.trim();
+        const isOverdue = schedDate && schedDate < today;
+
+        if (isUnassigned || isOverdue) totalBacklog++;
+      }
+    }
+    document.getElementById('stBacklog').textContent = totalBacklog;
+    document.getElementById('cardBacklog').className = totalBacklog > 5 ? 'stat-card danger' : (totalBacklog > 0 ? 'stat-card warn' : 'stat-card');
+  } catch { document.getElementById('stBacklog').textContent = '—'; }
 }
 
 loadStats();

@@ -24,6 +24,12 @@
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
     body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:env(safe-area-inset-bottom); }
 
+    /* Sync Indicator */
+    .sync-banner { background:var(--amber); color:#fff; font-size:12px; font-weight:700; text-align:center; padding:6px; display:none; position:sticky; top:0; z-index:110; }
+    .sync-banner.active { display:block; }
+    .sync-dot { display:inline-block; width:8px; height:8px; background:#fff; border-radius:50%; margin-right:6px; animation:pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity:1; } 50% { opacity:0.3; } 100% { opacity:1; } }
+
     /* Header */
     .header { background:var(--dark); color:#fff; padding:18px 20px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; gap:14px; }
     .header-inner { display:flex; align-items:center; gap:14px; flex:1; }
@@ -122,6 +128,10 @@
 </head>
 <body>
 
+<div class="sync-banner" id="syncBanner">
+  <span class="sync-dot"></span> <span id="syncText">Offline — Changes will sync automatically</span>
+</div>
+
 <div class="header">
   <div class="header-inner">
     <div class="header-logo">
@@ -167,7 +177,98 @@
   <div id="dayContent"></div>
 </div>
 
+<!-- ── Changeover checklist modal ─────────────────────────────── -->
+<div class="cl-overlay" id="clOverlay">
+  <div class="cl-box">
+    <div class="cl-title">
+      <span id="clTitle">Changeover complete?</span>
+      <button class="cl-x" onclick="closeChecklist()">✕</button>
+    </div>
+    <div class="cl-sub" id="clSub">Tick everything you've done. The list goes on the clean's record.</div>
+    <div class="cl-list" id="clList"></div>
+    <div class="cl-notes-row">
+      <label class="cl-lbl">Notes (anything else worth recording)</label>
+      <textarea id="clNotes" class="cl-notes" placeholder="Optional"></textarea>
+    </div>
+    <div class="cl-actions">
+      <button class="cl-btn-cancel" onclick="closeChecklist()">Cancel</button>
+      <button class="cl-btn-go" id="clGo" onclick="submitChecklist()">✓ Mark complete</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
+
+<!-- ── Maintenance Exception modal ───────────────────────────── -->
+<div class="cl-overlay" id="exOverlay">
+  <div class="ex-box">
+    <div class="ex-title">Reschedule or Release</div>
+    <div class="ex-hint">If you can't finish this today, move it or put it back in the queue for someone else.</div>
+    
+    <div class="ex-group">
+      <span class="ex-lbl">Action</span>
+      <select id="exAction" class="ex-select" onchange="toggleExDate()">
+        <option value="move">Move to another day</option>
+        <option value="return">Return to Queue (unassign me)</option>
+      </select>
+    </div>
+
+    <div class="ex-group" id="exDateGroup">
+      <span class="ex-lbl">New Date</span>
+      <input type="date" id="exDate" class="ex-input">
+    </div>
+
+    <div class="ex-group">
+      <span class="ex-lbl">Reason / Note for manager</span>
+      <input type="text" id="exReason" class="ex-input" placeholder="e.g. Ran out of time, No access">
+    </div>
+
+    <div class="ex-actions">
+      <button class="ex-btn cancel" onclick="closeMaintException()">Cancel</button>
+      <button class="ex-btn go" id="exSaveBtn" onclick="submitMaintException()">Confirm</button>
+    </div>
+  </div>
+</div>
+
+<style>
+  /* Checklist modal */
+  .cl-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; z-index:200; padding:14px; }
+  .cl-overlay.show { display:flex; }
+  .cl-box { background:#fff; border-radius:14px; max-width:460px; width:100%; max-height:92vh; overflow-y:auto; padding:18px 18px 16px; display:flex; flex-direction:column; gap:10px; }
+  .cl-title { display:flex; justify-content:space-between; align-items:center; font-size:17px; font-weight:700; color:var(--dark); }
+  .cl-x { background:none; border:0; font-size:18px; cursor:pointer; color:var(--muted); padding:0 4px; }
+  .cl-sub { font-size:12px; color:var(--muted); margin-top:-6px; }
+  .cl-list { display:flex; flex-direction:column; gap:6px; margin-top:6px; }
+  .cl-item { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1.5px solid var(--border); border-radius:10px; cursor:pointer; user-select:none; background:#fff; transition:background 0.1s; }
+  .cl-item:hover { background:#fafaf5; }
+  .cl-item.checked { background:#edf7f2; border-color:#52b788; }
+  .cl-item.checked .cl-tick { background:#52b788; color:#fff; }
+  .cl-item.required { border-left-width:4px; border-left-color:var(--gold); }
+  .cl-item.required.checked { border-left-color:#52b788; }
+  .cl-tick { display:inline-flex; align-items:center; justify-content:center; width:22px; height:22px; border-radius:6px; background:#fff; border:1.5px solid var(--border); flex-shrink:0; font-size:14px; font-weight:700; color:transparent; transition:all 0.1s; }
+  .cl-label { flex:1; font-size:14px; font-weight:600; color:var(--dark); line-height:1.3; }
+  .cl-na { font-size:11px; color:var(--muted); margin-left:auto; }
+  .cl-required-tag { font-size:9px; background:var(--gold); color:#fff; padding:1px 5px; border-radius:3px; font-weight:700; letter-spacing:0.3px; text-transform:uppercase; flex-shrink:0; }
+  .cl-notes-row { margin-top:6px; }
+  .cl-lbl { display:block; font-size:11px; font-weight:700; color:var(--sage); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }
+  .cl-notes { width:100%; padding:9px 11px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:13px; min-height:50px; resize:vertical; }
+  .cl-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:6px; flex-wrap:wrap; }
+  .cl-btn-cancel { background:#eee; color:var(--dark); border:0; padding:9px 14px; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  .cl-btn-go { background:#2d6a4f; color:#fff; border:0; padding:9px 16px; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  .cl-btn-go:disabled { opacity:0.5; cursor:not-allowed; }
+
+  /* Exception modal */
+  .ex-box { background:#fff; border-radius:14px; max-width:400px; width:100%; padding:20px; display:flex; flex-direction:column; gap:14px; box-shadow:0 10px 30px rgba(0,0,0,0.3); }
+  .ex-title { font-size:18px; font-weight:700; color:var(--dark); }
+  .ex-group { display:flex; flex-direction:column; gap:6px; }
+  .ex-lbl { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--sage-mid); }
+  .ex-input, .ex-select { padding:10px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; width:100%; }
+  .ex-hint { font-size:11px; color:var(--sage); line-height:1.4; background:var(--amber-bg); padding:8px 10px; border-radius:6px; border:1px solid #f9e6c2; }
+  .ex-actions { display:flex; gap:8px; margin-top:6px; }
+  .ex-btn { flex:1; padding:12px; border-radius:9px; border:none; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+  .ex-btn.cancel { background:#eee; color:var(--dark); }
+  .ex-btn.go { background:var(--sage); color:#fff; }
+</style>
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════
@@ -246,6 +347,12 @@ const MAINT_SOURCES = [
 const ISSUES_BOARD_ID = 5095294474;
 const ISSUES_STATUS_COL = 'color_mm2s9cc9';
 
+// Properties without a hot tub — these get the changeover checklist minus the
+// "Hot tub serviced" item. Currently three on the Hot Tub Status board.
+const OUTSIDE_NO_HT = new Set(['Goose Landing', 'Serenity', 'Green Haven']);
+// HC_NOTES is already defined further down with the rest of the Hot Tub
+// Cleans column constants — that single declaration is used here too.
+
 // Staff columns
 const ST_CODE     = 'text_mm2qd59j';
 const ST_ROLE     = 'color_mm2psadz';
@@ -322,16 +429,76 @@ function prettyDate(iso) {
   return `${DOW[d.getDay()]} ${d.getDate()} ${mo}`;
 }
 
-async function mondayFetch(query, variables) {
-  const r = await fetch('https://api.monday.com/v2', {
-    method: 'POST',
-    headers: { 'Content-Type':'application/json','Authorization':API_TOKEN,'API-Version':'2024-01' },
-    body: JSON.stringify(variables ? { query, variables } : { query })
-  });
-  const j = await r.json();
-  if (j.errors) throw new Error(j.errors[0].message);
-  return j.data;
+let _outbox = JSON.parse(localStorage.getItem('outbox') || '[]');
+
+function saveOutbox() { 
+  localStorage.setItem('outbox', JSON.stringify(_outbox));
+  updateSyncUI();
 }
+
+function updateSyncUI() {
+  const b = document.getElementById('syncBanner');
+  const t = document.getElementById('syncText');
+  if (_outbox.length > 0) {
+    b.classList.add('active');
+    t.textContent = `Syncing ${_outbox.length} pending update${_outbox.length > 1 ? 's' : ''}...`;
+  } else if (!navigator.onLine) {
+    b.classList.add('active');
+    t.textContent = 'Offline — using cached data';
+  } else {
+    b.classList.remove('active');
+  }
+}
+
+async function mondayFetch(query, variables, useOutbox = false) {
+  try {
+    const r = await fetch('https://api.monday.com/v2', {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json','Authorization':API_TOKEN,'API-Version':'2024-01' },
+      body: JSON.stringify(variables ? { query, variables } : { query })
+    });
+    const j = await r.json();
+    if (j.errors) throw new Error(j.errors[0].message);
+    return j.data;
+  } catch (e) {
+    // If it's a network error and we're allowed to queue
+    if (useOutbox && (e.name === 'TypeError' || !navigator.onLine)) {
+      const id = Date.now() + Math.random().toString(36).substr(2, 5);
+      _outbox.push({ id, query, variables, timestamp: Date.now() });
+      saveOutbox();
+      // Throw special error for UI
+      const err = new Error('OFFLINE_QUEUED');
+      err.outboxId = id;
+      throw err;
+    }
+    throw e;
+  }
+}
+
+async function processOutbox() {
+  if (!_outbox.length || !navigator.onLine) {
+    updateSyncUI();
+    return;
+  }
+  const items = [..._outbox];
+  for (const item of items) {
+    try {
+      await mondayFetch(item.query, item.variables, false);
+      _outbox = _outbox.filter(x => x.id !== item.id);
+      saveOutbox();
+    } catch (e) {
+      if (e.message !== 'OFFLINE_QUEUED') {
+        console.error('Outbox individual item failure:', e);
+        // If it's a real API error (not network), we might want to discard or alert, 
+        // but for now we'll just stop the drain to avoid out-of-order errors
+        break;
+      }
+    }
+  }
+}
+
+window.addEventListener('online', processOutbox);
+setInterval(processOutbox, 30000);
 
 function toast(msg, type='') {
   const el = document.getElementById('toast');
@@ -396,26 +563,40 @@ async function boot() {
   document.getElementById('greetingDate').textContent = prettyDate(todayISO());
   document.getElementById('dayContent').innerHTML = '<div class="loading"><span class="spin"></span>Loading your day…</div>';
   currentDay = todayISO();
-  // Run loaders independently so a single failure doesn't blank the whole page.
-  // Promise.allSettled lets us collect partial successes and surface a soft
-  // warning at the top instead of an empty error screen.
+
+  // Load from cache instantly for zero-wait UI
+  try {
+    cleans = JSON.parse(localStorage.getItem('cache_cleans') || '[]');
+    hotTubCleans = JSON.parse(localStorage.getItem('cache_hot_tubs') || '[]');
+    maintTasks = JSON.parse(localStorage.getItem('cache_maint') || '[]');
+    shifts = JSON.parse(localStorage.getItem('cache_shifts') || '[]');
+    if (cleans.length || hotTubCleans.length || maintTasks.length || shifts.length) {
+      renderDayNav();
+      renderDay();
+    }
+  } catch(e) {}
+
+  // Run loaders independently
   const results = await Promise.allSettled([loadCleans(), loadShifts(), loadHotTubCleans(), loadMaintenanceTasks()]);
   const labels = ['cleans', 'shifts', 'hot tub cleans', 'maintenance tasks'];
   const failures = results
     .map((r, i) => r.status === 'rejected' ? { label: labels[i], err: r.reason } : null)
     .filter(Boolean);
+  
+  renderDayNav();
+  renderDay();
+  processOutbox();
+
+  if (failures.length > 0 && !navigator.onLine) {
+    // Suppress errors if offline (we're using cache)
+    return;
+  }
+
   if (failures.length === results.length) {
     document.getElementById('dayContent').innerHTML = `<div class="empty">⚠️ Could not load your day: ${escapeHtml(failures[0].err.message || String(failures[0].err))}</div>`;
     return;
   }
-  if (failures.length > 0) {
-    console.warn('Some loaders failed:', failures);
-  }
-  renderDayNav();
-  renderDay();
-  if (failures.length > 0) {
-    const msg = failures.map(f => `${f.label}: ${f.err.message || f.err}`).join(' · ');
-    const warn = document.createElement('div');
+}
     warn.style.cssText = 'background:#fff4e0;border:1px solid #fdab3d;color:#7a5a00;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px';
     warn.innerHTML = `⚠️ Some data couldn't be loaded — showing what we have. (${escapeHtml(msg)})`;
     document.getElementById('dayContent').prepend(warn);
@@ -498,6 +679,8 @@ async function loadCleans() {
     });
   }
   cleans.sort((a,b) => (a.day+a.start).localeCompare(b.day+b.start));
+  localStorage.setItem('cache_cleans', JSON.stringify(cleans));
+}
 }
 
 /* ─── Load Hot Tub Cleans assigned to me (today + 6 days) ──── */
@@ -543,6 +726,8 @@ async function loadHotTubCleans() {
     });
   }
   hotTubCleans.sort((a,b) => (a.day+a.start).localeCompare(b.day+b.start));
+  localStorage.setItem('cache_hot_tubs', JSON.stringify(hotTubCleans));
+}
 }
 
 /* ─── Load Maintenance Tasks scheduled for me (today + 6 days) ────
@@ -591,6 +776,8 @@ async function loadMaintenanceTasks() {
     }
   }
   maintTasks.sort((a,b) => (a.day+a.sourceKey+a.property).localeCompare(b.day+b.sourceKey+b.property));
+  localStorage.setItem('cache_maint', JSON.stringify(maintTasks));
+}
 }
 
 /* ─── Load Shifts in the visible window ─────────────────────── */
@@ -628,6 +815,8 @@ async function loadShifts() {
       hours: parseFloat(pj(cv[SH_HOURS]?.value)) || 0,
     });
   }
+  shifts.sort((a,b) => a.date.localeCompare(b.date));
+  localStorage.setItem('cache_shifts', JSON.stringify(shifts));
 }
 
 /* ─── Day navigation strip ──────────────────────────────────── */
@@ -846,16 +1035,26 @@ function renderHotTubCleanCard(h) {
   const formUrl = `hot-tub.html?property=${encodeURIComponent(h.property)}&date=${encodeURIComponent(h.day)}&visit=${visitParam}&from=staff`;
 
   // Status buttons — Start, Complete, Reset. They write back to Monday immediately.
+  // Changeover cleans (full property service) get the checklist modal on
+  // complete so the maintenance team has to positively confirm cobwebbing /
+  // BBQ / plants / decking / sills / "outside guest ready" etc. Mid-stay and
+  // Mid-vacancy stay as a one-tap mark-complete since those are tub-only.
+  const isChangeover = h.type === 'Changeover';
   let statusBtns = '';
   if (cancelled) {
     statusBtns = '';
   } else if (completed) {
     statusBtns = `<button class="cc-btn secondary" onclick="setHotTubStatus('${h.id}','Scheduled', this)" style="background:#eee; color:#555">Reset</button>`;
   } else if (inProgress) {
-    statusBtns = `<button class="cc-btn primary" onclick="setHotTubStatus('${h.id}','Completed', this)" style="background:#2d6a4f; color:#fff">✓ Mark complete</button>`;
+    statusBtns = isChangeover
+      ? `<button class="cc-btn primary" onclick="openChangeoverChecklist('${h.id}')" style="background:#2d6a4f; color:#fff">✓ Mark complete (with checks)</button>`
+      : `<button class="cc-btn primary" onclick="setHotTubStatus('${h.id}','Completed', this)" style="background:#2d6a4f; color:#fff">✓ Mark complete</button>`;
   } else {
+    const completeAction = isChangeover
+      ? `<button class="cc-btn secondary" onclick="openChangeoverChecklist('${h.id}')" style="background:#2d6a4f; color:#fff">✓ Mark complete (with checks)</button>`
+      : `<button class="cc-btn secondary" onclick="setHotTubStatus('${h.id}','Completed', this)" style="background:#2d6a4f; color:#fff">✓ Mark complete</button>`;
     statusBtns = `<button class="cc-btn primary" onclick="setHotTubStatus('${h.id}','In Progress', this)" style="background:#fdab3d; color:#1a1a1a">▶ Start</button>
-                  <button class="cc-btn secondary" onclick="setHotTubStatus('${h.id}','Completed', this)" style="background:#2d6a4f; color:#fff">✓ Mark complete</button>`;
+                  ${completeAction}`;
   }
 
   const logBtn = !cancelled
@@ -885,24 +1084,250 @@ function renderHotTubCleanCard(h) {
   </div>`;
 }
 
-/* ─── Maintenance task card (window / jet / PAT / ad-hoc) ─── */
+/* ═══════════════════════════════════════════════════════════════════
+   Changeover checklist — required for hot-tub Changeover cleans.
+   The maintenance team must positively confirm the outside-only items
+   (cobwebbing, BBQ, plants, decking, sills etc.) before a Changeover
+   counts as done. The ticked list gets appended to the Notes column on
+   Hot Tub Cleans for an audit trail.
+   ═══════════════════════════════════════════════════════════════════ */
+const CHECKLIST_TEMPLATE = [
+  { key: 'tub',       label: 'Hot tub serviced (chemicals, level, lid)',  hotTubOnly: true },
+  { key: 'cobweb',    label: 'Cobwebbing — exterior + deck' },
+  { key: 'bbq',       label: 'BBQ cleaned and checked' },
+  { key: 'plants',    label: 'Plants watered' },
+  { key: 'decking',   label: 'Decking swept' },
+  { key: 'furniture', label: 'Outside furniture / cushions checked' },
+  { key: 'lights',    label: 'Lights / external bulbs checked' },
+  { key: 'sills',     label: 'Sills wiped down' },
+  { key: 'guest',     label: 'Outside is guest ready', required: true },
+];
+
+let _checklistFor = null;       // hot tub clean id we're completing
+let _checklistChecked = {};     // { key: true/false }
+
+function openChangeoverChecklist(htId) {
+  const h = hotTubCleans.find(x => x.id === htId);
+  if (!h) return;
+  _checklistFor = htId;
+  _checklistChecked = {};
+  document.getElementById('clTitle').textContent = `${h.property} — Changeover complete?`;
+  document.getElementById('clSub').textContent = 'Tick everything you actually did. The list gets saved to the clean record.';
+  document.getElementById('clNotes').value = '';
+
+  const list = document.getElementById('clList');
+  const noTub = OUTSIDE_NO_HT.has((h.property || '').trim());
+  const items = CHECKLIST_TEMPLATE.filter(it => !(it.hotTubOnly && noTub));
+  list.innerHTML = items.map(it => `
+    <div class="cl-item ${it.required ? 'required' : ''}" data-key="${it.key}" onclick="toggleChecklistItem('${it.key}')">
+      <span class="cl-tick">✓</span>
+      <span class="cl-label">${escapeHtml(it.label)}</span>
+      ${it.required ? '<span class="cl-required-tag">required</span>' : ''}
+    </div>
+  `).join('');
+  document.getElementById('clOverlay').classList.add('show');
+}
+
+function toggleChecklistItem(key) {
+  _checklistChecked[key] = !_checklistChecked[key];
+  const row = document.querySelector(`.cl-item[data-key="${key}"]`);
+  if (row) row.classList.toggle('checked', !!_checklistChecked[key]);
+}
+
+function closeChecklist() {
+  document.getElementById('clOverlay').classList.remove('show');
+  _checklistFor = null;
+  _checklistChecked = {};
+}
+
+async function submitChecklist() {
+  const htId = _checklistFor;
+  const h = hotTubCleans.find(x => x.id === htId);
+  if (!h) return;
+  // Build the list of items shown for this property
+  const noTub = OUTSIDE_NO_HT.has((h.property || '').trim());
+  const items = CHECKLIST_TEMPLATE.filter(it => !(it.hotTubOnly && noTub));
+
+  // Required items must be ticked
+  const missingRequired = items.filter(it => it.required && !_checklistChecked[it.key]);
+  if (missingRequired.length) {
+    alert('Tick the required items before marking complete: ' + missingRequired.map(i => i.label).join(', '));
+    return;
+  }
+  // At least one non-required item should be ticked or the user should add a note
+  const userNotes = document.getElementById('clNotes').value.trim();
+  const tickedAny = items.some(it => !it.required && _checklistChecked[it.key]);
+  if (!tickedAny && !userNotes) {
+    if (!confirm('Nothing is ticked — submit an empty checklist?')) return;
+  }
+
+  const btn = document.getElementById('clGo');
+  btn.disabled = true; btn.textContent = 'Saving…';
+
+  // Build the audit string
+  const stamp = new Date().toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  const rows = items.map(it => {
+    const ticked = _checklistChecked[it.key];
+    return `${ticked ? '✓' : '✗'} ${it.label}`;
+  }).join('  |  ');
+  const auditLine = `[${stamp} — ${me.name}] Changeover checks:  ${rows}` + (userNotes ? `  |  Notes: ${userNotes}` : '');
+  const newNotes = h.notes ? (h.notes + '\n\n' + auditLine) : auditLine;
+
+  // Optimistic local state
+  const prevStatus = h.status, prevNotes = h.notes;
+  h.status = 'Completed';
+  h.notes = newNotes;
+
+    const q = `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`;
+    await mondayFetch(q, { b: HT_CLEANS_BOARD, i: htId, v: cv }, true);
+    closeChecklist();
+    renderDay();
+    renderDayNav();
+    toast('✓ Changeover checks saved');
+  } catch (e) {
+    if (e.message === 'OFFLINE_QUEUED') {
+      closeChecklist();
+      renderDay();
+      renderDayNav();
+      toast('✓ Offline: Changeover queued');
+      return;
+    }
+    // Revert
+    // Revert
+    h.status = prevStatus; h.notes = prevNotes;
+    btn.disabled = false; btn.textContent = '✓ Mark complete';
+    alert('Could not save: ' + e.message);
+  }
+}
+
+/* ─── Maintenance task card (window / jet / PAT / paddleboard / ad-hoc) ───
+   Paddleboards are detected via description prefix and get a "Run checks"
+   button that deep-links to the existing paddle-boards.html app rather
+   than a simple Mark Complete — they need positive checklist confirmation
+   (fin intact, paddle present, inflated, etc.) for both drop-off and
+   collection. Window / Jet / PAT get a small "Open dashboard" link to
+   the existing register UI for history and other-property context. */
 function renderMaintTaskCard(m) {
   const src = MAINT_SOURCES.find(s => s.key === m.sourceKey);
   if (!src) return '';
   const issueUrl = `report-issue.html?from=staff&property=${encodeURIComponent(m.property)}&reporter=${encodeURIComponent(me.name)}`;
   const descBlock = m.description ? `<div class="cc-notes">${escapeHtml(m.description)}</div>` : '';
+
+  const isPaddleboard = m.sourceKey === 'adhoc' && /^paddleboards?/i.test((m.description||'').trim());
+  const dashboardUrl = src.key === 'window' ? `window-cleaning.html?from=staff&property=${encodeURIComponent(m.property)}`
+                    : src.key === 'jet'    ? `jet-washing.html?from=staff&property=${encodeURIComponent(m.property)}`
+                    : src.key === 'pat'    ? `pat-testing.html?from=staff&property=${encodeURIComponent(m.property)}`
+                    : null;
+
+  // Status badge
+  const sts = (m.status || '').toLowerCase();
+  const isInProgress = /in.?progress|progress|started/i.test(sts);
+  const isComplete   = /complet|done/i.test(sts);
+  let statusBadge = '';
+  if (isInProgress) statusBadge = `<span class="cc-badge" style="background:#1a5276;color:#fff">▶ In Progress</span>`;
+  else if (isComplete) statusBadge = `<span class="cc-badge comp">✓ Done</span>`;
+  else statusBadge = `<span class="cc-badge" style="background:#f0ede4;color:${src.color};border:1px solid ${src.color}">Scheduled</span>`;
+
+  // Action buttons
+  let primaryBtn;
+  if (isPaddleboard) {
+    const isCollection = /collect/i.test(m.description || '');
+    const padUrl = `paddle-boards.html?from=staff&property=${encodeURIComponent(m.property)}&move=${isCollection?'collection':'dropoff'}&taskId=${encodeURIComponent(m.id)}`;
+    primaryBtn = `<a class="cc-btn primary" href="${padUrl}" style="background:${src.color}; color:#fff">▶ Run paddleboard checks</a>`;
+  } else if (isComplete) {
+    primaryBtn = `<button class="cc-btn primary" disabled style="background:#52b788;color:#fff;opacity:0.7">✓ Completed</button>`;
+  } else if (isInProgress) {
+    primaryBtn = `<button class="cc-btn primary" onclick="markMaintComplete('${m.id}','${m.sourceKey}',this)" style="background:${src.color};color:#fff">✓ Mark complete</button>`;
+  } else {
+    primaryBtn = `<button class="cc-btn primary" onclick="markMaintStarted('${m.id}','${m.sourceKey}',this)" style="background:${src.color};color:#fff">▶ Start task</button>`;
+  }
+
+  const dashLink = dashboardUrl
+    ? `<a class="cc-btn secondary" href="${dashboardUrl}" style="background:#fff;color:${src.color};border:1.5px solid ${src.color};flex:0 0 auto;min-width:0;padding-left:10px;padding-right:10px">📋 Board</a>`
+    : '';
+
+  // Notes panel (collapsed by default)
+  const notesId = `mnt-notes-${m.id}`;
+  const notesPanel = !isComplete ? `
+    <div style="margin-top:8px">
+      <button class="cc-btn secondary" style="font-size:12px;padding:6px 10px" onclick="toggleMaintNotes('${notesId}')" id="ntbtn-${m.id}">📝 Notes</button>
+      <div id="${notesId}" style="display:none;margin-top:8px;display:none">
+        <textarea placeholder="Add a note (timestamped &amp; appended to task record)…" style="width:100%;padding:8px;border:1.5px solid #e0ddd6;border-radius:8px;font-family:inherit;font-size:13px;min-height:60px;resize:vertical" id="ntarea-${m.id}"></textarea>
+        <button onclick="addMaintNote('${m.id}','${m.sourceKey}','${src.boardId}')" class="cc-btn primary" style="margin-top:6px;width:100%;background:#1a5276;color:#fff;font-size:13px">Save note</button>
+      </div>
+    </div>` : '';
+
   return `<div class="clean-card" data-mid="${m.id}" data-src="${m.sourceKey}"
     style="border-left-color:${src.color}; background:${src.bg}">
     <div class="cc-top">
       <div class="cc-prop">${src.icon} ${escapeHtml(m.property)}</div>
-      <div class="cc-badges"><span class="role-pill">${escapeHtml(src.label)}</span></div>
+      <div class="cc-badges">
+        <span class="role-pill">${escapeHtml(src.label)}</span>
+        ${statusBadge}
+        ${m.linkedIssue ? '<span class="cc-badge" style="background:#fdf0ec;color:#8B2020">🚨 Issue</span>' : ''}
+      </div>
     </div>
     ${descBlock}
     <div class="cc-actions">
-      <button class="cc-btn primary" onclick="markMaintComplete('${m.id}','${m.sourceKey}', this)" style="background:${src.color}; color:#fff">✓ Mark complete</button>
-      <a class="cc-btn secondary" href="${issueUrl}" title="Found something else broken? Log it" style="background:#a9434a; color:#fff; flex:0 0 auto; min-width:0; padding-left:12px; padding-right:12px">🚨</a>
+      ${primaryBtn}
+      ${!isComplete ? `<button class="cc-btn secondary" onclick="openMaintException('${m.id}','${m.sourceKey}')" title="Can't do it today? Refer back.">🔄 Refer back</button>` : ''}
+      ${dashLink}
+      <a class="cc-btn secondary" href="${issueUrl}" style="background:#a9434a;color:#fff;flex:0 0 auto;min-width:0;padding-left:12px;padding-right:12px">🚨</a>
     </div>
+    ${notesPanel}
   </div>`;
+}
+
+function toggleMaintNotes(panelId) {
+  const p = document.getElementById(panelId);
+  if (!p) return;
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+}
+
+/* Mark task as Started (In Progress) — for ad-hoc only (status-based). */
+async function markMaintStarted(itemId, sourceKey, btnEl) {
+  const src = MAINT_SOURCES.find(s => s.key === sourceKey);
+  const m = maintTasks.find(x => x.id === itemId && x.sourceKey === sourceKey);
+  if (!src || !m) return;
+  // Optimistically update local status
+  m.status = 'In Progress';
+  renderDay();
+  try {
+    const cv = {};
+    if (src.statusCol) cv[src.statusCol] = { label: 'In Progress' };
+    const q = `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`;
+    await mondayFetch(q, { b: src.boardId, i: itemId, v: JSON.stringify(cv) }, true);
+    toast(`▶ ${src.label} started`);
+  } catch (e) {
+    if (e.message === 'OFFLINE_QUEUED') { toast('▶ Offline: status queued'); return; }
+    m.status = ''; renderDay();
+    toast('Update failed: ' + e.message, 'err');
+  }
+}
+
+/* Append a timestamped note to the task's description column. */
+async function addMaintNote(itemId, sourceKey, boardId) {
+  const areaEl = document.getElementById(`ntarea-${itemId}`);
+  const note = areaEl?.value?.trim();
+  if (!note) return;
+  const src = MAINT_SOURCES.find(s => s.key === sourceKey);
+  if (!src?.descCol) return;
+  const stamp = new Date().toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  const m = maintTasks.find(x => x.id === itemId);
+  const existing = m?.description ? m.description + '\n' : '';
+  const appended = existing + `[${stamp}] ${me.name}: ${note}`;
+  try {
+    const cv = { [src.descCol]: appended };
+    const q = `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v){ id } }`;
+    await mondayFetch(q, { b: src.boardId, i: itemId, v: JSON.stringify(cv) }, true);
+    if (m) m.description = appended;
+    if (areaEl) areaEl.value = '';
+    renderDay();
+    toast('📝 Note saved');
+  } catch (e) {
+    if (e.message === 'OFFLINE_QUEUED') { toast('📝 Note queued'); areaEl.value = ''; return; }
+    toast('Note failed: ' + e.message, 'err');
+  }
 }
 
 /* Mark a maintenance task complete. Writes back to the source board:
@@ -933,25 +1358,106 @@ async function markMaintComplete(itemId, sourceKey, btnEl) {
     const q = `mutation($b:ID!,$i:ID!,$v:JSON!){
       change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id }
     }`;
-    await mondayFetch(q, { b: src.boardId, i: itemId, v: JSON.stringify(cv) });
-
-    // If this was an Ad-hoc task that came from an Issue, close that issue too.
-    if (m.linkedIssue) {
-      try {
-        const cv2 = JSON.stringify({ [ISSUES_STATUS_COL]: { label: 'Fixed' } });
-        await mondayFetch(q, { b: ISSUES_BOARD_ID, i: m.linkedIssue, v: cv2 });
-      } catch (issueErr) {
-        console.warn('Could not close linked issue', m.linkedIssue, issueErr);
-      }
-    }
+    await mondayFetch(q, { b: src.boardId, i: itemId, v: JSON.stringify(cv) }, true);
 
     toast(`✓ ${src.label} marked complete`);
   } catch (e) {
+    if (e.message === 'OFFLINE_QUEUED') {
+      toast(`✓ Offline: ${src.label} queued`);
+      return;
+    }
+    // Revert local state
     // Revert local state
     maintTasks.push(m);
     renderDay();
     renderDayNav();
     toast('Update failed: ' + e.message, 'err');
+  }
+}
+
+/* ─── Maintenance Exception handling ─────────────────────────── */
+let _exFor = null; // { id, sourceKey }
+
+function openMaintException(id, sourceKey) {
+  _exFor = { id, sourceKey };
+  document.getElementById('exDate').value = addDaysISO(todayISO(), 1);
+  document.getElementById('exReason').value = '';
+  document.getElementById('exAction').value = 'move';
+  toggleExDate();
+  document.getElementById('exOverlay').classList.add('show');
+}
+
+function closeMaintException() {
+  document.getElementById('exOverlay').classList.remove('show');
+  _exFor = null;
+}
+
+function toggleExDate() {
+  const isMove = document.getElementById('exAction').value === 'move';
+  document.getElementById('exDateGroup').style.display = isMove ? 'flex' : 'none';
+}
+
+async function submitMaintException() {
+  if (!_exFor) return;
+  const { id, sourceKey } = _exFor;
+  const action = document.getElementById('exAction').value;
+  const newDate = document.getElementById('exDate').value;
+  const reason = document.getElementById('exReason').value.trim();
+  const src = MAINT_SOURCES.find(s => s.key === sourceKey);
+  const m = maintTasks.find(x => x.id === id && x.sourceKey === sourceKey);
+
+  if (action === 'move' && !newDate) return alert('Pick a new date.');
+  if (!reason) return alert('Please provide a reason / note for the manager.');
+
+  const btn = document.getElementById('exSaveBtn');
+  btn.disabled = true; btn.textContent = 'Updating…';
+
+  try {
+    const stamp = new Date().toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+    const auditLine = `[${stamp} — ${me.name}] ${action === 'move' ? 'Rescheduled to ' + newDate : 'Returned to queue'} | Reason: ${reason}`;
+    const newNotes = m.description ? (m.description + '\n\n' + auditLine) : auditLine;
+
+    // Use whichever notes/description column the board has
+    // Ad-hoc uses 'descCol' (long_text_mm2s5dwj)
+    // Recurring boards use 'lastDoneCol' for history? No, let's use a generic 'Notes' strategy.
+    // Actually, looking at MAINT_SOURCES, recurring boards don't have a Notes column defined in the object,
+    // but they often have 'date4' for lastDone.
+    // I'll check if src.descCol exists, else I'll try to find a column named 'Notes'.
+    const notesCol = src.descCol || 'notes'; 
+
+    let cv = {};
+    cv[notesCol] = newNotes;
+
+    if (action === 'move') {
+      cv[src.schedCol] = { date: newDate };
+    } else {
+      cv[src.assigneeCol] = { labels: [] };
+      if (src.statusCol) cv[src.statusCol] = { label: 'Scheduled' };
+    }
+
+    const q = `mutation($b:ID!,$i:ID!,$v:JSON!){
+      change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id }
+    }`;
+    
+    await mondayFetch(q, { b: src.boardId, i: id, v: JSON.stringify(cv) }, true);
+    
+    maintTasks = maintTasks.filter(x => !(x.id === id && x.sourceKey === sourceKey));
+    closeMaintException();
+    renderDay();
+    renderDayNav();
+    toast(action === 'move' ? '✓ Rescheduled' : '✓ Returned to queue');
+  } catch (e) {
+    if (e.message === 'OFFLINE_QUEUED') {
+      maintTasks = maintTasks.filter(x => !(x.id === id && x.sourceKey === sourceKey));
+      closeMaintException();
+      renderDay();
+      renderDayNav();
+      toast('✓ Offline: Change queued');
+      return;
+    }
+    alert('Update failed: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Confirm';
   }
 }
 

@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#272F2E">
+<title>Maintenance Workload — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec; --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2; --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:80px; }
+
+  header { background:var(--dark); color:#fff; padding:18px 20px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
+  header h1 { font-size:18px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.65; margin-top:2px; }
+  .hdr-back { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; }
+
+  .summary-bar { background:var(--cream); padding:12px 20px; display:flex; gap:12px; border-bottom:1px solid var(--border); position:sticky; top:64px; z-index:90; }
+  .stat { background:#fff; border-radius:10px; padding:10px 14px; flex:1; border:1px solid var(--border); text-align:center; }
+  .stat-val { font-size:24px; font-weight:700; display:block; }
+  .stat-lbl { font-size:10px; font-weight:700; text-transform:uppercase; color:var(--sage-mid); letter-spacing:0.5px; }
+  .stat.danger .stat-val { color:var(--red); }
+  .stat.warn .stat-val { color:var(--amber); }
+
+  .container { max-width:800px; margin:0 auto; padding:20px 16px; }
+  .section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:var(--sage-mid); margin:24px 0 10px; display:flex; align-items:center; gap:10px; }
+  .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+
+  /* Workload List */
+  .workload-list { display:flex; flex-direction:column; gap:12px; }
+  .staff-group { background:#fff; border-radius:14px; border:1px solid var(--border); overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+  .staff-hdr { padding:14px 16px; display:flex; align-items:center; cursor:pointer; user-select:none; }
+  .staff-hdr:hover { background:#fafafa; }
+  .staff-name { flex:1; font-weight:700; font-size:15px; }
+  .staff-count { background:var(--bg); color:var(--dark); font-size:11px; font-weight:700; padding:3px 9px; border-radius:10px; }
+  .staff-group.has-work .staff-count { background:var(--dark); color:var(--cream); }
+  .staff-content { display:none; border-top:1px solid var(--border); background:#f9f8f4; padding:12px; }
+  .staff-group.open .staff-content { display:flex; flex-direction:column; gap:8px; }
+
+  /* Task Cards */
+  .card { background:#fff; border-radius:10px; padding:12px; border:1px solid var(--border); display:flex; flex-direction:column; gap:8px; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
+  .card.unassigned { border-left:4px solid var(--amber); }
+  .card.overdue { border-left:4px solid var(--red); }
+  .card-top { display:flex; justify-content:space-between; gap:10px; }
+  .card-title { font-size:14px; font-weight:700; }
+  .badge-ln { font-size:9px; font-weight:700; background:var(--gold); color:white; padding:2px 6px; border-radius:4px; text-transform:uppercase; }
+  .card-meta { font-size:11px; color:var(--sage); display:flex; gap:8px; }
+  .card-desc { font-size:12px; color:var(--dark); line-height:1.4; border-top:1px dashed var(--border); padding-top:6px; margin-top:2px; }
+  
+  /* Update Row */
+  .update-row { border-top:1.5px solid #eee; padding-top:10px; margin-top:4px; display:flex; flex-direction:column; gap:8px; }
+  .assign-row { display:flex; gap:6px; }
+  .sel-assign { flex:1; font-family:inherit; font-size:12px; padding:6px; border-radius:6px; border:1.5px solid var(--border); background:#fff; }
+  .note-input { width:100%; border:1.5px solid var(--border); border-radius:6px; padding:6px 10px; font-family:inherit; font-size:12px; height:34px; resize:none; }
+  .btn-save { padding:8px 14px; background:var(--dark); color:var(--cream); border:none; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; }
+  .btn-save:disabled { opacity:0.5; }
+
+  .empty { text-align:center; padding:30px; font-size:13px; color:var(--sage-mid); font-style:italic; }
+  .loading { text-align:center; padding:60px; color:var(--sage); }
+  .spin { display:inline-block; width:22px; height:22px; border:3px solid rgba(100,105,85,.15); border-top-color:var(--sage); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--dark); color:var(--cream); padding:10px 20px; border-radius:20px; font-size:13px; font-weight:600; opacity:0; transition:opacity .3s; z-index:200; pointer-events:none; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Management · Workload</h1>
+    <div class="sub">Ad-hoc Maintenance Operations</div>
+  </div>
+  <a href="hub.html" class="hdr-back">‹ Hub</a>
+</header>
+
+<div class="summary-bar">
+  <div class="stat warn">
+    <span class="stat-val" id="stUn">0</span>
+    <span class="stat-lbl">Unassigned</span>
+  </div>
+  <div class="stat danger">
+    <span class="stat-val" id="stOv">0</span>
+    <span class="stat-lbl">Overdue</span>
+  </div>
+  <div class="stat">
+    <span class="stat-val" id="stAc">0</span>
+    <span class="stat-lbl">Total Active</span>
+  </div>
+</div>
+
+<div class="container">
+  <div id="triageSection">
+    <div class="section-label">Backlog & Triage</div>
+    <div id="triageList" class="triage-list"></div>
+  </div>
+
+  <div id="workloadSection">
+    <div class="section-label">Staff Workload</div>
+    <div id="workloadList" class="workload-list"></div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script>
+const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const ADHOC_BOARD = 5095296374;
+const STAFF_BOARD = 5095127554;
+
+const COLS = {
+  sched:    'date_mm2stp44',
+  assignee: 'dropdown_mm2szsp5',
+  status:   'color_mm2sf7a8',
+  prop:     'text_mm2shvja',
+  desc:     'long_text_mm2s5dwj',
+  linked:   'text_mm2sqa3f'
+};
+
+const ST_ROLE = 'color_mm2psadz';
+const ST_STATUS = 'color_mm2psvh2';
+
+let tasks = [];
+let staff = [];
+
+async function mq(query, variables) {
+  const r = await fetch('https://api.monday.com/v2', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', 'Authorization': TOKEN, 'API-Version': '2024-01' },
+    body: JSON.stringify({ query, variables })
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+const pj = (v) => { try { return JSON.parse(v); } catch { return null; } };
+const todayISO = () => new Date().toISOString().split('T')[0];
+
+function showToast(m) {
+  const t = document.getElementById('toast');
+  t.textContent = m; t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+async function boot() {
+  document.getElementById('triageList').innerHTML = '<div class="loading"><div class="spin"></div></div>';
+  document.getElementById('workloadList').innerHTML = '<div class="loading"><div class="spin"></div></div>';
+  try {
+    const [st, ta] = await Promise.all([loadStaff(), loadTasks()]);
+    render();
+  } catch (e) { alert('Error: ' + e.message); }
+}
+
+async function loadStaff() {
+  const d = await mq(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:100){ items{ id name column_values(ids:["${ST_ROLE}","${ST_STATUS}"]){ id text } } } } }`);
+  const items = d?.boards?.[0]?.items_page?.items || [];
+  staff = items
+    .filter(it => {
+      const role = it.column_values.find(c => c.id === ST_ROLE)?.text || '';
+      const status = it.column_values.find(c => c.id === ST_STATUS)?.text || '';
+      return /maintenance/i.test(role) && !/left|inactive/i.test(status);
+    })
+    .map(it => ({ id: it.id, name: it.name }))
+    .sort((a,b) => a.name.localeCompare(b.name));
+}
+
+async function loadTasks() {
+  const colList = Object.values(COLS).map(c => `"${c}"`).join(',');
+  const d = await mq(`{ boards(ids:[${ADHOC_BOARD}]){ items_page(limit:500){ items{ id name column_values(ids:[${colList}]){ id text value } } } } }`);
+  const raw = d?.boards?.[0]?.items_page?.items || [];
+  
+  tasks = raw.map(r => {
+    const cv = Object.fromEntries(r.column_values.map(c => [c.id, c]));
+    const sched = pj(cv[COLS.sched]?.value)?.date || null;
+    const status = cv[COLS.status]?.text || 'Scheduled';
+    const desc = pj(cv[COLS.desc]?.value)?.text || cv[COLS.desc]?.text || '';
+    const prop = cv[COLS.prop]?.text || r.name;
+    const assignee = cv[COLS.assignee]?.text || '';
+    const linkedId = cv[COLS.linked]?.text || '';
+    
+    return {
+      id: r.id,
+      name: r.name,
+      property: prop,
+      description: desc,
+      date: sched,
+      assignee: assignee.split(',').map(s=>s.trim()).filter(Boolean)[0] || '',
+      status: status,
+      linked: linkedId,
+      overdue: sched && sched < todayISO() && !/completed|fixed|done/i.test(status),
+      done: /completed|fixed|done/i.test(status)
+    };
+  }).filter(t => !t.done);
+}
+
+function render() {
+  const unassigned = tasks.filter(t => !t.assignee), overdue = tasks.filter(t => t.overdue);
+  document.getElementById('stUn').textContent = unassigned.length;
+  document.getElementById('stOv').textContent = overdue.length;
+  document.getElementById('stAc').textContent = tasks.length;
+
+  const triageList = document.getElementById('triageList');
+  const triageItems = tasks.filter(t => !t.assignee || t.overdue);
+  triageItems.sort((a,b) => (a.date || '9999').localeCompare(b.date || '9999'));
+  triageList.innerHTML = triageItems.length ? triageItems.map(renderTaskCard).join('') : '<div class="empty">Backlog is empty.</div>';
+
+  const workloadList = document.getElementById('workloadList');
+  workloadList.innerHTML = staff.map(s => {
+    const sTasks = tasks.filter(t => t.assignee === s.name);
+    const isOpen = document.getElementById(`group-${s.name}`)?.classList.contains('open');
+    return `
+      <div id="group-${s.name}" class="staff-group ${sTasks.length?'has-work':''} ${isOpen?'open':''}">
+        <div class="staff-hdr" onclick="this.parentElement.classList.toggle('open')">
+          <span class="staff-name">👤 ${s.name}</span>
+          <span class="staff-count">${sTasks.length} jobs</span>
+        </div>
+        <div class="staff-content">
+          ${sTasks.length ? sTasks.map(renderTaskCard).join('') : '<div class="empty">No active jobs.</div>'}
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function renderTaskCard(t) {
+  return `
+    <div class="card ${!t.assignee?'unassigned':(t.overdue?'overdue':'')}">
+      <div class="card-top">
+        <div class="card-title">${t.property}</div>
+        ${t.linked ? '<span class="badge-ln">🚨 Linked Issue</span>' : ''}
+      </div>
+      <div class="card-meta">
+        <span>📅 ${t.date || 'Unscheduled'}</span>
+        <span>🏷️ ${t.status}</span>
+      </div>
+      ${t.description ? `<div class="card-desc">${t.description}</div>` : ''}
+      <div class="update-row">
+        <div class="assign-row">
+          <select class="sel-assign" id="sel-${t.id}">
+            <option value="">— Assign Staff —</option>
+            ${staff.map(s => `<option value="${s.name}" ${t.assignee===s.name?'selected':''}>${s.name}</option>`).join('')}
+          </select>
+          <button class="btn-save" onclick="saveTask('${t.id}')">Update</button>
+        </div>
+        <input type="text" id="note-${t.id}" class="note-input" placeholder="Add a new update or reason...">
+      </div>
+    </div>
+  `;
+}
+
+async function saveTask(taskId) {
+  const sel = document.getElementById(`sel-${taskId}`), noteEl = document.getElementById(`note-${taskId}`);
+  const newAssignee = sel.value, noteText = noteEl.value.trim();
+  const btn = sel.nextElementSibling;
+  
+  btn.disabled = true; btn.textContent = '...';
+  try {
+    const t = tasks.find(x => x.id === taskId);
+    let newNotes = t.description;
+    if (noteText) {
+      const stamp = new Date().toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+      const audit = `[${stamp}] ${noteText}`;
+      newNotes = newNotes ? (newNotes + '\n\n' + audit) : audit;
+    }
+
+    const cv = { [COLS.assignee]: { labels: newAssignee ? [newAssignee] : [] }, [COLS.desc]: newNotes };
+    await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`, { b: ADHOC_BOARD, i: taskId, v: JSON.stringify(cv) });
+    
+    t.assignee = newAssignee;
+    t.description = newNotes;
+    noteEl.value = '';
+    showToast('Task updated');
+    render();
+  } catch (e) { alert('Failed: ' + e.message); btn.disabled = false; btn.textContent = 'Update'; }
+}
+
+boot();
+</script>
+</body>
+</html>

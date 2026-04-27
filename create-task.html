@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#272F2E">
+<title>Create a task — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec; --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2; --blue:#1a5276; --blue-bg:#eaf4fb;
+    --purple:#9d50dd; --purple-bg:#f4e8fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:48px; }
+
+  header { background:var(--dark); color:#fff; padding:18px 20px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; }
+  header h1 { font-size:17px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.65; margin-top:2px; }
+  .hdr-back { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; }
+
+  .container { max-width:560px; margin:0 auto; padding:18px 16px; }
+  .card { background:var(--surface); border-radius:14px; padding:18px 18px 16px; margin-bottom:14px; box-shadow:0 1px 4px rgba(39,47,46,0.08); }
+
+  .field { margin-bottom:14px; }
+  .field:last-child { margin-bottom:0; }
+  label.lbl { display:block; font-size:12px; font-weight:700; color:var(--sage); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+  label.lbl .req { color:var(--red); margin-left:2px; }
+  .hint { font-size:11px; color:var(--sage-mid); font-weight:400; text-transform:none; letter-spacing:0; margin-top:3px; }
+
+  input[type=text], input[type=date], input[type=number], select, textarea {
+    width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:9px;
+    font-family:inherit; font-size:15px; color:var(--dark); background:#fff; outline:none;
+    transition:border-color 0.15s; -webkit-appearance:none; appearance:none;
+  }
+  input:focus, select:focus, textarea:focus { border-color:var(--dark); }
+  textarea { min-height:70px; resize:vertical; font-size:14px; }
+  select { background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'><path d='M1 1l5 5 5-5' stroke='%23272F2E' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>"); background-repeat:no-repeat; background-position:right 12px center; padding-right:32px; }
+
+  /* Task type chips */
+  .type-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(120px, 1fr)); gap:8px; }
+  .type-chip {
+    padding:11px 6px; border:2px solid var(--border); border-radius:11px; background:#fff;
+    font-family:inherit; font-size:12px; font-weight:700; color:var(--sage-mid); cursor:pointer;
+    text-align:center; transition:all 0.15s; line-height:1.3; display:flex; flex-direction:column; align-items:center; gap:4px;
+  }
+  .type-chip .tc-icon { font-size:18px; }
+  .type-chip:hover { border-color:var(--sage); color:var(--sage); }
+  .type-chip.active.window { border-color:#1a6fba; background:#ddeeff; color:#1a6fba; }
+  .type-chip.active.jet    { border-color:#a86c00; background:#fdf5e8; color:#a86c00; }
+  .type-chip.active.pat    { border-color:#9d50dd; background:#f4e8fb; color:#9d50dd; }
+  .type-chip.active.paddle { border-color:#1a5276; background:#eaf4fb; color:#1a5276; }
+  .type-chip.active.adhoc  { border-color:var(--sage); background:#f6f4ed; color:var(--sage); }
+
+  /* Move-type chips (paddleboard sub-type) */
+  .sub-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .sub-chip {
+    padding:9px 6px; border:1.5px solid var(--border); border-radius:9px; background:#fff;
+    font-family:inherit; font-size:12px; font-weight:700; color:var(--sage-mid); cursor:pointer;
+    text-align:center; transition:all 0.15s;
+  }
+  .sub-chip.active { border-color:var(--blue); background:var(--blue-bg); color:var(--blue); }
+
+  /* Submit */
+  .submit-row { padding:0 16px 24px; }
+  .submit-btn { width:100%; padding:15px; background:var(--sage); color:#fff; border:0; border-radius:12px;
+    font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; box-shadow:0 2px 6px rgba(0,0,0,0.1); }
+  .submit-btn:hover { background:var(--dark); }
+  .submit-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .submit-btn.saving { background:var(--gold); }
+
+  /* Success state */
+  .success { background:var(--green-bg); border:1.5px solid var(--green); border-radius:12px; padding:20px; text-align:center; margin-bottom:14px; }
+  .success-icon { font-size:36px; margin-bottom:8px; }
+  .success-title { font-size:18px; font-weight:700; color:var(--green); margin-bottom:4px; }
+  .success-msg { font-size:13px; color:var(--dark); margin-bottom:14px; }
+  .success-btns { display:flex; gap:8px; }
+  .success-btns a, .success-btns button { flex:1; padding:11px; border-radius:9px; text-align:center;
+    font-family:inherit; font-size:14px; font-weight:700; text-decoration:none; cursor:pointer; border:0; }
+  .success-btns .primary { background:var(--green); color:#fff; }
+  .success-btns .secondary { background:#fff; color:var(--green); border:1.5px solid var(--green); }
+
+  .err { background:var(--red-bg); border:1.5px solid var(--red); border-radius:10px; padding:11px 14px;
+         font-size:13px; color:var(--red); margin-bottom:14px; }
+  .info-banner { background:var(--cream); border-radius:8px; padding:10px 12px; font-size:12px; color:var(--dark); margin-bottom:10px; line-height:1.45; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Create a task</h1>
+    <div class="sub">Schedule any one-off or recurring maintenance job</div>
+  </div>
+  <a href="hub.html" id="backLink" class="hdr-back">‹ Hub</a>
+</header>
+
+<div class="container">
+
+  <div id="successCard" class="success" style="display:none">
+    <div class="success-icon">✓</div>
+    <div class="success-title">Task scheduled</div>
+    <div class="success-msg" id="successMsg"></div>
+    <div class="success-btns">
+      <button class="primary" onclick="resetForm()">Create another</button>
+      <a href="hub.html" id="successBack" class="secondary">Back to Hub</a>
+    </div>
+  </div>
+
+  <div id="errBox" class="err" style="display:none"></div>
+
+  <form id="form" class="card">
+
+    <div class="field">
+      <label class="lbl">Task type <span class="req">*</span></label>
+      <div class="type-row" id="typeRow">
+        <button type="button" class="type-chip" data-type="window"><span class="tc-icon">🪟</span>Window clean</button>
+        <button type="button" class="type-chip" data-type="jet"><span class="tc-icon">💦</span>Jet wash</button>
+        <button type="button" class="type-chip" data-type="pat"><span class="tc-icon">⚡</span>PAT test</button>
+        <button type="button" class="type-chip" data-type="paddle"><span class="tc-icon">🛟</span>Paddleboards</button>
+        <button type="button" class="type-chip active adhoc" data-type="adhoc"><span class="tc-icon">🔧</span>Ad-hoc / repair</button>
+      </div>
+      <div class="hint" id="typeHint">Anything not on a recurring board — fix dishwasher, deck repair, etc.</div>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="propertySel">Property <span class="req">*</span></label>
+      <select id="propertySel" required>
+        <option value="" disabled selected>— pick a property —</option>
+      </select>
+      <div class="hint" id="propHint"></div>
+    </div>
+
+    <!-- Paddleboard-only sub-fields -->
+    <div class="field" id="paddleFields" style="display:none">
+      <label class="lbl">Move type</label>
+      <div class="sub-row" id="moveRow">
+        <button type="button" class="sub-chip active" data-move="Drop-off">📦 Drop-off</button>
+        <button type="button" class="sub-chip" data-move="Collection">↩ Collection</button>
+      </div>
+      <label class="lbl" style="margin-top:14px" for="paddleCount">Number of boards</label>
+      <select id="paddleCount" style="max-width:160px">
+        <option>1</option><option selected>2</option><option>3</option><option>4</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="dateSel">When <span class="req">*</span></label>
+      <input type="date" id="dateSel" required>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="assigneeSel">Assigned to <span class="req">*</span></label>
+      <select id="assigneeSel" required>
+        <option value="" disabled selected>— pick a maintenance person —</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="notesArea">Description / notes</label>
+      <textarea id="notesArea" placeholder="Anything else they need to know"></textarea>
+      <div class="hint" id="notesHint">Optional. Required for Ad-hoc tasks so the team knows what to do.</div>
+    </div>
+
+  </form>
+
+  <div class="submit-row">
+    <button type="button" class="submit-btn" id="submitBtn" onclick="submit()">Schedule task</button>
+  </div>
+
+</div>
+
+<script>
+const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const URL_API = 'https://api.monday.com/v2';
+
+const PC_BOARD = 5094466278;
+const STAFF_BOARD = 5095127554;
+const ST_ROLE = 'color_mm2psadz';
+const ST_STATUS = 'color_mm2psvh2';
+
+// Source boards (recurring)
+const WINDOWS_BOARD = 1987064628;
+const W_SCHED = 'date_mm2sn17y';
+const W_ASSIGN = 'dropdown_mm2se9z7';
+
+const DECKING_BOARD = 5092955038;
+const D_SCHED = 'date_mm2s2qpv';
+const D_ASSIGN = 'dropdown_mm2shyxp';
+
+const PAT_BOARD = 5092954987;
+const P_SCHED = 'date_mm2srjzv';
+const P_ASSIGN = 'dropdown_mm2sxqvv';
+
+// Ad-hoc Maintenance
+const ADHOC_BOARD = 5095296374;
+const AH_PROP      = 'text_mm2shvja';
+const AH_DESC      = 'long_text_mm2s5dwj';
+const AH_SCHED     = 'date_mm2stp44';
+const AH_ASSIGNEE  = 'dropdown_mm2szsp5';
+const AH_STATUS    = 'color_mm2sf7a8';
+
+const TYPE_CONFIG = {
+  window: { label: 'Window clean',  hint: 'Updates the Windows & Balustrades board for that property.', boardId: WINDOWS_BOARD, schedCol: W_SCHED, assignCol: W_ASSIGN },
+  jet:    { label: 'Jet wash',      hint: 'Updates the Decking board for that property.',                boardId: DECKING_BOARD, schedCol: D_SCHED, assignCol: D_ASSIGN },
+  pat:    { label: 'PAT test',      hint: 'Updates the PAT Testing board for that property.',           boardId: PAT_BOARD, schedCol: P_SCHED, assignCol: P_ASSIGN },
+  paddle: { label: 'Paddleboard move', hint: 'Drop-off + checks, then collection 24–48h later. Stored at Waters Edge & Little Horseshoe.' },
+  adhoc:  { label: 'Ad-hoc / repair',  hint: 'Anything not on a recurring board — fix dishwasher, deck repair, etc.' },
+};
+
+let activeType = 'adhoc';
+let moveType = 'Drop-off';
+let properties = [];
+let staffNames = [];
+
+function gql(query, variables) {
+  return fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: TOKEN, 'API-Version': '2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  }).then(r => r.json()).then(j => {
+    if (j.errors) throw new Error(j.errors[0].message);
+    return j.data;
+  });
+}
+function tomorrowISO() {
+  const d = new Date(); d.setDate(d.getDate()+1);
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function escapeHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+(function () {
+  const params = new URLSearchParams(location.search);
+  if (params.get('from') === 'staff') {
+    document.getElementById('backLink').href = 'staff.html';
+    document.getElementById('backLink').textContent = '‹ My day';
+    document.getElementById('successBack').href = 'staff.html';
+    document.getElementById('successBack').textContent = 'Back to My Day';
+  }
+})();
+
+document.getElementById('dateSel').value = tomorrowISO();
+
+async function boot() {
+  try {
+    const [pcData, stData] = await Promise.all([
+      gql(`{ boards(ids:[${PC_BOARD}]){ items_page(limit:200){ items{ id name } } } }`),
+      gql(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:200){ items{ id name column_values(ids:["${ST_ROLE}","${ST_STATUS}"]){ id text } } } } }`),
+    ]);
+    properties = (pcData?.boards?.[0]?.items_page?.items || [])
+      .map(p => p.name).sort();
+    const propSel = document.getElementById('propertySel');
+    for (const name of properties) {
+      const o = document.createElement('option'); o.value = name; o.textContent = name; propSel.appendChild(o);
+    }
+    staffNames = (stData?.boards?.[0]?.items_page?.items || [])
+      .filter(s => {
+        const cv = Object.fromEntries(s.column_values.map(c => [c.id, c.text]));
+        const role = (cv[ST_ROLE] || '').trim();
+        const status = (cv[ST_STATUS] || '').trim().toLowerCase();
+        return role === 'Maintenance' && status !== 'inactive';
+      }).map(s => s.name).sort();
+    const aSel = document.getElementById('assigneeSel');
+    for (const name of staffNames) {
+      const o = document.createElement('option'); o.value = name; o.textContent = name; aSel.appendChild(o);
+    }
+  } catch (e) {
+    showErr('Could not load reference data: ' + e.message);
+  }
+}
+boot();
+
+// Type chip switching
+document.querySelectorAll('.type-chip').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.type-chip').forEach(x => x.classList.remove('active','window','jet','pat','paddle','adhoc'));
+  b.classList.add('active', b.dataset.type);
+  activeType = b.dataset.type;
+  const cfg = TYPE_CONFIG[activeType];
+  document.getElementById('typeHint').textContent = cfg.hint || '';
+  document.getElementById('paddleFields').style.display = activeType === 'paddle' ? '' : 'none';
+  // Description label tweak
+  const notesLbl = document.querySelector('label[for="notesArea"]');
+  document.getElementById('notesHint').textContent = activeType === 'adhoc'
+    ? 'Required — describe what needs doing.'
+    : 'Optional.';
+}));
+
+// Move-type chip switching (paddleboards)
+document.querySelectorAll('.sub-chip').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('.sub-chip').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  moveType = b.dataset.move;
+}));
+
+function showErr(msg) {
+  const e = document.getElementById('errBox');
+  e.textContent = msg;
+  e.style.display = '';
+  e.scrollIntoView({behavior:'smooth', block:'center'});
+}
+
+async function submit() {
+  document.getElementById('errBox').style.display = 'none';
+  const property = document.getElementById('propertySel').value;
+  const date     = document.getElementById('dateSel').value;
+  const assignee = document.getElementById('assigneeSel').value;
+  const notes    = document.getElementById('notesArea').value.trim();
+
+  if (!property)  return showErr('Pick a property.');
+  if (!date)      return showErr('Pick a date.');
+  if (!assignee)  return showErr('Pick an assignee.');
+  if (activeType === 'adhoc' && !notes) return showErr('Describe the ad-hoc task in the notes field.');
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.classList.add('saving'); btn.textContent = 'Scheduling…';
+
+  try {
+    if (activeType === 'window' || activeType === 'jet' || activeType === 'pat') {
+      // Update Scheduled date + Assigned to on the property's existing row.
+      // First find the row (by name) on the source board.
+      const cfg = TYPE_CONFIG[activeType];
+      const findQ = `{ boards(ids:[${cfg.boardId}]){ items_page(limit:500){ items{ id name } } } }`;
+      const data = await gql(findQ);
+      const found = (data?.boards?.[0]?.items_page?.items || [])
+        .find(it => (it.name || '').trim().toLowerCase() === property.trim().toLowerCase());
+      if (!found) {
+        // Fall back to ad-hoc row if the property isn't on the source board
+        await createAdhoc(property, `${cfg.label} — ${notes}`.trim().replace(/—\s*$/, ''), date, assignee);
+        showSuccess(`${cfg.label} scheduled (saved as ad-hoc — property not found on the ${cfg.label} board).`);
+        return;
+      }
+      const cv = {
+        [cfg.schedCol]:  { date },
+        [cfg.assignCol]: { labels: [assignee] },
+      };
+      const q = `mutation($b:ID!,$i:ID!,$v:JSON!){
+        change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id }
+      }`;
+      await gql(q, { b: cfg.boardId, i: found.id, v: JSON.stringify(cv) });
+      showSuccess(`${cfg.label} scheduled at ${property} for ${date}, assigned to ${assignee}.`);
+
+    } else if (activeType === 'paddle') {
+      const count = document.getElementById('paddleCount').value;
+      const desc = `Paddleboards ${moveType.toLowerCase()} — ${count} board${count==='1'?'':'s'}`
+        + (notes ? ` · ${notes}` : '');
+      await createAdhoc(property, desc, date, assignee, '🛟 ' + property);
+      showSuccess(`Paddleboard ${moveType.toLowerCase()} (${count}) at ${property} for ${date}, assigned to ${assignee}.`);
+
+    } else {
+      // Ad-hoc / repair
+      await createAdhoc(property, notes, date, assignee);
+      showSuccess(`Ad-hoc task at ${property} for ${date}, assigned to ${assignee}.`);
+    }
+
+  } catch (e) {
+    showErr('Could not schedule: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.classList.remove('saving'); btn.textContent = 'Schedule task';
+  }
+}
+
+async function createAdhoc(property, description, date, assignee, namePrefix) {
+  const taskName = (namePrefix || property) + ' · ' + (description || '').slice(0, 60);
+  const cv = {
+    [AH_PROP]:     property,
+    [AH_DESC]:     description,
+    [AH_SCHED]:    { date },
+    [AH_ASSIGNEE]: { labels: [assignee] },
+    [AH_STATUS]:   { label: 'Scheduled' },
+  };
+  const q = `mutation($b:ID!,$n:String!,$v:JSON!){
+    create_item(board_id:$b, item_name:$n, column_values:$v, create_labels_if_missing:true){ id }
+  }`;
+  await gql(q, { b: ADHOC_BOARD, n: taskName, v: JSON.stringify(cv) });
+}
+
+function showSuccess(msg) {
+  document.getElementById('successMsg').textContent = msg;
+  document.getElementById('form').style.display = 'none';
+  document.querySelector('.submit-row').style.display = 'none';
+  document.getElementById('successCard').style.display = '';
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+function resetForm() {
+  document.getElementById('successCard').style.display = 'none';
+  document.getElementById('form').style.display = '';
+  document.querySelector('.submit-row').style.display = '';
+  document.getElementById('notesArea').value = '';
+  // Keep type, property, assignee — managers often schedule a few in a row for the same person
+  document.getElementById('dateSel').value = tomorrowISO();
+  window.scrollTo({top:0, behavior:'smooth'});
+}
+</script>
+</body>
+</html>

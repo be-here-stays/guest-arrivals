@@ -149,16 +149,53 @@
       </select>
     </div>
 
-    <div class="field">
-      <label class="lbl" for="dateSel">When <span class="req">*</span></label>
-      <input type="date" id="dateSel" required>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+      <div class="field">
+        <label class="lbl" for="dateSel">Start Date <span class="req">*</span></label>
+        <input type="date" id="dateSel" required>
+      </div>
+      <div class="field">
+        <label class="lbl" for="dueSel">Due Date <span class="hint" style="display:inline">(optional)</span></label>
+        <input type="date" id="dueSel">
+      </div>
     </div>
 
     <div class="field">
-      <label class="lbl" for="assigneeSel">Assigned to <span class="req">*</span></label>
-      <select id="assigneeSel" required>
-        <option value="" disabled selected>— pick a maintenance person —</option>
+      <label class="lbl" for="prioSel">Priority</label>
+      <select id="prioSel">
+        <option value="Low">Low</option>
+        <option value="Medium" selected>Medium</option>
+        <option value="High">High</option>
+        <option value="Urgent">Urgent</option>
       </select>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="guestSel">Guest Access</label>
+      <select id="guestSel">
+        <option value="No Guests" selected>No Guests (Only when empty / Check-in/out days)</option>
+        <option value="Guests OK">Guests OK (Can be done while guests are in)</option>
+      </select>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+      <div class="field">
+        <label class="lbl" for="assigneeSel">Assigned to</label>
+        <select id="assigneeSel">
+          <option value="" selected>— None —</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="lbl" for="assigneeSel2">Partner</label>
+        <select id="assigneeSel2">
+          <option value="" selected>— None —</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="field" style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-top:1px dashed var(--border); border-bottom:1px dashed var(--border); margin:10px 0">
+      <label class="lbl" style="margin:0">Billable to owner?</label>
+      <input type="checkbox" id="billable" style="width:20px; height:20px; accent-color:var(--dark)" checked>
     </div>
 
     <div class="field">
@@ -204,11 +241,15 @@ const AH_DESC      = 'long_text_mm2s5dwj';
 const AH_SCHED     = 'date_mm2stp44';
 const AH_ASSIGNEE  = 'dropdown_mm2szsp5';
 const AH_STATUS    = 'color_mm2sf7a8';
+const AH_DUE       = 'date_mm2vw7qh';
+const AH_GUEST     = 'dropdown_mm2vpbet';
+const AH_PRIO      = 'color_mm2sy0cn';
+const AH_BILLABLE  = 'checkbox_mm2vpxq7';
 
 const TYPE_CONFIG = {
-  window: { label: 'Window clean',  hint: 'Updates the Windows & Balustrades board for that property.', boardId: WINDOWS_BOARD, schedCol: W_SCHED, assignCol: W_ASSIGN },
-  jet:    { label: 'Jet wash',      hint: 'Updates the Decking board for that property.',                boardId: DECKING_BOARD, schedCol: D_SCHED, assignCol: D_ASSIGN },
-  pat:    { label: 'PAT test',      hint: 'Updates the PAT Testing board for that property.',           boardId: PAT_BOARD, schedCol: P_SCHED, assignCol: P_ASSIGN },
+  window: { label: 'Window clean',  hint: 'Updates the Windows & Balustrades board for that property.', boardId: WINDOWS_BOARD, schedCol: W_SCHED, assignCol: W_ASSIGN, billCol: AH_BILLABLE, prioCol: AH_PRIO },
+  jet:    { label: 'Jet wash',      hint: 'Updates the Decking board for that property.',                boardId: DECKING_BOARD, schedCol: D_SCHED, assignCol: D_ASSIGN, billCol: AH_BILLABLE, prioCol: AH_PRIO },
+  pat:    { label: 'PAT test',      hint: 'Updates the PAT Testing board for that property.',           boardId: PAT_BOARD, schedCol: P_SCHED, assignCol: P_ASSIGN, billCol: AH_BILLABLE, prioCol: AH_PRIO },
   paddle: { label: 'Paddleboard move', hint: 'Drop-off + checks, then collection 24–48h later. Stored at Waters Edge & Little Horseshoe.' },
   adhoc:  { label: 'Ad-hoc / repair',  hint: 'Anything not on a recurring board — fix dishwasher, deck repair, etc.' },
 };
@@ -246,6 +287,18 @@ function escapeHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;
 
 document.getElementById('dateSel').value = tomorrowISO();
 
+let activeType = 'adhoc';
+function setType(t) {
+  activeType = t;
+  document.querySelectorAll('.tab').forEach(el => el.classList.remove('active'));
+  document.getElementById('tab-' + t).classList.add('active');
+  const cfg = TYPE_CONFIG[t];
+  document.getElementById('typeHint').textContent = cfg.hint;
+  document.getElementById('paddleFields').style.display = (t === 'paddle') ? 'block' : 'none';
+  document.getElementById('notesLabel').textContent = (t === 'adhoc' || t === 'paddle') ? 'Notes / Description' : 'Access Notes';
+  document.getElementById('notesArea').placeholder = (t === 'adhoc') ? 'e.g. Broken latch on terrace door' : '';
+}
+
 async function boot() {
   try {
     const [pcData, stData] = await Promise.all([
@@ -266,8 +319,10 @@ async function boot() {
         return role === 'Maintenance' && status !== 'inactive';
       }).map(s => s.name).sort();
     const aSel = document.getElementById('assigneeSel');
+    const aSel2 = document.getElementById('assigneeSel2');
     for (const name of staffNames) {
-      const o = document.createElement('option'); o.value = name; o.textContent = name; aSel.appendChild(o);
+      const o1 = document.createElement('option'); o1.value = name; o1.textContent = name; aSel.appendChild(o1);
+      const o2 = document.createElement('option'); o2.value = name; o2.textContent = name; aSel2.appendChild(o2);
     }
   } catch (e) {
     showErr('Could not load reference data: ' + e.message);
@@ -308,12 +363,21 @@ async function submit() {
   document.getElementById('errBox').style.display = 'none';
   const property = document.getElementById('propertySel').value;
   const date     = document.getElementById('dateSel').value;
-  const assignee = document.getElementById('assigneeSel').value;
+  const due      = document.getElementById('dueSel').value;
+  const prio     = document.getElementById('prioSel').value;
+  const guest    = document.getElementById('guestSel').value;
+  const p1       = document.getElementById('assigneeSel').value;
+  const p2       = document.getElementById('assigneeSel2').value;
+  const billable = document.getElementById('billable').checked;
   const notes    = document.getElementById('notesArea').value.trim();
 
   if (!property)  return showErr('Pick a property.');
   if (!date)      return showErr('Pick a date.');
-  if (!assignee)  return showErr('Pick an assignee.');
+  
+  const labels = [];
+  if (p1) labels.push(p1);
+  if (p2 && p2 !== p1) labels.push(p2);
+
   if (activeType === 'adhoc' && !notes) return showErr('Describe the ad-hoc task in the notes field.');
 
   const btn = document.getElementById('submitBtn');
@@ -336,25 +400,28 @@ async function submit() {
       }
       const cv = {
         [cfg.schedCol]:  { date },
-        [cfg.assignCol]: { labels: [assignee] },
+        [cfg.assignCol]: { labels: labels },
+        [cfg.billCol]:   { checked: billable },
+        [cfg.prioCol]:   { label: prio }
       };
       const q = `mutation($b:ID!,$i:ID!,$v:JSON!){
         change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id }
       }`;
       await gql(q, { b: cfg.boardId, i: found.id, v: JSON.stringify(cv) });
-      showSuccess(`${cfg.label} scheduled at ${property} for ${date}, assigned to ${assignee}.`);
+      showSuccess(`${cfg.label} scheduled at ${property} for ${date}.`);
 
     } else if (activeType === 'paddle') {
       const count = document.getElementById('paddleCount').value;
       const desc = `Paddleboards ${moveType.toLowerCase()} — ${count} board${count==='1'?'':'s'}`
         + (notes ? ` · ${notes}` : '');
-      await createAdhoc(property, desc, date, assignee, '🛟 ' + property);
-      showSuccess(`Paddleboard ${moveType.toLowerCase()} (${count}) at ${property} for ${date}, assigned to ${assignee}.`);
+      const ahName = (count==='1'?'Paddleboard':'Paddleboards') + ' ' + moveType.toLowerCase();
+      await createAdhoc(property, desc, date, labels, ahName, { due, prio, guest, billable });
+      showSuccess(`Paddleboard ${moveType.toLowerCase()} (${count}) scheduled at ${property} for ${date}.`);
 
     } else {
       // Ad-hoc / repair
-      await createAdhoc(property, notes, date, assignee);
-      showSuccess(`Ad-hoc task at ${property} for ${date}, assigned to ${assignee}.`);
+      await createAdhoc(property, notes, date, labels, null, { due, prio, guest, billable });
+      showSuccess(`Ad-hoc task at ${property} scheduled for ${date}.`);
     }
 
   } catch (e) {
@@ -364,15 +431,21 @@ async function submit() {
   }
 }
 
-async function createAdhoc(property, description, date, assignee, namePrefix) {
+async function createAdhoc(property, description, date, labels, namePrefix, extras) {
   const taskName = (namePrefix || property) + ' · ' + (description || '').slice(0, 60);
   const cv = {
     [AH_PROP]:     property,
     [AH_DESC]:     description,
     [AH_SCHED]:    { date },
-    [AH_ASSIGNEE]: { labels: [assignee] },
+    [AH_ASSIGNEE]: { labels: labels },
     [AH_STATUS]:   { label: 'Scheduled' },
   };
+  if (extras) {
+    if (extras.due) cv[AH_DUE] = { date: extras.due };
+    cv[AH_GUEST] = { labels: [extras.guest] };
+    cv[AH_PRIO]  = { label: extras.prio };
+    cv[AH_BILLABLE] = { checked: extras.billable };
+  }
   const q = `mutation($b:ID!,$n:String!,$v:JSON!){
     create_item(board_id:$b, item_name:$n, column_values:$v, create_labels_if_missing:true){ id }
   }`;

@@ -83,6 +83,10 @@
 </header>
 
 <div class="summary-bar">
+  <div class="stat danger" id="stRtq" style="display:none">
+    <span class="stat-val" id="stRtqVal">0</span>
+    <span class="stat-lbl">⏰ Returned</span>
+  </div>
   <div class="stat warn">
     <span class="stat-val" id="stUn">0</span>
     <span class="stat-lbl">Unassigned</span>
@@ -98,6 +102,11 @@
 </div>
 
 <div class="container">
+  <div id="rtqSection" style="display:none">
+    <div class="section-label" style="color:var(--red)">⏰ Returned to Queue — Date Window Expired</div>
+    <div id="rtqList" class="workload-list"></div>
+  </div>
+
   <div id="triageSection">
     <div class="section-label">Backlog & Triage</div>
     <div id="triageList" class="triage-list"></div>
@@ -117,12 +126,11 @@ const ADHOC_BOARD = 5095296374;
 const STAFF_BOARD = 5095127554;
 
 const COLS = {
-  sched:    'date_mm2stp44',
-  assignee: 'dropdown_mm2szsp5',
-  status:   'color_mm2sf7a8',
-  prop:     'text_mm2shvja',
-  desc:     'long_text_mm2s5dwj',
-  linked:   'text_mm2sqa3f'
+  sched: 'date_mm2stp44', assignee: 'dropdown_mm2szsp5', status: 'color_mm2sf7a8',
+  desc: 'long_text_mm2s5dwj', prop: 'text_mm2shvja', linked: 'text_mm2sqa3f',
+  dueTo: 'date_mm2vw7qh', access: 'dropdown_mm2vpbet',
+  billable: 'checkbox_mm2vpxq7', matCost: 'numeric_mm2vks4c', labour: 'numeric_mm2vks4l',
+  priority: 'color_mm2sy0cn'
 };
 
 const ST_ROLE = 'color_mm2psadz';
@@ -180,42 +188,66 @@ async function loadTasks() {
   
   tasks = raw.map(r => {
     const cv = Object.fromEntries(r.column_values.map(c => [c.id, c]));
-    const sched = pj(cv[COLS.sched]?.value)?.date || null;
+    const sched  = pj(cv[COLS.sched]?.value)?.date || null;
+    const dueTo  = pj(cv[COLS.dueTo]?.value)?.date  || null;
     const status = cv[COLS.status]?.text || 'Scheduled';
-    const desc = pj(cv[COLS.desc]?.value)?.text || cv[COLS.desc]?.text || '';
-    const prop = cv[COLS.prop]?.text || r.name;
+    const desc   = pj(cv[COLS.desc]?.value)?.text || cv[COLS.desc]?.text || '';
+    const prop   = cv[COLS.prop]?.text || r.name;
     const assignee = cv[COLS.assignee]?.text || '';
     const linkedId = cv[COLS.linked]?.text || '';
-    
+    const access   = cv[COLS.access]?.text || 'No Guests';
+    const today = todayISO();
+    const returned = /returned.to.queue/i.test(status);
+    const overdue  = sched && (dueTo || sched) < today && !(/completed|fixed|done|returned/i.test(status));
+    const isBillable = cv[COLS.billable]?.text === 'v';
+    const matCost = parseFloat(cv[COLS.matCost]?.text) || 0;
+    const labourCost = parseFloat(cv[COLS.labour]?.text) || 0;
+    const priority = cv[COLS.priority]?.text || 'Medium';
+
     return {
-      id: r.id,
-      name: r.name,
-      property: prop,
-      description: desc,
-      date: sched,
-      assignee: assignee.split(',').map(s=>s.trim()).filter(Boolean)[0] || '',
-      status: status,
-      linked: linkedId,
-      overdue: sched && sched < todayISO() && !/completed|fixed|done/i.test(status),
+      id: r.id, name: r.name, property: prop, description: desc,
+      date: sched, dueTo, assignees: assignee.split(',').map(s=>s.trim()).filter(Boolean),
+      status, linked: linkedId, access,
+      returned, overdue, isBillable, matCost, labourCost, priority,
       done: /completed|fixed|done/i.test(status)
     };
   }).filter(t => !t.done);
 }
 
 function render() {
-  const unassigned = tasks.filter(t => !t.assignee), overdue = tasks.filter(t => t.overdue);
-  document.getElementById('stUn').textContent = unassigned.length;
-  document.getElementById('stOv').textContent = overdue.length;
-  document.getElementById('stAc').textContent = tasks.length;
+  const unassigned = tasks.filter(t => !t.assignees.length && !t.returned);
+  const overdue    = tasks.filter(t => t.overdue && !t.returned);
+  const returned   = tasks.filter(t => t.returned);
+  const active     = tasks.filter(t => !t.returned);
 
-  const triageList = document.getElementById('triageList');
-  const triageItems = tasks.filter(t => !t.assignee || t.overdue);
+  document.getElementById('stUn').textContent  = unassigned.length;
+  document.getElementById('stOv').textContent  = overdue.length;
+  document.getElementById('stAc').textContent  = active.length;
+  const rtqStatEl = document.getElementById('stRtq');
+  const rtqValEl  = document.getElementById('stRtqVal');
+  rtqValEl.textContent = returned.length;
+  rtqStatEl.style.display = returned.length ? '' : 'none';
+
+  // Returned-to-Queue section (expired date windows)
+  const rtqSection = document.getElementById('rtqSection');
+  const rtqList    = document.getElementById('rtqList');
+  if (returned.length) {
+    rtqSection.style.display = '';
+    rtqList.innerHTML = returned.map(t => renderTaskCard(t, true)).join('');
+  } else {
+    rtqSection.style.display = 'none';
+  }
+
+  // Triage section (unassigned or overdue active tasks)
+  const triageList  = document.getElementById('triageList');
+  const triageItems = active.filter(t => !t.assignees.length);
   triageItems.sort((a,b) => (a.date || '9999').localeCompare(b.date || '9999'));
-  triageList.innerHTML = triageItems.length ? triageItems.map(renderTaskCard).join('') : '<div class="empty">Backlog is empty.</div>';
+  triageList.innerHTML = triageItems.length ? triageItems.map(t=>renderTaskCard(t)).join('') : '<div class="empty">Backlog is clear.</div>';
 
+  // Staff workload
   const workloadList = document.getElementById('workloadList');
   workloadList.innerHTML = staff.map(s => {
-    const sTasks = tasks.filter(t => t.assignee === s.name);
+    const sTasks = active.filter(t => t.assignees.includes(s.name));
     const isOpen = document.getElementById(`group-${s.name}`)?.classList.contains('open');
     return `
       <div id="group-${s.name}" class="staff-group ${sTasks.length?'has-work':''} ${isOpen?'open':''}">
@@ -224,44 +256,85 @@ function render() {
           <span class="staff-count">${sTasks.length} jobs</span>
         </div>
         <div class="staff-content">
-          ${sTasks.length ? sTasks.map(renderTaskCard).join('') : '<div class="empty">No active jobs.</div>'}
+          ${sTasks.length ? sTasks.map(t=>renderTaskCard(t)).join('') : '<div class="empty">No active jobs.</div>'}
         </div>
       </div>
     `;
   }).join('');
 }
 
-function renderTaskCard(t) {
+function renderTaskCard(t, isRtq) {
+  const fmt = d => { if (!d) return '?'; const [,mo,dy] = d.split('-'); return `${parseInt(dy)} ${['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(mo)]}`; };
+  const windowBadge = t.dueTo && t.dueTo !== t.date
+    ? `<span style="font-size:10px;background:#eaf4fb;color:#1a5276;font-weight:700;padding:2px 6px;border-radius:4px">📅 ${fmt(t.date)}–${fmt(t.dueTo)}</span>`
+    : '';
+  // Priority badge
+  const prio = (t.priority || 'Medium').toLowerCase();
+  const prioColor = prio === 'urgent' ? '#8B2020' : prio === 'high' ? '#a86c00' : '#1a5276';
+  const prioBadge = `<span style="font-size:9px;background:${prioColor}22;color:${prioColor};border:1px solid ${prioColor};padding:1px 5px;border-radius:4px;font-weight:700">${t.priority || 'Medium'}</span>`;
+
+  const accessBadge = t.access === 'Guests OK'
+    ? `<span style="font-size:10px;background:#edf7f2;color:#2d6a4f;font-weight:700;padding:2px 6px;border-radius:4px">👥 Guests OK</span>`
+    : `<span style="font-size:10px;background:#fdf5e8;color:#a86c00;font-weight:700;padding:2px 6px;border-radius:4px">⛔ No Guests</span>`;
+  const rtqBadge = isRtq ? `<span style="font-size:10px;background:#fdf0ec;color:#8B2020;font-weight:700;padding:2px 6px;border-radius:4px">⏰ Returned to Queue</span>` : '';
+
+  const ass1 = t.assignees[0] || '';
+  const ass2 = t.assignees[1] || '';
+
   return `
-    <div class="card ${!t.assignee?'unassigned':(t.overdue?'overdue':'')}">
+    <div class="card ${!t.assignees.length&&!isRtq?'unassigned':(t.overdue&&!isRtq?'overdue':'')} ${isRtq?'overdue':''}">
       <div class="card-top">
         <div class="card-title">${t.property}</div>
-        ${t.linked ? '<span class="badge-ln">🚨 Linked Issue</span>' : ''}
+        <div style="display:flex; gap:4px; flex-wrap:wrap; align-items:center">
+          ${prioBadge}
+          ${rtqBadge}
+          ${windowBadge}
+          ${accessBadge}
+          ${t.isBillable ? '<span style="font-size:9px;background:#1a5276;color:white;padding:2px 6px;border-radius:4px;font-weight:700">CHARGEABLE</span>' : ''}
+          ${t.linked ? '<span class="badge-ln">🚨 Issue</span>' : ''}
+        </div>
       </div>
       <div class="card-meta">
-        <span>📅 ${t.date || 'Unscheduled'}</span>
+        <span>📅 ${t.date ? fmt(t.date) : 'Unscheduled'}${t.dueTo ? ' → ' + fmt(t.dueTo) : ''}</span>
         <span>🏷️ ${t.status}</span>
+        ${t.assignees.length ? `<span>👤 ${t.assignees.join(', ')}</span>` : ''}
       </div>
-      ${t.description ? `<div class="card-desc">${t.description}</div>` : ''}
+      ${t.description ? `<div class="card-desc">${t.description.replace(/\n/g,'<br>')}</div>` : ''}
+      
+      ${(t.matCost || t.labourCost) ? `
+      <div style="background:#f4f7f6; padding:8px; border-radius:6px; margin-top:4px; font-size:11px">
+        <div style="display:flex; justify-content:space-between"><span>Labour:</span> <strong>£${t.labourCost.toFixed(2)}</strong></div>
+        <div style="display:flex; justify-content:space-between"><span>Materials:</span> <strong>£${t.matCost.toFixed(2)}</strong></div>
+        <div style="display:flex; justify-content:space-between; border-top:1px solid #ccc; margin-top:4px; padding-top:4px; font-weight:700"><span>Total:</span> <span>£${(t.labourCost + t.matCost).toFixed(2)}</span></div>
+      </div>
+      ` : ''}
       <div class="update-row">
-        <div class="assign-row">
+        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px">
           <select class="sel-assign" id="sel-${t.id}">
-            <option value="">— Assign Staff —</option>
-            ${staff.map(s => `<option value="${s.name}" ${t.assignee===s.name?'selected':''}>${s.name}</option>`).join('')}
+            <option value="">— Primary —</option>
+            ${staff.map(s => `<option value="${s.name}" ${ass1===s.name?'selected':''}>${s.name}</option>`).join('')}
           </select>
+          <select class="sel-assign" id="sel2-${t.id}">
+            <option value="">— Partner —</option>
+            ${staff.map(s => `<option value="${s.name}" ${ass2===s.name?'selected':''}>${s.name}</option>`).join('')}
+          </select>
+        </div>
+        <div class="assign-row" style="margin-top:4px">
+          <input type="text" id="note-${t.id}" class="note-input" placeholder="Add a note or reason for reassignment...">
           <button class="btn-save" onclick="saveTask('${t.id}')">Update</button>
         </div>
-        <input type="text" id="note-${t.id}" class="note-input" placeholder="Add a new update or reason...">
       </div>
     </div>
   `;
 }
 
 async function saveTask(taskId) {
-  const sel = document.getElementById(`sel-${taskId}`), noteEl = document.getElementById(`note-${taskId}`);
-  const newAssignee = sel.value, noteText = noteEl.value.trim();
-  const btn = sel.nextElementSibling;
+  const sel1 = document.getElementById(`sel-${taskId}`), sel2 = document.getElementById(`sel2-${taskId}`), noteEl = document.getElementById(`note-${taskId}`);
+  const p1 = sel1.value, p2 = sel2.value, noteText = noteEl.value.trim();
+  const btn = sel2.closest('.update-row').querySelector('.btn-save');
   
+  if (p1 && p2 && p1 === p2) return alert('Cannot assign the same person twice.');
+
   btn.disabled = true; btn.textContent = '...';
   try {
     const t = tasks.find(x => x.id === taskId);
@@ -272,10 +345,14 @@ async function saveTask(taskId) {
       newNotes = newNotes ? (newNotes + '\n\n' + audit) : audit;
     }
 
-    const cv = { [COLS.assignee]: { labels: newAssignee ? [newAssignee] : [] }, [COLS.desc]: newNotes };
+    const labels = [];
+    if (p1) labels.push(p1);
+    if (p2) labels.push(p2);
+
+    const cv = { [COLS.assignee]: { labels }, [COLS.desc]: newNotes };
     await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`, { b: ADHOC_BOARD, i: taskId, v: JSON.stringify(cv) });
     
-    t.assignee = newAssignee;
+    t.assignees = labels;
     t.description = newNotes;
     noteEl.value = '';
     showToast('Task updated');

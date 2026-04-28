@@ -151,6 +151,10 @@
       <div class="stat-val" id="stSup"><span class="spin"></span></div>
       <div class="stat-lbl">Open supply requests</div>
     </a>
+    <a href="issues-inbox.html" class="stat-card danger" id="cardIssues">
+      <div class="stat-val" id="stIssues"><span class="spin"></span></div>
+      <div class="stat-lbl">Issues Triage</div>
+    </a>
     <a href="task-backlog.html" class="stat-card danger" id="cardBacklog">
       <div class="stat-val" id="stBacklog"><span class="spin"></span></div>
       <div class="stat-lbl">Maint Backlog</div>
@@ -168,6 +172,62 @@
 
 <div class="page-body">
 
+  <!-- Management -->
+  <div style="grid-column:1/-1">
+    <div class="section-label">💻 Management</div>
+    <div class="cards cards-3">
+      <a href="staff-shifts.html" class="tool-card">
+        <div class="card-icon">⏱️</div>
+        <div class="card-name">Staff Shifts</div>
+        <div class="card-desc">Weekly matrix of start/finish times by staff (leave/sick/feeds payroll).</div>
+        <span class="card-badge b-both">📱💻 Any</span>
+      </a>
+      <a href="payroll.html" class="tool-card">
+        <div class="card-icon">💷</div>
+        <div class="card-name">Payroll</div>
+        <div class="card-desc">Per-staff hours and pay totals. Export CSV for accounting.</div>
+        <span class="card-badge b-both">📱💻 Any</span>
+      </a>
+      <a href="#" onclick="gatedNav('stock.html');return false;" class="tool-card">
+        <div class="card-icon">🏪</div>
+        <div class="card-name">Stock Warehouse <span style="font-size:11px;opacity:.5">🔒</span></div>
+        <div class="card-desc">Global stock levels, values, and master register.</div>
+        <span class="card-badge b-both">📱💻 Any</span>
+      </a>
+      <a href="stock-in.html" class="tool-card">
+        <div class="card-icon">📥</div>
+        <div class="card-name">Stock In</div>
+        <div class="card-desc">Book in deliveries (prosecco, cleaning kits, etc).</div>
+        <span class="card-badge b-mobile">📱 Mobile</span>
+      </a>
+      <a href="supplies-field.html" class="tool-card featured">
+        <div class="card-icon">📦</div>
+        <div class="card-name">Field Supplies</div>
+        <div class="card-desc">Van run logs, shortages, and delivery confirmations.</div>
+        <span class="card-badge b-mobile">📱 Mobile</span>
+      </a>
+      <a href="#" onclick="gatedNav('delivery-report.html');return false;" class="tool-card">
+        <div class="card-icon">📊</div>
+        <div class="card-name">Delivery Report <span style="font-size:11px;opacity:.5">🔒</span></div>
+        <div class="card-desc">Cost by lodge — net, VAT & handling. CSV export.</div>
+        <span class="card-badge b-desktop">💻 Desktop</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Day Control -->
+  <div style="grid-column:1/-1">
+    <div class="section-label">📅 Day Control</div>
+    <div class="cards cards-4">
+      <a href="changeover-form.html" class="tool-card featured">
+        <div class="card-icon">✅</div>
+        <div class="card-name">Changeover</div>
+        <div class="card-desc">Log completed changeovers and confirm restocking on the spot.</div>
+        <span class="card-badge b-mobile">📱 Mobile</span>
+      </a>
+    </div>
+  </div>
+
   <!-- Housekeeping -->
   <div style="grid-column:1/-1">
     <div class="section-label">🧹 Housekeeping</div>
@@ -178,28 +238,10 @@
         <div class="card-desc">Plan cleans by day — drag staff onto bookings, track hours against contracts, same-day T auto-flagged from Lodge Status.</div>
         <span class="card-badge b-both">📱💻 Any</span>
       </a>
-      <a href="changeover-form.html" class="tool-card featured">
-        <div class="card-icon">✅</div>
-        <div class="card-name">Changeover</div>
-        <div class="card-desc">Log completed changeovers and confirm restocking on the spot.</div>
-        <span class="card-badge b-mobile">📱 Mobile</span>
-      </a>
       <a href="checker.html" class="tool-card">
         <div class="card-icon">🔎</div>
         <div class="card-name">Checker</div>
         <div class="card-desc">Quality Check cleans for the day. Assign a checker inline; email the day sheet to each checker.</div>
-        <span class="card-badge b-both">📱💻 Any</span>
-      </a>
-      <a href="staff-shifts.html" class="tool-card">
-        <div class="card-icon">⏱️</div>
-        <div class="card-name">Staff Shifts</div>
-        <div class="card-desc">Weekly matrix of start/finish times by staff. Mark leave/sick, copy week forward, feeds rota availability and payroll.</div>
-        <span class="card-badge b-both">📱💻 Any</span>
-      </a>
-      <a href="payroll.html" class="tool-card">
-        <div class="card-icon">💷</div>
-        <div class="card-name">Payroll</div>
-        <div class="card-desc">Per-staff hours (cleans + checks + shifts) and pay totals for a pay period. Edit rates inline, export CSV.</div>
         <span class="card-badge b-both">📱💻 Any</span>
       </a>
     </div>
@@ -334,43 +376,6 @@
     </div>
   </div>
 
-  <!-- Management -->
-  <div style="grid-column:1/-1">
-    <div class="section-label">💻 Management</div>
-    <div class="cards cards-3">
-      <a href="#" onclick="gatedNav('delivery-report.html');return false;" class="tool-card">
-        <div class="card-icon">📊</div>
-        <div class="card-name">Delivery Report <span style="font-size:11px;opacity:.5">🔒</span></div>
-        <div class="card-desc">Cost by lodge — net, VAT &amp; handling. CSV export.</div>
-        <span class="card-badge b-desktop">💻 Desktop</span>
-      </a>
-    </div>
-  </div>
-
-  <!-- Stock Control -->
-  <div style="grid-column:1/-1">
-    <div class="section-label">📦 Stock Control</div>
-    <div class="cards cards-3">
-      <a href="#" onclick="gatedNav('stock.html');return false;" class="tool-card">
-        <div class="card-icon">🏪</div>
-        <div class="card-name">Stock Warehouse <span style="font-size:11px;opacity:.5">🔒</span></div>
-        <div class="card-desc">Manage stock, run a stock take, and track valuations.</div>
-        <span class="card-badge b-both">📱💻 Any</span>
-      </a>
-      <a href="stock-in.html" class="tool-card">
-        <div class="card-icon">📥</div>
-        <div class="card-name">Stock In</div>
-        <div class="card-desc">Book in received deliveries — prosecco, cleaning supplies, and more. Updates stock levels instantly.</div>
-        <span class="card-badge b-mobile">📱 Mobile</span>
-      </a>
-      <a href="supplies-field.html" class="tool-card featured">
-        <div class="card-icon">📦</div>
-        <div class="card-name">Field Log</div>
-        <div class="card-desc">Log shortages, confirm deliveries, take stock, build your van run.</div>
-        <span class="card-badge b-mobile">📱 Mobile</span>
-      </a>
-    </div>
-  </div>
 
 </div>
 
@@ -414,8 +419,9 @@ startClock();
 window.addEventListener('pageshow', e => {
   if (e.persisted) {
     startClock();
-    ['stArr','stNext','stSup','stOut','stLow','stBacklog'].forEach(id => {
-      document.getElementById(id).innerHTML = '<span class="spin"></span>';
+    ['stArr','stNext','stSup','stOut','stLow','stBacklog','stIssues'].forEach(id => {
+      const el = document.getElementById(id);
+      if (el) el.innerHTML = '<span class="spin"></span>';
     });
     loadStats();
   }
@@ -515,8 +521,8 @@ async function loadStats() {
 
   // Maintenance Backlog (Overdue + Unassigned)
   try {
-    const BOARDS = [1987064628, 5092955038, 5092954987, 5095296374];
-    const COLS = ['date_mm2sn17y','dropdown_mm2se9z7','date_mm2s2qpv','dropdown_mm2shyxp','date_mm2srjzv','dropdown_mm2sxqvv','date_mm2stp44','dropdown_mm2szsp5','color_mm2sf7a8'];
+    const BOARDS = [5095296374]; // Ad-hoc Only
+    const COLS = ['date_mm2stp44','dropdown_mm2szsp5','color_mm2sf7a8'];
     const colsStr = '[' + COLS.map(c => `"${c}"`).join(',') + ']';
     
     let totalBacklog = 0;
@@ -545,6 +551,18 @@ async function loadStats() {
     document.getElementById('stBacklog').textContent = totalBacklog;
     document.getElementById('cardBacklog').className = totalBacklog > 5 ? 'stat-card danger' : (totalBacklog > 0 ? 'stat-card warn' : 'stat-card');
   } catch { document.getElementById('stBacklog').textContent = '—'; }
+
+  // Issues Triage (Status: Review/Triage or Not Fixed)
+  try {
+    const d = await mq(`{ boards(ids:[5095294474]) { items_page(limit:500) { items { column_values(ids:["color_mm2s9cc9"]) { text } } } } }`);
+    const items = d?.boards?.[0]?.items_page?.items || [];
+    const untriaged = items.filter(it => {
+      const status = it.column_values[0]?.text || '';
+      return !/fix|check/i.test(status);
+    }).length;
+    document.getElementById('stIssues').textContent = untriaged;
+    document.getElementById('cardIssues').className = untriaged > 0 ? 'stat-card danger' : 'stat-card';
+  } catch { document.getElementById('stIssues').textContent = '—'; }
 }
 
 loadStats();

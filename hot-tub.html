@@ -160,9 +160,19 @@
       .sc-readings { grid-template-columns:repeat(2,1fr); }
       .vt-row { grid-template-columns:1fr; }
     }
+
+    /* Sync Banner */
+    .sync-banner { background:var(--amber); color:#fff; font-size:12px; font-weight:700; text-align:center; padding:6px; display:none; position:sticky; top:0; z-index:110; }
+    .sync-banner.active { display:block; }
+    .sync-dot { display:inline-block; width:8px; height:8px; background:#fff; border-radius:50%; margin-right:6px; animation:pulse 1.5s infinite; }
+    @keyframes pulse { 0% { opacity:1; } 50% { opacity:0.3; } 100% { opacity:1; } }
   </style>
 </head>
 <body>
+
+<div class="sync-banner" id="syncBanner">
+  <span class="sync-dot"></span> <span id="syncText">Offline — log will be sent when back in coverage</span>
+</div>
 
 <header>
   <div class="header-logo">
@@ -548,17 +558,51 @@ document.addEventListener('DOMContentLoaded', async () => {
   await loadProperties();
 });
 
-// ── Monday API ───────────────────────────────────────────
-async function mq(query) {
-  const r = await fetch('https://api.monday.com/v2', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': API_TOKEN, 'API-Version': '2024-01' },
-    body: JSON.stringify({ query })
-  });
-  const j = await r.json();
-  if (j.errors) throw new Error(j.errors[0].message);
-  return j.data;
+let _outbox = JSON.parse(localStorage.getItem('outbox') || '[]');
+function saveOutbox() { localStorage.setItem('outbox', JSON.stringify(_outbox)); updateSyncUI(); }
+function updateSyncUI() {
+  const b = document.getElementById('syncBanner'), t = document.getElementById('syncText');
+  if (_outbox.length > 0) { b.classList.add('active'); t.textContent = `Syncing ${_outbox.length} pending log${_outbox.length>1?'s':''}...`; }
+  else if (!navigator.onLine) { b.classList.add('active'); t.textContent = 'Offline — logging is queued'; }
+  else { b.classList.remove('active'); }
 }
+
+async function mq(query, variables, useOutbox = false) {
+  try {
+    const r = await fetch('https://api.monday.com/v2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': API_TOKEN, 'API-Version': '2024-01' },
+      body: JSON.stringify(variables ? { query, variables } : { query })
+    });
+    const j = await r.json();
+    if (j.errors) throw new Error(j.errors[0].message);
+    return j.data;
+  } catch (e) {
+    if (useOutbox && (e.name === 'TypeError' || !navigator.onLine)) {
+      const id = 'ht_' + Date.now();
+      _outbox.push({ id, query, variables, timestamp: Date.now() });
+      saveOutbox();
+      const err = new Error('OFFLINE_QUEUED');
+      err.outboxId = id;
+      throw err;
+    }
+    throw e;
+  }
+}
+
+async function processOutbox() {
+  if (!_outbox.length || !navigator.onLine) { updateSyncUI(); return; }
+  for (const item of [..._outbox]) {
+    try {
+      await mq(item.query, item.variables, false);
+      _outbox = _outbox.filter(x => x.id !== item.id);
+      saveOutbox();
+    } catch (e) { break; }
+  }
+}
+window.addEventListener('online', processOutbox);
+setInterval(processOutbox, 30000);
+setTimeout(processOutbox, 500);
 
 // ── Load properties from status board ───────────────────
 async function loadProperties() {
@@ -830,13 +874,8 @@ async function submitForm() {
     const itemName = esc(property);
 
     // Create record in charging board
-    await mq(`mutation {
-      create_item(
-        board_id: ${CHARGING_BOARD}
-        item_name: "${itemName}"
-        column_values: ${colValsStr}
-      ) { id }
-    }`);
+    await mq(`mutation($b:ID!,$n:String!,$v:JSON!){ create_item(board_id:$b,item_name:$n,column_values:$v){ id } }`, 
+      { b: CHARGING_BOARD, n: itemName, v: JSON.parse(colValsStr) }, true);
 
     // Status board updated by Make automation triggered by new charging record
 
@@ -847,6 +886,13 @@ async function submitForm() {
     setTimeout(resetForm, 2500);
 
   } catch (e) {
+    if (e.message === 'OFFLINE_QUEUED') {
+      showMsg('✓ Offline: Log saved to outbox. It will sync automatically.', 'success');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      if (timerRunning) timerStop();
+      setTimeout(resetForm, 2500);
+      return;
+    }
     showMsg('Submission error: ' + e.message, 'error');
     btn.disabled = false;
   }

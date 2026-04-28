@@ -230,6 +230,40 @@
   </div>
 </div>
 
+<!-- ── Maintenance Completion Modal ─────────────────────────── -->
+<div class="cl-overlay" id="maintCompOverlay">
+  <div class="ex-box">
+    <div class="ex-title" id="maintCompTitle">Complete Maintenance</div>
+    <div class="ex-hint">Record your time and materials used for this job. Costs are calculated for the owner.</div>
+    
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+      <div class="ex-group">
+        <span class="ex-lbl">Start Time</span>
+        <input type="time" id="compStart" class="ex-input">
+      </div>
+      <div class="ex-group">
+        <span class="ex-lbl">Finish Time</span>
+        <input type="time" id="compFinish" class="ex-input">
+      </div>
+    </div>
+
+    <div class="ex-group">
+      <span class="ex-lbl">Materials Used</span>
+      <textarea id="compMaterials" class="ex-input" style="min-height:60px" placeholder="e.g. 2x LED Bulbs, Silicone sealant"></textarea>
+    </div>
+
+    <div class="ex-group">
+      <span class="ex-lbl">Material Cost (£)</span>
+      <input type="number" id="compMatCost" class="ex-input" step="0.01" placeholder="0.00">
+    </div>
+
+    <div class="ex-actions">
+      <button class="ex-btn cancel" onclick="closeMaintComp()">Cancel</button>
+      <button class="ex-btn go" id="maintCompSaveBtn" onclick="submitMaintComp()">✓ Complete Job</button>
+    </div>
+  </div>
+</div>
+
 <style>
   /* Checklist modal */
   .cl-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; z-index:200; padding:14px; }
@@ -300,7 +334,9 @@ const MAINT_SOURCES = [
     schedCol:    'date_mm2sn17y',
     assigneeCol: 'dropdown_mm2se9z7',
     lastDoneCol: 'date4',
-    completeMode: 'date',     // mark done = set lastDoneCol to today, clear sched + assignee
+    completeMode: 'date',
+    billableCol: 'checkbox_mm2vpxq7',
+    priorityCol: 'color_mm2sy0cn'
   },
   {
     key:   'jet',
@@ -313,6 +349,8 @@ const MAINT_SOURCES = [
     assigneeCol: 'dropdown_mm2shyxp',
     lastDoneCol: 'date4',
     completeMode: 'date',
+    billableCol: 'checkbox_mm2vpxq7',
+    priorityCol: 'color_mm2sy0cn'
   },
   {
     key:   'pat',
@@ -325,6 +363,8 @@ const MAINT_SOURCES = [
     assigneeCol: 'dropdown_mm2sxqvv',
     lastDoneCol: 'date4',
     completeMode: 'date',
+    billableCol: 'checkbox_mm2vpxq7',
+    priorityCol: 'color_mm2sy0cn'
   },
   {
     key:   'adhoc',
@@ -333,15 +373,28 @@ const MAINT_SOURCES = [
     color: '#646955',
     bg:    '#f6f4ed',
     boardId: 5095296374,
-    schedCol:    'date_mm2stp44',
-    assigneeCol: 'dropdown_mm2szsp5',
-    statusCol:   'color_mm2sf7a8',
-    propCol:     'text_mm2shvja',
-    descCol:     'long_text_mm2s5dwj',
-    linkedIssueCol: 'text_mm2sqa3f', // Issues board item id when promoted from inbox
-    completeMode: 'status',  // mark done = set status to Completed
+    schedCol:      'date_mm2stp44',
+    assigneeCol:   'dropdown_mm2szsp5',
+    statusCol:     'color_mm2sf7a8',
+    propCol:       'text_mm2shvja',
+    descCol:       'long_text_mm2s5dwj',
+    linkedIssueCol:'text_mm2sqa3f',
+    dueDateCol:    'date_mm2vw7qh',
+    guestAccessCol:'dropdown_mm2vpbet',
+    billableCol:   'checkbox_mm2vpxq7',
+    priorityCol:   'color_mm2sy0cn',
+    completeMode: 'status',
   },
 ];
+
+const MAINT_COLS = {
+  billable: 'checkbox_mm2vpxq7',
+  matCost:  'numeric_mm2vks4c',
+  labour:   'numeric_mm2vks4l',
+  matsUsed: 'long_text_mm2vks4m',
+  start:    'hour_mm2vks4j',
+  finish:   'hour_mm2vks4p'
+};
 
 // Issues board (used to close out an Ad-hoc's linked issue when the task is done)
 const ISSUES_BOARD_ID = 5095294474;
@@ -586,6 +639,7 @@ async function boot() {
   renderDayNav();
   renderDay();
   processOutbox();
+  expireOverdueTasks();
 
   if (failures.length > 0 && !navigator.onLine) {
     // Suppress errors if offline (we're using cache)
@@ -595,11 +649,6 @@ async function boot() {
   if (failures.length === results.length) {
     document.getElementById('dayContent').innerHTML = `<div class="empty">⚠️ Could not load your day: ${escapeHtml(failures[0].err.message || String(failures[0].err))}</div>`;
     return;
-  }
-}
-    warn.style.cssText = 'background:#fff4e0;border:1px solid #fdab3d;color:#7a5a00;padding:10px 12px;border-radius:8px;font-size:12px;margin-bottom:10px';
-    warn.innerHTML = `⚠️ Some data couldn't be loaded — showing what we have. (${escapeHtml(msg)})`;
-    document.getElementById('dayContent').prepend(warn);
   }
 }
 
@@ -681,7 +730,6 @@ async function loadCleans() {
   cleans.sort((a,b) => (a.day+a.start).localeCompare(b.day+b.start));
   localStorage.setItem('cache_cleans', JSON.stringify(cleans));
 }
-}
 
 /* ─── Load Hot Tub Cleans assigned to me (today + 6 days) ──── */
 async function loadHotTubCleans() {
@@ -728,7 +776,6 @@ async function loadHotTubCleans() {
   hotTubCleans.sort((a,b) => (a.day+a.start).localeCompare(b.day+b.start));
   localStorage.setItem('cache_hot_tubs', JSON.stringify(hotTubCleans));
 }
-}
 
 /* ─── Load Maintenance Tasks scheduled for me (today + 6 days) ────
    Pulls scheduled rows from each maintenance source board where Assigned-to
@@ -741,7 +788,9 @@ async function loadMaintenanceTasks() {
 
   for (const src of MAINT_SOURCES) {
     try {
-      const colList = [src.schedCol, src.assigneeCol, src.lastDoneCol, src.statusCol, src.propCol, src.descCol, src.linkedIssueCol]
+      const colList = [src.schedCol, src.assigneeCol, src.lastDoneCol, src.statusCol,
+                       src.propCol, src.descCol, src.linkedIssueCol, src.dueDateCol, 
+                       src.guestAccessCol, src.priorityCol, src.billableCol]
         .filter(Boolean).map(c => `"${c}"`).join(',');
       const cols = `[${colList}]`;
       const q = `{ boards(ids:[${src.boardId}]){ items_page(limit:500){ items{ id name column_values(ids:${cols}){ id text value } } } } }`;
@@ -750,25 +799,34 @@ async function loadMaintenanceTasks() {
       for (const it of items) {
         const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
         const scheduledDate = pj(cv[src.schedCol]?.value)?.date || null;
-        if (!scheduledDate || scheduledDate < startISO || scheduledDate > endISO) continue;
-        const assignee = (cv[src.assigneeCol]?.text || '').split(',').map(s => s.trim()).filter(Boolean)[0] || '';
-        if (assignee !== me.name) continue;
+        const dateTo = src.dueDateCol ? (pj(cv[src.dueDateCol]?.value)?.date || null) : null;
+        const effectiveTo = dateTo || scheduledDate;
+        if (!scheduledDate) continue;
+        if (scheduledDate > endISO) continue;         // Start date beyond our 7-day window
+        if (effectiveTo && effectiveTo < startISO) continue; // Entire range in the past
+        const assignees = (cv[src.assigneeCol]?.text || '').split(',').map(s => s.trim()).filter(Boolean);
+        if (!assignees.includes(me.name)) continue;
         const status = src.statusCol ? (cv[src.statusCol]?.text || '') : '';
-        // For ad-hoc, skip already-finished tasks
         if (src.completeMode === 'status' && /completed|cancelled/i.test(status)) continue;
-        // Property — for recurring boards the item NAME is the property.
-        // For ad-hoc, prefer the explicit Property text column.
         const property = src.propCol ? (cv[src.propCol]?.text || it.name) : it.name;
         const description = src.descCol ? (pj(cv[src.descCol]?.value)?.text || cv[src.descCol]?.text || '') : '';
         const linkedIssue = src.linkedIssueCol ? (cv[src.linkedIssueCol]?.text || '').trim() : '';
+        const guestAccess = src.guestAccessCol ? (cv[src.guestAccessCol]?.text || 'No Guests') : 'No Guests';
+        const priority = cv[src.priorityCol]?.text || 'Medium';
+        const isBillable = cv[src.billableCol]?.text === 'v';
+
         maintTasks.push({
           id: it.id,
           sourceKey: src.key,
           property,
           description,
-          day: scheduledDate,
+          day: scheduledDate,       // dateFrom
+          dateTo,                   // null = single day
           status,
           linkedIssue,
+          guestAccess,
+          priority,
+          isBillable
         });
       }
     } catch (e) {
@@ -778,6 +836,65 @@ async function loadMaintenanceTasks() {
   maintTasks.sort((a,b) => (a.day+a.sourceKey+a.property).localeCompare(b.day+b.sourceKey+b.property));
   localStorage.setItem('cache_maint', JSON.stringify(maintTasks));
 }
+
+/* ─── Guest access helpers ──────────────────────────────────── */
+
+/* Returns access type for a property on a given day, using the loaded cleans
+   as a proxy for booking status (cleans are derived from Guesty).
+   Return values: 'empty' | 'checkout' | 'checkin' | 'backtoback' | 'occupied' */
+function getPropertyAccessForDay(property, day) {
+  const propCleans = cleans.filter(c => c.property === property);
+  const dayClean = propCleans.find(c => c.day === day);
+  if (dayClean) {
+    const co = dayClean.checkoutDate === day;
+    const ci = dayClean.checkinDate  === day;
+    if (co && ci) return 'backtoback'; // window 10:00 – 15:00
+    if (co) return 'checkout';         // empty after 10:00
+    if (ci) return 'checkin';          // empty until 15:00
+    return 'empty';
+  }
+  // No clean on this day — infer mid-stay from booking spans
+  const midStay = propCleans.some(c => {
+    const ci = c.checkinDate, co = c.checkoutDate;
+    if (ci && co) return ci <= day && co > day;
+    if (ci && !co) return ci <= day && addDaysISO(ci, 14) > day;
+    return false;
+  });
+  return midStay ? 'occupied' : 'empty';
+}
+
+/* Is a task eligible to appear on a given day?
+   Checks date range AND guest-access rule. */
+function isTaskEligibleOnDay(task, day) {
+  const from = task.day;
+  const to   = task.dateTo || task.day;
+  if (day < from || day > to) return false;
+  if (task.guestAccess === 'Guests OK') return true;
+  // Default: No Guests
+  const access = getPropertyAccessForDay(task.property, day);
+  return access !== 'occupied';  // all other states allow the task (with possible timing badge)
+}
+
+/* On boot, auto-return any tasks whose date window has fully expired. */
+async function expireOverdueTasks() {
+  const today = todayISO();
+  const overdue = maintTasks.filter(m =>
+    m.dateTo && m.dateTo < today &&
+    !/completed|cancelled|returned/i.test(m.status)
+  );
+  for (const m of overdue) {
+    const src = MAINT_SOURCES.find(s => s.key === m.sourceKey);
+    if (!src?.statusCol) continue;
+    m.status = 'Returned to Queue';
+    try {
+      const cv = { [src.statusCol]: { label: 'Returned to Queue' } };
+      const q = `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`;
+      await mondayFetch(q, { b: src.boardId, i: m.id, v: JSON.stringify(cv) }, true);
+    } catch(e) { /* outbox will handle it */ }
+  }
+  if (overdue.length > 0) {
+    toast(`⏰ ${overdue.length} task${overdue.length > 1 ? 's' : ''} past due — returned to queue`, 'err');
+  }
 }
 
 /* ─── Load Shifts in the visible window ─────────────────────── */
@@ -905,10 +1022,10 @@ function renderDay() {
   }
 
   // Other maintenance work scheduled for me today (windows / jet / PAT / ad-hoc)
-  const dayMaint = maintTasks.filter(m => m.day === day);
+  const dayMaint = maintTasks.filter(m => isTaskEligibleOnDay(m, day));
   if (dayMaint.length) {
     parts.push(`<div class="section-label">Other maintenance jobs <span class="count">${dayMaint.length}</span></div>`);
-    for (const m of dayMaint) parts.push(renderMaintTaskCard(m));
+    for (const m of dayMaint) parts.push(renderMaintTaskCard(m, day));
   }
 
   // Always-available link to hot-tub.html so staff can drop in to log readings
@@ -1178,6 +1295,8 @@ async function submitChecklist() {
   h.status = 'Completed';
   h.notes = newNotes;
 
+  try {
+    const cv = JSON.stringify({ [HC_STATUS]: {label: 'Completed'}, [HC_NOTES]: newNotes });
     const q = `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`;
     await mondayFetch(q, { b: HT_CLEANS_BOARD, i: htId, v: cv }, true);
     closeChecklist();
@@ -1193,7 +1312,6 @@ async function submitChecklist() {
       return;
     }
     // Revert
-    // Revert
     h.status = prevStatus; h.notes = prevNotes;
     btn.disabled = false; btn.textContent = '✓ Mark complete';
     alert('Could not save: ' + e.message);
@@ -1207,17 +1325,14 @@ async function submitChecklist() {
    (fin intact, paddle present, inflated, etc.) for both drop-off and
    collection. Window / Jet / PAT get a small "Open dashboard" link to
    the existing register UI for history and other-property context. */
-function renderMaintTaskCard(m) {
+function renderMaintTaskCard(m, day) {
+  day = day || todayISO();
   const src = MAINT_SOURCES.find(s => s.key === m.sourceKey);
   if (!src) return '';
   const issueUrl = `report-issue.html?from=staff&property=${encodeURIComponent(m.property)}&reporter=${encodeURIComponent(me.name)}`;
   const descBlock = m.description ? `<div class="cc-notes">${escapeHtml(m.description)}</div>` : '';
 
-  const isPaddleboard = m.sourceKey === 'adhoc' && /^paddleboards?/i.test((m.description||'').trim());
-  const dashboardUrl = src.key === 'window' ? `window-cleaning.html?from=staff&property=${encodeURIComponent(m.property)}`
-                    : src.key === 'jet'    ? `jet-washing.html?from=staff&property=${encodeURIComponent(m.property)}`
-                    : src.key === 'pat'    ? `pat-testing.html?from=staff&property=${encodeURIComponent(m.property)}`
-                    : null;
+  // const dashboardUrl = ... (removed per request)
 
   // Status badge
   const sts = (m.status || '').toLowerCase();
@@ -1228,6 +1343,30 @@ function renderMaintTaskCard(m) {
   else if (isComplete) statusBadge = `<span class="cc-badge comp">✓ Done</span>`;
   else statusBadge = `<span class="cc-badge" style="background:#f0ede4;color:${src.color};border:1px solid ${src.color}">Scheduled</span>`;
 
+  const isPaddleboard = m.sourceKey === 'paddle' || /paddleboard/i.test(m.property + (m.description || ''));
+
+  // Guest access badge (derived from cleans board occupancy data)
+  const access = getPropertyAccessForDay(m.property, day);
+  let accessBadge = '';
+  if (m.guestAccess === 'Guests OK') {
+    accessBadge = `<span class="cc-badge" style="background:#edf7f2;color:#2d6a4f">👥 Guests OK</span>`;
+  } else if (access === 'checkout') {
+    accessBadge = `<span class="cc-badge" style="background:#fdf5e8;color:#a86c00">⏰ After 10am</span>`;
+  } else if (access === 'checkin') {
+    accessBadge = `<span class="cc-badge" style="background:#fdf5e8;color:#a86c00">⏰ Before 3pm</span>`;
+  } else if (access === 'backtoback') {
+    accessBadge = `<span class="cc-badge" style="background:#fdf5e8;color:#a86c00">⏰ 10am–3pm only</span>`;
+  } else if (access === 'occupied') {
+    accessBadge = `<span class="cc-badge" style="background:#fdf0ec;color:#8B2020">⛔ Guests in</span>`;
+  }
+
+  // Date-window badge (only when a due date is set and it's different from the start date)
+  const hasDatTo = m.dateTo && m.dateTo !== m.day;
+  const fmt = d => { const [,mo,dy] = d.split('-'); return `${parseInt(dy)} ${['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(mo)]}`; };
+  const windowBadge = hasDatTo
+    ? `<span class="cc-badge" style="background:#eaf4fb;color:#1a5276">📅 ${fmt(m.day)}–${fmt(m.dateTo)}</span>`
+    : '';
+
   // Action buttons
   let primaryBtn;
   if (isPaddleboard) {
@@ -1237,25 +1376,31 @@ function renderMaintTaskCard(m) {
   } else if (isComplete) {
     primaryBtn = `<button class="cc-btn primary" disabled style="background:#52b788;color:#fff;opacity:0.7">✓ Completed</button>`;
   } else if (isInProgress) {
-    primaryBtn = `<button class="cc-btn primary" onclick="markMaintComplete('${m.id}','${m.sourceKey}',this)" style="background:${src.color};color:#fff">✓ Mark complete</button>`;
+    primaryBtn = `<button class="cc-btn primary" onclick="openMaintComp('${m.id}','${m.sourceKey}')" style="background:${src.color};color:#fff">✓ Mark complete</button>`;
   } else {
     primaryBtn = `<button class="cc-btn primary" onclick="markMaintStarted('${m.id}','${m.sourceKey}',this)" style="background:${src.color};color:#fff">▶ Start task</button>`;
   }
 
-  const dashLink = dashboardUrl
-    ? `<a class="cc-btn secondary" href="${dashboardUrl}" style="background:#fff;color:${src.color};border:1.5px solid ${src.color};flex:0 0 auto;min-width:0;padding-left:10px;padding-right:10px">📋 Board</a>`
-    : '';
+  // const dashLink = ... (removed per request)
 
   // Notes panel (collapsed by default)
   const notesId = `mnt-notes-${m.id}`;
   const notesPanel = !isComplete ? `
     <div style="margin-top:8px">
-      <button class="cc-btn secondary" style="font-size:12px;padding:6px 10px" onclick="toggleMaintNotes('${notesId}')" id="ntbtn-${m.id}">📝 Notes</button>
-      <div id="${notesId}" style="display:none;margin-top:8px;display:none">
+      <button class="cc-btn secondary" style="font-size:12px;padding:6px 10px" onclick="toggleMaintNotes('${notesId}')">📝 Notes</button>
+      <div id="${notesId}" style="display:none;margin-top:8px">
         <textarea placeholder="Add a note (timestamped &amp; appended to task record)…" style="width:100%;padding:8px;border:1.5px solid #e0ddd6;border-radius:8px;font-family:inherit;font-size:13px;min-height:60px;resize:vertical" id="ntarea-${m.id}"></textarea>
         <button onclick="addMaintNote('${m.id}','${m.sourceKey}','${src.boardId}')" class="cc-btn primary" style="margin-top:6px;width:100%;background:#1a5276;color:#fff;font-size:13px">Save note</button>
       </div>
     </div>` : '';
+
+  // Priority badge
+  const prio = (m.priority || 'Medium').toLowerCase();
+  const prioColor = prio === 'urgent' ? '#8B2020' : prio === 'high' ? '#a86c00' : '#1a5276';
+  const prioBadge = `<span class="cc-badge" style="background:${prioColor}22;color:${prioColor};border:1px solid ${prioColor}">${m.priority || 'Medium'}</span>`;
+
+  // Billable badge
+  const billBadge = m.isBillable ? `<span class="cc-badge" style="background:#eaf4fb;color:#1a5276;font-weight:700">CHARGEABLE</span>` : '';
 
   return `<div class="clean-card" data-mid="${m.id}" data-src="${m.sourceKey}"
     style="border-left-color:${src.color}; background:${src.bg}">
@@ -1263,15 +1408,18 @@ function renderMaintTaskCard(m) {
       <div class="cc-prop">${src.icon} ${escapeHtml(m.property)}</div>
       <div class="cc-badges">
         <span class="role-pill">${escapeHtml(src.label)}</span>
+        ${prioBadge}
         ${statusBadge}
+        ${accessBadge}
+        ${windowBadge}
+        ${billBadge}
         ${m.linkedIssue ? '<span class="cc-badge" style="background:#fdf0ec;color:#8B2020">🚨 Issue</span>' : ''}
       </div>
     </div>
     ${descBlock}
     <div class="cc-actions">
       ${primaryBtn}
-      ${!isComplete ? `<button class="cc-btn secondary" onclick="openMaintException('${m.id}','${m.sourceKey}')" title="Can't do it today? Refer back.">🔄 Refer back</button>` : ''}
-      ${dashLink}
+      ${!isComplete ? `<button class="cc-btn secondary" onclick="openMaintException('${m.id}','${m.sourceKey}')">🔄 Refer back</button>` : ''}
       <a class="cc-btn secondary" href="${issueUrl}" style="background:#a9434a;color:#fff;flex:0 0 auto;min-width:0;padding-left:12px;padding-right:12px">🚨</a>
     </div>
     ${notesPanel}
@@ -1367,11 +1515,94 @@ async function markMaintComplete(itemId, sourceKey, btnEl) {
       return;
     }
     // Revert local state
-    // Revert local state
     maintTasks.push(m);
     renderDay();
     renderDayNav();
     toast('Update failed: ' + e.message, 'err');
+  }
+}
+
+/* ─── Maintenance Completion Modal Logic ────────────────────── */
+let _mCompFor = null; // { id, sourceKey }
+
+function openMaintComp(id, sourceKey) {
+  _mCompFor = { id, sourceKey };
+  const m = maintTasks.find(x => x.id === id && x.sourceKey === sourceKey);
+  document.getElementById('maintCompTitle').textContent = `Complete: ${m?.property || 'Task'}`;
+  document.getElementById('compStart').value = '10:00';
+  document.getElementById('compFinish').value = '11:00';
+  document.getElementById('compMaterials').value = '';
+  document.getElementById('compMatCost').value = '';
+  document.getElementById('maintCompOverlay').classList.add('show');
+}
+
+function closeMaintComp() {
+  document.getElementById('maintCompOverlay').classList.remove('show');
+  _mCompFor = null;
+}
+
+async function submitMaintComp() {
+  if (!_mCompFor) return;
+  const { id, sourceKey } = _mCompFor;
+  const start = document.getElementById('compStart').value;
+  const finish = document.getElementById('compFinish').value;
+  const materials = document.getElementById('compMaterials').value.trim();
+  const matCost = parseFloat(document.getElementById('compMatCost').value) || 0;
+  
+  if (!start || !finish) return alert('Please enter start and finish times.');
+
+  const btn = document.getElementById('maintCompSaveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  
+  try {
+    const src = MAINT_SOURCES.find(s => s.key === sourceKey);
+    const m = maintTasks.find(x => x.id === id);
+    
+    // Calculate labour cost (£25/hr default)
+    const [h1, m1] = start.split(':').map(Number);
+    const [h2, m2] = finish.split(':').map(Number);
+    const mins = (h2 * 60 + m2) - (h1 * 60 + m1);
+    const labourRate = 25; 
+    const labourCost = Math.max(0, (mins / 60) * labourRate);
+
+    const cv = {};
+    if (src.completeMode === 'date') {
+      cv[src.lastDoneCol] = { date: todayISO() };
+      cv[src.schedCol]    = { date: '', cleared: true };
+      cv[src.assigneeCol] = { labels: [] };
+    } else {
+      cv[src.statusCol]   = { label: 'Completed' };
+    }
+
+    cv[MAINT_COLS.start]   = { hour: h1, minute: m1 };
+    cv[MAINT_COLS.finish]  = { hour: h2, minute: m2 };
+    cv[MAINT_COLS.matsUsed] = materials;
+    cv[MAINT_COLS.matCost]  = matCost;
+    cv[MAINT_COLS.labour]   = labourCost;
+
+    const q = `mutation($b:ID!,$i:ID!,$v:JSON!){
+      change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id }
+    }`;
+    
+    await mondayFetch(q, { b: src.boardId, i: id, v: JSON.stringify(cv) }, true);
+    
+    maintTasks = maintTasks.filter(x => !(x.id === id && x.sourceKey === sourceKey));
+    closeMaintComp();
+    renderDay();
+    renderDayNav();
+    toast(`✓ Completed. Labour: £${labourCost.toFixed(2)}`);
+  } catch (e) {
+    if (e.message === 'OFFLINE_QUEUED') {
+      maintTasks = maintTasks.filter(x => !(x.id === id && x.sourceKey === sourceKey));
+      closeMaintComp();
+      renderDay();
+      renderDayNav();
+      toast('✓ Offline: Completion queued');
+      return;
+    }
+    alert('Failed to save completion details: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = '✓ Complete Job';
   }
 }
 

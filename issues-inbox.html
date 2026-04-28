@@ -123,13 +123,46 @@
     </div>
     
     <div class="field">
-      <span class="lbl">Date</span>
+      <span class="lbl">Start Date</span>
       <input type="date" id="sdSlot" class="input">
+    </div>
+
+    <div class="field">
+      <span class="lbl">Due by (optional — leave blank for single-day task)</span>
+      <input type="date" id="sdDueTo" class="input">
     </div>
     
     <div class="field">
-      <span class="lbl">Allocated to</span>
-      <select id="sdPerson" class="select"></select>
+      <span class="lbl">Guest Access</span>
+      <select id="sdGuestAccess" class="select">
+        <option value="No Guests" selected>No Guests (Only when empty / Check-in/out days)</option>
+        <option value="Guests OK">Guests OK (Can be done while guests are in)</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <span class="lbl">Priority</span>
+      <select id="sdPriority" class="select">
+        <option value="Low">Low</option>
+        <option value="Medium" selected>Medium</option>
+        <option value="High">High</option>
+        <option value="Urgent">Urgent</option>
+      </select>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:10px">
+      <div class="field">
+        <span class="lbl">Primary Staff</span>
+        <select id="sdPerson" class="select"></select>
+      </div>
+      <div class="field">
+        <span class="lbl">Partner (optional)</span>
+        <select id="sdPerson2" class="select"></select>
+      </div>
+    </div>
+    <div class="field" style="flex-direction:row; justify-content:space-between; align-items:center; padding:10px 0; border-top:1px dashed var(--border); border-bottom:1px dashed var(--border); margin:10px 0">
+      <span class="lbl" style="margin:0">Billable to owner?</span>
+      <input type="checkbox" id="sdBillable" style="width:20px; height:20px; accent-color:var(--dark)" checked>
     </div>
     
     <div class="field">
@@ -149,10 +182,10 @@ const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjox
 const ISSUES_BOARD = 5095294474, STAFF_BOARD = 5095127554, STATUS_BOARD = 1918769299;
 
 const MAINT_SOURCES = [
-  { key:'window', label:'Window cleaning', boardId:1987064628, schedCol:'date_mm2sn17y', assigneeCol:'dropdown_mm2se9z7' },
-  { key:'jet',    label:'Jet wash',        boardId:5092955038, schedCol:'date_mm2s2qpv', assigneeCol:'dropdown_mm2shyxp' },
-  { key:'pat',    label:'PAT testing',     boardId:5092954987, schedCol:'date_mm2srjzv', assigneeCol:'dropdown_mm2sxqvv' },
-  { key:'adhoc',  label:'Ad-hoc maint',    boardId:5095296374, schedCol:'date_mm2stp44', assigneeCol:'dropdown_mm2szsp5', statusCol:'color_mm2sf7a8', lnkCol:'text_mm2sqa3f', propCol:'text_mm2shvja', dscCol:'long_text_mm2s5dwj' }
+  { key:'window', label:'Window cleaning', boardId:1987064628, schedCol:'date_mm2sn17y', assigneeCol:'dropdown_mm2se9z7', billableCol:'checkbox_mm2vpxq7', priorityCol:'color_mm2sy0cn' },
+  { key:'jet',    label:'Jet wash',        boardId:5092955038, schedCol:'date_mm2s2qpv', assigneeCol:'dropdown_mm2shyxp', billableCol:'checkbox_mm2vpxq7', priorityCol:'color_mm2sy0cn' },
+  { key:'pat',    label:'PAT testing',     boardId:5092954987, schedCol:'date_mm2srjzv', assigneeCol:'dropdown_mm2sxqvv', billableCol:'checkbox_mm2vpxq7', priorityCol:'color_mm2sy0cn' },
+  { key:'adhoc',  label:'Ad-hoc maint',    boardId:5095296374, schedCol:'date_mm2stp44', assigneeCol:'dropdown_mm2szsp5', statusCol:'color_mm2sf7a8', lnkCol:'text_mm2sqa3f', propCol:'text_mm2shvja', dscCol:'long_text_mm2s5dwj', billableCol:'checkbox_mm2vpxq7', priorityCol:'color_mm2sy0cn' }
 ];
 
 const IS_LOC = 'dropdown_mm2s6ek3', IS_URG = 'color_mm2sy0cn', IS_STA = 'color_mm2s9cc9', IS_DSC = 'long_text_mm2smt15', IS_PHO = 'file_mm2sxvcm';
@@ -283,15 +316,31 @@ function openSched(id) {
   document.getElementById('sdNotes').value = '';
   onCategoryChange();
   document.getElementById('sdSlot').value = new Date(Date.now()+86400000).toISOString().split('T')[0];
-  document.getElementById('sdPerson').innerHTML = '<option value="">— assign to —</option>'+staff.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('sdDueTo').value = '';
+  document.getElementById('sdGuestAccess').value = 'No Guests';
+  document.getElementById('sdPriority').value = 'Medium';
+  const staffOpts = staff.map(s=>`<option>${s}</option>`).join('');
+  document.getElementById('sdPerson').innerHTML = '<option value="">— Primary —</option>'+staffOpts;
+  document.getElementById('sdPerson2').innerHTML = '<option value="">— Partner —</option>'+staffOpts;
   document.getElementById('schedModal').classList.add('show');
 }
 function closeSched() { document.getElementById('schedModal').classList.remove('show'); editingId=null; }
 
 async function saveSched() {
   const cat = document.getElementById('sdCategory').value;
-  const date = document.getElementById('sdSlot').value, person = document.getElementById('sdPerson').value, notes = document.getElementById('sdNotes').value;
-  if (!date || !person) return alert('Pick a date and staff member.');
+  const date = document.getElementById('sdSlot').value;
+  const dueTo = document.getElementById('sdDueTo').value;
+  const guestAccess = document.getElementById('sdGuestAccess').value;
+  const person1 = document.getElementById('sdPerson').value;
+  const person2 = document.getElementById('sdPerson2').value;
+  const notes = document.getElementById('sdNotes').value;
+  const billable = document.getElementById('sdBillable').checked;
+  const priority = document.getElementById('sdPriority').value;
+  if (!date) return alert('Please pick a start date.');
+  
+  const labels = [];
+  if (person1) labels.push(person1);
+  if (person2 && person2 !== person1) labels.push(person2);
   
   const src = MAINT_SOURCES.find(s => s.key === cat);
   const issue = issues.find(x=>x.id===editingId);
@@ -300,14 +349,27 @@ async function saveSched() {
   try {
     if (cat === 'adhoc') {
       const taskTitle = document.getElementById('sdName').value.trim() || 'Maintenance Task';
-      const cv = { [src.assigneeCol]:{labels:[person]}, [src.schedCol]:{date}, [src.statusCol]:{label:'Scheduled'}, [src.lnkCol]:editingId, [src.dscCol]:notes, [src.propCol]:issue.prop };
+      const cv = {
+        [src.assigneeCol]: {labels:labels},
+        [src.schedCol]: {date},
+        [src.statusCol]: {label:'Scheduled'},
+        [src.lnkCol]: editingId,
+        [src.dscCol]: notes,
+        [src.propCol]: issue.prop,
+        'date_mm2vw7qh': dueTo ? {date: dueTo} : null,
+        'dropdown_mm2vpbet': {labels:[guestAccess]},
+        [src.billableCol]: {checked: billable},
+        [src.priorityCol]: {label: priority}
+      };
+      // Remove null values
+      Object.keys(cv).forEach(k => cv[k] === null && delete cv[k]);
       await mq(`mutation($n:String!,$v:JSON!){ create_item(board_id:${src.boardId},item_name:$n,column_values:$v,create_labels_if_missing:true){ id } }`, { n:taskTitle + ' · Task', v:JSON.stringify(cv) });
     } else {
       // Recurring board: Find existing row for property (loose match)
       const ip = issue.prop.toLowerCase();
       const targetItem = tasks.find(t => t.srcKey === cat && t.prop && (t.prop.toLowerCase() === ip || t.prop.toLowerCase().startsWith(ip)));
       if (!targetItem) throw new Error(`Could not find a record for "${issue.prop}" in the ${src.label} board.`);
-      const cv = { [src.assigneeCol]:{labels:[person]}, [src.schedCol]:{date} };
+      const cv = { [src.assigneeCol]:{labels:labels}, [src.schedCol]:{date}, [src.billableCol]:{checked:billable}, [src.priorityCol]:{label:priority} };
       await mq(`mutation($i:ID!,$v:JSON!){ change_multiple_column_values(board_id:${src.boardId},item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`, { i:targetItem.id, v:JSON.stringify(cv) });
     }
 
@@ -333,6 +395,13 @@ async function markFixed(id) {
     await mq(`mutation{ change_multiple_column_values(board_id:${ISSUES_BOARD},item_id:${id},column_values:"{\\"${IS_STA}\\":{\\"label\\":\\"Fixed\\"}}"){ id } }`);
     toast('✓ Issue closed'); boot();
   } catch(e){ alert(e.message); }
+}
+
+function setFilter(val, el) {
+  activeFilter = val;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('on'));
+  el.classList.add('on');
+  render();
 }
 
 boot();

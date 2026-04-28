@@ -239,9 +239,9 @@ const STOCK_BOARD     = 5094763973;
 const HOT_TUB_BOARD   = 1621263971;
 
 const HT_COL = {
-  lodge:       'text3__1',
-  date:        'date4',
-  waterChange: 'text_mkzapa47',
+  lodge:      'text3__1',
+  date:       'date4',
+  waterMaint: 'full_drop6__1', // numbers: 0=normal clean, 1=full drop, 2=partial drop
 };
 
 const SUP_COL = {
@@ -382,34 +382,47 @@ async function generateReport() {
       deliveries.push({ lodge, itemName, qty, date: itemDate, price });
     }
 
-    // 4. Fetch hot tub water changes
+    // 4. Fetch hot tub water changes (paginated — board exceeds 500 items)
     let htDrops = [];
     try {
-      const htData = await mq(`{
-        boards(ids:[${HOT_TUB_BOARD}]) {
-          items_page(limit:500) {
-            items {
-              column_values(ids:["${HT_COL.lodge}","${HT_COL.date}","${HT_COL.waterChange}"]) { id text }
+      let htCursor = null;
+      do {
+        const cursorPart = htCursor ? `, cursor: "${htCursor}"` : '';
+        const htData = await mq(`{
+          boards(ids:[${HOT_TUB_BOARD}]) {
+            items_page(limit:500${cursorPart}) {
+              cursor
+              items {
+                name
+                column_values(ids:["${HT_COL.lodge}","${HT_COL.date}","${HT_COL.waterMaint}"]) { id text value }
+              }
             }
           }
+        }`);
+        const page    = htData?.boards?.[0]?.items_page;
+        const htItems = page?.items || [];
+        htCursor      = page?.cursor || null;
+
+        for (const item of htItems) {
+          const cv = {};
+          for (const c of item.column_values) cv[c.id] = c;
+          // text3__1 populated by new form; JotForm records stored lodge in item name
+          const lodge = cv[HT_COL.lodge]?.text?.trim() || item.name.trim();
+          // Use value JSON for reliable YYYY-MM-DD date regardless of locale
+          let date = '';
+          try { date = JSON.parse(cv[HT_COL.date]?.value || '{}').date || ''; } catch(e) {}
+          const wcNum = parseFloat(cv[HT_COL.waterMaint]?.text);
+
+          if (!lodge || !date || !(wcNum >= 1)) continue;
+          if (date < dateFrom || date > dateTo) continue;
+          if (lodgeSel !== 'All' && lodge.toLowerCase() !== lodgeSel.toLowerCase()) continue;
+          htDrops.push({ lodge, date, type: wcNum === 1 ? 'full' : 'partial' });
         }
-      }`);
-      const htItems = htData?.boards?.[0]?.items_page?.items || [];
-      for (const item of htItems) {
-        const cv = {};
-        for (const c of item.column_values) cv[c.id] = c.text || '';
-        const lodge = cv[HT_COL.lodge]?.trim();
-        const date  = cv[HT_COL.date]?.trim();
-        const wc    = (cv[HT_COL.waterChange] || '').toLowerCase().trim();
-        if (!lodge || !date || wc === 'none' || wc === '') continue;
-        if (date < dateFrom || date > dateTo) continue;
-        if (lodgeSel !== 'All' && lodge.toLowerCase() !== lodgeSel.toLowerCase()) continue;
-        htDrops.push({ lodge, date, type: wc }); // 'full' or 'partial'
-      }
+      } while (htCursor);
     } catch(e) {
-      // Hot tub data optional — don't block the report
       console.warn('Hot tub data fetch failed:', e);
     }
+
 
     // 5. Render report
     renderReport(deliveries, dateFrom, dateTo, lodgeSel, vatRate, markupRate, priceMap, htDrops);
@@ -427,7 +440,7 @@ function renderReport(deliveries, dateFrom, dateTo, lodgeSel, vatRate, markupRat
   htDrops = htDrops || [];
   const area = document.getElementById('reportArea');
 
-  if (!deliveries.length) {
+  if (!deliveries.length && !htDrops.length) {
     area.innerHTML = `<div class="empty">No deliveries found for the selected period and lodge.</div>`;
     return;
   }

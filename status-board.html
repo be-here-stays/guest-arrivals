@@ -700,6 +700,75 @@
       font-weight: 700;
       letter-spacing: -0.5px;
     }
+    /* Stock shelf comparison */
+    .ws-stock-block {
+      border: 1px solid #e8e4dc;
+      border-radius: 10px;
+      overflow: hidden;
+    }
+    .ws-stock-header {
+      padding: 12px 16px;
+      background: #f5f2ed;
+      display: flex;
+      align-items: baseline;
+      gap: 10px;
+    }
+    .ws-stock-header-title {
+      font-size: 13px;
+      font-weight: 700;
+      color: var(--green-dark);
+      flex: 1;
+    }
+    .ws-stock-header-ts {
+      font-size: 11px;
+      color: var(--muted);
+    }
+    .ws-stock-no-data {
+      padding: 16px;
+      font-size: 13px;
+      color: var(--muted);
+      font-style: italic;
+    }
+    .ws-stock-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .ws-stock-table thead th {
+      padding: 7px 12px;
+      background: #faf8f5;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--muted);
+      text-align: right;
+      border-bottom: 1px solid #eee;
+    }
+    .ws-stock-table thead th:first-child { text-align: left; }
+    .ws-stock-table tbody tr { border-bottom: 1px solid #f5f2ed; }
+    .ws-stock-table tbody tr:last-child { border-bottom: none; }
+    .ws-stock-table tbody td {
+      padding: 7px 12px;
+      text-align: right;
+      color: #444;
+    }
+    .ws-stock-table tbody td:first-child { text-align: left; font-weight: 500; color: var(--green-dark); }
+    .ws-stock-table tr.ws-row-ok    td:last-child { color: #2d6a4f; font-weight: 700; }
+    .ws-stock-table tr.ws-row-low   td:last-child { color: #a86c00; font-weight: 700; }
+    .ws-stock-table tr.ws-row-short td:last-child { color: #8B2020; font-weight: 700; }
+    .ws-stock-table tr.ws-row-short { background: #fff8f7; }
+    .ws-stock-table tr.ws-row-low   { background: #fffbf4; }
+    .ws-stock-group-header td {
+      background: #faf8f5;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+      color: var(--green);
+      padding: 5px 12px;
+      border-bottom: 1px solid #eeebe5;
+    }
     .ws-open-btn {
       background: none;
       border: 1px solid rgba(255,255,255,0.25);
@@ -1685,7 +1754,119 @@
           </div>
         </div>`;
 
-      document.getElementById('wsBody').innerHTML = propertyBlocks.join('') + totalsHTML;
+      // ── STOCK SHELF COMPARISON ──
+      const LINEN_ITEMS = [
+        { id:'skDuvets',     label:'Super King Duvets',    section:'Duvets' },
+        { id:'kingDuvets',   label:'King Duvets',           section:'Duvets' },
+        { id:'doubleDuvets', label:'Double Duvets',         section:'Duvets' },
+        { id:'singleDuvets', label:'Single Duvets',         section:'Duvets' },
+        { id:'kingSheets',   label:'Superking Sheets',      section:'Sheets' },
+        { id:'doubleSheets', label:'Double Sheets',         section:'Sheets' },
+        { id:'singleSheets', label:'Single Sheets',         section:'Sheets' },
+        { id:'oxford',       label:'Oxford Pillow Cases',   section:'Pillows & Towels' },
+        { id:'standard',     label:'Standard Pillow Cases', section:'Pillows & Towels' },
+        { id:'bathTowels',   label:'Bath Towels',           section:'Pillows & Towels' },
+        { id:'handTowels',   label:'Hand Towels',           section:'Pillows & Towels' },
+        { id:'hotTubTowels', label:'Hot Tub Towels',        section:'Pillows & Towels' },
+        { id:'bathrobes',    label:'Bathrobes',             section:'Pillows & Towels' },
+        { id:'teaTowels',    label:'Tea Towels',            section:'Pillows & Towels' },
+        { id:'bathMats',     label:'Bath Mats',             section:'Pillows & Towels' },
+      ];
+      const LINEN_DEFAULT_MINS = {
+        skDuvets:4, kingDuvets:4, doubleDuvets:6, singleDuvets:8,
+        kingSheets:8, doubleSheets:10, singleSheets:12,
+        oxford:20, standard:20, bathTowels:20, handTowels:20,
+        hotTubTowels:10, bathrobes:10, teaTowels:12, bathMats:12,
+      };
+      // Map linen-stock ITEMS ids → grand totals keys
+      const GT_KEY = {
+        skDuvets:'skDuvets', kingDuvets:'kDuvets', doubleDuvets:'dDuvets', singleDuvets:'sDuvets',
+        kingSheets:'kSheets', doubleSheets:'dSheets', singleSheets:'sSheets',
+        oxford:'oxford', standard:'standard', bathTowels:'bathTowels', handTowels:'handTowels',
+        hotTubTowels:'hotTubTowels', bathrobes:'bathrobes', teaTowels:'teaTowels', bathMats:'bathMats',
+      };
+
+      const stockLS = type === 'regency' ? 'linenStock_regency' : 'linenStock';
+      const minsLS  = type === 'regency' ? 'linenMins_regency'  : 'linenMins';
+      let stockData = null, minsData = null;
+      try { stockData = JSON.parse(localStorage.getItem(stockLS) || 'null'); } catch {}
+      try { minsData  = JSON.parse(localStorage.getItem(minsLS)  || 'null'); } catch {}
+      const mins = { ...LINEN_DEFAULT_MINS, ...(minsData || {}) };
+
+      let stockHTML = '';
+      const tsLabel = stockData?.ts
+        ? `Last counted: ${new Date(stockData.ts).toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' })}`
+        : '';
+
+      if (!stockData?.items) {
+        stockHTML = `
+          <div class="ws-stock-no-data">
+            No shelf count recorded yet. Use <strong>Linen Stock</strong> to count current stock.
+          </div>`;
+      } else {
+        const items = stockData.items;
+        // Only show items that are needed for this run (required > 0) or are below minimum
+        const relevantItems = LINEN_ITEMS.filter(it => {
+          const req = GT[GT_KEY[it.id]] || 0;
+          const onShelf = items[it.id] ?? 0;
+          return req > 0 || onShelf < mins[it.id];
+        });
+
+        if (!relevantItems.length) {
+          stockHTML = '<div class="ws-stock-no-data">No linen items needed for this run.</div>';
+        } else {
+          let tableRows = '';
+          let lastSection = '';
+          for (const it of relevantItems) {
+            const required = GT[GT_KEY[it.id]] || 0;
+            const onShelf  = items[it.id] ?? 0;
+            const minLevel = mins[it.id] || 0;
+            const afterRun = onShelf - required;
+            let rowClass = 'ws-row-ok';
+            let statusIcon = '✓ OK';
+            if (afterRun < 0) { rowClass = 'ws-row-short'; statusIcon = `⚠ Short by ${Math.abs(afterRun)}`; }
+            else if (afterRun < minLevel) { rowClass = 'ws-row-low'; statusIcon = `↓ Below min`; }
+            if (it.section !== lastSection) {
+              tableRows += `<tr class="ws-stock-group-header"><td colspan="6">${it.section}</td></tr>`;
+              lastSection = it.section;
+            }
+            tableRows += `
+              <tr class="${rowClass}">
+                <td>${it.label}</td>
+                <td>${onShelf}</td>
+                <td>${required || '—'}</td>
+                <td style="font-weight:700;color:${afterRun < 0 ? '#8B2020' : afterRun < minLevel ? '#a86c00' : '#2d6a4f'}">${afterRun}</td>
+                <td style="color:#888">${minLevel}</td>
+                <td>${statusIcon}</td>
+              </tr>`;
+          }
+          stockHTML = `
+            <table class="ws-stock-table">
+              <thead>
+                <tr>
+                  <th>Item</th>
+                  <th>On shelf</th>
+                  <th>Needed</th>
+                  <th>After run</th>
+                  <th>Min level</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody>${tableRows}</tbody>
+            </table>`;
+        }
+      }
+
+      const stockSectionHTML = `
+        <div class="ws-stock-block">
+          <div class="ws-stock-header">
+            <div class="ws-stock-header-title">📦 Shelf Stock vs. This Run</div>
+            <div class="ws-stock-header-ts">${tsLabel}</div>
+          </div>
+          ${stockHTML}
+        </div>`;
+
+      document.getElementById('wsBody').innerHTML = propertyBlocks.join('') + totalsHTML + stockSectionHTML;
     }
 
     function closeWorkingSheet() {

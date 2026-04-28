@@ -1,0 +1,538 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#272F2E">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Checker — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --gold:#AF926A; --cream:#F3E3C3;
+    --ink:#272F2E; --muted:#7b7a71; --line:rgba(39,47,46,.15);
+    --ok:#2a7f4f; --warn:#a9434a;
+    --qc-bg:#efe6f1; --qc-ink:#5a3b72;
+    --gr-bg:#e7f1ea; --gr-ink:#2a7f4f;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Instrument Sans',system-ui,sans-serif}
+  body{min-height:100vh;min-height:100svh}
+  a{color:inherit}
+  .hide{display:none!important}
+
+  .top{position:sticky;top:0;z-index:20;background:var(--dark);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .top a.home{color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:6px 10px;border:1px solid rgba(255,255,255,.25);border-radius:8px}
+  .top h1{margin:0;font-size:18px;font-weight:700;flex:1;min-width:0}
+  .top h1 small{font-weight:500;color:var(--cream);font-size:12px;margin-left:6px}
+  button.btn{background:var(--sage);color:#fff;border:0;border-radius:8px;padding:8px 14px;font:inherit;font-size:13px;cursor:pointer;font-weight:600}
+  button.btn.gold{background:var(--gold)}
+  button.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff}
+  button.btn:disabled{opacity:.5;cursor:not-allowed}
+  .pill{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 10px;border-radius:999px;font-size:12px;cursor:pointer;user-select:none}
+
+  .sub{background:var(--cream);padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+  .sub input[type=date]{padding:6px 8px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:13px;background:#fff}
+  .sub label{font-size:12px;color:var(--muted);font-weight:600}
+  .day-nav{display:flex;align-items:center;gap:6px}
+  .day-nav button{background:#fff;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font:inherit;font-size:13px;cursor:pointer;font-weight:600}
+  .status-bar{margin-left:auto;font-size:12px;color:var(--muted)}
+  .status-bar .sync{color:var(--sage);font-weight:700}
+  .status-bar .err{color:var(--warn);font-weight:700}
+
+  .wrap{padding:14px;padding-bottom:60px;max-width:1100px;margin:0 auto}
+
+  .kpi{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .kpi .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:130px;flex:1}
+  .kpi .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+  .kpi .val{font-size:22px;font-weight:700;color:var(--dark);margin-top:2px}
+  .kpi .val small{font-size:12px;color:var(--muted);font-weight:500}
+  .kpi .card.warn .val{color:var(--warn)}
+
+  .section{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px}
+  .section > h2{margin:0;padding:10px 14px;font-size:14px;font-weight:700;color:var(--dark);display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line);background:#faf8f2}
+  .section > h2 .badge{background:rgba(0,0,0,.06);color:inherit;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;margin-left:auto}
+
+  table.qc{width:100%;border-collapse:collapse}
+  table.qc th,table.qc td{padding:9px 10px;text-align:left;font-size:13px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.qc th{background:#f6f4ee;color:var(--muted);font-weight:600;font-size:11px;letter-spacing:.3px;text-transform:uppercase;position:sticky;top:0}
+  table.qc tr:last-child td{border-bottom:none}
+  table.qc .prop{font-weight:700;color:var(--dark)}
+  table.qc .time{font-variant-numeric:tabular-nums;color:var(--muted);font-weight:600}
+  table.qc .cleaner{color:var(--dark)}
+  table.qc .cleaner small{color:var(--muted);display:block;font-size:11px}
+  table.qc .ctype{padding:3px 8px;border-radius:999px;font-size:11px;font-weight:700;display:inline-block}
+  table.qc .ctype.qc{background:var(--qc-bg);color:var(--qc-ink)}
+  table.qc .ctype.gr{background:var(--gr-bg);color:var(--gr-ink)}
+  table.qc tr.unassigned{background:#fdf2ec}
+  table.qc tr.unassigned td.chk{color:var(--warn);font-weight:700}
+  table.qc select.chk-select{padding:5px 6px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:12px;background:#fff;min-width:140px}
+  table.qc select.chk-select.dirty{border-color:var(--gold);background:#fff8ee}
+
+  .empty{padding:16px;color:var(--muted);text-align:center;font-size:13px}
+
+  .send-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:8px}
+  .send-bar .hint{color:var(--muted);font-size:12px;flex:1;min-width:180px}
+  .save-chip{display:inline-flex;align-items:center;gap:6px;background:var(--gold);color:#fff;padding:4px 10px;border-radius:999px;font-size:12px;font-weight:700}
+
+  .toast{position:fixed;bottom:16px;left:50%;transform:translateX(-50%);background:var(--dark);color:#fff;padding:10px 16px;border-radius:8px;font-size:13px;box-shadow:0 8px 24px rgba(0,0,0,.25);z-index:200;opacity:0;transition:opacity .15s}
+  .toast.on{opacity:1}
+
+  /* PIN */
+  .pin-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+  .pin-card{background:#fff;border-radius:14px;padding:28px 22px;width:100%;max-width:320px;box-shadow:0 12px 40px rgba(0,0,0,.18);text-align:center}
+  .pin-card h2{margin:0 0 6px;color:var(--dark);font-size:18px}
+  .pin-card p{margin:0 0 14px;color:var(--muted);font-size:13px}
+  .pin-card input{width:100%;padding:14px;border:2px solid var(--line);border-radius:10px;font-size:22px;text-align:center;letter-spacing:10px;font-family:inherit;font-weight:700}
+  .pin-card input:focus{outline:none;border-color:var(--gold)}
+  .pin-err{color:var(--warn);font-size:13px;margin-top:8px;min-height:18px}
+
+  @media (max-width:640px){
+    .top h1{font-size:16px}
+    .kpi .card{min-width:48%}
+    table.qc{font-size:12px}
+    table.qc th,table.qc td{padding:7px 8px}
+    table.qc select.chk-select{min-width:110px}
+  }
+</style>
+</head>
+<body>
+
+<div id="pinOverlay" class="pin-overlay">
+  <div class="pin-card">
+    <h2>Checker</h2>
+    <p>Manager PIN required</p>
+    <input id="pinInput" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••••">
+    <div id="pinErr" class="pin-err"></div>
+  </div>
+</div>
+
+<div id="app" class="hide">
+
+  <div class="top">
+    <a href="hub.html" class="home">← Hub</a>
+    <h1>Checker <small id="dayTitle"></small></h1>
+    <button class="pill" id="btnSettings" title="Webhook settings">⚙</button>
+    <button class="btn gold" id="btnSave" disabled>💾 <span id="saveLabel">Save</span></button>
+    <button class="btn" id="btnRefresh">↻ Refresh</button>
+  </div>
+
+  <div class="sub">
+    <div class="day-nav">
+      <button id="btnPrev" title="Previous day">‹</button>
+      <input type="date" id="dayPicker">
+      <button id="btnNext" title="Next day">›</button>
+      <button id="btnToday">Today</button>
+    </div>
+    <label style="margin-left:10px"><input type="checkbox" id="chkIncludeGR"> Include Guest-Ready cleans</label>
+    <div class="status-bar" id="statusBar">Loading…</div>
+  </div>
+
+  <div class="wrap">
+
+    <div class="kpi" id="kpiRow"></div>
+
+    <div class="section">
+      <h2>✅ Quality checks today <span class="badge" id="qcCount">0</span></h2>
+      <div id="qcBody"><div class="empty">Loading…</div></div>
+    </div>
+
+    <div class="send-bar">
+      <div class="hint">Assign any missing checker(s), then send the day's QC sheet to each checker.</div>
+      <button class="btn" id="btnSendCheckers">✉ Send checker sheet(s)</button>
+    </div>
+
+  </div>
+
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="work-dispatch.js"></script>
+<script>
+/* ========== Config ========== */
+const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const MONDAY_URL = 'https://api.monday.com/v2';
+
+const STAFF_BOARD   = '5095127554';
+const CLEANS_BOARD  = '5095134636';
+
+// Staff columns
+const ST_ROLE   = 'color_mm2psadz';
+const ST_STATUS = 'color_mm2psvh2';
+const ST_EMAIL  = 'email_mm2pa071';
+
+// Cleans columns
+const CL_DATE       = 'date_mm2pphc';
+const CL_CHECKIN    = 'date_mm2p6tck';
+const CL_PROP       = 'board_relation_mm2psy0b';
+const CL_START      = 'hour_mm2pskhh';
+const CL_END        = 'hour_mm2pct11';
+const CL_PRIMARY    = 'dropdown_mm2pntvm';
+const CL_PARTNER    = 'dropdown_mm2pbcnq';
+const CL_CHECKER    = 'dropdown_mm2p9qd3';
+const CL_STATUS     = 'color_mm2prq2f';
+const CL_CHECKTYPE  = 'color_mm2pznw1';
+const CL_NOTES      = 'long_text_mm2pedn3';
+
+const PIN_HASH = 'df8d602b7bcaf41725409b83af2a3df79722be244d9f33b5f128b81a269b955e';
+const EXCLUDE_STATUSES = ['Inactive'];
+
+/* ========== State ========== */
+let dayISO = '';
+let staff = [];       // {id,name,role,email}
+let cleans = [];      // day-filtered cleans
+let includeGR = false;
+let pending = new Map();   // cleanId -> newCheckerName
+
+/* ========== Helpers ========== */
+function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+function addDays(iso, n){ const d=new Date(iso+'T12:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function fmtLong(iso){ return new Date(iso+'T12:00').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'}); }
+function fmtShort(iso){ return new Date(iso+'T12:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}); }
+function pj(v){ try{ return typeof v==='string' ? JSON.parse(v) : v; }catch(e){ return null; } }
+function escHTML(s){ return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]); }
+function setStatus(txt, cls){ const el=document.getElementById('statusBar'); el.innerHTML=txt; el.className='status-bar'+(cls?' '+cls:''); }
+function toast(msg, ms){ const t=document.getElementById('toast'); t.textContent=msg; t.classList.add('on'); clearTimeout(toast._t); toast._t=setTimeout(()=>t.classList.remove('on'), ms||2000); }
+
+/* ========== Monday API ========== */
+async function mondayQuery(q){
+  const r = await fetch(MONDAY_URL,{
+    method:'POST',
+    headers:{'Authorization':TOKEN,'Content-Type':'application/json','API-Version':'2024-01'},
+    body:JSON.stringify({query:q})
+  });
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const j = await r.json();
+  if(j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+async function fetchStaff(){
+  const q = `{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:500){ items{
+    id name column_values(ids:["${ST_ROLE}","${ST_STATUS}","${ST_EMAIL}"]){ id text value }
+  } } } }`;
+  const d = await mondayQuery(q);
+  staff = d.boards[0].items_page.items.map(it => {
+    const cv = Object.fromEntries(it.column_values.map(c=>[c.id,c]));
+    const emailObj = pj(cv[ST_EMAIL]?.value);
+    return {
+      id: it.id,
+      name: it.name,
+      role: cv[ST_ROLE]?.text || '',
+      status: cv[ST_STATUS]?.text || 'Active',
+      email: (emailObj && emailObj.email) || cv[ST_EMAIL]?.text || '',
+    };
+  }).filter(s => !EXCLUDE_STATUSES.includes(s.status));
+}
+
+async function fetchCleans(){
+  const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_PROP}","${CL_START}","${CL_END}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_STATUS}","${CL_CHECKTYPE}","${CL_NOTES}"]`;
+  let items=[]; let cursor=null;
+  do {
+    const q = cursor
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${colIds}){ id text value } } } }`
+      : `{ boards(ids:[${CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id text value } } } } }`;
+    const d = await mondayQuery(q);
+    const page = cursor ? d.next_items_page : d.boards[0].items_page;
+    items = items.concat(page.items);
+    cursor = page.cursor;
+  } while (cursor);
+
+  cleans = items.map(it => {
+    const cv = Object.fromEntries(it.column_values.map(c=>[c.id,c]));
+    const dObj = pj(cv[CL_DATE]?.value);
+    const primary = (cv[CL_PRIMARY]?.text||'').split(',').map(s=>s.trim()).filter(Boolean)[0] || '';
+    const partner = (cv[CL_PARTNER]?.text||'').split(',').map(s=>s.trim()).filter(Boolean)[0] || '';
+    const checker = (cv[CL_CHECKER]?.text||'').split(',').map(s=>s.trim()).filter(Boolean)[0] || '';
+    return {
+      id: it.id,
+      name: it.name,
+      day: dObj?.date || '',
+      checkinDate: pj(cv[CL_CHECKIN]?.value)?.date || '',
+      property: cv[CL_PROP]?.text || '',
+      start: cv[CL_START]?.text || '',
+      end:   cv[CL_END]?.text   || '',
+      primary, partner,
+      checker,
+      status: cv[CL_STATUS]?.text || '',
+      checkType: cv[CL_CHECKTYPE]?.text || '',
+      notes: pj(cv[CL_NOTES]?.value)?.text || cv[CL_NOTES]?.text || '',
+    };
+  });
+}
+
+/* ========== Derivation ========== */
+function cleansForDay(){
+  return cleans.filter(c => c.day === dayISO && c.status !== 'Cancelled')
+               .filter(c => includeGR || c.checkType !== 'Guest Ready')
+               .sort((a,b) => (a.start||'99').localeCompare(b.start||'99') || a.property.localeCompare(b.property));
+}
+
+function checkerStaff(){
+  return staff.filter(s => s.role === 'Checker' || s.role === 'Manager' || s.role === 'A Team');
+}
+
+function effectiveChecker(c){
+  return pending.has(c.id) ? pending.get(c.id) : c.checker;
+}
+
+function staffEmail(name){
+  if (!name) return '';
+  const s = staff.find(x => x.name.toLowerCase() === name.toLowerCase());
+  return s?.email || '';
+}
+
+/* ========== Render ========== */
+function render(){
+  document.getElementById('dayTitle').textContent = fmtLong(dayISO);
+  document.getElementById('dayPicker').value = dayISO;
+
+  const dayCleans = cleansForDay();
+  const qc = dayCleans.filter(c => c.checkType === 'Quality Check');
+  const gr = dayCleans.filter(c => c.checkType === 'Guest Ready');
+  const unassigned = qc.filter(c => !effectiveChecker(c));
+
+  // KPI
+  document.getElementById('kpiRow').innerHTML = `
+    <div class="card"><div class="lbl">Quality checks</div><div class="val">${qc.length}</div></div>
+    <div class="card ${unassigned.length ? 'warn' : ''}"><div class="lbl">Unassigned</div><div class="val">${unassigned.length}</div></div>
+    <div class="card"><div class="lbl">Guest-Ready (no check)</div><div class="val">${gr.length}</div></div>
+    <div class="card"><div class="lbl">Checkers on shift</div><div class="val">${new Set(qc.map(c=>effectiveChecker(c)).filter(Boolean)).size}</div></div>
+  `;
+
+  document.getElementById('qcCount').textContent = String(dayCleans.length);
+
+  if (!dayCleans.length) {
+    document.getElementById('qcBody').innerHTML = '<div class="empty">No cleans scheduled today.</div>';
+  } else {
+    const checkers = checkerStaff();
+    const opts = `<option value="">— assign —</option>` + checkers.map(s =>
+      `<option value="${escHTML(s.name)}">${escHTML(s.name)}${s.role!=='Checker' ? ' ('+escHTML(s.role)+')' : ''}</option>`
+    ).join('');
+
+    document.getElementById('qcBody').innerHTML = `
+      <table class="qc">
+        <thead><tr>
+          <th>Time</th><th>Property</th><th>Type</th><th>Cleaner</th><th>Checker</th><th>Notes</th>
+        </tr></thead>
+        <tbody>
+          ${dayCleans.map(c => {
+            const chk = effectiveChecker(c);
+            const isQC = c.checkType === 'Quality Check';
+            const isDirty = pending.has(c.id);
+            const cls = (isQC && !chk) ? 'unassigned' : '';
+            const chkCell = isQC
+              ? `<select class="chk-select ${isDirty?'dirty':''}" data-id="${c.id}">
+                   ${opts.replace(`value="${escHTML(chk)}"`, `value="${escHTML(chk)}" selected`)}
+                 </select>`
+              : '<span style="color:var(--muted);font-size:11px">—</span>';
+            const typeBadge = isQC ? '<span class="ctype qc">Quality Check</span>' : '<span class="ctype gr">Guest Ready</span>';
+            return `<tr class="${cls}" data-id="${c.id}">
+              <td class="time">${escHTML(c.start || '—')}</td>
+              <td><span class="prop">${escHTML(c.property || c.name)}</span></td>
+              <td>${typeBadge}</td>
+              <td class="cleaner">
+                ${escHTML(c.primary || '—')}
+                ${c.partner ? `<small>+ ${escHTML(c.partner)}</small>` : ''}
+              </td>
+              <td class="chk">${chkCell}</td>
+              <td style="color:var(--muted);font-size:12px">${escHTML((c.notes||'').replace(/\s+/g,' ').slice(0,100))}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+    `;
+
+    // Wire up checker assign
+    document.querySelectorAll('select.chk-select').forEach(sel => {
+      sel.addEventListener('change', e => {
+        const id = e.target.dataset.id;
+        const v = e.target.value;
+        const c = cleans.find(x => x.id === id);
+        if (!c) return;
+        if (v === c.checker) {
+          pending.delete(id);
+        } else {
+          pending.set(id, v);
+        }
+        updateSaveBtn();
+        render();
+      });
+    });
+  }
+
+  updateSaveBtn();
+}
+
+function updateSaveBtn(){
+  const btn = document.getElementById('btnSave');
+  const n = pending.size;
+  document.getElementById('saveLabel').textContent = n ? `Save (${n})` : 'Save';
+  btn.disabled = !n;
+}
+
+/* ========== Save ========== */
+async function saveChanges(){
+  if (!pending.size) return;
+  const btn = document.getElementById('btnSave');
+  btn.disabled = true;
+  setStatus('Saving…');
+  try {
+    for (const [id, newChecker] of pending.entries()) {
+      const cv = newChecker
+        ? { [CL_CHECKER]: { labels: [newChecker] } }
+        : { [CL_CHECKER]: { labels: [] } };
+      const cvStr = JSON.stringify(JSON.stringify(cv));
+      const q = `mutation { change_multiple_column_values(board_id:${CLEANS_BOARD}, item_id:${id}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
+      await mondayQuery(q);
+      // apply locally
+      const c = cleans.find(x => x.id === id);
+      if (c) c.checker = newChecker;
+    }
+    pending.clear();
+    render();
+    setStatus('<span class="sync">Saved</span> ' + new Date().toLocaleTimeString());
+    toast('Saved');
+  } catch(e) {
+    console.error(e);
+    setStatus('<span class="err">Save failed: '+escHTML(e.message)+'</span>');
+    btn.disabled = false;
+  }
+}
+
+/* ========== Send ========== */
+function sendCheckers(){
+  const dayCleans = cleansForDay().filter(c => c.checkType === 'Quality Check');
+  if (!dayCleans.length) { setStatus('<span class="err">No QC cleans today.</span>'); return; }
+
+  // Group by (pending-applied) checker
+  const byChecker = new Map();
+  const unassigned = [];
+  for (const c of dayCleans) {
+    const chk = effectiveChecker(c);
+    if (!chk) { unassigned.push(c); continue; }
+    if (!byChecker.has(chk)) byChecker.set(chk, []);
+    byChecker.get(chk).push(c);
+  }
+  if (unassigned.length) {
+    toast(`${unassigned.length} QC clean${unassigned.length===1?'':'s'} unassigned — assign them first.`, 3200);
+    return;
+  }
+
+  const dayLabel = fmtShort(dayISO);
+  const drafts = [];
+  for (const [name, rows] of byChecker.entries()) {
+    const email = staffEmail(name);
+    const subject = `Quality checks — ${dayLabel}`;
+    const textLines = [
+      `Hi ${name},`, '',
+      `Here are your quality checks for ${dayLabel}:`, ''
+    ];
+    for (const r of rows) {
+      const cleaner = r.partner ? `${r.primary} + ${r.partner}` : r.primary;
+      textLines.push(`• ${r.start || '—'}  ${r.property || r.name}  — cleaner: ${cleaner || '—'}${r.notes?` (${r.notes.replace(/\s+/g,' ').slice(0,100)})`:''}`);
+    }
+    textLines.push('', 'Please flag anything that needs re-work before the guest arrives.', '', 'Thanks,', 'Be Here Stays');
+    const bodyHtml = `
+      <p>Hi ${escHTML(name)},</p>
+      <p>Here are your quality checks for <strong>${escHTML(dayLabel)}</strong>:</p>
+      <table style="border-collapse:collapse;margin:8px 0" cellpadding="6">
+        <thead><tr style="background:#f6f4ee;color:#7b7a71;font-size:11px;text-transform:uppercase">
+          <th align="left">Time</th><th align="left">Property</th><th align="left">Cleaner</th><th align="left">Notes</th>
+        </tr></thead>
+        <tbody>
+          ${rows.map(r => {
+            const cleaner = r.partner ? `${escHTML(r.primary)} + ${escHTML(r.partner)}` : escHTML(r.primary||'—');
+            return `<tr style="border-bottom:1px solid #e5e4df">
+              <td><strong>${escHTML(r.start||'—')}</strong></td>
+              <td>${escHTML(r.property||r.name)}</td>
+              <td>${cleaner}</td>
+              <td style="color:#646955">${escHTML((r.notes||'').replace(/\s+/g,' ').slice(0,120))}</td>
+            </tr>`;
+          }).join('')}
+        </tbody>
+      </table>
+      <p style="color:#646955;font-size:13px">Please flag anything that needs re-work before the guest arrives.</p>
+      <p>Thanks,<br>Be Here Stays</p>`;
+    drafts.push({ to: email, name, subject, bodyHtml, bodyText: textLines.join('\n') });
+  }
+
+  WorkDispatch.showPreview({
+    title: `Checker sheet — ${dayLabel}`,
+    kind: 'checker',
+    drafts,
+  });
+}
+
+/* ========== Load ========== */
+async function loadAll(){
+  setStatus('Loading…');
+  try {
+    await Promise.all([fetchStaff(), fetchCleans()]);
+    render();
+    setStatus('<span class="sync">Synced</span> ' + new Date().toLocaleTimeString());
+  } catch(e) {
+    console.error(e);
+    setStatus('<span class="err">Error: '+escHTML(e.message)+'</span>');
+  }
+}
+
+/* ========== PIN ========== */
+async function sha256(t){
+  const buf = new TextEncoder().encode(t);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function setupPin(){
+  const inp = document.getElementById('pinInput');
+  const err = document.getElementById('pinErr');
+  const overlay = document.getElementById('pinOverlay');
+  const app = document.getElementById('app');
+  if (sessionStorage.getItem('checker_pin_ok') === '1') {
+    overlay.classList.add('hide'); app.classList.remove('hide');
+    init(); return;
+  }
+  setTimeout(()=>inp.focus(), 100);
+  inp.addEventListener('input', async e => {
+    const v = e.target.value;
+    if (v.length !== 6) { err.textContent=''; return; }
+    if ((await sha256(v)) === PIN_HASH) {
+      sessionStorage.setItem('checker_pin_ok','1');
+      overlay.classList.add('hide'); app.classList.remove('hide');
+      init();
+    } else { err.textContent='Wrong PIN'; inp.value=''; }
+  });
+}
+
+/* ========== Init ========== */
+function init(){
+  dayISO = todayISO();
+  document.getElementById('dayPicker').value = dayISO;
+
+  document.getElementById('btnPrev').addEventListener('click', ()=>{ dayISO = addDays(dayISO,-1); render(); });
+  document.getElementById('btnNext').addEventListener('click', ()=>{ dayISO = addDays(dayISO, 1); render(); });
+  document.getElementById('btnToday').addEventListener('click', ()=>{ dayISO = todayISO(); render(); });
+  document.getElementById('dayPicker').addEventListener('change', e => { dayISO = e.target.value; render(); });
+  document.getElementById('btnRefresh').addEventListener('click', loadAll);
+  document.getElementById('btnSave').addEventListener('click', saveChanges);
+  document.getElementById('btnSettings').addEventListener('click', ()=> WorkDispatch.showSettings());
+  document.getElementById('btnSendCheckers').addEventListener('click', sendCheckers);
+  document.getElementById('chkIncludeGR').addEventListener('change', e => { includeGR = e.target.checked; render(); });
+
+  loadAll();
+}
+
+/* ========== Boot ========== */
+setupPin();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>

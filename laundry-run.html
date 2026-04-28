@@ -1,0 +1,638 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#272F2E">
+<link rel="manifest" href="manifest.json">
+<link rel="icon" type="image/svg+xml" href="icon.svg">
+<link rel="apple-touch-icon" href="icon-192.png">
+<title>Laundry Run — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --gold:#AF926A; --cream:#F3E3C3;
+    --ink:#272F2E; --muted:#7b7a71; --line:rgba(39,47,46,.15);
+    --ok:#2a7f4f; --warn:#a9434a;
+    --linen:#e9f1ea; --linen-dark:#2a7f4f;
+    --dirt:#f7ede4; --dirt-dark:#AF926A;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--ink);font-family:'Instrument Sans',system-ui,sans-serif}
+  body{min-height:100vh;min-height:100svh}
+  a{color:inherit}
+  .hide{display:none!important}
+
+  .top{position:sticky;top:0;z-index:20;background:var(--dark);color:#fff;padding:10px 14px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .top a.home{color:#fff;text-decoration:none;font-weight:700;font-size:14px;padding:6px 10px;border:1px solid rgba(255,255,255,.25);border-radius:8px}
+  .top h1{margin:0;font-size:18px;font-weight:700;flex:1;min-width:0}
+  .top h1 small{font-weight:500;color:var(--cream);font-size:12px;margin-left:6px}
+  button.btn{background:var(--sage);color:#fff;border:0;border-radius:8px;padding:8px 14px;font:inherit;font-size:13px;cursor:pointer;font-weight:600}
+  button.btn.gold{background:var(--gold)}
+  button.btn.ghost{background:transparent;border:1px solid rgba(255,255,255,.3);color:#fff}
+  button.btn:disabled{opacity:.5;cursor:not-allowed}
+  .pill{background:rgba(255,255,255,.12);border:1px solid rgba(255,255,255,.2);color:#fff;padding:6px 10px;border-radius:999px;font-size:12px;cursor:pointer;user-select:none}
+
+  .sub{background:var(--cream);padding:10px 14px;display:flex;gap:10px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line)}
+  .sub input[type=date]{padding:6px 8px;border:1px solid var(--line);border-radius:6px;font:inherit;font-size:13px;background:#fff}
+  .sub label{font-size:12px;color:var(--muted);font-weight:600}
+  .day-nav{display:flex;align-items:center;gap:6px}
+  .day-nav button{background:#fff;border:1px solid var(--line);border-radius:6px;padding:6px 10px;font:inherit;font-size:13px;cursor:pointer;font-weight:600}
+  .status-bar{margin-left:auto;font-size:12px;color:var(--muted)}
+  .status-bar .sync{color:var(--sage);font-weight:700}
+  .status-bar .err{color:var(--warn);font-weight:700}
+
+  .wrap{padding:14px;padding-bottom:60px;max-width:1100px;margin:0 auto}
+
+  .kpi{display:flex;gap:10px;flex-wrap:wrap;margin-bottom:14px}
+  .kpi .card{background:#fff;border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:130px;flex:1}
+  .kpi .lbl{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.4px;font-weight:600}
+  .kpi .val{font-size:22px;font-weight:700;color:var(--dark);margin-top:2px}
+  .kpi .val small{font-size:12px;color:var(--muted);font-weight:500}
+
+  .section{background:#fff;border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:14px}
+  .section > h2{margin:0;padding:10px 14px;font-size:14px;font-weight:700;color:var(--dark);display:flex;align-items:center;gap:8px;border-bottom:1px solid var(--line)}
+  .section.linen > h2{background:var(--linen);color:var(--linen-dark)}
+  .section.dirt  > h2{background:var(--dirt);color:var(--dirt-dark)}
+  .section > h2 .badge{background:rgba(0,0,0,.06);color:inherit;padding:2px 8px;border-radius:999px;font-size:11px;font-weight:700;margin-left:auto}
+
+  .driver-group{border-bottom:1px solid var(--line)}
+  .driver-group:last-child{border-bottom:none}
+  .driver-hdr{padding:8px 14px;display:flex;align-items:center;gap:10px;background:#faf8f2;font-size:13px;font-weight:700}
+  .driver-hdr .method{font-size:11px;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:.4px}
+  .driver-hdr .count{margin-left:auto;font-size:11px;color:var(--muted);font-weight:600}
+  .driver-hdr .email{color:var(--muted);font-weight:500;font-size:12px}
+  .driver-hdr .email.missing{color:var(--warn);font-weight:700}
+
+  table.runs{width:100%;border-collapse:collapse}
+  table.runs th,table.runs td{padding:7px 10px;text-align:left;font-size:13px;border-bottom:1px solid var(--line);vertical-align:top}
+  table.runs th{background:#f6f4ee;color:var(--muted);font-weight:600;font-size:11px;letter-spacing:.3px;text-transform:uppercase}
+  table.runs tr:last-child td{border-bottom:none}
+  table.runs .prop{font-weight:700;color:var(--dark)}
+  table.runs .from{color:var(--linen-dark);font-weight:600}
+  table.runs .to  {color:var(--dark)}
+  table.runs .note{color:var(--muted);font-size:11px}
+  table.runs .meta{font-size:11px;color:var(--muted)}
+  table.runs .arr{color:var(--muted);margin:0 4px}
+
+  .empty{padding:16px;color:var(--muted);text-align:center;font-size:13px}
+
+  .send-bar{display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:#fff;border:1px solid var(--line);border-radius:12px;padding:12px 14px;margin-top:8px}
+  .send-bar .hint{color:var(--muted);font-size:12px;flex:1;min-width:180px}
+
+  /* PIN */
+  .pin-overlay{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:100;padding:20px}
+  .pin-card{background:#fff;border-radius:14px;padding:28px 22px;width:100%;max-width:320px;box-shadow:0 12px 40px rgba(0,0,0,.18);text-align:center}
+  .pin-card h2{margin:0 0 6px;color:var(--dark);font-size:18px}
+  .pin-card p{margin:0 0 14px;color:var(--muted);font-size:13px}
+  .pin-card input{width:100%;padding:14px;border:2px solid var(--line);border-radius:10px;font-size:22px;text-align:center;letter-spacing:10px;font-family:inherit;font-weight:700}
+  .pin-card input:focus{outline:none;border-color:var(--gold)}
+  .pin-err{color:var(--warn);font-size:13px;margin-top:8px;min-height:18px}
+
+  @media (max-width:640px){
+    .top h1{font-size:16px}
+    .kpi .card{min-width:48%}
+    table.runs{font-size:12px}
+    table.runs th,table.runs td{padding:6px 8px}
+  }
+</style>
+</head>
+<body>
+
+<div id="pinOverlay" class="pin-overlay">
+  <div class="pin-card">
+    <h2>Laundry Run</h2>
+    <p>Manager PIN required</p>
+    <input id="pinInput" type="password" inputmode="numeric" maxlength="6" autocomplete="off" placeholder="••••••">
+    <div id="pinErr" class="pin-err"></div>
+  </div>
+</div>
+
+<div id="app" class="hide">
+
+  <div class="top">
+    <a href="hub.html" class="home">← Hub</a>
+    <h1>Laundry Run <small id="dayTitle"></small></h1>
+    <button class="pill" id="btnSettings" title="Webhook settings">⚙</button>
+    <button class="btn gold" id="btnRefresh">↻ Refresh</button>
+  </div>
+
+  <div class="sub">
+    <div class="day-nav">
+      <button id="btnPrev" title="Previous day">‹</button>
+      <input type="date" id="dayPicker">
+      <button id="btnNext" title="Next day">›</button>
+      <button id="btnToday">Today</button>
+    </div>
+    <div class="status-bar" id="statusBar">Loading…</div>
+  </div>
+
+  <div class="wrap">
+
+    <div class="kpi" id="kpiRow"></div>
+
+    <div class="section linen" id="linenSection">
+      <h2>🧺 Clean linen IN <span class="badge" id="linenCount">0</span></h2>
+      <div id="linenBody"><div class="empty">Loading…</div></div>
+    </div>
+
+    <div class="section dirt" id="dirtSection">
+      <h2>🗑 Dirties OUT <span class="badge" id="dirtCount">0</span></h2>
+      <div id="dirtBody"><div class="empty">Loading…</div></div>
+    </div>
+
+    <div class="send-bar">
+      <div class="hint">Preview and send each driver a one-line sheet for their day. Staff without an email on file are flagged.</div>
+      <button class="btn" id="btnSendLinen">✉ Send Linen-in</button>
+      <button class="btn" id="btnSendDirt">✉ Send Dirties-out</button>
+      <button class="btn gold" id="btnSendBoth">✉ Send both (combined)</button>
+    </div>
+
+  </div>
+
+</div>
+
+<script src="work-dispatch.js"></script>
+<script>
+/* ========== Config ========== */
+const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const MONDAY_URL = 'https://api.monday.com/v2';
+
+const STAFF_BOARD   = '5095127554';
+const CLEANS_BOARD  = '5095134636';
+
+// Staff columns
+const ST_ROLE   = 'color_mm2psadz';
+const ST_STATUS = 'color_mm2psvh2';
+const ST_EMAIL  = 'email_mm2pa071';
+
+// Cleans columns (same as rota-planner)
+const CL_DATE       = 'date_mm2pphc';       // scheduled clean day
+const CL_CHECKIN    = 'date_mm2p6tck';
+const CL_PROP       = 'board_relation_mm2psy0b';
+const CL_START      = 'hour_mm2pskhh';
+const CL_LINEN_MTHD = 'color_mm2pgdm5';
+const CL_LINEN_DRV  = 'dropdown_mm2pmr0f';
+const CL_LINEN_DATE = 'date_mm2phz49';
+const CL_LINEN_SRC  = 'board_relation_mm2pke5q';
+const CL_DIRT_MTHD  = 'color_mm2pd9tb';
+const CL_DIRT_DRV   = 'dropdown_mm2pwdwg';
+const CL_STATUS     = 'color_mm2prq2f';
+const CL_CHECKTYPE  = 'color_mm2pznw1';
+const CL_NOTES      = 'long_text_mm2pedn3';
+
+const PIN_HASH = 'df8d602b7bcaf41725409b83af2a3df79722be244d9f33b5f128b81a269b955e';
+const EXCLUDE_STATUSES = ['Inactive'];
+
+/* ========== State ========== */
+let dayISO = '';
+let staff = [];       // {id, name, role, email}
+let cleans = [];      // all loaded cleans in a +/- window (for IN scheduled elsewhere)
+let lastFetchedAt = null;
+
+/* ========== Helpers ========== */
+function todayISO(){ const d=new Date(); d.setHours(0,0,0,0); return d.toISOString().slice(0,10); }
+function addDays(iso, n){ const d=new Date(iso+'T12:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function fmtLong(iso){ return new Date(iso+'T12:00').toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long'}); }
+function fmtShort(iso){ return new Date(iso+'T12:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'}); }
+function pj(v){ try{ return typeof v==='string' ? JSON.parse(v) : v; }catch(e){ return null; } }
+function escHTML(s){ return String(s==null?'':s).replace(/[&<>"']/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]); }
+function setStatus(txt, cls){
+  const el = document.getElementById('statusBar');
+  el.innerHTML = txt;
+  el.className = 'status-bar' + (cls?' '+cls:'');
+}
+
+/* ========== Monday API ========== */
+async function mondayQuery(q){
+  const r = await fetch(MONDAY_URL,{
+    method:'POST',
+    headers:{'Authorization':TOKEN,'Content-Type':'application/json','API-Version':'2024-01'},
+    body:JSON.stringify({query:q})
+  });
+  if(!r.ok) throw new Error('HTTP '+r.status);
+  const j = await r.json();
+  if(j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+async function fetchStaff(){
+  const q = `{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:500){ items{
+    id name column_values(ids:["${ST_ROLE}","${ST_STATUS}","${ST_EMAIL}"]){ id text value }
+  } } } }`;
+  const d = await mondayQuery(q);
+  staff = d.boards[0].items_page.items.map(it => {
+    const cv = Object.fromEntries(it.column_values.map(c=>[c.id,c]));
+    const emailObj = pj(cv[ST_EMAIL]?.value);
+    return {
+      id: it.id,
+      name: it.name,
+      role: cv[ST_ROLE]?.text || '',
+      status: cv[ST_STATUS]?.text || 'Active',
+      email: (emailObj && emailObj.email) || cv[ST_EMAIL]?.text || '',
+    };
+  }).filter(s => !EXCLUDE_STATUSES.includes(s.status));
+}
+
+async function fetchCleansWindow(){
+  // Pull a window around the selected day so we also see linen-in scheduled on other days.
+  const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_PROP}","${CL_START}","${CL_LINEN_MTHD}","${CL_LINEN_DRV}","${CL_LINEN_DATE}","${CL_LINEN_SRC}","${CL_DIRT_MTHD}","${CL_DIRT_DRV}","${CL_STATUS}","${CL_CHECKTYPE}","${CL_NOTES}"]`;
+  let items = []; let cursor = null;
+  do {
+    const q = cursor
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${colIds}){ id text value } } } }`
+      : `{ boards(ids:[${CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id text value } } } } }`;
+    const d = await mondayQuery(q);
+    const page = cursor ? d.next_items_page : d.boards[0].items_page;
+    items = items.concat(page.items);
+    cursor = page.cursor;
+  } while (cursor);
+
+  cleans = items.map(it => {
+    const cv = Object.fromEntries(it.column_values.map(c=>[c.id,c]));
+    const dateObj = pj(cv[CL_DATE]?.value);
+    const checkinObj = pj(cv[CL_CHECKIN]?.value);
+    const linenDateObj = pj(cv[CL_LINEN_DATE]?.value);
+    const day = dateObj?.date || '';
+    const linenDay = linenDateObj?.date || day;   // default: on clean day
+    const linenDriverLabels = (cv[CL_LINEN_DRV]?.text||'').split(',').map(s=>s.trim()).filter(Boolean);
+    const dirtDriverLabels  = (cv[CL_DIRT_DRV]?.text ||'').split(',').map(s=>s.trim()).filter(Boolean);
+    return {
+      id: it.id,
+      name: it.name,
+      day,
+      linenDay,
+      checkinDate: checkinObj?.date || day,
+      property: cv[CL_PROP]?.text || '',
+      start: cv[CL_START]?.text || '',
+      linenMethod: cv[CL_LINEN_MTHD]?.text || '',
+      linenDriver: linenDriverLabels[0] || '',
+      linenSrc:    cv[CL_LINEN_SRC]?.text || '',
+      dirtiesMethod: cv[CL_DIRT_MTHD]?.text || '',
+      dirtiesDriver: dirtDriverLabels[0] || '',
+      status: cv[CL_STATUS]?.text || '',
+      checkType: cv[CL_CHECKTYPE]?.text || '',
+      notes: pj(cv[CL_NOTES]?.value)?.text || cv[CL_NOTES]?.text || '',
+    };
+  });
+  lastFetchedAt = new Date();
+}
+
+/* ========== Derivation ========== */
+/**
+ * For the selected day, return:
+ *   linenRows: items where (linenDay === dayISO) AND linenMethod populated
+ *   dirtRows:  items where (day === dayISO)      AND dirtiesMethod populated
+ * A clean that still needs a method assigned appears in "Needs method" so the planner sees gaps.
+ */
+function rowsForDay(){
+  const linen = [];
+  const dirt = [];
+  const linenGaps = [];
+  const dirtGaps = [];
+  for (const c of cleans) {
+    if (c.status === 'Cancelled') continue;
+    // Linen-in: scheduled for this date (may be earlier than the clean itself)
+    if (c.linenDay === dayISO) {
+      if (c.linenMethod) linen.push(c);
+      else linenGaps.push(c);
+    }
+    // Dirties-out: always happens on clean day
+    if (c.day === dayISO) {
+      if (c.dirtiesMethod) dirt.push(c);
+      else dirtGaps.push(c);
+    }
+  }
+  return { linen, dirt, linenGaps, dirtGaps };
+}
+
+const METHOD_ORDER = ['Laundry van','Maintenance team','Management','Cleaner'];
+function groupByDriver(rows, kind){
+  // Group key = `${method}::${driver||'—'}`
+  const groups = new Map();
+  for (const r of rows) {
+    const method = (kind==='linen'?r.linenMethod:r.dirtiesMethod) || 'Unassigned';
+    const driver = (kind==='linen'?r.linenDriver :r.dirtiesDriver) || '';
+    const key = method + '::' + driver;
+    if (!groups.has(key)) groups.set(key, { method, driver, rows:[] });
+    groups.get(key).rows.push(r);
+  }
+  // Sort: driver-first (van last or first? van typically no named driver),
+  // within group by start time then property
+  const out = [...groups.values()];
+  out.sort((a,b) => {
+    const ai = METHOD_ORDER.indexOf(a.method); const bi = METHOD_ORDER.indexOf(b.method);
+    if (ai !== bi) return (ai<0?99:ai) - (bi<0?99:bi);
+    return (a.driver||'').localeCompare(b.driver||'');
+  });
+  for (const g of out) {
+    g.rows.sort((a,b) => (a.start||'99').localeCompare(b.start||'99') || a.property.localeCompare(b.property));
+  }
+  return out;
+}
+
+function staffEmail(name){
+  if (!name) return '';
+  const s = staff.find(x => x.name.toLowerCase() === name.toLowerCase());
+  return s?.email || '';
+}
+
+/* ========== Render ========== */
+function render(){
+  document.getElementById('dayTitle').textContent = fmtLong(dayISO);
+  document.getElementById('dayPicker').value = dayISO;
+
+  const { linen, dirt, linenGaps, dirtGaps } = rowsForDay();
+
+  // KPIs
+  const linenVan = linen.filter(r => r.linenMethod==='Laundry van').length;
+  const kpi = document.getElementById('kpiRow');
+  kpi.innerHTML = `
+    <div class="card"><div class="lbl">Linen-in today</div><div class="val">${linen.length} <small>/ ${linen.length+linenGaps.length}</small></div></div>
+    <div class="card"><div class="lbl">Dirties-out today</div><div class="val">${dirt.length} <small>/ ${dirt.length+dirtGaps.length}</small></div></div>
+    <div class="card"><div class="lbl">Laundry van stops</div><div class="val">${linenVan}</div></div>
+    <div class="card"><div class="lbl">Cross-prop drops</div><div class="val">${linen.filter(r=>r.linenSrc).length}</div></div>
+  `;
+
+  // Linen section
+  document.getElementById('linenCount').textContent = String(linen.length + linenGaps.length);
+  document.getElementById('linenBody').innerHTML = renderSection(groupByDriver(linen,'linen'), linenGaps, 'linen');
+
+  // Dirt section
+  document.getElementById('dirtCount').textContent = String(dirt.length + dirtGaps.length);
+  document.getElementById('dirtBody').innerHTML = renderSection(groupByDriver(dirt,'dirt'), dirtGaps, 'dirt');
+}
+
+function renderSection(groups, gaps, kind){
+  const head = kind==='linen'
+    ? '<tr><th>Time</th><th>Property</th><th>From</th><th>Notes</th></tr>'
+    : '<tr><th>Time</th><th>Property</th><th>Notes</th></tr>';
+  let out = '';
+  if (!groups.length && !gaps.length) {
+    return '<div class="empty">Nothing scheduled today.</div>';
+  }
+  for (const g of groups) {
+    const driverEmail = staffEmail(g.driver);
+    const emailBadge = g.driver
+      ? (driverEmail ? `<span class="email">${escHTML(driverEmail)}</span>` : `<span class="email missing">⚠ no email</span>`)
+      : '';
+    out += `<div class="driver-group">
+      <div class="driver-hdr">
+        <span>${escHTML(g.driver || (g.method==='Laundry van' ? 'Laundry van' : '—'))}</span>
+        <span class="method">${escHTML(g.method)}</span>
+        ${emailBadge}
+        <span class="count">${g.rows.length} stop${g.rows.length===1?'':'s'}</span>
+      </div>
+      <table class="runs">
+        <thead>${head}</thead>
+        <tbody>
+          ${g.rows.map(r => renderRow(r, kind)).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  }
+  if (gaps.length) {
+    out += `<div class="driver-group">
+      <div class="driver-hdr" style="color:var(--warn)">
+        <span>Needs method</span>
+        <span class="count">${gaps.length} clean${gaps.length===1?'':'s'}</span>
+      </div>
+      <table class="runs">
+        <thead>${head}</thead>
+        <tbody>
+          ${gaps.map(r => renderRow(r, kind, true)).join('')}
+        </tbody>
+      </table>
+    </div>`;
+  }
+  return out;
+}
+
+function renderRow(r, kind, isGap){
+  const time = r.start || '';
+  const propCell = `<span class="prop">${escHTML(r.property || r.name || '—')}</span>`;
+  const notes = r.notes ? `<div class="note">${escHTML(r.notes).slice(0,140)}</div>` : '';
+  if (kind==='linen') {
+    const from = r.linenSrc
+      ? `<span class="from">Pickup at ${escHTML(r.linenSrc)}</span>`
+      : (r.linenMethod === 'Laundry van' ? '<span class="meta">From laundry</span>' : '<span class="meta">From stock</span>');
+    return `<tr>
+      <td>${escHTML(time) || '<span class="meta">—</span>'}</td>
+      <td>${propCell}</td>
+      <td>${isGap ? '<span class="meta">—</span>' : from}</td>
+      <td>${notes || '<span class="meta">&nbsp;</span>'}</td>
+    </tr>`;
+  } else {
+    return `<tr>
+      <td>${escHTML(time) || '<span class="meta">—</span>'}</td>
+      <td>${propCell}</td>
+      <td>${notes || '<span class="meta">Before next check-in</span>'}</td>
+    </tr>`;
+  }
+}
+
+/* ========== Email drafts ========== */
+function buildDraftsForGroups(groups, kind, dayLabel){
+  const drafts = [];
+  for (const g of groups) {
+    if (!g.driver) continue;  // skip "van with no named driver" — we have a separate van handling
+    const email = staffEmail(g.driver);
+    const subject = (kind==='linen'
+      ? `Clean linen drop — ${dayLabel}`
+      : `Dirties pickup — ${dayLabel}`);
+    const lines = g.rows.map(r => {
+      const t = r.start || '—';
+      const extra = (kind==='linen'
+        ? (r.linenSrc ? ` · pickup at ${r.linenSrc}` : '')
+        : '');
+      const note = r.notes ? ` — ${r.notes.replace(/\s+/g,' ').slice(0,120)}` : '';
+      return `• ${t}  ${r.property || r.name}${extra}${note}`;
+    });
+    const bodyText = [
+      `Hi ${g.driver},`,
+      ``,
+      kind==='linen'
+        ? `Here are your clean-linen drops for ${dayLabel} (${g.method}).`
+        : `Here are your dirty-laundry pickups for ${dayLabel} (${g.method}).`,
+      ``,
+      ...lines,
+      ``,
+      kind==='dirt' ? `Please collect all dirties before the property's next check-in.` : `Drops can be made any time before the clean starts — cleaners will collect them.`,
+      ``,
+      `Thanks,`,
+      `Be Here Stays`,
+    ].join('\n');
+    const bodyHtml = `<p>Hi ${escHTML(g.driver)},</p>
+      <p>${kind==='linen'
+        ? `Here are your clean-linen drops for <strong>${escHTML(dayLabel)}</strong> (${escHTML(g.method)}).`
+        : `Here are your dirty-laundry pickups for <strong>${escHTML(dayLabel)}</strong> (${escHTML(g.method)}).`}</p>
+      <ul style="padding-left:18px">${g.rows.map(r => {
+        const t = r.start || '—';
+        const extra = (kind==='linen' && r.linenSrc) ? ` · pickup at <em>${escHTML(r.linenSrc)}</em>` : '';
+        const note = r.notes ? ` — <span style="color:#646955">${escHTML(r.notes.replace(/\s+/g,' ').slice(0,120))}</span>` : '';
+        return `<li><strong>${escHTML(t)}</strong> &nbsp; ${escHTML(r.property || r.name)}${extra}${note}</li>`;
+      }).join('')}</ul>
+      <p style="color:#646955;font-size:13px">${kind==='dirt'
+        ? 'Please collect all dirties before the property\u2019s next check-in.'
+        : 'Drops can be made any time before the clean starts \u2014 cleaners will collect them.'}</p>
+      <p>Thanks,<br>Be Here Stays</p>`;
+    drafts.push({ to: email, name: g.driver, subject, bodyHtml, bodyText });
+  }
+  return drafts;
+}
+
+function buildCombinedDrafts(dayLabel){
+  // Merge linen + dirt for the same driver into one email
+  const { linen, dirt } = rowsForDay();
+  const linenG = groupByDriver(linen,'linen');
+  const dirtG  = groupByDriver(dirt ,'dirt');
+  const byDriver = new Map();
+  for (const g of linenG) {
+    if (!g.driver) continue;
+    const key = g.driver;
+    if (!byDriver.has(key)) byDriver.set(key, { driver: key, linen:[], dirt:[], methods:new Set() });
+    byDriver.get(key).linen.push(...g.rows.map(r => ({...r, _method:g.method})));
+    byDriver.get(key).methods.add(g.method);
+  }
+  for (const g of dirtG) {
+    if (!g.driver) continue;
+    const key = g.driver;
+    if (!byDriver.has(key)) byDriver.set(key, { driver: key, linen:[], dirt:[], methods:new Set() });
+    byDriver.get(key).dirt.push(...g.rows.map(r => ({...r, _method:g.method})));
+    byDriver.get(key).methods.add(g.method);
+  }
+  const drafts = [];
+  for (const b of byDriver.values()) {
+    const email = staffEmail(b.driver);
+    const subject = `Laundry run — ${dayLabel}`;
+    const textParts = [`Hi ${b.driver},`, '', `Your laundry run for ${dayLabel}:`, ''];
+    const htmlParts = [`<p>Hi ${escHTML(b.driver)},</p>`, `<p>Your laundry run for <strong>${escHTML(dayLabel)}</strong>:</p>`];
+    if (b.linen.length) {
+      textParts.push('CLEAN LINEN DROPS:');
+      textParts.push(...b.linen.map(r => `• ${r.start||'—'}  ${r.property||r.name}${r.linenSrc?` · pickup at ${r.linenSrc}`:''}`));
+      textParts.push('');
+      htmlParts.push('<h4 style="margin:10px 0 4px;color:#2a7f4f">Clean linen drops</h4>');
+      htmlParts.push('<ul style="padding-left:18px">' + b.linen.map(r =>
+        `<li><strong>${escHTML(r.start||'—')}</strong> &nbsp; ${escHTML(r.property||r.name)}${r.linenSrc?` · pickup at <em>${escHTML(r.linenSrc)}</em>`:''}</li>`
+      ).join('') + '</ul>');
+    }
+    if (b.dirt.length) {
+      textParts.push('DIRTIES PICKUP:');
+      textParts.push(...b.dirt.map(r => `• ${r.start||'—'}  ${r.property||r.name}`));
+      textParts.push('');
+      htmlParts.push('<h4 style="margin:10px 0 4px;color:#AF926A">Dirties pickup</h4>');
+      htmlParts.push('<ul style="padding-left:18px">' + b.dirt.map(r =>
+        `<li><strong>${escHTML(r.start||'—')}</strong> &nbsp; ${escHTML(r.property||r.name)}</li>`
+      ).join('') + '</ul>');
+    }
+    textParts.push('Thanks,', 'Be Here Stays');
+    htmlParts.push('<p>Thanks,<br>Be Here Stays</p>');
+    drafts.push({ to: email, name: b.driver, subject, bodyText: textParts.join('\n'), bodyHtml: htmlParts.join('') });
+  }
+  return drafts;
+}
+
+function sendLinen(){
+  const { linen } = rowsForDay();
+  const groups = groupByDriver(linen,'linen');
+  const drafts = buildDraftsForGroups(groups, 'linen', fmtShort(dayISO));
+  if (!drafts.length) { setStatus('<span class="err">No named linen drivers today.</span>'); return; }
+  WorkDispatch.showPreview({
+    title: `Clean linen IN — ${fmtShort(dayISO)}`,
+    kind: 'laundry-linen',
+    drafts,
+  });
+}
+function sendDirt(){
+  const { dirt } = rowsForDay();
+  const groups = groupByDriver(dirt,'dirt');
+  const drafts = buildDraftsForGroups(groups, 'dirt', fmtShort(dayISO));
+  if (!drafts.length) { setStatus('<span class="err">No named dirties drivers today.</span>'); return; }
+  WorkDispatch.showPreview({
+    title: `Dirties OUT — ${fmtShort(dayISO)}`,
+    kind: 'laundry-dirt',
+    drafts,
+  });
+}
+function sendBoth(){
+  const drafts = buildCombinedDrafts(fmtShort(dayISO));
+  if (!drafts.length) { setStatus('<span class="err">Nobody to email for this day.</span>'); return; }
+  WorkDispatch.showPreview({
+    title: `Laundry run — ${fmtShort(dayISO)}`,
+    kind: 'laundry',
+    drafts,
+  });
+}
+
+/* ========== Load ========== */
+async function loadAll(){
+  setStatus('Loading…');
+  try {
+    await Promise.all([fetchStaff(), fetchCleansWindow()]);
+    render();
+    setStatus('<span class="sync">Synced</span> ' + new Date().toLocaleTimeString());
+  } catch(e) {
+    console.error(e);
+    setStatus('<span class="err">Error: ' + escHTML(e.message) + '</span>');
+  }
+}
+
+/* ========== PIN ========== */
+async function sha256(t){
+  const buf = new TextEncoder().encode(t);
+  const hash = await crypto.subtle.digest('SHA-256', buf);
+  return Array.from(new Uint8Array(hash)).map(b=>b.toString(16).padStart(2,'0')).join('');
+}
+function setupPin(){
+  const inp = document.getElementById('pinInput');
+  const err = document.getElementById('pinErr');
+  const overlay = document.getElementById('pinOverlay');
+  const app = document.getElementById('app');
+  if (sessionStorage.getItem('laundry_pin_ok') === '1') {
+    overlay.classList.add('hide'); app.classList.remove('hide');
+    init();
+    return;
+  }
+  setTimeout(()=>inp.focus(), 100);
+  inp.addEventListener('input', async e => {
+    const v = e.target.value;
+    if (v.length !== 6) { err.textContent=''; return; }
+    if ((await sha256(v)) === PIN_HASH) {
+      sessionStorage.setItem('laundry_pin_ok','1');
+      overlay.classList.add('hide'); app.classList.remove('hide');
+      init();
+    } else {
+      err.textContent = 'Wrong PIN'; inp.value = '';
+    }
+  });
+}
+
+/* ========== Init ========== */
+function init(){
+  dayISO = todayISO();
+  document.getElementById('dayPicker').value = dayISO;
+
+  document.getElementById('btnPrev').addEventListener('click', ()=>{ dayISO = addDays(dayISO,-1); render(); });
+  document.getElementById('btnNext').addEventListener('click', ()=>{ dayISO = addDays(dayISO, 1); render(); });
+  document.getElementById('btnToday').addEventListener('click', ()=>{ dayISO = todayISO(); render(); });
+  document.getElementById('dayPicker').addEventListener('change', e => { dayISO = e.target.value; render(); });
+  document.getElementById('btnRefresh').addEventListener('click', loadAll);
+  document.getElementById('btnSettings').addEventListener('click', ()=> WorkDispatch.showSettings());
+  document.getElementById('btnSendLinen').addEventListener('click', sendLinen);
+  document.getElementById('btnSendDirt').addEventListener('click', sendDirt);
+  document.getElementById('btnSendBoth').addEventListener('click', sendBoth);
+
+  loadAll();
+}
+
+/* ========== Boot ========== */
+setupPin();
+
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('sw.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>

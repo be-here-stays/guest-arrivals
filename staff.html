@@ -186,6 +186,16 @@
     </div>
     <div class="cl-sub" id="clSub">Tick everything you've done. The list goes on the clean's record.</div>
     <div class="cl-list" id="clList"></div>
+
+    <div class="cl-inspect-wrap" id="clInspect">
+      <div class="cl-inspect-hdr">📷 Decking inspection</div>
+      <button class="cl-inspect-btn" id="clInspectBtn" onclick="document.getElementById('clInspectFile').click()">
+        📷 Take photo of completed decking
+      </button>
+      <input type="file" id="clInspectFile" accept="image/*" capture="environment" style="display:none" onchange="handleDeckingPhoto(event)">
+      <div class="cl-inspect-result" id="clInspectResult" style="display:none"></div>
+    </div>
+
     <div class="cl-notes-row">
       <label class="cl-lbl">Notes (anything else worth recording)</label>
       <textarea id="clNotes" class="cl-notes" placeholder="Optional"></textarea>
@@ -291,6 +301,20 @@
   .cl-btn-go { background:#2d6a4f; color:#fff; border:0; padding:9px 16px; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
   .cl-btn-go:disabled { opacity:0.5; cursor:not-allowed; }
 
+  /* Decking photo inspection */
+  .cl-inspect-wrap { border-top:1px dashed var(--border); padding-top:12px; margin-top:4px; }
+  .cl-inspect-hdr { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--sage); margin-bottom:8px; }
+  .cl-inspect-btn { width:100%; padding:12px; border:2px dashed var(--sage-mid); border-radius:10px; background:#f7f9f5; color:var(--sage); font-family:inherit; font-size:14px; font-weight:600; cursor:pointer; transition:all .15s; }
+  .cl-inspect-btn:hover { border-color:var(--sage); background:#edf0e8; }
+  .cl-inspect-btn:disabled { opacity:.5; cursor:not-allowed; }
+  .cl-inspect-result { padding:12px 14px; border-radius:9px; font-size:13px; line-height:1.55; margin-top:8px; white-space:pre-wrap; }
+  .cl-inspect-result.good { background:var(--green-bg); color:var(--green); border:1px solid #52b788; }
+  .cl-inspect-result.warn { background:var(--amber-bg); color:var(--amber); border:1px solid #d4a017; }
+  .cl-inspect-result.err  { background:var(--red-bg);   color:var(--red);   border:1px solid #c0392b; }
+  .cl-item.suggested { background:#fffde8; border-color:#d4a017; }
+  @keyframes cl-pulse { 0%,100%{box-shadow:0 0 0 0 rgba(175,146,106,.5)} 50%{box-shadow:0 0 0 6px rgba(175,146,106,0)} }
+  .cl-item.suggested { animation:cl-pulse 1.2s ease 3; }
+
   /* Exception modal */
   .ex-box { background:#fff; border-radius:14px; max-width:400px; width:100%; padding:20px; display:flex; flex-direction:column; gap:14px; box-shadow:0 10px 30px rgba(0,0,0,0.3); }
   .ex-title { font-size:18px; font-weight:700; color:var(--dark); }
@@ -312,7 +336,8 @@
    for today + 6 days ahead.
    ═══════════════════════════════════════════════════════════════════ */
 
-const API_TOKEN  = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const API_TOKEN      = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const ANTHROPIC_KEY  = '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'; // OpenRouter key
 const STAFF_BOARD  = 5095127554;
 const CLEANS_BOARD = 5095134636;
 const SHIFTS_BOARD = 5095155773;
@@ -403,6 +428,7 @@ const ISSUES_STATUS_COL = 'color_mm2s9cc9';
 // Properties without a hot tub — these get the changeover checklist minus the
 // "Hot tub serviced" item. Currently three on the Hot Tub Status board.
 const OUTSIDE_NO_HT = new Set(['Goose Landing', 'Serenity', 'Green Haven']);
+const NO_OUTSIDE    = new Set(['Essitone House']); // no outdoor decking inspection needed
 // HC_NOTES is already defined further down with the rest of the Hot Tub
 // Cleans column constants — that single declaration is used here too.
 
@@ -1208,6 +1234,81 @@ function renderHotTubCleanCard(h) {
    counts as done. The ticked list gets appended to the Notes column on
    Hot Tub Cleans for an audit trail.
    ═══════════════════════════════════════════════════════════════════ */
+async function handleDeckingPhoto(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  event.target.value = '';
+
+  const btn      = document.getElementById('clInspectBtn');
+  const resultEl = document.getElementById('clInspectResult');
+
+  btn.disabled    = true;
+  btn.textContent = '⏳ Analysing photo…';
+  resultEl.style.display = 'none';
+  resultEl.className     = 'cl-inspect-result';
+
+  try {
+    const base64 = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload  = () => resolve(reader.result.split(',')[1]);
+      reader.onerror = reject;
+      reader.readAsDataURL(file);
+    });
+
+    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type':  'application/json',
+        'Authorization': `Bearer ${ANTHROPIC_KEY}`,
+        'HTTP-Referer':  window.location.origin,
+        'X-Title':       'Be Here Staff'
+      },
+      body: JSON.stringify({
+        model:      'anthropic/claude-haiku-4-5',
+        max_tokens: 350,
+        messages: [{
+          role: 'user',
+          content: [
+            { type: 'image_url', image_url: { url: `data:${file.type || 'image/jpeg'};base64,${base64}` } },
+            { type: 'text', text:
+              'You are inspecting the outdoor decking area of a holiday cottage immediately before guest arrival. ' +
+              'Look at this photo and tell the operative whether the area is guest-ready or not. ' +
+              'Check for: swept decking (no leaves, dirt, or debris), tidy outdoor furniture with cushions in place, ' +
+              'BBQ covered or visibly clean, no obvious cobwebs on rails or furniture, tidy plant pots. ' +
+              'Reply in 2–4 plain-English sentences. ' +
+              'If everything looks good, begin your reply with exactly "All looks good". ' +
+              'Otherwise begin with "Not quite ready yet" and list the specific things still needing attention.'
+            }
+          ]
+        }]
+      })
+    });
+
+    if (!resp.ok) throw new Error(`OpenRouter API returned ${resp.status}`);
+    const data = await resp.json();
+    const text = (data.choices?.[0]?.message?.content || '').trim() || 'No response received.';
+
+    const isGood = /^all looks good/i.test(text);
+    resultEl.textContent  = text;
+    resultEl.className    = `cl-inspect-result ${isGood ? 'good' : 'warn'}`;
+    resultEl.style.display = 'block';
+
+    if (isGood) {
+      const guestItem = document.querySelector('.cl-item[data-key="guest"]');
+      if (guestItem && !_checklistChecked['guest']) {
+        guestItem.classList.add('suggested');
+      }
+    }
+  } catch (err) {
+    resultEl.textContent   = 'Could not analyse the photo — please inspect manually.\n' + err.message;
+    resultEl.className     = 'cl-inspect-result err';
+    resultEl.style.display = 'block';
+  } finally {
+    btn.disabled    = false;
+    btn.textContent = '📷 Take another photo';
+  }
+}
+
 const CHECKLIST_TEMPLATE = [
   { key: 'tub',       label: 'Hot tub serviced (chemicals, level, lid)',  hotTubOnly: true },
   { key: 'cobweb',    label: 'Cobwebbing — exterior + deck' },
@@ -1243,6 +1344,17 @@ function openChangeoverChecklist(htId) {
     </div>
   `).join('');
   document.getElementById('clOverlay').classList.add('show');
+
+  // Decking inspection panel — hide for indoor-only properties
+  const noOutside = NO_OUTSIDE.has((h.property || '').trim());
+  const inspectWrap = document.getElementById('clInspect');
+  inspectWrap.style.display = noOutside ? 'none' : '';
+  document.getElementById('clInspectResult').style.display = 'none';
+  document.getElementById('clInspectResult').className = 'cl-inspect-result';
+  const inspectBtn = document.getElementById('clInspectBtn');
+  inspectBtn.disabled = false;
+  inspectBtn.textContent = '📷 Take photo of completed decking';
+  document.getElementById('clInspectFile').value = '';
 }
 
 function toggleChecklistItem(key) {

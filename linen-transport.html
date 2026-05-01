@@ -1,0 +1,730 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Linen Transport — Be Here</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@300;400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --green: #646955; --green-dark: #272F2E; --green-light: #eaede4;
+      --amber: #AF926A; --amber-light: #faf3e8;
+      --own: #1a6fba;   --own-light: #ddeeff;
+      --reg: #c0392b;   --reg-light: #fde8e8;
+      --text: #1a1a1a; --muted: #888; --border: #e0ddd6;
+      --card: #ffffff; --bg: #D5D0C4;
+      --plus: #2d6a4f; --plus-bg: #d4edda;
+      --transit: #5a3e8f; --transit-bg: #e0d6f0;
+    }
+    body { font-family: 'Instrument Sans', system-ui, sans-serif;
+           background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 60px; }
+
+    #header { height: 52px; background: var(--green-dark);
+              display: flex; align-items: center; padding: 0 16px; gap: 12px; }
+    .back-btn { background: rgba(255,255,255,0.12); border: none; color: #fff;
+                padding: 5px 12px; border-radius: 7px; font-size: 13px;
+                font-family: inherit; cursor: pointer; text-decoration: none;
+                display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .back-btn:hover { background: rgba(255,255,255,0.22); }
+    .header-title { color: #fff; font-size: 15px; font-weight: 600; flex: 1; }
+    .header-btn { background: rgba(255,255,255,0.12); border: none; color: #fff;
+                  padding: 5px 11px; border-radius: 7px; font-size: 12px;
+                  font-family: inherit; cursor: pointer; white-space: nowrap; }
+    .header-btn:hover { background: rgba(255,255,255,0.22); }
+
+    /* Loading bar */
+    #loadingBar { display: none; height: 3px;
+                  background: linear-gradient(90deg, var(--own), var(--amber));
+                  animation: loadpulse 1.2s ease-in-out infinite; }
+    @keyframes loadpulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+    /* Logged-by row */
+    .countedby-row { background: var(--green-dark);
+                     padding: 0 16px 10px; display: flex; align-items: center; gap: 10px; }
+    .countedby-label { color: rgba(255,255,255,0.7); font-size: 12px;
+                       font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+    .countedby-input { flex: 1; background: rgba(255,255,255,0.12); border: none;
+                       border-radius: 7px; color: #fff; font-family: inherit;
+                       font-size: 13px; padding: 6px 10px; }
+    .countedby-input::placeholder { color: rgba(255,255,255,0.4); }
+    .countedby-input:focus { outline: none; background: rgba(255,255,255,0.22); }
+
+    /* Filter row */
+    .filter-row { background: rgba(0,0,0,0.25); padding: 8px 16px;
+                  display: flex; gap: 6px; flex-wrap: wrap;
+                  border-top: 1px solid rgba(255,255,255,0.1); }
+    .filter-chip { background: rgba(255,255,255,0.12); border: none;
+                   color: rgba(255,255,255,0.75); padding: 4px 10px;
+                   border-radius: 14px; font-size: 11px; font-weight: 600;
+                   font-family: inherit; cursor: pointer; transition: all 0.15s;
+                   white-space: nowrap; }
+    .filter-chip.active { background: #fff; color: var(--green-dark); }
+    .filter-chip:hover { background: rgba(255,255,255,0.22); }
+    .filter-chip.active:hover { background: #fff; }
+
+    .page-wrap { max-width: 800px; margin: 16px auto; padding: 0 16px; }
+
+    /* Section headers */
+    .section { margin-bottom: 22px; }
+    .section-hdr { display: flex; align-items: center; justify-content: space-between;
+                   padding: 0 4px; margin-bottom: 8px; }
+    .section-title { font-size: 12px; font-weight: 700; text-transform: uppercase;
+                     letter-spacing: 0.6px; color: var(--green-dark); }
+    .section-title.transit  { color: var(--transit); }
+    .section-title.delivered{ color: var(--plus); }
+    .section-count { font-size: 11px; color: var(--muted); font-weight: 600; }
+    .section-empty { font-size: 13px; color: #aaa; font-style: italic;
+                     padding: 18px 12px; background: rgba(255,255,255,0.3);
+                     border-radius: 9px; text-align: center; }
+
+    /* Method group label */
+    .method-group { margin-bottom: 14px; }
+    .method-label { font-size: 10px; font-weight: 700; color: var(--muted);
+                    text-transform: uppercase; letter-spacing: 0.5px;
+                    padding: 0 4px 4px; }
+    .method-label.unassigned { color: var(--reg); }
+
+    /* Bag card */
+    .bag-card { background: #fff; border-radius: 10px; padding: 12px 13px;
+                margin-bottom: 8px; box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+                border-left: 4px solid #ddd; transition: all 0.15s; }
+    .bag-card.own     { border-left-color: var(--own); }
+    .bag-card.regency { border-left-color: var(--reg); }
+    .bag-card.delivered { background: #f0faf4; opacity: 0.85; }
+
+    .bag-row1 { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .bag-prop { flex: 1; font-size: 14px; font-weight: 700; min-width: 0;
+                white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .type-badge { display: inline-block; font-size: 10px; font-weight: 700;
+                  text-transform: uppercase; letter-spacing: 0.4px;
+                  padding: 2px 7px; border-radius: 5px; flex-shrink: 0; }
+    .type-badge.own     { background: var(--own-light); color: var(--own); }
+    .type-badge.regency { background: var(--reg-light); color: var(--reg); }
+
+    .bag-meta { font-size: 11px; color: var(--muted); margin-bottom: 8px;
+                line-height: 1.4; }
+    .bag-meta strong { color: var(--text); font-weight: 700; }
+
+    .bag-items-toggle { font-size: 11px; color: var(--own); cursor: pointer;
+                        text-decoration: underline; user-select: none;
+                        margin-bottom: 6px; display: inline-block; }
+    .bag-items-toggle:hover { color: var(--green-dark); }
+    .bag-items-list { font-size: 11px; color: #555; line-height: 1.4;
+                       padding: 6px 8px; background: #f7f5f0; border-radius: 6px;
+                       margin-bottom: 8px; display: none; }
+    .bag-items-list.open { display: block; }
+
+    .bag-status-row { display: flex; align-items: center; gap: 8px;
+                      flex-wrap: wrap; margin-top: 4px; }
+    .status-pill { font-size: 10px; font-weight: 700; padding: 2px 8px;
+                   border-radius: 5px; text-transform: uppercase; letter-spacing: 0.3px; }
+    .status-pill.bagged    { background: #fef3e2; color: #b07d2a; }
+    .status-pill.transit   { background: var(--transit-bg); color: var(--transit); }
+    .status-pill.delivered { background: var(--plus-bg); color: var(--plus); }
+    .status-pill.planned   { background: #f0f0f0; color: #777; }
+
+    .transport-chip { font-size: 11px; padding: 2px 8px; border-radius: 5px;
+                      background: #eaeae5; color: #555; font-weight: 600; }
+    .transport-chip.unassigned { background: #fde8e8; color: var(--reg); cursor: pointer; }
+    .transport-chip.unassigned:hover { background: #fbd3d3; }
+
+    .bag-actions { display: flex; gap: 6px; margin-top: 10px;
+                   flex-wrap: wrap; }
+    .action-btn { padding: 8px 14px; border: none; border-radius: 7px;
+                  font-size: 12px; font-weight: 700; font-family: inherit;
+                  cursor: pointer; transition: all 0.12s; }
+    .action-btn.primary { background: var(--own); color: #fff; }
+    .action-btn.primary:hover { background: #155a96; }
+    .action-btn.deliver { background: var(--plus); color: #fff; }
+    .action-btn.deliver:hover { background: #1f4e3a; }
+    .action-btn.secondary { background: #f0eeea; color: #555; }
+    .action-btn.secondary:hover { background: #e5e2dc; }
+    .action-btn.danger { background: transparent; color: var(--muted);
+                          font-size: 11px; padding: 6px 10px; }
+    .action-btn.danger:hover { color: var(--reg); background: var(--reg-light); }
+    .action-btn:disabled { opacity: 0.4; cursor: wait; }
+
+    /* Transport assign dropdown */
+    .transport-select { padding: 7px 10px; border: 1.5px solid var(--border);
+                        border-radius: 7px; font-family: inherit; font-size: 12px;
+                        background: #fafaf8; color: var(--text); cursor: pointer; }
+    .transport-select:focus { outline: none; border-color: var(--own); }
+
+    /* Delivered section: more compact */
+    .section.delivered .bag-card { padding: 8px 12px; margin-bottom: 5px; }
+    .section.delivered .bag-actions { display: none; }
+    .section.delivered .bag-meta { display: none; }
+
+    /* Toast */
+    #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+             background: var(--green-dark); color: #fff; padding: 11px 22px;
+             border-radius: 10px; font-size: 13px; opacity: 0;
+             transition: opacity 0.3s; pointer-events: none; white-space: nowrap; z-index: 200;
+             max-width: calc(100vw - 32px); overflow: hidden; text-overflow: ellipsis; }
+    #toast.show { opacity: 1; }
+
+    @media (max-width: 480px) {
+      .filter-row { padding: 8px 12px; gap: 5px; }
+      .filter-chip { padding: 4px 8px; font-size: 10px; }
+      .page-wrap { padding: 0 10px; }
+      .bag-actions .action-btn { flex: 1; min-width: 0; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <a href="hub.html" class="back-btn">← Hub</a>
+  <div class="header-title">Linen Transport</div>
+  <a href="laundry-rota.html" class="header-btn">Rota</a>
+  <button class="header-btn" onclick="reload()">↻ Refresh</button>
+</div>
+<div id="loadingBar"></div>
+
+<div class="countedby-row">
+  <span class="countedby-label">Driver / staff</span>
+  <input type="text" class="countedby-input" id="staffName"
+         placeholder="Your name" oninput="onStaffNameInput()">
+</div>
+
+<div class="filter-row" id="methodFilter">
+  <button class="filter-chip active" data-method="all" onclick="setMethodFilter('all')">All</button>
+  <button class="filter-chip" data-method="Laundry van" onclick="setMethodFilter('Laundry van')">Laundry van</button>
+  <button class="filter-chip" data-method="Staff (own car)" onclick="setMethodFilter('Staff (own car)')">Staff</button>
+  <button class="filter-chip" data-method="Manager (own car)" onclick="setMethodFilter('Manager (own car)')">Manager</button>
+  <button class="filter-chip" data-method="Maintenance van" onclick="setMethodFilter('Maintenance van')">Maintenance</button>
+  <button class="filter-chip" data-method="Other" onclick="setMethodFilter('Other')">Other</button>
+  <button class="filter-chip" data-method="unassigned" onclick="setMethodFilter('unassigned')">Unassigned</button>
+</div>
+
+<div class="page-wrap">
+  <div id="content">
+    <div class="section-empty">Loading…</div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<!-- Shared schema -->
+<script src="linen-schema.js"></script>
+
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
+
+<script>
+  const MONDAY_API_TOKEN = window.MONDAY_API_TOKEN;
+  const STAFF_NAME_KEY = 'linenStaffName';
+
+  const TRANSPORT_METHODS = ['Laundry van','Staff (own car)','Manager (own car)','Maintenance van','Other'];
+
+  let bags = [];
+  let staffList = [];
+  let methodFilter = 'all';
+  let staffName = (() => { try { return localStorage.getItem(STAFF_NAME_KEY) || ''; } catch { return ''; } })();
+  const expandedBags = new Set();
+
+  // ── Date utils ────────────────────────────────────────────────────────────
+  function localStr(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function fmtShort(dateStr) {
+    if (!dateStr) return '';
+    const d = new Date(dateStr + 'T12:00:00');
+    return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+
+  // ── Monday ────────────────────────────────────────────────────────────────
+  async function mondayFetch(query, variables) {
+    const r = await fetch('https://api.monday.com/v2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json',
+                 'Authorization': MONDAY_API_TOKEN,
+                 'API-Version': '2024-01' },
+      body: JSON.stringify({ query, variables: variables || {} })
+    });
+    const j = await r.json();
+    if (j.errors) throw new Error(j.errors[0].message);
+    return j.data;
+  }
+
+  function setLoading(on) {
+    document.getElementById('loadingBar').style.display = on ? 'block' : 'none';
+  }
+
+  async function fetchStaff() {
+    const c = LINEN.staffColumns;
+    const data = await mondayFetch(
+      `{ boards(ids:["${LINEN.boards.staff}"]) { items_page(limit:200) { items {
+         id name
+         column_values(ids:["${c.role}","${c.status}"]) { id text }
+      } } } }`
+    );
+    staffList = (data.boards[0].items_page.items || []).map(it => {
+      const cv = {};
+      for (const col of it.column_values) cv[col.id] = col.text;
+      return { id: it.id, name: it.name, role: cv[c.role] || '', status: cv[c.status] || '' };
+    }).sort((a, b) => {
+      const aActive = a.status === 'Active' ? 0 : 1;
+      const bActive = b.status === 'Active' ? 0 : 1;
+      if (aActive !== bActive) return aActive - bActive;
+      return a.name.localeCompare(b.name);
+    });
+  }
+
+  async function fetchBags() {
+    const c = LINEN.bagsColumns;
+    const itemColIds = Object.values(c.items);
+    const colIds = [c.arrival, c.linenType, c.status, c.transportMethod,
+                    c.driver, c.driverStaff, c.dirtiesDriverStaff,
+                    c.baggedAt, c.pickedUpAt, c.deliveredAt,
+                    c.dirtiesCollectedAt, c.dirtiesCollectedBy, c.notes,
+                    ...itemColIds].map(id => `"${id}"`).join(',');
+    const data = await mondayFetch(`{ boards(ids:[${LINEN.boards.bags}]){ items_page(limit:200){ items {
+      id name
+      column_values(ids:[${colIds}]) {
+        id text
+        ... on BoardRelationValue { linked_item_ids display_value }
+      }
+    } } } }`);
+    bags = [];
+    for (const it of data.boards[0].items_page.items) {
+      const cv = {};
+      for (const col of it.column_values) cv[col.id] = col;
+      const linkedIds = cv[c.arrival]?.linked_item_ids || [];
+      const arrivalId = linkedIds.length ? String(linkedIds[0]) : null;
+      const items = {};
+      for (const itemSchema of LINEN.items) {
+        const colId = c.items[itemSchema.id];
+        const qty = parseInt(cv[colId]?.text) || 0;
+        if (qty) items[itemSchema.id] = qty;
+      }
+      const property = (it.name || '').split(' · ')[0] || cv[c.arrival]?.display_value || '(unknown)';
+      const driverIds = cv[c.driverStaff]?.linked_item_ids || [];
+      const driverId = driverIds.length ? String(driverIds[0]) : null;
+      const dirtiesDriverIds = cv[c.dirtiesDriverStaff]?.linked_item_ids || [];
+      const dirtiesDriverId  = dirtiesDriverIds.length ? String(dirtiesDriverIds[0]) : null;
+      const dirtiesByIds = cv[c.dirtiesCollectedBy]?.linked_item_ids || [];
+      bags.push({
+        id: it.id,
+        name: it.name,
+        property,
+        arrivalId,
+        type:        cv[c.linenType]?.text === 'Regency' ? 'regency' : 'own',
+        status:      cv[c.status]?.text || 'Planned',
+        transport:   cv[c.transportMethod]?.text || '',
+        driverId,
+        driverName:  cv[c.driverStaff]?.display_value || '',
+        dirtiesDriverId,
+        dirtiesDriverName: cv[c.dirtiesDriverStaff]?.display_value || '',
+        baggedAt:    cv[c.baggedAt]?.text || '',
+        pickedUpAt:  cv[c.pickedUpAt]?.text || '',
+        deliveredAt: cv[c.deliveredAt]?.text || '',
+        dirtiesCollectedAt:    cv[c.dirtiesCollectedAt]?.text || '',
+        dirtiesCollectedById:  dirtiesByIds.length ? String(dirtiesByIds[0]) : null,
+        dirtiesCollectedByName: cv[c.dirtiesCollectedBy]?.display_value || '',
+        notes:       cv[c.notes]?.text || '',
+        items,
+        total: Object.values(items).reduce((a,b) => a + b, 0),
+      });
+    }
+  }
+
+  // ── Mutations ─────────────────────────────────────────────────────────────
+  async function setBagStatus(bagId, newStatus) {
+    const bc = LINEN.bagsColumns;
+    const today = localStr(new Date());
+    const cv = { [bc.status]: { label: newStatus } };
+    if (newStatus === 'In transit') cv[bc.pickedUpAt]  = { date: today };
+    if (newStatus === 'Delivered')  cv[bc.deliveredAt] = { date: today };
+    setLoading(true);
+    try {
+      await mondayFetch(
+        `mutation Up($cv: JSON!) { change_multiple_column_values(board_id: "${LINEN.boards.bags}", item_id: "${bagId}", column_values: $cv) { id } }`,
+        { cv: JSON.stringify(cv) }
+      );
+      await fetchBags();
+      render();
+      const verb = newStatus === 'In transit' ? 'picked up'
+                : newStatus === 'Delivered'  ? 'delivered'
+                : newStatus === 'Bagged'     ? 'reverted to bagged'
+                : `set to ${newStatus.toLowerCase()}`;
+      showToast(`Bag ${verb}`);
+    } catch (e) {
+      console.error(e); showToast('Update failed — ' + (e.message || 'see console'));
+    } finally { setLoading(false); }
+  }
+
+  async function setBagTransport(bagId, method) {
+    const bc = LINEN.bagsColumns;
+    const cv = method ? { [bc.transportMethod]: { label: method } }
+                      : { [bc.transportMethod]: null }; // clear
+    setLoading(true);
+    try {
+      await mondayFetch(
+        `mutation Up($cv: JSON!) { change_multiple_column_values(board_id: "${LINEN.boards.bags}", item_id: "${bagId}", column_values: $cv) { id } }`,
+        { cv: JSON.stringify(cv) }
+      );
+      await fetchBags();
+      render();
+      showToast(method ? `Transport set: ${method}` : 'Transport cleared');
+    } catch (e) {
+      console.error(e); showToast('Update failed — ' + (e.message || 'see console'));
+    } finally { setLoading(false); }
+  }
+
+  async function setBagDriver(bagId, driverId) {
+    const bc = LINEN.bagsColumns;
+    const cv = {};
+    if (driverId) {
+      cv[bc.driverStaff] = { item_ids: [Number(driverId)] };
+      // Also auto-fill transport mode from the driver's role
+      const staff = staffList.find(s => s.id === driverId);
+      if (staff) {
+        const tm = (typeof transportForRole === 'function')
+          ? transportForRole(staff.role) : 'Staff (own car)';
+        cv[bc.transportMethod] = { label: tm };
+      }
+      // If dirties driver is unset, mirror cleans driver
+      const bag = bags.find(b => b.id === bagId);
+      if (bag && !bag.dirtiesDriverId) {
+        cv[bc.dirtiesDriverStaff] = { item_ids: [Number(driverId)] };
+      }
+    } else {
+      cv[bc.driverStaff] = { item_ids: [] };
+    }
+    setLoading(true);
+    try {
+      await mondayFetch(
+        `mutation Up($cv: JSON!) { change_multiple_column_values(board_id: "${LINEN.boards.bags}", item_id: "${bagId}", column_values: $cv) { id } }`,
+        { cv: JSON.stringify(cv) }
+      );
+      await fetchBags();
+      render();
+      const name = staffList.find(s => s.id === driverId)?.name;
+      showToast(driverId ? `Cleans driver set: ${name || driverId}` : 'Cleans driver cleared');
+    } catch (e) {
+      console.error(e); showToast('Update failed — ' + (e.message || 'see console'));
+    } finally { setLoading(false); }
+  }
+
+  async function setBagDirtiesDriver(bagId, driverId) {
+    const bc = LINEN.bagsColumns;
+    const cv = driverId
+      ? { [bc.dirtiesDriverStaff]: { item_ids: [Number(driverId)] } }
+      : { [bc.dirtiesDriverStaff]: { item_ids: [] } };
+    setLoading(true);
+    try {
+      await mondayFetch(
+        `mutation Up($cv: JSON!) { change_multiple_column_values(board_id: "${LINEN.boards.bags}", item_id: "${bagId}", column_values: $cv) { id } }`,
+        { cv: JSON.stringify(cv) }
+      );
+      await fetchBags();
+      render();
+      const name = staffList.find(s => s.id === driverId)?.name;
+      showToast(driverId ? `Dirties driver set: ${name || driverId}` : 'Dirties driver cleared');
+    } catch (e) {
+      console.error(e); showToast('Update failed — ' + (e.message || 'see console'));
+    } finally { setLoading(false); }
+  }
+
+  async function markDirties(bagId, undo) {
+    const bc = LINEN.bagsColumns;
+    const today = localStr(new Date());
+    const bag = bags.find(b => b.id === bagId);
+    const cv = {};
+    if (undo) {
+      cv[bc.dirtiesCollectedAt] = '';
+      cv[bc.dirtiesCollectedBy] = { item_ids: [] };
+    } else {
+      cv[bc.dirtiesCollectedAt] = { date: today };
+      // Default collector = assigned dirties driver, or cleans driver as fallback
+      const collectorId = bag?.dirtiesDriverId || bag?.driverId;
+      if (collectorId) cv[bc.dirtiesCollectedBy] = { item_ids: [Number(collectorId)] };
+    }
+    setLoading(true);
+    try {
+      await mondayFetch(
+        `mutation Up($cv: JSON!) { change_multiple_column_values(board_id: "${LINEN.boards.bags}", item_id: "${bagId}", column_values: $cv) { id } }`,
+        { cv: JSON.stringify(cv) }
+      );
+      await fetchBags();
+      render();
+      showToast(undo ? 'Dirties pickup undone' : 'Dirties marked collected');
+    } catch (e) {
+      console.error(e); showToast('Update failed — ' + (e.message || 'see console'));
+    } finally { setLoading(false); }
+  }
+
+  // ── Render ────────────────────────────────────────────────────────────────
+  function render() {
+    const today = localStr(new Date());
+    const isToday = b => b.deliveredAt && b.deliveredAt === today;
+
+    // Filter by method
+    const filtered = bags.filter(b => {
+      if (methodFilter === 'all') return true;
+      if (methodFilter === 'unassigned') return !b.transport;
+      return b.transport === methodFilter;
+    });
+
+    const ready    = filtered.filter(b => b.status === 'Bagged');
+    const inTrans  = filtered.filter(b => b.status === 'In transit');
+    const delTodayBags = filtered.filter(b => b.status === 'Delivered' && isToday(b));
+    const planned  = filtered.filter(b => b.status === 'Planned');
+
+    let html = '';
+
+    // Planned (not on shelf yet)
+    if (planned.length) {
+      html += `<div class="section">
+        <div class="section-hdr">
+          <span class="section-title">Planned (still on shelf)</span>
+          <span class="section-count">${planned.length}</span>
+        </div>
+        ${planned.map(renderBagCard).join('')}
+      </div>`;
+    }
+
+    // Ready to go (Bagged) — grouped by transport method
+    html += `<div class="section">
+      <div class="section-hdr">
+        <span class="section-title">Ready to go</span>
+        <span class="section-count">${ready.length} ${ready.length === 1 ? 'bag' : 'bags'}</span>
+      </div>`;
+    if (!ready.length) {
+      html += `<div class="section-empty">Nothing ready for transport.</div>`;
+    } else {
+      // Group by transport method
+      const groups = new Map();
+      for (const b of ready) {
+        const key = b.transport || 'Unassigned';
+        if (!groups.has(key)) groups.set(key, []);
+        groups.get(key).push(b);
+      }
+      // Sort: Unassigned first (needs attention), then alphabetical
+      const sortedKeys = [...groups.keys()].sort((a, b) => {
+        if (a === 'Unassigned') return -1;
+        if (b === 'Unassigned') return 1;
+        return a.localeCompare(b);
+      });
+      for (const key of sortedKeys) {
+        const list = groups.get(key);
+        const cls = key === 'Unassigned' ? 'unassigned' : '';
+        html += `<div class="method-group">
+          <div class="method-label ${cls}">${key} · ${list.length} ${list.length === 1 ? 'bag' : 'bags'}</div>
+          ${list.map(renderBagCard).join('')}
+        </div>`;
+      }
+    }
+    html += `</div>`;
+
+    // Out for delivery (In transit)
+    html += `<div class="section">
+      <div class="section-hdr">
+        <span class="section-title transit">Out for delivery</span>
+        <span class="section-count">${inTrans.length} ${inTrans.length === 1 ? 'bag' : 'bags'}</span>
+      </div>`;
+    if (!inTrans.length) {
+      html += `<div class="section-empty">No bags currently in transit.</div>`;
+    } else {
+      html += inTrans.map(renderBagCard).join('');
+    }
+    html += `</div>`;
+
+    // Delivered today
+    if (delTodayBags.length) {
+      html += `<div class="section delivered">
+        <div class="section-hdr">
+          <span class="section-title delivered">Delivered today</span>
+          <span class="section-count">${delTodayBags.length}</span>
+        </div>
+        ${delTodayBags.map(renderBagCard).join('')}
+      </div>`;
+    }
+
+    document.getElementById('content').innerHTML = html;
+  }
+
+  function renderBagCard(b) {
+    const isExpanded = expandedBags.has(b.id);
+    const typeLabel = b.type === 'own' ? 'Own' : 'Regency';
+
+    // Items list (sorted in our schema's natural order)
+    const itemsStr = LINEN.items
+      .filter(i => b.items[i.id])
+      .map(i => `${b.items[i.id]} ${i.label}`)
+      .join(', ') || '(empty)';
+
+    // Meta: who/when
+    const metaParts = [];
+    if (b.baggedAt)    metaParts.push(`bagged ${fmtShort(b.baggedAt)}`);
+    if (b.pickedUpAt && b.status !== 'Delivered') metaParts.push(`picked up ${fmtShort(b.pickedUpAt)}`);
+    if (b.deliveredAt && b.status === 'Delivered') metaParts.push(`delivered ${fmtShort(b.deliveredAt)}`);
+    if (b.dirtiesCollectedAt) metaParts.push(`dirties picked up ${fmtShort(b.dirtiesCollectedAt)}`);
+    const metaHtml = metaParts.length
+      ? `<div class="bag-meta">${metaParts.join(' · ')}</div>` : '';
+
+    // Status pill
+    const stCls = b.status === 'In transit' ? 'transit'
+                : b.status === 'Delivered'  ? 'delivered'
+                : b.status === 'Planned'    ? 'planned'
+                :                              'bagged';
+    const statusPill = `<span class="status-pill ${stCls}">${b.status}</span>`;
+
+    // Transport chip / select
+    let transportEl;
+    if (b.transport) {
+      transportEl = `<span class="transport-chip">${b.transport}</span>`;
+    } else {
+      const opts = TRANSPORT_METHODS.map(m =>
+        `<option value="${m}">${m}</option>`
+      ).join('');
+      transportEl = `<select class="transport-select" onchange="setBagTransport('${b.id}', this.value)">
+        <option value="">— assign transport —</option>${opts}
+      </select>`;
+    }
+
+    // Driver chip / select (cleans + dirties)
+    const buildStaffOpts = (placeholder) => {
+      const opts = [`<option value="">${placeholder}</option>`];
+      const active = staffList.filter(s => s.status === 'Active');
+      const inactive = staffList.filter(s => s.status !== 'Active');
+      if (active.length) {
+        opts.push('<optgroup label="Active">');
+        for (const s of active) opts.push(`<option value="${s.id}">${s.name}${s.role ? ' · ' + s.role : ''}</option>`);
+        opts.push('</optgroup>');
+      }
+      if (inactive.length) {
+        opts.push('<optgroup label="Other">');
+        for (const s of inactive) opts.push(`<option value="${s.id}">${s.name}${s.role ? ' · ' + s.role : ''}</option>`);
+        opts.push('</optgroup>');
+      }
+      return opts.join('');
+    };
+    const driverEl = b.driverName
+      ? `<span class="transport-chip">👤 ${b.driverName}</span>`
+      : `<select class="transport-select" onchange="setBagDriver('${b.id}', this.value)">${buildStaffOpts('— assign cleans driver —')}</select>`;
+    // Show dirties driver only if it differs from cleans driver, otherwise just show "(same)"
+    let dirtiesDriverEl;
+    if (b.dirtiesDriverName && b.dirtiesDriverId !== b.driverId) {
+      dirtiesDriverEl = `<span class="transport-chip" style="background:#f5e0ca;color:#8a5a2a">🧺 ${b.dirtiesDriverName}</span>`;
+    } else if (b.dirtiesDriverId && b.dirtiesDriverId === b.driverId) {
+      dirtiesDriverEl = `<span class="transport-chip" style="background:#f0eee8;color:#888">🧺 same</span>`;
+    } else {
+      dirtiesDriverEl = `<select class="transport-select" onchange="setBagDirtiesDriver('${b.id}', this.value)">${buildStaffOpts('— dirties driver —')}</select>`;
+    }
+
+    // Action buttons by status
+    let actions = '';
+    // Dirties pickup is available whenever the driver has been to the property
+    // (i.e. status is In transit or Delivered)
+    const dirtiesEligible = b.status === 'In transit' || b.status === 'Delivered';
+    const dirtiesBtn = dirtiesEligible
+      ? (b.dirtiesCollectedAt
+          ? `<button class="action-btn danger" onclick="markDirties('${b.id}', true)">↶ Undo dirties pickup</button>`
+          : `<button class="action-btn secondary" onclick="markDirties('${b.id}', false)">🧺 Dirties collected</button>`)
+      : '';
+
+    if (b.status === 'Bagged') {
+      actions = `
+        <button class="action-btn primary" onclick="setBagStatus('${b.id}','In transit')">▶ Mark in transit</button>
+        ${b.transport ? `<button class="action-btn secondary" onclick="setBagTransport('${b.id}','')">Change transport</button>` : ''}
+        ${b.driverName ? `<button class="action-btn secondary" onclick="setBagDriver('${b.id}','')">Change driver</button>` : ''}
+      `;
+    } else if (b.status === 'In transit') {
+      actions = `
+        <button class="action-btn deliver" onclick="setBagStatus('${b.id}','Delivered')">✓ Mark delivered</button>
+        ${dirtiesBtn}
+        <button class="action-btn danger" onclick="setBagStatus('${b.id}','Bagged')">↶ Revert to bagged</button>
+      `;
+    } else if (b.status === 'Delivered') {
+      actions = `
+        ${dirtiesBtn}
+        <button class="action-btn danger" onclick="setBagStatus('${b.id}','In transit')">↶ Undo delivery</button>
+      `;
+    } else if (b.status === 'Planned') {
+      actions = `<button class="action-btn secondary" onclick="setBagStatus('${b.id}','Bagged')">Mark bagged (off shelf)</button>`;
+    }
+
+    const itemsToggle = b.total > 0
+      ? `<span class="bag-items-toggle" onclick="toggleBagItems('${b.id}')">${isExpanded ? '▾ Hide' : '▸ Show'} contents (${b.total} item${b.total === 1 ? '' : 's'})</span>`
+      : '';
+
+    return `
+      <div class="bag-card ${b.type} ${b.status === 'Delivered' ? 'delivered' : ''}" id="card-${b.id}">
+        <div class="bag-row1">
+          <span class="bag-prop" title="${b.property}">${b.property}</span>
+          <span class="type-badge ${b.type}">${typeLabel}</span>
+        </div>
+        ${metaHtml}
+        ${itemsToggle}
+        <div class="bag-items-list ${isExpanded ? 'open' : ''}" id="items-${b.id}">${itemsStr}</div>
+        <div class="bag-status-row">
+          ${statusPill}
+          ${transportEl}
+          ${driverEl}
+          ${dirtiesDriverEl}
+        </div>
+        <div class="bag-actions">${actions}</div>
+      </div>`;
+  }
+
+  function toggleBagItems(bagId) {
+    if (expandedBags.has(bagId)) expandedBags.delete(bagId);
+    else expandedBags.add(bagId);
+    render();
+  }
+
+  // ── Filters ───────────────────────────────────────────────────────────────
+  function setMethodFilter(m) {
+    methodFilter = m;
+    document.querySelectorAll('.filter-chip').forEach(c => {
+      c.classList.toggle('active', c.dataset.method === m);
+    });
+    render();
+  }
+
+  // ── Staff name ────────────────────────────────────────────────────────────
+  function onStaffNameInput() {
+    staffName = document.getElementById('staffName').value.trim();
+    try { localStorage.setItem(STAFF_NAME_KEY, staffName); } catch {}
+  }
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
+  function showToast(msg) {
+    const t = document.getElementById('toast');
+    t.textContent = msg; t.classList.add('show');
+    setTimeout(() => t.classList.remove('show'), 2800);
+  }
+
+  // ── Load + reload ─────────────────────────────────────────────────────────
+  async function reload() {
+    setLoading(true);
+    try {
+      await Promise.all([fetchBags(), fetchStaff()]);
+      render();
+      showToast('Refreshed');
+    } catch (e) {
+      console.error(e);
+      document.getElementById('content').innerHTML =
+        `<div class="section-empty">Could not load — ${e.message || 'see console'}</div>`;
+    } finally { setLoading(false); }
+  }
+
+  // ── Init ──────────────────────────────────────────────────────────────────
+  document.getElementById('staffName').value = staffName;
+  setLoading(true);
+  Promise.all([fetchBags(), fetchStaff()])
+    .then(() => { render(); setLoading(false); })
+    .catch(e => {
+      console.error(e);
+      setLoading(false);
+      document.getElementById('content').innerHTML =
+        `<div class="section-empty">Could not load — ${e.message || 'see console'}</div>`;
+    });
+</script>
+</body>
+</html>

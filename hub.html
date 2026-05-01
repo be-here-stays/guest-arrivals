@@ -167,6 +167,10 @@
       <div class="stat-val" id="stLow"><span class="spin"></span></div>
       <div class="stat-lbl">Low stock</div>
     </a>
+    <a href="linen-dashboard.html" class="stat-card" id="cardLinen">
+      <div class="stat-val" id="stLinen"><span class="spin"></span></div>
+      <div class="stat-lbl">Linen low/out</div>
+    </a>
   </div>
 </div>
 
@@ -257,28 +261,40 @@
         <div class="card-desc">Regency order totals and own laundry requirements for each delivery window.</div>
         <span class="card-badge b-both">📱💻 Any</span>
       </a>
-      <a href="laundry-rota.html" class="tool-card">
-        <div class="card-icon">📋</div>
-        <div class="card-name">Laundry Rota</div>
-        <div class="card-desc">14-day rota — move wash runs between days, mark as bagged, add one-off notes.</div>
+      <a href="linen-dashboard.html" class="tool-card featured">
+        <div class="card-icon">📊</div>
+        <div class="card-name">Linen Status</div>
+        <div class="card-desc">At-a-glance shelf state — what's low, what's empty, and what's currently bagged out for delivery.</div>
         <span class="card-badge b-both">📱💻 Any</span>
       </a>
-      <a href="laundry-run.html" class="tool-card featured">
-        <div class="card-icon">🧺</div>
-        <div class="card-name">Laundry Run</div>
-        <div class="card-desc">One day at a glance — every linen-in drop and dirties-out pickup, by driver. Email the day sheet to the driver.</div>
+      <a href="laundry-rota.html" class="tool-card">
+        <div class="card-icon">📋</div>
+        <div class="card-name">Bagging Rota</div>
+        <div class="card-desc">Daily/2-week rota — bag for each arrival with derived quantities from the bed config, edit beds, add notes.</div>
         <span class="card-badge b-both">📱💻 Any</span>
+      </a>
+      <a href="linen-transport.html" class="tool-card">
+        <div class="card-icon">🚚</div>
+        <div class="card-name">Linen Transport</div>
+        <div class="card-desc">Dispatch and deliver — assign transport method, mark bags in transit, confirm delivered.</div>
+        <span class="card-badge b-mobile">📱 Mobile</span>
       </a>
       <a href="linen-stock.html" class="tool-card">
         <div class="card-icon">📦</div>
-        <div class="card-name">Linen Stock Take</div>
-        <div class="card-desc">Count what's on the shelf. Set buffer levels and see RAG status for own laundry and Regency.</div>
+        <div class="card-name">Stock Take</div>
+        <div class="card-desc">Confirm or correct shelf counts. Surplus/deficit shown live as you count.</div>
         <span class="card-badge b-both">📱💻 Any</span>
       </a>
       <a href="linen-returns.html" class="tool-card">
         <div class="card-icon">↩️</div>
         <div class="card-name">Returns &amp; Deliveries</div>
         <div class="card-desc">Log property returns, wash runs off the line, and incoming Regency deliveries.</div>
+        <span class="card-badge b-both">📱💻 Any</span>
+      </a>
+      <a href="laundry-run.html" class="tool-card">
+        <div class="card-icon">🧺</div>
+        <div class="card-name">Laundry Run</div>
+        <div class="card-desc">One day at a glance — every linen-in drop and dirties-out pickup, by driver. Email the day sheet to the driver.</div>
         <span class="card-badge b-both">📱💻 Any</span>
       </a>
     </div>
@@ -329,6 +345,12 @@
         <div class="card-name">Jet Washing</div>
         <div class="card-desc">Track when paths and decking were last jet washed. Ad hoc — log as and when done.</div>
         <span class="card-badge b-both">📱💻 Any</span>
+      </a>
+      <a href="decking-audit.html" class="tool-card">
+        <div class="card-icon">📸</div>
+        <div class="card-name">Decking Audit</div>
+        <div class="card-desc">Before/after photo audit of decking with AI-flagged damage and stubborn-spot detection. Auto-logs the wash and opens issues for anything serious.</div>
+        <span class="card-badge b-mobile">📱 Mobile</span>
       </a>
       <a href="pat-testing.html" class="tool-card">
         <div class="card-icon">⚡</div>
@@ -391,6 +413,12 @@
   </div>
 </div>
 
+<!-- Shared linen schema -->
+<script src="linen-schema.js"></script>
+
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
+
 <script>
 // Service worker
 if ('serviceWorker' in navigator) {
@@ -419,7 +447,7 @@ startClock();
 window.addEventListener('pageshow', e => {
   if (e.persisted) {
     startClock();
-    ['stArr','stNext','stSup','stOut','stLow','stBacklog','stIssues'].forEach(id => {
+    ['stArr','stNext','stSup','stOut','stLow','stLinen','stBacklog','stIssues'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = '<span class="spin"></span>';
     });
@@ -460,7 +488,7 @@ function dismissInstall() {
 }
 
 // Monday API
-const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const TOKEN = window.MONDAY_API_TOKEN;
 async function mq(q) {
   const r = await fetch('https://api.monday.com/v2', {
     method:'POST', headers:{'Content-Type':'application/json','Authorization':TOKEN,'API-Version':'2024-01'},
@@ -518,6 +546,32 @@ async function loadStats() {
     document.getElementById('stOut').textContent = out;
     document.getElementById('stLow').textContent = low;
   } catch { document.getElementById('stOut').textContent = document.getElementById('stLow').textContent = '—'; }
+
+  // Linen shelf state — counts items at empty / below min across both Own and Regency
+  try {
+    if (typeof LINEN === 'undefined') throw new Error('linen-schema.js not loaded');
+    const cols = LINEN.stockColumns;
+    const d = await mq(`{ boards(ids:["${LINEN.boards.stock}"]) { items_page(limit:50) { items {
+      column_values(ids:["${cols.currentCount}","${cols.minLevel}"]) { id text }
+    } } } }`);
+    let lEmpty = 0, lLow = 0;
+    for (const it of d?.boards?.[0]?.items_page?.items || []) {
+      const cv = {}; for (const c of it.column_values) cv[c.id] = parseInt(c.text) || 0;
+      const count = cv[cols.currentCount] || 0;
+      const min   = cv[cols.minLevel] || 0;
+      if (count <= 0) lEmpty++;
+      else if (count < min) lLow++;
+    }
+    const total = lEmpty + lLow;
+    document.getElementById('stLinen').textContent = total;
+    const card = document.getElementById('cardLinen');
+    card.classList.remove('warn', 'danger');
+    if (lEmpty > 0)    card.classList.add('danger');
+    else if (lLow > 0) card.classList.add('warn');
+  } catch (e) {
+    console.warn('Linen stat fetch failed:', e);
+    document.getElementById('stLinen').textContent = '—';
+  }
 
   // Maintenance Backlog (Overdue + Unassigned)
   try {

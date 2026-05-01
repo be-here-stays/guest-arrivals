@@ -209,6 +209,9 @@
 
 <div class="toast" id="toast"></div>
 
+<!-- Shared linen schema (board IDs, column IDs, role→transport map) -->
+<script src="linen-schema.js"></script>
+
 <!-- ── Maintenance Exception modal ───────────────────────────── -->
 <div class="cl-overlay" id="exOverlay">
   <div class="ex-box">
@@ -328,6 +331,9 @@
   .ex-btn.go { background:var(--sage); color:#fff; }
 </style>
 
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
+
 <script>
 /* ═══════════════════════════════════════════════════════════════════
    Be Here — Staff personal day view
@@ -336,8 +342,8 @@
    for today + 6 days ahead.
    ═══════════════════════════════════════════════════════════════════ */
 
-const API_TOKEN      = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
-const ANTHROPIC_KEY  = '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'; // OpenRouter key
+const API_TOKEN = window.MONDAY_API_TOKEN;
+const ANTHROPIC_KEY = window.ANTHROPIC_KEY;
 const STAFF_BOARD  = 5095127554;
 const CLEANS_BOARD = 5095134636;
 const SHIFTS_BOARD = 5095155773;
@@ -486,6 +492,7 @@ let cleans = [];
 let shifts = [];
 let hotTubCleans = [];  // hot tub cleans assigned to this staff member
 let maintTasks = [];    // scheduled work from window/jet/PAT/ad-hoc boards
+let linenBags = [];     // linen bags where Driver = me (from Linen Bags board)
 let currentDay = null;  // yyyy-mm-dd
 
 /* ─── Helpers ───────────────────────────────────────────────── */
@@ -649,15 +656,16 @@ async function boot() {
     hotTubCleans = JSON.parse(localStorage.getItem('cache_hot_tubs') || '[]');
     maintTasks = JSON.parse(localStorage.getItem('cache_maint') || '[]');
     shifts = JSON.parse(localStorage.getItem('cache_shifts') || '[]');
-    if (cleans.length || hotTubCleans.length || maintTasks.length || shifts.length) {
+    linenBags = JSON.parse(localStorage.getItem('cache_linen_bags') || '[]');
+    if (cleans.length || hotTubCleans.length || maintTasks.length || shifts.length || linenBags.length) {
       renderDayNav();
       renderDay();
     }
   } catch(e) {}
 
   // Run loaders independently
-  const results = await Promise.allSettled([loadCleans(), loadShifts(), loadHotTubCleans(), loadMaintenanceTasks()]);
-  const labels = ['cleans', 'shifts', 'hot tub cleans', 'maintenance tasks'];
+  const results = await Promise.allSettled([loadCleans(), loadShifts(), loadHotTubCleans(), loadMaintenanceTasks(), loadLinenBags()]);
+  const labels = ['cleans', 'shifts', 'hot tub cleans', 'maintenance tasks', 'linen bags'];
   const failures = results
     .map((r, i) => r.status === 'rejected' ? { label: labels[i], err: r.reason } : null)
     .filter(Boolean);
@@ -889,6 +897,103 @@ function getPropertyAccessForDay(property, day) {
   return midStay ? 'occupied' : 'empty';
 }
 
+/* ─── Load Linen Bags assigned to me ─────────────────────────────
+   Pulls bags from the Linen Bags board where Driver (staff) = me.id.
+   Used for the "Linen deliveries" section in renderDay. */
+async function loadLinenBags() {
+  if (typeof LINEN === 'undefined') { linenBags = []; return; }
+  const c = LINEN.bagsColumns;
+  const itemColIds = Object.values(c.items);
+  const colIds = [c.arrival, c.linenType, c.status, c.transportMethod,
+                  c.driverStaff, c.dirtiesDriverStaff,
+                  c.baggedAt, c.pickedUpAt, c.deliveredAt,
+                  c.dirtiesCollectedAt, c.dirtiesCollectedBy, c.notes,
+                  ...itemColIds].map(id => `"${id}"`).join(',');
+  const data = await mondayFetch(`{ boards(ids:[${LINEN.boards.bags}]){ items_page(limit:200){ items {
+    id name
+    column_values(ids:[${colIds}]) {
+      id text
+      ... on BoardRelationValue { linked_item_ids display_value }
+    }
+  } } } }`);
+  linenBags = [];
+  for (const it of (data?.boards?.[0]?.items_page?.items || [])) {
+    const cv = {};
+    for (const col of it.column_values) cv[col.id] = col;
+    const driverIds = cv[c.driverStaff]?.linked_item_ids || [];
+    const driverId = driverIds.length ? String(driverIds[0]) : null;
+    const dirtiesDriverIds = cv[c.dirtiesDriverStaff]?.linked_item_ids || [];
+    const dirtiesDriverId = dirtiesDriverIds.length ? String(dirtiesDriverIds[0]) : null;
+    // Include bag if I'm either the cleans driver OR the dirties driver
+    if (driverId !== me.id && dirtiesDriverId !== me.id) continue;
+    const items = {};
+    for (const itemSchema of LINEN.items) {
+      const colId = c.items[itemSchema.id];
+      const qty = parseInt(cv[colId]?.text) || 0;
+      if (qty) items[itemSchema.id] = qty;
+    }
+    const property = (it.name || '').split(' · ')[0] || cv[c.arrival]?.display_value || '(unknown)';
+    linenBags.push({
+      id:          it.id,
+      property,
+      type:        cv[c.linenType]?.text === 'Regency' ? 'regency' : 'own',
+      status:      cv[c.status]?.text || 'Planned',
+      transport:   cv[c.transportMethod]?.text || '',
+      driverId,
+      dirtiesDriverId,
+      baggedAt:    cv[c.baggedAt]?.text || '',
+      pickedUpAt:  cv[c.pickedUpAt]?.text || '',
+      deliveredAt: cv[c.deliveredAt]?.text || '',
+      dirtiesCollectedAt: cv[c.dirtiesCollectedAt]?.text || '',
+      notes:       cv[c.notes]?.text || '',
+      items,
+      total: Object.values(items).reduce((a,b) => a + b, 0),
+    });
+  }
+  localStorage.setItem('cache_linen_bags', JSON.stringify(linenBags));
+}
+
+/* Apply a one-tap status flip to one of my linen bags. Called from the
+   linen-card action buttons. Optimistic UI — local state updates first,
+   then writes to Monday. */
+async function linenAction(bagId, action) {
+  if (typeof LINEN === 'undefined') return;
+  const bag = linenBags.find(b => b.id === bagId);
+  if (!bag) return;
+  const bc = LINEN.bagsColumns;
+  const today = todayISO();
+  const cv = {};
+  if (action === 'transit') {
+    cv[bc.status] = { label: 'In transit' };
+    cv[bc.pickedUpAt] = { date: today };
+    bag.status = 'In transit'; bag.pickedUpAt = today;
+  } else if (action === 'delivered') {
+    cv[bc.status] = { label: 'Delivered' };
+    cv[bc.deliveredAt] = { date: today };
+    bag.status = 'Delivered'; bag.deliveredAt = today;
+  } else if (action === 'dirties') {
+    cv[bc.dirtiesCollectedAt] = { date: today };
+    cv[bc.dirtiesCollectedBy] = { item_ids: [Number(me.id)] };
+    bag.dirtiesCollectedAt = today;
+  }
+  localStorage.setItem('cache_linen_bags', JSON.stringify(linenBags));
+  renderDay();
+
+  try {
+    const q = `mutation Up($cv: JSON!) { change_multiple_column_values(board_id: "${LINEN.boards.bags}", item_id: "${bagId}", column_values: $cv) { id } }`;
+    await mondayFetch(q, { cv: JSON.stringify(cv) });
+    const verb = action === 'transit' ? 'Marked as taken'
+               : action === 'delivered' ? 'Delivered ✓'
+               : 'Dirties collected ✓';
+    toast(verb, 'ok');
+  } catch (e) {
+    console.error(e);
+    toast('Update failed — refreshing', 'err');
+    await loadLinenBags();
+    renderDay();
+  }
+}
+
 /* Is a task eligible to appear on a given day?
    Checks date range AND guest-access rule. */
 function isTaskEligibleOnDay(task, day) {
@@ -1040,6 +1145,40 @@ function renderDay() {
     for (const c of dirtiesMine) parts.push(renderDirtiesCard(c));
   }
 
+  // Linen bag deliveries + dirties pickups assigned to me
+  // Two separate sections so a Wendy who only does pickups, or only delivers,
+  // sees just her work. A staff member assigned to both gets the bag in
+  // "Linen deliveries" with both actions on the card (avoiding duplication).
+  const todayStr = todayISO();
+  const isToday = day === todayStr;
+  const onThisDay = (b) => isToday
+    ? (b.status !== 'Delivered' || b.deliveredAt === day)
+    : (b.baggedAt === day || b.pickedUpAt === day || b.deliveredAt === day || b.dirtiesCollectedAt === day);
+  const sortByStatus = (a, b) => {
+    const order = s => s === 'Bagged' ? 0 : s === 'In transit' ? 1 : s === 'Delivered' ? 2 : 3;
+    if (a.status !== b.status) return order(a.status) - order(b.status);
+    return a.property.localeCompare(b.property);
+  };
+
+  // Section 1: cleans deliveries (where I'm the cleans driver)
+  const myDeliveries = (linenBags || [])
+    .filter(b => b.driverId === me.id && onThisDay(b))
+    .sort(sortByStatus);
+  if (myDeliveries.length) {
+    parts.push(`<div class="section-label">Linen deliveries <span class="count">${myDeliveries.length}</span></div>`);
+    for (const lb of myDeliveries) parts.push(renderLinenBagCard(lb));
+  }
+
+  // Section 2: dirties pickups (where I'm the dirties driver but NOT the cleans driver,
+  // so the cleans card doesn't already cover this bag)
+  const myDirties = (linenBags || [])
+    .filter(b => b.dirtiesDriverId === me.id && b.driverId !== me.id && onThisDay(b))
+    .sort(sortByStatus);
+  if (myDirties.length) {
+    parts.push(`<div class="section-label">Dirties pickups <span class="count">${myDirties.length}</span></div>`);
+    for (const lb of myDirties) parts.push(renderDirtiesPickupCard(lb));
+  }
+
   // Hot tub work — primary section for maintenance users
   if (dayHotTubs.length) {
     const label = maint ? 'Hot tub jobs today' : 'Hot tubs';
@@ -1153,6 +1292,108 @@ function renderDirtiesCard(c) {
   </div>`;
 }
 
+/* ─── Linen bag card (driver assignment from Linen Bags board) ───
+   Shown for staff members assigned as Driver on a bag. One-tap actions
+   to mark in transit, mark delivered, and confirm dirties pickup. */
+function renderLinenBagCard(b) {
+  const itemsStr = LINEN.items
+    .filter(i => b.items[i.id])
+    .map(i => `${b.items[i.id]} ${i.label}`)
+    .join(' · ') || '(empty)';
+
+  const isDelivered = b.status === 'Delivered';
+  const isTransit   = b.status === 'In transit';
+  const isBagged    = b.status === 'Bagged';
+
+  // Card styling: green tint for delivered, blue for in transit
+  let bgColor = '#fff', borderColor = b.type === 'own' ? '#1a6fba' : '#c0392b';
+  if (isDelivered)    { bgColor = '#f0faf4'; borderColor = '#2d6a4f'; }
+  else if (isTransit) { bgColor = '#f1edf8'; borderColor = '#5a3e8f'; }
+
+  // Status badge
+  const stBadge = isDelivered ? `<span class="cc-badge comp">DELIVERED</span>`
+                : isTransit   ? `<span class="cc-badge qc">IN TRANSIT</span>`
+                : isBagged    ? `<span class="cc-badge rf">READY TO TAKE</span>`
+                :               `<span class="cc-badge">${escapeHtml(b.status)}</span>`;
+
+  const typeBadge = b.type === 'own'
+    ? `<span class="cc-badge" style="background:#ddeeff;color:#1a6fba">OWN</span>`
+    : `<span class="cc-badge" style="background:#fde8e8;color:#c0392b">REGENCY</span>`;
+
+  // Action buttons by status. Dirties button only shown if I'm also the
+  // assigned dirties driver — otherwise that's a separate person's job and
+  // it'll appear in their own "Dirties pickups" section.
+  const iAmDirtiesDriver = b.dirtiesDriverId === me.id;
+  let actions = '';
+  if (isBagged) {
+    actions = `<button class="cc-btn primary" style="background:var(--sage);color:#fff;border:none;padding:10px 14px;border-radius:8px;font-weight:700;font-family:inherit;cursor:pointer" onclick="linenAction('${b.id}','transit')">▶ I'm taking this</button>`;
+  } else if (isTransit) {
+    const dirtyBtn = !iAmDirtiesDriver ? '' : (b.dirtiesCollectedAt
+      ? `<button class="cc-btn" style="background:#f0eee8;color:#888;padding:10px 14px;border-radius:8px;font-weight:700;font-family:inherit;border:none" disabled>🧺 Dirties collected ✓</button>`
+      : `<button class="cc-btn" style="background:#fff;color:#646955;border:1.5px solid #646955;padding:10px 14px;border-radius:8px;font-weight:700;font-family:inherit;cursor:pointer" onclick="linenAction('${b.id}','dirties')">🧺 Dirties picked up</button>`);
+    actions = `
+      <button class="cc-btn primary" style="background:#2d6a4f;color:#fff;border:none;padding:10px 14px;border-radius:8px;font-weight:700;font-family:inherit;cursor:pointer" onclick="linenAction('${b.id}','delivered')">✓ Delivered</button>
+      ${dirtyBtn}
+    `;
+  } else if (isDelivered && iAmDirtiesDriver && !b.dirtiesCollectedAt) {
+    actions = `<button class="cc-btn" style="background:#fff;color:#646955;border:1.5px solid #646955;padding:10px 14px;border-radius:8px;font-weight:700;font-family:inherit;cursor:pointer" onclick="linenAction('${b.id}','dirties')">🧺 Dirties picked up</button>`;
+  }
+
+  // Meta line: dates + transport
+  const metaParts = [];
+  if (b.transport) metaParts.push(b.transport);
+  metaParts.push(`${b.total} item${b.total === 1 ? '' : 's'}`);
+  if (b.deliveredAt && isDelivered) metaParts.push(`delivered ${escapeHtml(prettyDate(b.deliveredAt))}`);
+  else if (b.pickedUpAt && isTransit) metaParts.push(`picked up ${escapeHtml(prettyDate(b.pickedUpAt))}`);
+  else if (b.baggedAt) metaParts.push(`bagged ${escapeHtml(prettyDate(b.baggedAt))}`);
+  if (b.dirtiesCollectedAt) metaParts.push(`dirties ${escapeHtml(prettyDate(b.dirtiesCollectedAt))}`);
+
+  return `<div class="clean-card" style="background:${bgColor};border-left-color:${borderColor}">
+    <div class="cc-top">
+      <div class="cc-prop">🧺 ${escapeHtml(b.property)}</div>
+      <div class="cc-badges">${typeBadge}${stBadge}</div>
+    </div>
+    <div class="cc-meta">${metaParts.join(' · ')}</div>
+    <div class="cc-meta" style="font-size:11px;color:#666">${escapeHtml(itemsStr)}</div>
+    ${actions ? `<div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">${actions}</div>` : ''}
+  </div>`;
+}
+
+/* ─── Dirties pickup card ───────────────────────────────────────
+   Used when the staff member is the assigned Dirties driver but not the
+   cleans driver — they're going to the property only to collect the dirty
+   bag (the clean delivery is someone else's job). Shows just the pickup
+   action and minimal context. */
+function renderDirtiesPickupCard(b) {
+  const collected = !!b.dirtiesCollectedAt;
+  const typeBadge = b.type === 'own'
+    ? `<span class="cc-badge" style="background:#ddeeff;color:#1a6fba">OWN</span>`
+    : `<span class="cc-badge" style="background:#fde8e8;color:#c0392b">REGENCY</span>`;
+  const stBadge = collected
+    ? `<span class="cc-badge comp">DIRTIES COLLECTED</span>`
+    : `<span class="cc-badge" style="background:#f5e0ca;color:#8a5a2a">DIRTIES TO COLLECT</span>`;
+
+  const action = collected
+    ? `<button class="cc-btn" style="background:#f0eee8;color:#888;padding:10px 14px;border-radius:8px;font-weight:700;font-family:inherit;border:none" disabled>🧺 Dirties collected ✓</button>`
+    : `<button class="cc-btn primary" style="background:var(--sage);color:#fff;border:none;padding:10px 14px;border-radius:8px;font-weight:700;font-family:inherit;cursor:pointer" onclick="linenAction('${b.id}','dirties')">🧺 Picked up dirties</button>`;
+
+  // Context: when the cleans were/will-be delivered, so the dirties driver
+  // knows whether the property has already been visited.
+  const contextParts = [];
+  if (b.deliveredAt)      contextParts.push(`cleans delivered ${escapeHtml(prettyDate(b.deliveredAt))}`);
+  else if (b.pickedUpAt)  contextParts.push(`cleans in transit (picked up ${escapeHtml(prettyDate(b.pickedUpAt))})`);
+  else if (b.baggedAt)    contextParts.push(`cleans bagged ${escapeHtml(prettyDate(b.baggedAt))} — not yet on the way`);
+
+  return `<div class="clean-card" style="background:#fdf5e8;border-left-color:#a86c00">
+    <div class="cc-top">
+      <div class="cc-prop">🧺 Dirties from ${escapeHtml(b.property)}</div>
+      <div class="cc-badges">${typeBadge}${stBadge}</div>
+    </div>
+    <div class="cc-meta">${contextParts.join(' · ') || 'No clean delivery scheduled'}</div>
+    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">${action}</div>
+  </div>`;
+}
+
 /* ─── Hot tub clean card ────────────────────────────────────── */
 function renderHotTubCleanCard(h) {
   const completed = h.status === 'Completed';
@@ -1255,21 +1496,21 @@ async function handleDeckingPhoto(event) {
       reader.readAsDataURL(file);
     });
 
-    const resp = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+    const resp = await fetch('https://api.anthropic.com/v1/messages', {
       method: 'POST',
       headers: {
-        'Content-Type':  'application/json',
-        'Authorization': `Bearer ${ANTHROPIC_KEY}`,
-        'HTTP-Referer':  window.location.origin,
-        'X-Title':       'Be Here Staff'
+        'Content-Type':                      'application/json',
+        'x-api-key':                         ANTHROPIC_KEY,
+        'anthropic-version':                 '2023-06-01',
+        'anthropic-dangerous-allow-browser': 'true'
       },
       body: JSON.stringify({
-        model:      'anthropic/claude-haiku-4-5',
+        model:      'claude-haiku-4-5-20251001',
         max_tokens: 350,
         messages: [{
           role: 'user',
           content: [
-            { type: 'image_url', image_url: { url: `data:${file.type || 'image/jpeg'};base64,${base64}` } },
+            { type: 'image', source: { type: 'base64', media_type: file.type || 'image/jpeg', data: base64 } },
             { type: 'text', text:
               'You are inspecting the outdoor decking area of a holiday cottage immediately before guest arrival. ' +
               'Look at this photo and tell the operative whether the area is guest-ready or not. ' +
@@ -1284,9 +1525,9 @@ async function handleDeckingPhoto(event) {
       })
     });
 
-    if (!resp.ok) throw new Error(`OpenRouter API returned ${resp.status}`);
+    if (!resp.ok) throw new Error(`Anthropic API returned ${resp.status}`);
     const data = await resp.json();
-    const text = (data.choices?.[0]?.message?.content || '').trim() || 'No response received.';
+    const text = data.content?.[0]?.text?.trim() || 'No response received.';
 
     const isGood = /^all looks good/i.test(text);
     resultEl.textContent  = text;

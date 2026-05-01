@@ -94,8 +94,15 @@
                   border-left: 3px solid #ddd; font-size: 11px; }
     .entry-card.own     { border-left-color: var(--own); }
     .entry-card.regency { border-left-color: var(--reg); }
-    .entry-card.bagged  { opacity: 0.55; }
-    .entry-card.bagged .card-name { text-decoration: line-through; }
+    .entry-card.bagged           { background: #f0faf4; border-left-color: #2d6a4f; }
+    .entry-card.bagged .card-name { color: #2d6a4f; }
+    .entry-card .bag-pill { display: inline-block; background: #d4edda; color: #2d6a4f;
+                            font-size: 9px; font-weight: 700; padding: 0 5px;
+                            border-radius: 4px; margin-left: 4px; vertical-align: middle; }
+    .bag-list-compact { font-size: 9px; color: #2d6a4f; padding: 0 5px 4px;
+                        border-top: 1px solid #d4edda; line-height: 1.35;
+                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bag-list-compact .reg { color: #c0392b; }
 
     .card-row { display: flex; align-items: center; padding: 4px 5px 3px 5px; gap: 3px; }
     .card-name { flex: 1; font-size: 11px; font-weight: 700; min-width: 0;
@@ -205,6 +212,156 @@
                    font-size: 15px; cursor: pointer; padding: 2px 5px; }
     .ext-del-btn:hover { color: var(--red); }
 
+    /* ── VIEW MODE TOGGLE ── */
+    .view-mode-row { display: flex; justify-content: center;
+                     background: var(--green-dark); padding: 0 16px 10px; }
+    .view-toggle { display: flex; gap: 0; background: rgba(255,255,255,0.12);
+                   border-radius: 8px; padding: 3px; }
+    .view-toggle button { background: transparent; border: none;
+                          color: rgba(255,255,255,0.7); padding: 6px 18px;
+                          border-radius: 6px; font-size: 12px; font-weight: 600;
+                          font-family: inherit; cursor: pointer;
+                          transition: all 0.15s; }
+    .view-toggle button.active { background: rgba(255,255,255,0.95);
+                                  color: var(--green-dark); }
+
+    /* ── DAILY VIEW ── */
+    .day-view { max-width: 600px; margin: 0 auto; }
+    .day-view-hdr { font-size: 18px; font-weight: 700; color: var(--green-dark);
+                    margin-bottom: 2px; padding: 0 4px; }
+    .day-view-hdr.today { color: var(--own); }
+    .day-view-hdr.past  { color: var(--muted); }
+    .day-view-sub { font-size: 12px; color: var(--muted); padding: 0 4px;
+                    margin-bottom: 14px; text-transform: uppercase;
+                    letter-spacing: 0.5px; font-weight: 600; }
+    .day-view-empty { text-align: center; color: #aaa; font-style: italic;
+                      padding: 30px 12px; font-size: 13px;
+                      background: rgba(255,255,255,0.3); border-radius: 10px; }
+    .daily-card { background: #fff; border-radius: 9px; margin-bottom: 8px;
+                  border-left: 4px solid #ddd; padding: 11px 13px;
+                  box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
+    .daily-card.own     { border-left-color: var(--own); }
+    .daily-card.regency { border-left-color: var(--reg); }
+    .daily-card.bagged           { background: #f0faf4; border-left-color: #2d6a4f; }
+    .daily-card.bagged .daily-card-name { color: #2d6a4f; }
+
+    /* Bag list on daily card */
+    .daily-bag-list { margin-top: 8px; padding-top: 8px;
+                      border-top: 1px dashed #c5e3d0; }
+    .daily-bag-row { display: flex; align-items: center; gap: 8px;
+                     padding: 4px 0; font-size: 12px; color: #444; }
+    .daily-bag-row .type-badge { padding: 1px 6px; font-size: 9px; }
+    .daily-bag-status { font-size: 9px; font-weight: 700; padding: 1px 6px;
+                        border-radius: 4px; background: #d4edda; color: #2d6a4f;
+                        text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0; }
+    .daily-bag-status.intransit { background: #e0d6f0; color: #5a3e8f; }
+    .daily-bag-status.delivered { background: #c5e6cf; color: #1a4a30; }
+    .daily-bag-status.planned   { background: #f0f0f0; color: #777; }
+    .daily-bag-content { flex: 1; font-size: 11px; color: #555; min-width: 0;
+                         white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+                         cursor: pointer; }
+    .daily-bag-content:hover { color: var(--own); }
+    .daily-bag-add { background: transparent; border: 1.5px dashed #c5e3d0;
+                    color: #2d6a4f; padding: 7px 10px; border-radius: 7px;
+                    font-size: 12px; font-family: inherit; cursor: pointer;
+                    width: 100%; text-align: center; margin-top: 6px;
+                    font-weight: 600; transition: all 0.12s; }
+    .daily-bag-add:hover { border-color: #2d6a4f; background: #d4edda; }
+    .daily-card-row { display: flex; align-items: center; gap: 8px; }
+    .daily-card-name { flex: 1; font-size: 15px; font-weight: 700;
+                       white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .daily-card-btns { display: flex; gap: 3px; flex-shrink: 0; }
+    .daily-card-btns .cb { padding: 5px 8px; font-size: 11px; border-radius: 5px; }
+    .daily-card-sub { font-size: 12px; color: #666; padding: 4px 0 0 0;
+                      line-height: 1.4; }
+    .daily-card-note { font-size: 12px; color: #7b5ea7; background: #f8f4fd;
+                       padding: 7px 10px; border-radius: 6px; margin-top: 7px;
+                       cursor: pointer; line-height: 1.35; }
+    .daily-card-note:hover { background: #ede8f5; }
+    .daily-add-btn { background: transparent; border: 1.5px dashed #ccc;
+                     color: #999; padding: 12px; border-radius: 9px;
+                     font-size: 13px; font-family: inherit; cursor: pointer;
+                     width: 100%; text-align: center; margin-top: 8px;
+                     transition: all 0.12s; }
+    .daily-add-btn:hover { border-color: var(--own); color: var(--own);
+                            background: var(--own-light); }
+
+    /* Bag modal */
+    .bag-modal-meta { font-size: 11px; color: var(--muted); padding: 8px 10px;
+                      background: #f0faf4; border-radius: 7px;
+                      margin-bottom: 12px; line-height: 1.4;
+                      border-left: 3px solid #2d6a4f; }
+    .bag-section-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 6px;
+                        margin-bottom: 12px; }
+    .bag-item-row { display: flex; align-items: center; justify-content: space-between;
+                    padding: 7px 10px; background: #f7f7f5; border-radius: 7px; gap: 6px; }
+    .bag-item-row.own     { background: var(--own-light); }
+    .bag-item-row.regency { background: var(--reg-light); }
+    .bag-item-label { font-size: 12px; color: #444; flex: 1; min-width: 0;
+                      white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .bag-item-input { width: 50px; padding: 4px 6px; text-align: center;
+                      border: 1.5px solid var(--border); border-radius: 6px;
+                      font-size: 14px; font-weight: 700; font-family: inherit;
+                      color: var(--text); background: #fff; }
+    .bag-section-label { font-size: 9px; font-weight: 700; text-transform: uppercase;
+                         letter-spacing: 0.5px; color: var(--muted);
+                         grid-column: 1 / -1; margin: 6px 0 1px; }
+    .bag-type-toggle { margin-bottom: 12px; }
+    .bag-total { font-size: 12px; color: var(--muted); padding: 6px 10px;
+                 background: #f0f0ee; border-radius: 7px;
+                 margin: 4px 0 8px; text-align: center; }
+    .bag-total strong { color: var(--text); font-size: 14px; }
+    .bag-status-section { display: flex; gap: 8px; margin: 12px 0 8px; }
+    .bag-status-section select { flex: 1; padding: 8px 10px; border: 1.5px solid var(--border);
+                                  border-radius: 7px; font-family: inherit; font-size: 13px;
+                                  background: #fafaf8; }
+    .bag-driver-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+                       margin: 0 0 12px; }
+    .bag-driver-cell { display: flex; flex-direction: column; gap: 3px; }
+    .bag-driver-lbl  { font-size: 10px; font-weight: 700; color: var(--muted);
+                       text-transform: uppercase; letter-spacing: 0.4px; padding-left: 2px; }
+    .bag-driver-cell select { padding: 8px 10px; border: 1.5px solid var(--border);
+                              border-radius: 7px; font-family: inherit; font-size: 13px;
+                              background: #fafaf8; }
+    @media (max-width: 480px) {
+      .bag-driver-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Bag override + breakdown */
+    .bag-override-row { display: flex; align-items: center; gap: 10px;
+                        padding: 8px 10px; background: #faf8f3; border-radius: 7px;
+                        border-left: 3px solid var(--amber); margin-bottom: 12px; }
+    .bag-override-label { display: flex; align-items: center; gap: 7px;
+                          font-size: 12px; font-weight: 700; color: var(--text);
+                          cursor: pointer; flex-shrink: 0; }
+    .bag-override-label input { cursor: pointer; }
+    .bag-override-hint { flex: 1; font-size: 11px; color: var(--muted);
+                         text-align: right; line-height: 1.3; }
+    .bag-item-input:disabled { opacity: 0.65; cursor: not-allowed; background: #fafafa; }
+    .bag-item-row.locked { opacity: 0.85; }
+    .bag-item-row.fixed-only { background: #f4f0e3 !important; }
+    .bag-item-row.adjusted { box-shadow: inset 3px 0 0 var(--amber); }
+    .bag-breakdown { font-size: 11px; color: var(--muted); margin: 8px 0;
+                      padding: 8px 12px; background: #f4f1ea; border-radius: 7px; }
+    .bag-breakdown summary { cursor: pointer; font-weight: 700; color: var(--text);
+                              padding: 2px 0; user-select: none; }
+    .bag-breakdown summary:hover { color: var(--own); }
+    .bag-breakdown ul { margin: 8px 0 0 18px; padding: 0; line-height: 1.55; }
+    .bag-breakdown li { font-size: 11px; }
+
+    /* Bed edit modal */
+    .beds-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0 12px; }
+    .bed-chip { padding: 7px 11px; border: 1.5px solid var(--border);
+                border-radius: 8px; background: #fafaf8; font-size: 12px;
+                font-family: inherit; cursor: pointer; transition: all 0.12s;
+                text-align: left; color: var(--text); }
+    .bed-chip:hover { border-color: var(--own); background: var(--own-light); color: var(--own); }
+    .beds-meta { font-size: 11px; color: var(--muted); margin: 8px 0;
+                 padding: 7px 10px; background: #faf8f3; border-radius: 7px;
+                 border-left: 3px solid var(--amber); line-height: 1.4; }
+    .bed-tag.clickable { cursor: pointer; }
+    .bed-tag.clickable:hover { filter: brightness(0.95); }
+
     /* Toast */
     #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
              background: var(--green-dark); color: #fff; padding: 11px 22px;
@@ -229,16 +386,23 @@
 <div id="header">
   <a href="hub.html" class="back-btn">← Hub</a>
   <div class="header-title">Laundry Rota</div>
+  <a href="linen-transport.html" class="header-btn">🚚 Transport</a>
   <button class="header-btn" onclick="refreshArrivals()">↻ Refresh</button>
   <button class="header-btn" onclick="showExtManager()">⚙ External</button>
 </div>
 <div id="loadingBar"></div>
 
 <div class="week-nav">
-  <button class="week-arrow" onclick="prevWeek()">‹</button>
+  <button class="week-arrow" onclick="navPrev()">‹</button>
   <span id="weekLabel"></span>
   <button class="today-btn" onclick="goToToday()">Today</button>
-  <button class="week-arrow" onclick="nextWeek()">›</button>
+  <button class="week-arrow" onclick="navNext()">›</button>
+</div>
+<div class="view-mode-row">
+  <div class="view-toggle">
+    <button id="vmDaily"  class="active" onclick="setViewMode('daily')">Day</button>
+    <button id="vmWeekly"                onclick="setViewMode('weekly')">2 Weeks</button>
+  </div>
 </div>
 <div class="hide-bagged-row">
   <span class="hide-bagged-label">Hide bagged properties</span>
@@ -299,6 +463,88 @@
   </div>
 </div>
 
+<!-- Bed config modal -->
+<div class="modal-overlay mid" id="bedsModal" onclick="overlayClose(event,'bedsModal')">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span>Bed config — <span id="bedsTitleProp" style="font-weight:600"></span></span>
+      <button class="modal-close" onclick="closeModal('bedsModal')">✕</button>
+    </div>
+    <div id="bedsMeta" class="beds-meta" style="display:none"></div>
+    <textarea class="note-textarea" id="bedsInput"
+              placeholder="e.g. 1 superking, 1 king, 2 doubles, 2 singles"></textarea>
+    <div id="bedsChips" class="beds-chips" style="display:none"></div>
+    <div class="note-hint" id="bedsSyncHint">
+      Saves locally and writes back to the arrival on Monday with a "🧺 Laundry update" note. Also posts a note on the matching property record.
+    </div>
+    <button class="modal-save-btn" onclick="saveBedConfig()">Save &amp; sync to Monday</button>
+    <button class="modal-clear-btn" onclick="clearBedConfig()">Clear (revert to property default)</button>
+  </div>
+</div>
+
+<!-- Bag modal -->
+<div class="modal-overlay mid" id="bagModal" onclick="overlayClose(event,'bagModal')">
+  <div class="modal-box">
+    <div class="modal-title">
+      <span><span id="bagModalAction">New bag</span> — <span id="bagModalProp" style="font-weight:600"></span></span>
+      <button class="modal-close" onclick="closeModal('bagModal')">✕</button>
+    </div>
+    <div id="bagModalMeta" class="bag-modal-meta"></div>
+    <div class="type-toggle bag-type-toggle">
+      <button class="type-btn active" id="bagTypeOwn"     onclick="setBagType('own')">🧺 Own laundry</button>
+      <button class="type-btn"        id="bagTypeRegency" onclick="setBagType('regency')">🚚 Regency</button>
+    </div>
+    <div class="bag-override-row">
+      <label class="bag-override-label">
+        <input type="checkbox" id="bagOverride" onchange="onBagOverrideChange()">
+        <span>Override quantities</span>
+      </label>
+      <span class="bag-override-hint" id="bagOverrideHint">Quantities locked — derived from bed config</span>
+    </div>
+    <div class="bag-section-grid" id="bagItemsGrid"></div>
+    <details class="bag-breakdown" id="bagBreakdown">
+      <summary>Why these numbers?</summary>
+      <ul id="bagBreakdownList"></ul>
+    </details>
+    <div class="bag-total" id="bagTotal"><strong>0</strong> items</div>
+    <div class="bag-status-section">
+      <select id="bagStatus">
+        <option value="Bagged">Bagged (off shelf)</option>
+        <option value="Planned">Planned (still need to pack)</option>
+        <option value="In transit">In transit</option>
+        <option value="Delivered">Delivered</option>
+      </select>
+      <select id="bagTransport">
+        <option value="">— transport —</option>
+        <option value="Laundry van">Laundry van</option>
+        <option value="Staff (own car)">Staff (own car)</option>
+        <option value="Manager (own car)">Manager (own car)</option>
+        <option value="Maintenance van">Maintenance van</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div class="bag-driver-grid">
+      <div class="bag-driver-cell">
+        <label class="bag-driver-lbl">Cleans driver</label>
+        <select id="bagDriver" onchange="onBagDriverChange()">
+          <option value="">— pick —</option>
+        </select>
+      </div>
+      <div class="bag-driver-cell">
+        <label class="bag-driver-lbl">Dirties driver</label>
+        <select id="bagDirtiesDriver">
+          <option value="">— pick (or leave blank if no pickup) —</option>
+        </select>
+      </div>
+    </div>
+    <div class="note-hint" id="bagSyncHint">
+      Saving creates a Bag on Monday, links it to this arrival, and decrements the matching shelf counts. Logged movements write to the audit log.
+    </div>
+    <button class="modal-save-btn" onclick="saveBag()">Save bag &amp; decrement shelf</button>
+    <button class="modal-clear-btn" id="bagDeleteBtn" onclick="deleteBag()" style="display:none">Delete bag (return items to shelf)</button>
+  </div>
+</div>
+
 <!-- Manage external properties modal -->
 <div class="modal-overlay mid" id="extModal" onclick="overlayClose(event,'extModal')">
   <div class="modal-box">
@@ -325,11 +571,19 @@
 
 <div id="toast"></div>
 
+<!-- Shared schema -->
+<script src="linen-schema.js"></script>
+
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
+
 <script>
-  const MONDAY_API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+  const MONDAY_API_TOKEN = window.MONDAY_API_TOKEN;
+  const STAFF_NAME_KEY = 'linenStaffName';
   const BOARD_ID = '5094453064';
   const ROTA_KEY = 'laundryRota_v2';
   const EXT_KEY  = 'laundryExternalProps';
+  const VIEW_KEY = 'laundryRota_viewMode';
 
   const OWN_LAUNDRY = [
     'hideaway', 'tranquility', 'beaver brook',
@@ -371,12 +625,23 @@
 
   // ── STATE ──
   let windowStart = startOfWeek(new Date());
+  let currentDay  = (() => { const d = new Date(); d.setHours(0,0,0,0); return d; })();
+  let viewMode    = (() => {
+    try { return localStorage.getItem(VIEW_KEY) || 'daily'; } catch { return 'daily'; }
+  })();
   let rota        = [];
   let extProps    = [];
   let propConfigs = {};
   let movingId    = null;
   let notingId    = null;
   let addingToDay = null;
+  let editingBedsId = null;
+  let bagsByArrival = {};          // arrivalId -> [bag, bag, ...]
+  let editingBagArrivalId = null;
+  let editingBagId = null;          // null = creating new
+  let bagType = 'own';
+  let staffName = (() => { try { return localStorage.getItem(STAFF_NAME_KEY) || ''; } catch { return ''; } })();
+  let staffList = [];              // [{ id, name, role, status }] from Staff board
 
   // ── STORAGE ──
   function loadRota()   { try { return JSON.parse(localStorage.getItem(ROTA_KEY) || '[]'); } catch { return []; } }
@@ -385,11 +650,11 @@
   function saveExt()    { localStorage.setItem(EXT_KEY, JSON.stringify(extProps)); }
 
   // ── MONDAY API ──
-  async function mondayFetch(query) {
+  async function mondayFetch(query, variables) {
     const r = await fetch('https://api.monday.com/v2', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', 'Authorization': MONDAY_API_TOKEN, 'API-Version': '2024-01' },
-      body: JSON.stringify({ query })
+      body: JSON.stringify({ query, variables: variables || {} })
     });
     const j = await r.json();
     if (j.errors) throw new Error(j.errors[0].message);
@@ -431,21 +696,170 @@
 
   async function fetchPropConfigs() {
     const pd = await mondayFetch(`{ boards(ids:[${PROP_BOARD}]){ items_page(limit:200){ items{
-      name column_values(ids:["text_mm2a2a78","long_text_mm2a30dy","dropdown_mm2k2p4p"]){ id value }
+      id name column_values(ids:["text_mm2a2a78","long_text_mm2a30dy","dropdown_mm2k2p4p","numeric_mm2drc46","boolean_mm2rpzzh"]){ id text value }
     } } } }`);
     propConfigs = {};
     for (const it of pd.boards[0].items_page.items) {
-      const cv = {}; for (const c of it.column_values) cv[c.id] = c.value;
+      const cv = {}; for (const c of it.column_values) cv[c.id] = c;
       const p = v => { try { return JSON.parse(v); } catch { return null; } };
-      const opts = (p(cv['long_text_mm2a30dy'])?.text || '').split('|').map(s => s.trim()).filter(Boolean);
+      const opts = (p(cv['long_text_mm2a30dy']?.value)?.text || '').split('|').map(s => s.trim()).filter(Boolean);
       // Laundry supplier dropdown — label may say "Regency" or "In House" (or similar)
-      const dropRaw  = p(cv['dropdown_mm2k2p4p']);
+      const dropRaw  = p(cv['dropdown_mm2k2p4p']?.value);
       const dropText = (typeof dropRaw === 'string' ? dropRaw : (dropRaw?.text || dropRaw?.label || '')).toLowerCase().trim();
       const supplier = dropText.includes('regency') ? 'regency'
                      : (dropText.includes('house') || dropText.includes('internal') || dropText.includes('own')) ? 'own'
                      : null; // null = not set, fall back to name matching
-      propConfigs[it.name] = { fixedBeds: p(cv['text_mm2a2a78']) || '', bedOptions: opts, supplier };
+      // Bathrooms — accepts the .5 convention (1.5 = 1 full + 1 half)
+      const bathRaw   = cv['numeric_mm2drc46']?.text || '';
+      const bathrooms = bathRaw === '' ? null : (parseFloat(bathRaw) || 0);
+      // Hot tub — boolean column, text is "v" when checked
+      const hotVal    = p(cv['boolean_mm2rpzzh']?.value);
+      const hasHotTub = !!(hotVal?.checked === 'true' || hotVal?.checked === true) ||
+                        (cv['boolean_mm2rpzzh']?.text || '').toLowerCase() === 'v';
+      propConfigs[it.name] = {
+        id:        it.id,
+        fixedBeds: p(cv['text_mm2a2a78']?.value) || '',
+        bedOptions: opts,
+        supplier,
+        bathrooms,
+        hasHotTub,
+      };
     }
+  }
+
+  // ── LINEN BAGS / STOCK FETCHERS ──
+  async function fetchStaff() {
+    const c = LINEN.staffColumns;
+    const data = await mondayFetch(
+      `{ boards(ids:["${LINEN.boards.staff}"]) { items_page(limit:200) { items {
+        id name
+        column_values(ids:["${c.role}","${c.status}"]) { id text }
+      } } } }`
+    );
+    staffList = (data.boards[0].items_page.items || [])
+      .map(it => {
+        const cv = {};
+        for (const col of it.column_values) cv[col.id] = col.text;
+        return {
+          id:     it.id,
+          name:   it.name,
+          role:   cv[c.role]   || '',
+          status: cv[c.status] || '',
+        };
+      })
+      // Keep all staff so we can show stale driver assignments; sort active first
+      .sort((a, b) => {
+        const aActive = a.status === 'Active' ? 0 : 1;
+        const bActive = b.status === 'Active' ? 0 : 1;
+        if (aActive !== bActive) return aActive - bActive;
+        return a.name.localeCompare(b.name);
+      });
+  }
+
+  async function fetchBags() {
+    const c = LINEN.bagsColumns;
+    const itemColIds = Object.values(c.items);
+    const colIds = [c.arrival, c.linenType, c.status, c.transportMethod,
+                    c.driver, c.driverStaff, c.dirtiesDriverStaff,
+                    c.baggedAt, c.pickedUpAt, c.deliveredAt,
+                    c.dirtiesCollectedAt, c.dirtiesCollectedBy, c.notes,
+                    ...itemColIds].map(id => `"${id}"`).join(',');
+    // board_relation columns return null on text/value — must use the BoardRelationValue fragment
+    const data = await mondayFetch(`{ boards(ids:[${LINEN.boards.bags}]){ items_page(limit:200){ items {
+      id name
+      column_values(ids:[${colIds}]) {
+        id text
+        ... on BoardRelationValue { linked_item_ids display_value }
+      }
+    } } } }`);
+    bagsByArrival = {};
+    for (const it of data.boards[0].items_page.items) {
+      const cv = {};
+      for (const col of it.column_values) cv[col.id] = col;
+      // Pull arrival id from board_relation linked_item_ids
+      const linkedIds = cv[c.arrival]?.linked_item_ids || [];
+      const arrivalId = linkedIds.length ? String(linkedIds[0]) : null;
+      if (!arrivalId) continue;
+      const items = {};
+      for (const itemSchema of LINEN.items) {
+        const colId = c.items[itemSchema.id];
+        const qty = parseInt(cv[colId]?.text) || 0;
+        if (qty) items[itemSchema.id] = qty;
+      }
+      const driverIds = cv[c.driverStaff]?.linked_item_ids || [];
+      const driverId  = driverIds.length ? String(driverIds[0]) : null;
+      const driverName = cv[c.driverStaff]?.display_value || '';
+      const dirtiesDriverIds = cv[c.dirtiesDriverStaff]?.linked_item_ids || [];
+      const dirtiesDriverId   = dirtiesDriverIds.length ? String(dirtiesDriverIds[0]) : null;
+      const dirtiesDriverName = cv[c.dirtiesDriverStaff]?.display_value || '';
+      const dirtiesByIds = cv[c.dirtiesCollectedBy]?.linked_item_ids || [];
+      const bag = {
+        id: it.id,
+        name: it.name,
+        arrivalId,
+        type:        cv[c.linenType]?.text === 'Regency' ? 'regency' : 'own',
+        status:      cv[c.status]?.text || 'Planned',
+        transport:   cv[c.transportMethod]?.text || '',
+        driver:      cv[c.driver]?.text || '',
+        driverId,
+        driverName,
+        dirtiesDriverId,
+        dirtiesDriverName,
+        baggedAt:    cv[c.baggedAt]?.text || '',
+        pickedUpAt:  cv[c.pickedUpAt]?.text || '',
+        deliveredAt: cv[c.deliveredAt]?.text || '',
+        dirtiesCollectedAt:    cv[c.dirtiesCollectedAt]?.text || '',
+        dirtiesCollectedById:  dirtiesByIds.length ? String(dirtiesByIds[0]) : null,
+        dirtiesCollectedByName: cv[c.dirtiesCollectedBy]?.display_value || '',
+        notes:       cv[c.notes]?.text || '',
+        items,
+        total: Object.values(items).reduce((a,b) => a + b, 0),
+      };
+      (bagsByArrival[arrivalId] ||= []).push(bag);
+    }
+  }
+
+  async function fetchStockSnapshot() {
+    const cols = LINEN.stockColumns;
+    const data = await mondayFetch(
+      `query { boards(ids:["${LINEN.boards.stock}"]) { items_page(limit:50) { items {
+         id name
+         column_values(ids:["${cols.type}","${cols.currentCount}"]) { id text }
+       } } } }`
+    );
+    const out = { own: {}, regency: {} };
+    for (const it of data.boards[0].items_page.items) {
+      const cv = {};
+      for (const c of it.column_values) cv[c.id] = c.text;
+      const typeText = cv[cols.type];
+      const section  = typeText === 'Own' ? 'own'
+                     : typeText === 'Regency' ? 'regency' : null;
+      if (!section) continue;
+      const item = LINEN.items.find(i => i.label === it.name);
+      if (!item) continue;
+      out[section][item.id] = {
+        rowId: it.id,
+        count: parseInt(cv[cols.currentCount]) || 0,
+      };
+    }
+    return out;
+  }
+
+  // Helpers
+  function isBagged(entry) { return (bagsByArrival[entry.id] || []).length > 0; }
+  function bagsOf(entry)   { return bagsByArrival[entry.id] || []; }
+
+  // ── MONDAY MUTATIONS ──
+  function gqlEscape(s) {
+    return String(s).replace(/\\/g, '\\\\').replace(/"/g, '\\"').replace(/\n/g, '\\n').replace(/\r/g, '\\r');
+  }
+  async function mondayUpdateText(boardId, itemId, columnId, text) {
+    const v = gqlEscape(text);
+    return mondayFetch(`mutation { change_simple_column_value(item_id: ${itemId}, board_id: ${boardId}, column_id: "${columnId}", value: "${v}") { id } }`);
+  }
+  async function mondayPostUpdate(itemId, body) {
+    const b = gqlEscape(body);
+    return mondayFetch(`mutation { create_update(item_id: ${itemId}, body: "${b}") { id } }`);
   }
 
   // ── BED PARSING (mirrors status-board logic) ──
@@ -552,6 +966,11 @@
   }
 
   function render() {
+    if (viewMode === 'daily') return renderDaily();
+    return renderWeekly();
+  }
+
+  function renderWeekly() {
     const days     = getDays();
     const today    = new Date(); today.setHours(0,0,0,0);
     const todayStr = localStr(today);
@@ -568,7 +987,7 @@
         const dayStr  = localStr(day);
         const isPast  = day < today;
         const isToday = dayStr === todayStr;
-        const entries = rota.filter(r => r.assignedDay === dayStr && !(hideBagged && r.bagged));
+        const entries = rota.filter(r => r.assignedDay === dayStr && !(hideBagged && isBagged(r)));
         const hdr     = day.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
         const cards   = entries.length
           ? entries.map(e => renderCard(e)).join('')
@@ -588,9 +1007,141 @@
       buildWeekRow(days.slice(7, 14), 'Next week');
   }
 
+  function renderDaily() {
+    const today    = new Date(); today.setHours(0,0,0,0);
+    const dayStr   = localStr(currentDay);
+    const isToday  = dayStr === localStr(today);
+    const isPast   = currentDay < today;
+    const hideBagged = document.getElementById('hideBaggedToggle')?.checked;
+
+    const entries = rota.filter(r => r.assignedDay === dayStr && !(hideBagged && isBagged(r)))
+                        .sort((a, b) => {
+                          const ab = isBagged(a), bb = isBagged(b);
+                          if (ab !== bb) return ab ? 1 : -1;
+                          if (a.type !== b.type) return a.type === 'own' ? -1 : 1;
+                          return a.property.localeCompare(b.property);
+                        });
+
+    document.getElementById('weekLabel').textContent =
+      currentDay.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+
+    const ownCount = entries.filter(e => e.type === 'own'     && !isBagged(e)).length;
+    const regCount = entries.filter(e => e.type === 'regency' && !isBagged(e)).length;
+    const bagCount = entries.filter(e => isBagged(e)).length;
+    const counts = [];
+    if (ownCount) counts.push(`${ownCount} Own`);
+    if (regCount) counts.push(`${regCount} Regency`);
+    if (bagCount) counts.push(`${bagCount} bagged`);
+    const subText = entries.length
+      ? counts.join(' · ')
+      : 'Nothing scheduled';
+
+    const cards = entries.length
+      ? entries.map(e => renderDailyCard(e)).join('')
+      : '<div class="day-view-empty">No properties scheduled for this day.</div>';
+
+    const headerCls = isToday ? 'today' : (isPast ? 'past' : '');
+    const headerStr = currentDay.toLocaleDateString('en-GB',
+      { weekday: 'long', day: 'numeric', month: 'long' });
+
+    document.getElementById('rotaContent').innerHTML = `
+      <div class="day-view">
+        <div class="day-view-hdr ${headerCls}">${isToday ? '📍 Today — ' : ''}${headerStr}</div>
+        <div class="day-view-sub">${subText}${isPast && !isToday ? ' · past' : ''}</div>
+        ${cards}
+        <button class="daily-add-btn" onclick="showAddModal('${dayStr}')">+ Add property to this day</button>
+      </div>`;
+  }
+
+  function renderDailyCard(entry) {
+    const typeCls   = entry.type === 'own' ? 'own' : 'regency';
+    const bagged    = isBagged(entry);
+    const baggedCls = bagged ? 'bagged' : '';
+    const bags      = bagsOf(entry);
+
+    let subParts = [];
+    if (entry.source === 'arrival') {
+      if (entry.originalDay) {
+        const moved = entry.originalDay !== entry.assignedDay;
+        subParts.push(`Check-in ${fmtShort(entry.originalDay)}${moved ? ' (moved)' : ''}`);
+      }
+      const gParts = [];
+      if (entry.adults   > 0) gParts.push(`${entry.adults} adult${entry.adults > 1 ? 's' : ''}`);
+      if (entry.children > 0) gParts.push(`${entry.children} child${entry.children > 1 ? 'ren' : ''}`);
+      if (entry.pets     > 0) gParts.push(`🐾 ${entry.pets}`);
+      if (gParts.length) subParts.push(gParts.join(', '));
+
+      const { beds, status } = getEffectiveBeds(entry);
+      const bStr = bedSummary(beds);
+      if (bStr) {
+        const cls   = status === 'confirmed' ? 'bed-confirmed'
+                    : status === 'fixed'     ? 'bed-fixed-ok'
+                    :                          'bed-chase';
+        const label = status === 'confirmed' ? '✓ confirmed'
+                    : status === 'fixed'     ? '✓ fixed'
+                    :                          '? chase';
+        const tagHtml = `<span class="bed-tag ${cls} clickable" onclick="editBeds('${entry.id}')" title="Edit bed config">${label}</span>`;
+        subParts.push(bStr + ' ' + tagHtml);
+      }
+    }
+    const subHtml = subParts.map(p => `<div class="daily-card-sub">${p}</div>`).join('');
+
+    const noteHtml = entry.note
+      ? `<div class="daily-card-note" onclick="editNote('${entry.id}')">📝 ${entry.note}</div>` : '';
+
+    const typeBadge = `<span class="type-badge ${typeCls}">${entry.type === 'own' ? 'Own' : 'Regency'}</span>`;
+
+    // Bag list section
+    let bagListHtml = '';
+    if (bags.length) {
+      const rows = bags.map(b => {
+        const itemsStr = LINEN.items
+          .filter(i => b.items[i.id])
+          .map(i => `${b.items[i.id]} ${i.label}`)
+          .join(' · ') || `(empty)`;
+        const stCls = b.status === 'In transit' ? 'intransit'
+                    : b.status === 'Delivered'  ? 'delivered'
+                    : b.status === 'Planned'    ? 'planned'
+                    :                              '';
+        const trans = b.transport ? ` · ${b.transport}` : '';
+        return `<div class="daily-bag-row">
+          <span class="type-badge ${b.type === 'own' ? 'own' : 'regency'}">${b.type === 'own' ? 'Own' : 'Regency'}</span>
+          <span class="daily-bag-status ${stCls}">${b.status}</span>
+          <span class="daily-bag-content" onclick="openBagModal('${entry.id}','${b.id}')" title="Edit bag">
+            ${b.total} item${b.total === 1 ? '' : 's'}: ${itemsStr}${trans}
+          </span>
+        </div>`;
+      }).join('');
+      bagListHtml = `<div class="daily-bag-list">${rows}
+        <button class="daily-bag-add" onclick="openBagModal('${entry.id}')">+ Add another bag</button>
+      </div>`;
+    }
+    const bagAddBtn = !bags.length ? `<button class="daily-bag-add" onclick="openBagModal('${entry.id}')">+ Bag this property</button>` : '';
+
+    return `
+      <div class="daily-card ${typeCls} ${baggedCls}" id="card-${entry.id}">
+        <div class="daily-card-row">
+          ${typeBadge}
+          <span class="daily-card-name" title="${entry.property}">${entry.property}</span>
+          <div class="daily-card-btns">
+            <button class="cb note ${entry.note ? 'on' : ''}" onclick="editNote('${entry.id}')" title="Note">📝</button>
+            <button class="cb beds ${entry.bedConfig ? 'on' : ''}" onclick="editBeds('${entry.id}')" title="Edit bed config">🛏</button>
+            <button class="cb" onclick="showMoveModal('${entry.id}')" title="Move">↕</button>
+            <button class="cb" onclick="removeEntry('${entry.id}')" title="Remove">✕</button>
+          </div>
+        </div>
+        ${subHtml}
+        ${noteHtml}
+        ${bagListHtml}
+        ${bagAddBtn}
+      </div>`;
+  }
+
   function renderCard(entry) {
     const typeCls   = entry.type === 'own' ? 'own' : 'regency';
-    const baggedCls = entry.bagged ? 'bagged' : '';
+    const bagged    = isBagged(entry);
+    const baggedCls = bagged ? 'bagged' : '';
+    const bags      = bagsOf(entry);
 
     // ── Sub-line: guests + bed config ──
     let subParts = [];
@@ -609,47 +1160,48 @@
       const { beds, status } = getEffectiveBeds(entry);
       const bStr = bedSummary(beds);
       if (bStr) {
-        const tagHtml = status === 'confirmed'
-          ? `<span class="bed-tag bed-confirmed">✓</span>`
-          : status === 'fixed'
-            ? `<span class="bed-tag bed-fixed-ok">✓</span>`
-            : `<span class="bed-tag bed-chase">?</span>`;
+        const cls = status === 'confirmed' ? 'bed-confirmed'
+                  : status === 'fixed'     ? 'bed-fixed-ok'
+                  :                          'bed-chase';
+        const sym = status === 'confirmed' || status === 'fixed' ? '✓' : '?';
+        const tagHtml = `<span class="bed-tag ${cls} clickable" onclick="editBeds('${entry.id}')" title="Edit bed config">${sym}</span>`;
         subParts.push(bStr + tagHtml);
       }
     }
+    const bagPill = bagged ? `<span class="bag-pill">✓ ${bags.length === 1 ? 'BAGGED' : `${bags.length} BAGS`}</span>` : '';
     const subHtml = subParts.length
       ? `<div class="card-sub">${subParts.join('  ·  ')}</div>` : '';
 
     const noteHtml = entry.note
       ? `<div class="card-note" onclick="editNote('${entry.id}')">📝 ${entry.note}</div>` : '';
 
-    const movedHtml = '';
+    // Compact bag list (one line per bag, item counts truncated)
+    const bagListHtml = bags.length
+      ? `<div class="bag-list-compact" onclick="openBagModal('${entry.id}','${bags[0].id}')" title="View bags">
+           ${bags.map(b => {
+             const cls = b.type === 'regency' ? 'reg' : '';
+             return `<span class="${cls}">${b.type === 'own' ? 'O' : 'R'}·${b.total}</span>`;
+           }).join(' · ')}
+         </div>`
+      : '';
 
     return `
       <div class="entry-card ${typeCls} ${baggedCls}" id="card-${entry.id}">
         <div class="card-row">
-          <span class="card-name" title="${entry.property}">${entry.property}</span>
+          <span class="card-name" title="${entry.property}">${entry.property}${bagPill}</span>
           <div class="card-btns">
-            <button class="cb bag ${entry.bagged ? 'on' : ''}" onclick="toggleBagged('${entry.id}')"
-                    title="${entry.bagged ? 'Unmark bagged' : 'Mark as bagged'}">${entry.bagged ? '✓ Bag' : '○ Bag'}</button>
+            <button class="cb bag ${bagged ? 'on' : ''}" onclick="openBagModal('${entry.id}')"
+                    title="${bagged ? 'Add another bag' : 'Bag this property'}">${bagged ? '+ Bag' : '○ Bag'}</button>
             <button class="cb note ${entry.note ? 'on' : ''}" onclick="editNote('${entry.id}')" title="Note">📝</button>
             <button class="cb" onclick="showMoveModal('${entry.id}')" title="Move">↕</button>
             <button class="cb" onclick="removeEntry('${entry.id}')" title="Remove">✕</button>
           </div>
         </div>
-        ${subHtml}${noteHtml}${movedHtml}
+        ${subHtml}${noteHtml}${bagListHtml}
       </div>`;
   }
 
   // ── ACTIONS ──
-  function toggleBagged(id) {
-    const e = rota.find(r => r.id === id);
-    if (!e) return;
-    e.bagged = !e.bagged;
-    saveRota();
-    render();
-  }
-
   function removeEntry(id) {
     rota = rota.filter(r => r.id !== id);
     saveRota();
@@ -677,6 +1229,522 @@
     if (e) { e.note = ''; saveRota(); }
     closeModal('noteModal');
     render();
+  }
+
+  // ── BED CONFIG MODAL ──
+  function editBeds(id) {
+    const e = rota.find(r => r.id === id);
+    if (!e) return;
+    editingBedsId = id;
+    const cfg = propConfigs[e.property] || {};
+
+    document.getElementById('bedsTitleProp').textContent = e.property || '';
+    document.getElementById('bedsInput').value = e.bedConfig || '';
+
+    // Property metadata (fixed beds)
+    const meta = document.getElementById('bedsMeta');
+    if (cfg.fixedBeds) {
+      meta.textContent = 'Property fixed beds: ' + cfg.fixedBeds;
+      meta.style.display = '';
+    } else {
+      meta.textContent = '';
+      meta.style.display = 'none';
+    }
+
+    // Bed option chips (configurable extras from property record)
+    const chips = document.getElementById('bedsChips');
+    if (cfg.bedOptions && cfg.bedOptions.length) {
+      chips.innerHTML = cfg.bedOptions.map(opt =>
+        `<button type="button" class="bed-chip" onclick="pickBedOption(this)" data-opt="${opt.replace(/"/g,'&quot;').replace(/'/g,'&#39;')}">${opt}</button>`
+      ).join('');
+      chips.style.display = '';
+    } else {
+      chips.innerHTML = '';
+      chips.style.display = 'none';
+    }
+
+    // Adjust sync hint for manual entries (no Monday arrival item)
+    const hint = document.getElementById('bedsSyncHint');
+    const isArrival = e.source === 'arrival' && /^\d+$/.test(e.id);
+    if (isArrival) {
+      hint.textContent = 'Saves locally and writes back to the arrival on Monday with a "🧺 Laundry update" note. Also posts a note on the matching property record.';
+    } else if (cfg.id) {
+      hint.textContent = 'Saves locally and posts a "🧺 Laundry update" note on the matching property record on Monday.';
+    } else {
+      hint.textContent = 'Saved locally only — no matching Monday item found for "' + (e.property || '') + '".';
+    }
+
+    document.getElementById('bedsModal').style.display = 'flex';
+    setTimeout(() => document.getElementById('bedsInput').focus(), 60);
+  }
+
+  function pickBedOption(btn) {
+    const opt = btn.dataset.opt || '';
+    const ta  = document.getElementById('bedsInput');
+    const cur = ta.value.trim();
+    // If textarea matches a property's fixed beds prefix or is empty, replace; otherwise append
+    const cfg = propConfigs[(rota.find(r => r.id === editingBedsId) || {}).property] || {};
+    if (!cur) {
+      ta.value = (cfg.fixedBeds ? cfg.fixedBeds + ', ' : '') + opt;
+    } else {
+      ta.value = cur + (cur.endsWith(',') ? ' ' : ', ') + opt;
+    }
+    ta.focus();
+  }
+
+  async function saveBedConfig() {
+    const e = rota.find(r => r.id === editingBedsId);
+    if (!e) return closeModal('bedsModal');
+    const newBeds = document.getElementById('bedsInput').value.trim();
+    const oldBeds = (e.bedConfig || '').trim();
+
+    if (newBeds === oldBeds) { closeModal('bedsModal'); return; }
+
+    // Optimistic local update
+    e.bedConfig = newBeds;
+    saveRota();
+    closeModal('bedsModal');
+    render();
+
+    // Build update note
+    const dateStr  = e.assignedDay ? fmtShort(e.assignedDay) : '';
+    const propLine = e.property ? ` for ${e.property}` : '';
+    const datePart = dateStr ? ` (${dateStr})` : '';
+    const bedsLine = newBeds ? newBeds : '(cleared — revert to property default)';
+    const noteBody = `🧺 Laundry update${propLine}${datePart} — Bed config: ${bedsLine}`;
+
+    const tasks = [];
+    // 1) Update arrival item bedConfig column + post note (only for arrival entries with numeric Monday id)
+    if (e.source === 'arrival' && /^\d+$/.test(e.id)) {
+      tasks.push({ label: 'arrival col',    fn: () => mondayUpdateText(BOARD_ID, e.id, 'text_mm2ab56m', newBeds) });
+      tasks.push({ label: 'arrival update', fn: () => mondayPostUpdate(e.id, noteBody) });
+    }
+    // 2) Post update on matching property item (if found by name)
+    const propCfg = propConfigs[e.property];
+    if (propCfg?.id) {
+      tasks.push({ label: 'property update', fn: () => mondayPostUpdate(propCfg.id, noteBody) });
+    }
+
+    if (!tasks.length) {
+      showToast('Beds saved locally');
+      return;
+    }
+
+    document.getElementById('loadingBar').style.display = 'block';
+    try {
+      const results = await Promise.allSettled(tasks.map(t => t.fn()));
+      const failed = results.filter(r => r.status === 'rejected');
+      if (failed.length) {
+        console.error('Monday writeback failures:', failed.map(f => f.reason));
+        showToast(`Beds saved · ${tasks.length - failed.length}/${tasks.length} synced`);
+      } else {
+        showToast('Beds saved + Monday updated');
+      }
+    } catch (err) {
+      console.error(err);
+      showToast('Beds saved locally — Monday sync failed');
+    } finally {
+      document.getElementById('loadingBar').style.display = 'none';
+    }
+  }
+
+  function clearBedConfig() {
+    document.getElementById('bedsInput').value = '';
+    document.getElementById('bedsInput').focus();
+  }
+
+  // ── BAG MODAL ────────────────────────────────────────────────────────────
+  // Tracks the calculated quantities for the current modal session,
+  // so we can re-apply them when override is toggled off.
+  let bagDerivedQty = {};
+  let bagIsFixedOnly = false;   // property has fixedBeds + no bedOptions
+  let bagIsManual    = false;   // no property config available — forces override
+
+  function openBagModal(arrivalId, bagId) {
+    const e = rota.find(r => r.id === arrivalId);
+    if (!e) return;
+    editingBagArrivalId = arrivalId;
+    editingBagId = bagId || null;
+    const existingBag = bagId ? bagsOf(e).find(b => b.id === bagId) : null;
+    bagType = existingBag?.type || e.type || 'own';
+
+    document.getElementById('bagModalAction').textContent = existingBag ? 'Edit bag' : 'New bag';
+    document.getElementById('bagModalProp').textContent  = e.property || '';
+
+    // Pull property + stay context for the template calculation
+    const cfg = propConfigs[e.property] || {};
+    const isArrival = e.source === 'arrival';
+    bagIsManual    = !isArrival || !cfg.id;
+    bagIsFixedOnly = isArrival && cfg.id && (!cfg.bedOptions || cfg.bedOptions.length === 0);
+
+    let beds = { superKing: 0, king: 0, double: 0, single: 0 };
+    let bedStatus = 'unknown';
+    if (isArrival) {
+      const eff = getEffectiveBeds(e);
+      beds = eff.beds;
+      bedStatus = eff.status;
+    }
+    const adults    = isArrival ? (e.adults   || 0) : 0;
+    const children  = isArrival ? (e.children || 0) : 0;
+    const bathrooms = cfg.bathrooms != null ? cfg.bathrooms : 1;
+    const hasHotTub = !!cfg.hasHotTub;
+
+    // Compute the canonical bag for this stay
+    bagDerivedQty = (typeof computeBagTemplate === 'function')
+      ? computeBagTemplate({ beds, adults, children, bathrooms, hasHotTub })
+      : {};
+
+    // Meta line
+    const metaParts = [];
+    if (e.originalDay) metaParts.push(`Check-in ${fmtShort(e.originalDay)}`);
+    if (isArrival) {
+      const bStr = bedSummary(beds);
+      if (bStr) metaParts.push(`${bStr}${bedStatus === 'assumed' ? ' (assumed all-doubles)' : bedStatus === 'fixed' ? ' (fixed)' : ''}`);
+      const gParts = [];
+      if (adults)   gParts.push(`${adults} adult${adults > 1 ? 's' : ''}`);
+      if (children) gParts.push(`${children} child${children > 1 ? 'ren' : ''}`);
+      if (gParts.length) metaParts.push(gParts.join(', '));
+      const bathParts = [];
+      if (cfg.bathrooms != null) {
+        const f = Math.floor(cfg.bathrooms), h = cfg.bathrooms - f > 0 ? 1 : 0;
+        bathParts.push(`${f}${h ? '+½' : ''} bath${f === 1 && !h ? '' : 's'}`);
+      }
+      if (hasHotTub) bathParts.push('hot tub');
+      if (bathParts.length) metaParts.push(bathParts.join(' · '));
+    }
+    document.getElementById('bagModalMeta').textContent = metaParts.join('  ·  ') || 'Manual entry — no derivation available';
+
+    // Build items grid: pre-fill with existing bag qtys (edit) or derived qtys (new)
+    const grid = document.getElementById('bagItemsGrid');
+    let html = '', lastSection = '';
+    for (const item of LINEN.items) {
+      if (item.section !== lastSection) {
+        html += `<div class="bag-section-label">${item.section}</div>`;
+        lastSection = item.section;
+      }
+      const derived  = bagDerivedQty[item.id] || 0;
+      const value    = existingBag ? (existingBag.items?.[item.id] || 0) : derived;
+      const adjusted = existingBag && value !== derived ? 'adjusted' : '';
+      const fixedCls = bagIsFixedOnly ? 'fixed-only' : '';
+      html += `<div class="bag-item-row ${adjusted} ${fixedCls}" id="bagrow_${item.id}" data-derived="${derived}">
+        <span class="bag-item-label" title="${item.label}">${item.label}</span>
+        <input class="bag-item-input" type="number" id="baginp_${item.id}" value="${value}" min="0"
+               oninput="updateBagTotal()">
+      </div>`;
+    }
+    grid.innerHTML = html;
+
+    // Build breakdown
+    const breakdownList = document.getElementById('bagBreakdownList');
+    if (typeof describeBagTemplate === 'function' && !bagIsManual) {
+      const lines = describeBagTemplate({ beds, adults, children, bathrooms, hasHotTub });
+      breakdownList.innerHTML = lines.map(l => `<li>${l}</li>`).join('');
+      document.getElementById('bagBreakdown').style.display = '';
+    } else {
+      breakdownList.innerHTML = '<li>No bed config available — quantities entered manually.</li>';
+      document.getElementById('bagBreakdown').style.display = '';
+    }
+
+    // Override toggle: forced on for manual entries; otherwise off by default
+    const overrideEl = document.getElementById('bagOverride');
+    overrideEl.checked  = bagIsManual;
+    overrideEl.disabled = bagIsManual;
+
+    setBagType(bagType);
+    onBagOverrideChange();
+    updateBagTotal();
+
+    // Status + driver + transport selectors
+    document.getElementById('bagStatus').value    = existingBag?.status    || 'Bagged';
+    document.getElementById('bagTransport').value = existingBag?.transport || '';
+
+    // Populate driver dropdowns (cleans + dirties) from staff list
+    const buildStaffOpts = (placeholder) => {
+      const opts = [`<option value="">${placeholder}</option>`];
+      const active = staffList.filter(s => s.status === 'Active');
+      const inactive = staffList.filter(s => s.status !== 'Active');
+      if (active.length) {
+        opts.push('<optgroup label="Active">');
+        for (const s of active) {
+          opts.push(`<option value="${s.id}">${s.name}${s.role ? ' · ' + s.role : ''}</option>`);
+        }
+        opts.push('</optgroup>');
+      }
+      if (inactive.length) {
+        opts.push('<optgroup label="Other">');
+        for (const s of inactive) {
+          opts.push(`<option value="${s.id}">${s.name}${s.role ? ' · ' + s.role : ''}${s.status ? ' (' + s.status + ')' : ''}</option>`);
+        }
+        opts.push('</optgroup>');
+      }
+      return opts.join('');
+    };
+    const driverSel = document.getElementById('bagDriver');
+    if (driverSel) {
+      driverSel.innerHTML = buildStaffOpts('— pick —');
+      driverSel.value = existingBag?.driverId || '';
+    }
+    const dirtiesSel = document.getElementById('bagDirtiesDriver');
+    if (dirtiesSel) {
+      dirtiesSel.innerHTML = buildStaffOpts('— pick (or leave blank if no pickup) —');
+      // For new bags, default dirties driver = cleans driver. For edits, use stored value.
+      dirtiesSel.value = existingBag
+        ? (existingBag.dirtiesDriverId || '')
+        : (existingBag?.driverId || driverSel?.value || '');
+    }
+
+    document.getElementById('bagDeleteBtn').style.display = existingBag ? '' : 'none';
+    document.getElementById('bagModal').style.display = 'flex';
+  }
+
+  function onBagDriverChange() {
+    const sel = document.getElementById('bagDriver');
+    const driverId = sel?.value;
+    if (!driverId) return;
+    const staff = staffList.find(s => s.id === driverId);
+    if (!staff) return;
+    // Auto-fill transport method from role (overrideable)
+    const tm = (typeof transportForRole === 'function')
+      ? transportForRole(staff.role) : 'Staff (own car)';
+    const transportSel = document.getElementById('bagTransport');
+    if (transportSel) transportSel.value = tm;
+    // Auto-mirror to dirties driver only if it's blank — preserves explicit choices
+    const dirtiesSel = document.getElementById('bagDirtiesDriver');
+    if (dirtiesSel && !dirtiesSel.value) dirtiesSel.value = driverId;
+  }
+
+  function onBagOverrideChange() {
+    const overrideOn = document.getElementById('bagOverride').checked;
+    const inputs = document.querySelectorAll('#bagItemsGrid .bag-item-input');
+    inputs.forEach(inp => { inp.disabled = !overrideOn; });
+    document.querySelectorAll('#bagItemsGrid .bag-item-row').forEach(row => {
+      row.classList.toggle('locked', !overrideOn);
+    });
+    const hint = document.getElementById('bagOverrideHint');
+    if (bagIsManual) {
+      hint.textContent = 'Manual entry — no derivation available, edit freely.';
+    } else if (overrideOn) {
+      hint.textContent = 'Override on — quantities editable. Changes flagged on save.';
+    } else if (bagIsFixedOnly) {
+      hint.textContent = 'Fixed-config property — quantities locked to derived totals.';
+    } else {
+      hint.textContent = 'Quantities locked — change bed config to recalculate.';
+    }
+  }
+
+  function setBagType(type) {
+    bagType = type;
+    document.getElementById('bagTypeOwn').classList.toggle('active',     type === 'own');
+    document.getElementById('bagTypeRegency').classList.toggle('active', type === 'regency');
+    document.querySelectorAll('#bagItemsGrid .bag-item-row').forEach(r => {
+      r.classList.remove('own','regency');
+      r.classList.add(type);
+    });
+  }
+
+  function updateBagTotal() {
+    let total = 0;
+    for (const item of LINEN.items) {
+      const v = parseInt(document.getElementById('baginp_' + item.id)?.value) || 0;
+      total += v;
+    }
+    document.getElementById('bagTotal').innerHTML = `<strong>${total}</strong> ${total === 1 ? 'item' : 'items'}`;
+  }
+
+  async function saveBag() {
+    if (!editingBagArrivalId) return;
+    const e = rota.find(r => r.id === editingBagArrivalId);
+    if (!e) return;
+
+    // Collect items
+    const items = {};
+    let total = 0;
+    for (const item of LINEN.items) {
+      const v = parseInt(document.getElementById('baginp_' + item.id)?.value) || 0;
+      if (v > 0) { items[item.id] = v; total += v; }
+    }
+    if (total === 0) { showToast('Add at least one item'); return; }
+
+    if (!staffName) {
+      const n = prompt('Who is bagging? (your name)');
+      if (!n) return;
+      staffName = n.trim();
+      try { localStorage.setItem(STAFF_NAME_KEY, staffName); } catch {}
+    }
+
+    const isEdit = !!editingBagId;
+    const oldItems = isEdit ? (bagsOf(e).find(b => b.id === editingBagId)?.items || {}) : {};
+    const status     = document.getElementById('bagStatus').value || 'Bagged';
+    const transport  = document.getElementById('bagTransport').value || '';
+    const overrideOn = !!document.getElementById('bagOverride')?.checked && !bagIsManual;
+    const overrideTag = overrideOn ? ' [override]' : '';
+    const isOnShelf  = ['Bagged','In transit','Delivered'].includes(status); // off shelf
+    const wasOnShelf = isEdit && ['Bagged','In transit','Delivered'].includes(
+                         (bagsOf(e).find(b => b.id === editingBagId)?.status) || 'Planned');
+    // Stock effect: items in bag are off-shelf when status != Planned.
+    // delta = (newQty if isOnShelf else 0) - (oldQty if wasOnShelf else 0)
+
+    closeModal('bagModal');
+    document.getElementById('loadingBar').style.display = 'block';
+
+    try {
+      const stock = await fetchStockSnapshot();
+      const today = localStr(new Date());
+      const linenLabel = bagType === 'own' ? 'Own' : 'Regency';
+      const bc = LINEN.bagsColumns;
+      const mvCols = LINEN.movementsColumns;
+      const stCols = LINEN.stockColumns;
+
+      // Bag row column values
+      const driverId = document.getElementById('bagDriver')?.value || '';
+      const bagCV = {
+        [bc.arrival]:         { item_ids: [Number(editingBagArrivalId)] },
+        [bc.linenType]:       { label: linenLabel },
+        [bc.status]:          { label: status },
+        [bc.notes]:           `Bagged by ${staffName} for ${e.property || 'unknown property'}.${overrideTag}`,
+      };
+      if (isOnShelf && !isEdit) bagCV[bc.baggedAt] = { date: today };
+      if (transport) bagCV[bc.transportMethod] = { label: transport };
+      if (status === 'In transit') bagCV[bc.pickedUpAt] = { date: today };
+      if (status === 'Delivered')  bagCV[bc.deliveredAt] = { date: today };
+      if (driverId) bagCV[bc.driverStaff] = { item_ids: [Number(driverId)] };
+      const dirtiesDriverId = document.getElementById('bagDirtiesDriver')?.value || '';
+      // Always set: empty selection → clear the link
+      bagCV[bc.dirtiesDriverStaff] = dirtiesDriverId
+        ? { item_ids: [Number(dirtiesDriverId)] }
+        : { item_ids: [] };
+      for (const item of LINEN.items) {
+        bagCV[bc.items[item.id]] = String(items[item.id] || 0);
+      }
+
+      const ops = [];
+      const vars = {};
+      let opIdx = 0;
+
+      // 1. Create or update the bag row
+      const bagKey = `bag${opIdx}`; vars[bagKey] = JSON.stringify(bagCV);
+      if (isEdit) {
+        ops.push(`bag: change_multiple_column_values(board_id: "${LINEN.boards.bags}", item_id: "${editingBagId}", column_values: $${bagKey}) { id }`);
+      } else {
+        const bagName = `${e.property || 'Unknown'} · ${linenLabel} · ${today}`;
+        ops.push(`bag: create_item(board_id: "${LINEN.boards.bags}", item_name: ${JSON.stringify(bagName)}, column_values: $${bagKey}) { id name }`);
+      }
+      opIdx++;
+
+      // 2. Per-item: stock decrement + Bag-out movement (only for items that changed shelf-effect)
+      for (const item of LINEN.items) {
+        const newOff = (isOnShelf  ? (items[item.id]   || 0) : 0);
+        const oldOff = (wasOnShelf ? (oldItems[item.id] || 0) : 0);
+        const delta  = newOff - oldOff;          // positive = more off shelf
+        if (delta === 0) continue;
+
+        const stockRow = stock[bagType][item.id];
+        if (!stockRow) continue;
+        const newCount = stockRow.count - delta;
+
+        const mvCV = {
+          [mvCols.type]:           { label: 'Bag out' },
+          [mvCols.linenType]:      { label: linenLabel },
+          [mvCols.item]:           { item_ids: [Number(stockRow.rowId)] },
+          [mvCols.qty]:            String(-delta),
+          [mvCols.notes]:          `Bagged by ${staffName} for ${e.property || 'unknown'}.${isEdit ? ' (Edit adjustment)' : ''}${overrideTag}`,
+          [mvCols.recordedAt]:     { date: today },
+          [mvCols.linkedArrival]:  { item_ids: [Number(editingBagArrivalId)] },
+        };
+        const mvKey = `mv${opIdx}`; vars[mvKey] = JSON.stringify(mvCV);
+        const mvName = `Bag out · ${linenLabel} · ${item.label} · ${today}`;
+        ops.push(`mv${opIdx}: create_item(board_id: "${LINEN.boards.movements}", item_name: ${JSON.stringify(mvName)}, column_values: $${mvKey}) { id }`);
+        opIdx++;
+
+        const stCV = { [stCols.currentCount]: String(newCount) };
+        const stKey = `st${opIdx}`; vars[stKey] = JSON.stringify(stCV);
+        ops.push(`st${opIdx}: change_multiple_column_values(board_id: "${LINEN.boards.stock}", item_id: "${stockRow.rowId}", column_values: $${stKey}) { id }`);
+        opIdx++;
+      }
+
+      const varDecls = Object.keys(vars).map(k => `$${k}: JSON!`).join(', ');
+      await mondayFetch(`mutation BagSave(${varDecls}) { ${ops.join(' ')} }`, vars);
+
+      await fetchBags();
+      render();
+      const verb = isEdit ? 'Bag updated' : 'Bag saved';
+      const off  = isOnShelf ? ` · ${total} ${linenLabel} items off shelf` : ' · still planned (no shelf change)';
+      showToast(verb + off);
+    } catch (err) {
+      console.error(err);
+      showToast('Save failed — ' + (err.message || 'see console'));
+    } finally {
+      document.getElementById('loadingBar').style.display = 'none';
+    }
+  }
+
+  async function deleteBag() {
+    if (!editingBagId) return;
+    const e = rota.find(r => r.id === editingBagArrivalId);
+    if (!e) return;
+    const bag = bagsOf(e).find(b => b.id === editingBagId);
+    if (!bag) return;
+    if (!confirm('Delete this bag and return its items to the shelf?')) return;
+
+    closeModal('bagModal');
+    document.getElementById('loadingBar').style.display = 'block';
+
+    try {
+      const stock = await fetchStockSnapshot();
+      const today = localStr(new Date());
+      const linenLabel = bag.type === 'own' ? 'Own' : 'Regency';
+      const wasOff = ['Bagged','In transit','Delivered'].includes(bag.status);
+      const mvCols = LINEN.movementsColumns;
+      const stCols = LINEN.stockColumns;
+
+      const ops = [];
+      const vars = {};
+      let opIdx = 0;
+
+      ops.push(`del: delete_item(item_id: ${editingBagId}) { id }`);
+      opIdx++;
+
+      if (wasOff) {
+        for (const item of LINEN.items) {
+          const qty = bag.items[item.id] || 0;
+          if (qty === 0) continue;
+          const stockRow = stock[bag.type][item.id];
+          if (!stockRow) continue;
+          const newCount = stockRow.count + qty;
+
+          const mvCV = {
+            [mvCols.type]:        { label: 'Manual adjustment' },
+            [mvCols.linenType]:   { label: linenLabel },
+            [mvCols.item]:        { item_ids: [Number(stockRow.rowId)] },
+            [mvCols.qty]:         String(qty),
+            [mvCols.notes]:       `Bag deleted by ${staffName || 'unknown'}. Items returned to shelf.`,
+            [mvCols.recordedAt]:  { date: today },
+            [mvCols.linkedArrival]: { item_ids: [Number(editingBagArrivalId)] },
+          };
+          const mvKey = `mv${opIdx}`; vars[mvKey] = JSON.stringify(mvCV);
+          const mvName = `Bag delete · ${linenLabel} · ${item.label} · ${today}`;
+          ops.push(`mv${opIdx}: create_item(board_id: "${LINEN.boards.movements}", item_name: ${JSON.stringify(mvName)}, column_values: $${mvKey}) { id }`);
+          opIdx++;
+
+          const stCV = { [stCols.currentCount]: String(newCount) };
+          const stKey = `st${opIdx}`; vars[stKey] = JSON.stringify(stCV);
+          ops.push(`st${opIdx}: change_multiple_column_values(board_id: "${LINEN.boards.stock}", item_id: "${stockRow.rowId}", column_values: $${stKey}) { id }`);
+          opIdx++;
+        }
+      }
+
+      const varDecls = Object.keys(vars).map(k => `$${k}: JSON!`).join(', ');
+      const decl = varDecls ? `(${varDecls})` : '';
+      await mondayFetch(`mutation BagDelete${decl} { ${ops.join(' ')} }`, vars);
+      await fetchBags();
+      render();
+      showToast(wasOff ? 'Bag deleted · items returned to shelf' : 'Bag deleted');
+    } catch (err) {
+      console.error(err);
+      showToast('Delete failed — ' + (err.message || 'see console'));
+    } finally {
+      document.getElementById('loadingBar').style.display = 'none';
+    }
   }
 
   // ── MOVE MODAL ──
@@ -790,10 +1858,35 @@
     renderExtManager();
   }
 
-  // ── WEEK NAV ──
-  function prevWeek()  { windowStart = addDays(windowStart, -7); render(); }
-  function nextWeek()  { windowStart = addDays(windowStart,  7); render(); }
-  function goToToday() { windowStart = startOfWeek(new Date()); render(); }
+  // ── NAV ──
+  function navPrev() {
+    if (viewMode === 'daily') currentDay = addDays(currentDay, -1);
+    else                      windowStart = addDays(windowStart, -7);
+    render();
+  }
+  function navNext() {
+    if (viewMode === 'daily') currentDay = addDays(currentDay,  1);
+    else                      windowStart = addDays(windowStart,  7);
+    render();
+  }
+  function goToToday() {
+    if (viewMode === 'daily') {
+      currentDay = new Date(); currentDay.setHours(0,0,0,0);
+    } else {
+      windowStart = startOfWeek(new Date());
+    }
+    render();
+  }
+
+  // ── VIEW MODE ──
+  function setViewMode(mode) {
+    if (mode !== 'daily' && mode !== 'weekly') return;
+    viewMode = mode;
+    try { localStorage.setItem(VIEW_KEY, mode); } catch {}
+    document.getElementById('vmDaily').classList.toggle('active',  mode === 'daily');
+    document.getElementById('vmWeekly').classList.toggle('active', mode === 'weekly');
+    render();
+  }
 
   // ── MODALS ──
   function closeModal(id) { document.getElementById(id).style.display = 'none'; }
@@ -810,11 +1903,11 @@
   async function refreshArrivals() {
     document.getElementById('loadingBar').style.display = 'block';
     try {
-      const [arrivals] = await Promise.all([fetchArrivals(), fetchPropConfigs()]);
+      const [arrivals] = await Promise.all([fetchArrivals(), fetchPropConfigs(), fetchBags(), fetchStaff()]);
       mergeArrivals(arrivals);
       saveRota();
       render();
-      showToast('Arrivals updated from Monday');
+      showToast('Arrivals + bags + staff updated from Monday');
     } catch (e) {
       showToast('Could not reach Monday — saved rota shown');
       console.error(e);
@@ -827,15 +1920,18 @@
   async function init() {
     rota     = loadRota();
     extProps = loadExt();
+    // Sync view-toggle UI with persisted preference
+    document.getElementById('vmDaily').classList.toggle('active',  viewMode === 'daily');
+    document.getElementById('vmWeekly').classList.toggle('active', viewMode === 'weekly');
     render(); // show saved state immediately
 
     document.getElementById('loadingBar').style.display = 'block';
     try {
-      const [arrivals] = await Promise.all([fetchArrivals(), fetchPropConfigs()]);
+      const [arrivals] = await Promise.all([fetchArrivals(), fetchPropConfigs(), fetchBags(), fetchStaff()]);
       mergeArrivals(arrivals);
       saveRota();
     } catch (e) {
-      showToast('Could not load arrivals — showing saved data');
+      showToast('Could not load arrivals/bags/staff — showing saved data');
       console.error(e);
     } finally {
       document.getElementById('loadingBar').style.display = 'none';

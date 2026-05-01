@@ -18,14 +18,34 @@
     body { font-family: 'Instrument Sans', system-ui, sans-serif;
            background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
     #header { height: 52px; background: var(--green-dark);
-              display: flex; align-items: center; padding: 0 20px; gap: 14px; }
+              display: flex; align-items: center; padding: 0 16px; gap: 12px; }
     .back-btn { background: rgba(255,255,255,0.12); border: none; color: #fff;
                 padding: 5px 12px; border-radius: 7px; font-size: 13px;
                 font-family: inherit; cursor: pointer; text-decoration: none;
-                display: flex; align-items: center; gap: 5px; }
+                display: flex; align-items: center; gap: 5px; white-space: nowrap; }
     .back-btn:hover { background: rgba(255,255,255,0.22); }
-    .header-title { color: #fff; font-size: 15px; font-weight: 600; }
-    .header-sub   { color: rgba(255,255,255,0.55); font-size: 12px; }
+    .header-title { color: #fff; font-size: 15px; font-weight: 600; flex: 1; }
+    .header-btn { background: rgba(255,255,255,0.12); border: none; color: #fff;
+                  padding: 5px 11px; border-radius: 7px; font-size: 12px;
+                  font-family: inherit; cursor: pointer; white-space: nowrap; }
+    .header-btn:hover { background: rgba(255,255,255,0.22); }
+
+    /* Loading bar */
+    #loadingBar { display: none; height: 3px;
+                  background: linear-gradient(90deg, var(--green), var(--amber));
+                  animation: loadpulse 1.2s ease-in-out infinite; }
+    @keyframes loadpulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+    /* Counted-by row */
+    .countedby-row { background: var(--green-dark);
+                     padding: 0 16px 10px; display: flex; align-items: center; gap: 10px; }
+    .countedby-label { color: rgba(255,255,255,0.7); font-size: 12px;
+                       font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+    .countedby-input { flex: 1; background: rgba(255,255,255,0.12); border: none;
+                       border-radius: 7px; color: #fff; font-family: inherit;
+                       font-size: 13px; padding: 6px 10px; }
+    .countedby-input::placeholder { color: rgba(255,255,255,0.4); }
+    .countedby-input:focus { outline: none; background: rgba(255,255,255,0.22); }
 
     .page-wrap { max-width: 700px; margin: 24px auto; padding: 0 16px; }
 
@@ -64,13 +84,15 @@
                 padding: 10px 13px; background: var(--green-light);
                 border-radius: 9px; border-left: 3px solid var(--green); }
     .item-row.amber { background: var(--amber-light); border-left-color: var(--amber); }
-    .item-label { font-size: 13px; color: #444; }
+    .item-label { font-size: 13px; color: #444; flex: 1; min-width: 0;
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
     .item-input { width: 64px; padding: 6px 8px; text-align: center;
                   border: 1.5px solid var(--border); border-radius: 7px;
                   font-size: 16px; font-weight: 700; font-family: inherit;
-                  color: var(--green); background: #fff; }
+                  color: var(--green); background: #fff; flex-shrink: 0; }
     .item-input.amber { color: var(--amber); }
     .item-input:focus { outline: none; border-color: var(--green); }
+    .item-input:disabled { opacity: 0.4; cursor: wait; }
     .section-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
                      letter-spacing: 0.7px; color: var(--muted);
                      grid-column: 1 / -1; margin: 8px 0 2px; }
@@ -80,13 +102,22 @@
                   font-size: 15px; font-weight: 700; font-family: inherit;
                   cursor: pointer; margin-top: 8px; transition: background 0.15s; }
     .submit-btn:hover { background: #545943; }
+    .submit-btn:disabled { opacity: 0.5; cursor: wait; }
     .submit-btn.amber-btn { background: var(--amber); }
     .submit-btn.amber-btn:hover { background: #9a7d59; }
+
+    /* Total chip */
+    .total-chip { display: inline-block; font-size: 11px; font-weight: 700;
+                  background: #efeae0; color: #777; padding: 2px 8px;
+                  border-radius: 10px; margin-left: 6px; }
+    .card-summary { font-size: 12px; color: var(--muted); margin-bottom: 14px; }
 
     #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
              background: var(--green-dark); color: #fff;
              padding: 12px 24px; border-radius: 10px; font-size: 14px;
-             opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; }
+             opacity: 0; transition: opacity 0.3s; pointer-events: none;
+             white-space: nowrap; max-width: calc(100vw - 32px);
+             overflow: hidden; text-overflow: ellipsis; }
     #toast.show { opacity: 1; }
 
     /* History */
@@ -98,18 +129,15 @@
     .hist-header { font-weight: 700; font-size: 13px; margin-bottom: 3px; }
     .hist-date   { color: var(--muted); font-size: 11px; }
     .hist-items  { color: #555; }
-    .hist-delete { float: right; background: none; border: none;
-                   color: #ccc; font-size: 14px; cursor: pointer; padding: 0 0 0 8px; }
-    .hist-delete:hover { color: var(--red); }
     .hist-type   { display: inline-block; font-size: 10px; font-weight: 700;
                    text-transform: uppercase; letter-spacing: 0.4px;
                    padding: 1px 7px; border-radius: 5px; margin-bottom: 4px; }
     .hist-type.property { background: var(--green-light); color: var(--green); }
     .hist-type.regency  { background: #f5e6d0; color: var(--amber); }
+    .hist-type.washrun  { background: #e0f0ec; color: #4a7c6e; }
 
     .card.washrun-card { border-top: 3px solid #4a7c6e; }
     .type-btn.active.washrun { color: #4a7c6e; }
-    .hist-type.washrun { background: #e0f0ec; color: #4a7c6e; }
     .hist-entry.washrun { background: #f0f8f5; border-left-color: #4a7c6e; }
     .submit-btn.washrun-btn { background: #4a7c6e; }
     .submit-btn.washrun-btn:hover { background: #3a6c5e; }
@@ -126,10 +154,15 @@
 
 <div id="header">
   <a href="hub.html" class="back-btn">← Hub</a>
-  <div>
-    <div class="header-title">Linen Returns</div>
-    <div class="header-sub">Log property returns, wash runs &amp; Regency deliveries</div>
-  </div>
+  <div class="header-title">Linen Returns</div>
+  <button class="header-btn" onclick="reloadHistory()">↻ Refresh</button>
+</div>
+<div id="loadingBar"></div>
+
+<div class="countedby-row">
+  <span class="countedby-label">Logged by</span>
+  <input type="text" class="countedby-input" id="staffName"
+         placeholder="Your name" oninput="onStaffNameInput()">
 </div>
 
 <div class="page-wrap">
@@ -144,6 +177,7 @@
   <!-- Property Return form -->
   <div class="card" id="propertyForm">
     <div class="card-title">Log a property return</div>
+    <div class="card-summary">Linen returned from a property after a clean. Adds the items back onto the shelf.</div>
     <div class="meta-row">
       <div>
         <label for="fProperty">Property <span class="optional-tag">(optional)</span></label>
@@ -170,6 +204,7 @@
   <!-- Wash Run form -->
   <div class="card washrun-card" id="washrunForm" style="display:none">
     <div class="card-title">Log a wash run — own laundry onto shelves</div>
+    <div class="card-summary">Items washed in-house and going back to the Own laundry shelf.</div>
     <div class="meta-row">
       <div>
         <label for="wDate">Date processed</label>
@@ -181,12 +216,13 @@
       </div>
     </div>
     <div class="items-grid" id="washrunItems"></div>
-    <button class="submit-btn washrun-btn" onclick="saveWashRun()">Save Wash Run</button>
+    <button class="submit-btn washrun-btn" id="wSubmitBtn" onclick="saveWashRun()">Save Wash Run</button>
   </div>
 
   <!-- Regency Delivery form -->
   <div class="card regency-card" id="regencyForm" style="display:none">
     <div class="card-title">Log a Regency delivery</div>
+    <div class="card-summary">Linen received from Regency and going onto the Regency shelf.</div>
     <div class="meta-row three">
       <div>
         <label for="rDelivery">Delivery</label>
@@ -206,47 +242,61 @@
       </div>
     </div>
     <div class="items-grid" id="regencyItems"></div>
-    <button class="submit-btn amber-btn" onclick="saveRegencyDelivery()">Save Delivery</button>
+    <button class="submit-btn amber-btn" id="rSubmitBtn" onclick="saveRegencyDelivery()">Save Delivery</button>
   </div>
 
   <!-- History -->
   <div class="card">
     <div class="card-title">History (last 30 days)</div>
-    <div id="historyList"></div>
+    <div id="historyList"><div class="history-empty">Loading…</div></div>
   </div>
 
 </div>
 
 <div id="toast"></div>
 
+<!-- Shared schema (board IDs, column IDs, item list) -->
+<script src="linen-schema.js"></script>
+
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
+
 <script>
-  const MONDAY_API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
-  const PROP_BOARD = '5094466278';
+  const MONDAY_API_TOKEN = window.MONDAY_API_TOKEN;
+  const STAFF_NAME_KEY = 'linenStaffName';
+  const ITEMS = LINEN.items;
 
-  const FIELDS = [
-    { id: 'SkDuvets',    label: 'Super King Duvets',    section: 'Duvets' },
-    { id: 'KingDuvets',  label: 'King Duvets' },
-    { id: 'DblDuvets',   label: 'Double Duvets' },
-    { id: 'SglDuvets',   label: 'Single Duvets' },
-    { id: 'KingSheets',  label: 'Superking Sheets',      section: 'Sheets' },
-    { id: 'DblSheets',   label: 'Double Sheets' },
-    { id: 'SglSheets',   label: 'Single Sheets' },
-    { id: 'Oxford',      label: 'Oxford Pillow Cases',  section: 'Pillows & Towels' },
-    { id: 'Standard',    label: 'Standard Pillow Cases' },
-    { id: 'BathTowels',  label: 'Bath Towels' },
-    { id: 'HandTowels',  label: 'Hand Towels' },
-    { id: 'HotTubTowels',label: 'Hot Tub Towels' },
-    { id: 'Bathrobes',   label: 'Bathrobes' },
-    { id: 'TeaTowels',   label: 'Tea Towels' },
-    { id: 'BathMats',    label: 'Bath Mats' },
-  ];
+  let staffName = localStorage.getItem(STAFF_NAME_KEY) || '';
+  let currentType = 'property';
+  let linenType = 'own'; // for property return form
 
-  function buildItemsGrid(containerId, prefix, amber = false, colorCls = '') {
+  // ── Monday API ────────────────────────────────────────────────────────────
+  async function mondayFetch(query, variables) {
+    const res = await fetch('https://api.monday.com/v2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json',
+                 'Authorization': MONDAY_API_TOKEN,
+                 'API-Version': '2024-01' },
+      body: JSON.stringify({ query, variables: variables || {} })
+    });
+    const j = await res.json();
+    if (j.errors) throw new Error(j.errors[0].message);
+    return j.data;
+  }
+
+  function setLoading(on) {
+    document.getElementById('loadingBar').style.display = on ? 'block' : 'none';
+    document.querySelectorAll('.item-input').forEach(el => el.disabled = on);
+    document.querySelectorAll('.submit-btn').forEach(el => el.disabled = on);
+  }
+
+  // ── UI builders ───────────────────────────────────────────────────────────
+  function buildItemsGrid(containerId, prefix, colorCls = '') {
     const grid = document.getElementById(containerId);
     grid.innerHTML = '';
     let lastSection = '';
-    FIELDS.forEach(f => {
-      if (f.section && f.section !== lastSection) {
+    ITEMS.forEach(f => {
+      if (f.section !== lastSection) {
         lastSection = f.section;
         const sl = document.createElement('div');
         sl.className = 'section-label';
@@ -254,37 +304,41 @@
         grid.appendChild(sl);
       }
       const row = document.createElement('div');
-      const rowCls = colorCls ? colorCls : (amber ? 'amber' : '');
-      row.className = 'item-row' + (rowCls ? ' ' + rowCls : '');
-      const inputCls = colorCls ? colorCls : (amber ? 'amber' : '');
-      row.innerHTML = `<span class="item-label">${f.label}</span>
-        <input class="item-input${inputCls ? ' ' + inputCls : ''}" type="number"
+      row.className = 'item-row' + (colorCls ? ' ' + colorCls : '');
+      row.innerHTML = `<span class="item-label" title="${f.label}">${f.label}</span>
+        <input class="item-input${colorCls ? ' ' + colorCls : ''}" type="number"
                id="${prefix}${f.id}" value="0" min="0">`;
       grid.appendChild(row);
     });
   }
 
-  buildItemsGrid('propertyItems', 'p_');
-  buildItemsGrid('washrunItems',  'w_', false, 'washrun');
-  buildItemsGrid('regencyItems',  'r_', true);
+  function setRowColor(row, type) {
+    // type: 'own' | 'regency' | 'washrun'
+    row.className = 'item-row' + (type === 'regency' ? ' amber' : type === 'washrun' ? ' washrun' : '');
+    const input = row.querySelector('.item-input');
+    if (input) {
+      input.classList.remove('amber','washrun');
+      if (type === 'regency') input.classList.add('amber');
+      if (type === 'washrun') input.classList.add('washrun');
+    }
+  }
 
-  // Date defaults
+  function applyLinenColorToProperty() {
+    const grid = document.getElementById('propertyItems');
+    grid.querySelectorAll('.item-row').forEach(r => setRowColor(r, linenType === 'regency' ? 'regency' : 'own'));
+  }
+
+  // ── Date defaults & properties dropdown ───────────────────────────────────
   const todayStr = new Date().toISOString().split('T')[0];
-  document.getElementById('fDate').value = todayStr;
-  document.getElementById('wDate').value = todayStr;
-  document.getElementById('rDate').value = todayStr;
 
-  // Load properties
   async function loadProperties() {
     const sel = document.getElementById('fProperty');
     try {
-      const res = await fetch('https://api.monday.com/v2', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'Authorization': MONDAY_API_TOKEN },
-        body: JSON.stringify({ query: `{ boards(ids:[${PROP_BOARD}]){ items_page(limit:200){ items{ name } } } }` })
-      });
-      const j = await res.json();
-      const names = j.data.boards[0].items_page.items.map(i => i.name.trim()).filter(Boolean).sort();
+      const data = await mondayFetch(
+        `query { boards(ids:["${LINEN.boards.propertyConfig}"]) { items_page(limit:200) { items { name } } } }`
+      );
+      const names = data.boards[0].items_page.items
+                       .map(i => i.name.trim()).filter(Boolean).sort();
       names.forEach(p => {
         const opt = document.createElement('option');
         opt.value = p; opt.textContent = p;
@@ -292,10 +346,8 @@
       });
     } catch { /* keep default unknown option */ }
   }
-  loadProperties();
 
-  // Linen type within property return form
-  let linenType = 'own';
+  // ── Type toggle ───────────────────────────────────────────────────────────
   function switchLinenType(type) {
     linenType = type;
     document.getElementById('btnLinenOwn').classList.toggle('active',     type === 'own');
@@ -308,10 +360,9 @@
       btn.textContent = 'Save Own Laundry Return';
       btn.classList.remove('amber-btn');
     }
+    applyLinenColorToProperty();
   }
 
-  // Top-level toggle
-  let currentType = 'property';
   function switchType(type) {
     currentType = type;
     document.getElementById('btnProperty').classList.toggle('active', type === 'property');
@@ -322,126 +373,325 @@
     document.getElementById('regencyForm').style.display  = type === 'regency'  ? '' : 'none';
   }
 
-  // Storage
-  function loadHistory() {
-    try { return JSON.parse(localStorage.getItem('linenReturns') || '[]'); } catch { return []; }
-  }
-  function saveHistory(arr) { localStorage.setItem('linenReturns', JSON.stringify(arr)); }
-
+  // ── Helpers: read items from a form ───────────────────────────────────────
   function collectItems(prefix) {
-    const items = {};
+    const items = [];
     let total = 0;
-    FIELDS.forEach(f => {
+    ITEMS.forEach(f => {
       const v = parseInt(document.getElementById(prefix + f.id).value) || 0;
-      if (v > 0) { items[f.id] = { label: f.label, qty: v }; total += v; }
+      if (v > 0) { items.push({ id: f.id, label: f.label, qty: v }); total += v; }
     });
     return { items, total };
   }
   function resetItems(prefix) {
-    FIELDS.forEach(f => { document.getElementById(prefix + f.id).value = '0'; });
+    ITEMS.forEach(f => { document.getElementById(prefix + f.id).value = '0'; });
   }
 
-  function savePropertyReturn() {
+  // ── Stock fetch (used to compute new totals on save) ──────────────────────
+  async function fetchStockSnapshot() {
+    const cols = LINEN.stockColumns;
+    const data = await mondayFetch(
+      `query { boards(ids:["${LINEN.boards.stock}"]) { items_page(limit:50) { items {
+         id name
+         column_values(ids:["${cols.type}","${cols.currentCount}"]) { id text }
+       } } } }`
+    );
+    const items = data.boards[0].items_page.items;
+    // Map: itemId × type → { rowId, count }
+    const out = { own: {}, regency: {} };
+    for (const it of items) {
+      const cv = {};
+      for (const c of it.column_values) cv[c.id] = c.text;
+      const typeText = cv[cols.type];
+      const section  = typeText === 'Own' ? 'own'
+                     : typeText === 'Regency' ? 'regency' : null;
+      if (!section) continue;
+      const item = ITEMS.find(i => i.label === it.name);
+      if (!item) continue;
+      out[section][item.id] = {
+        rowId: it.id,
+        count: parseInt(cv[cols.currentCount]) || 0,
+      };
+    }
+    return out;
+  }
+
+  // ── Core save: post Movements + bump Stock counts ─────────────────────────
+  // mode: 'property' | 'washrun' | 'regency'
+  // section: 'own' | 'regency' (which Linen Stock half to bump)
+  async function postInflow({ mode, section, items, date, notes, headerName }) {
+    if (!items.length) { showToast('No items entered'); return false; }
+    if (!staffName) {
+      showToast('Please enter your name in "Logged by"');
+      document.getElementById('staffName').focus();
+      return false;
+    }
+
+    setLoading(true);
+    try {
+      const stock = await fetchStockSnapshot();
+      const linenLabel = section === 'own' ? 'Own' : 'Regency';
+      const movementType = mode === 'property' ? 'Property return'
+                         : mode === 'washrun'  ? 'Wash run in'
+                         :                       'Regency in';
+      const mvCols = LINEN.movementsColumns;
+      const stCols = LINEN.stockColumns;
+
+      // Build batched mutation: one create_item + one stock count update per item
+      const ops = [];
+      const vars = {};
+      let mIdx = 0, sIdx = 0;
+      const missingItems = [];
+
+      for (const it of items) {
+        const stockRow = stock[section][it.id];
+        if (!stockRow) { missingItems.push(it.label); continue; }
+        const newCount = stockRow.count + it.qty;
+        const noteParts = [`Logged by ${staffName}.`];
+        if (headerName) noteParts.push(headerName);
+        if (notes)      noteParts.push(notes);
+        const noteText = noteParts.join(' ');
+
+        // Movement row
+        const mvCV = {
+          [mvCols.type]:       { label: movementType },
+          [mvCols.linenType]:  { label: linenLabel },
+          [mvCols.item]:       { item_ids: [Number(stockRow.rowId)] },
+          [mvCols.qty]:        String(it.qty),
+          [mvCols.notes]:      noteText,
+          [mvCols.recordedAt]: { date },
+        };
+        const mvKey = `cvm${mIdx}`;
+        vars[mvKey] = JSON.stringify(mvCV);
+        const mvName = `${movementType} · ${linenLabel} · ${it.label} · ${date}`;
+        ops.push(`m${mIdx}: create_item(board_id: "${LINEN.boards.movements}", item_name: ${JSON.stringify(mvName)}, column_values: $${mvKey}) { id }`);
+        mIdx++;
+
+        // Stock row update (Current count = old + qty)
+        const stCV = { [stCols.currentCount]: String(newCount) };
+        const stKey = `cvs${sIdx}`;
+        vars[stKey] = JSON.stringify(stCV);
+        ops.push(`s${sIdx}: change_multiple_column_values(board_id: "${LINEN.boards.stock}", item_id: "${stockRow.rowId}", column_values: $${stKey}) { id }`);
+        sIdx++;
+      }
+
+      if (!ops.length) { showToast('No items matched stock board'); return false; }
+
+      const varDecls = Object.keys(vars).map(k => `$${k}: JSON!`).join(', ');
+      await mondayFetch(`mutation Inflow(${varDecls}) { ${ops.join(' ')} }`, vars);
+
+      const totalQty = items.reduce((a,b) => a + b.qty, 0);
+      const missingNote = missingItems.length ? ` · skipped ${missingItems.length} unmatched` : '';
+      showToast(`${movementType} saved — ${totalQty} items added to ${linenLabel} shelf${missingNote}`);
+      return true;
+    } catch (e) {
+      console.error(e);
+      showToast('Save failed — ' + (e.message || 'see console'));
+      return false;
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Property return ───────────────────────────────────────────────────────
+  async function savePropertyReturn() {
     const property = document.getElementById('fProperty').value || null;
     const date = document.getElementById('fDate').value;
     if (!date) { showToast('Please set a date'); return; }
-    const { items, total } = collectItems('p_');
-    if (total === 0) { showToast('No items entered'); return; }
+    const { items } = collectItems('p_');
+    const headerName = property ? `Returned from ${property}.` : 'Mixed/unknown property.';
 
-    const history = loadHistory();
-    history.unshift({ id: Date.now(), type: 'property', linenType, date, property, items });
-    saveHistory(history);
-    const typeLabel = linenType === 'regency' ? 'Regency' : 'Own Laundry';
-    showToast(`Saved: ${total} ${typeLabel} items${property ? ' from ' + property : ''}`);
-    resetItems('p_');
-    document.getElementById('fProperty').value = '';
-    renderHistory();
+    const ok = await postInflow({
+      mode: 'property',
+      section: linenType,         // 'own' or 'regency'
+      items, date,
+      notes: '',
+      headerName,
+    });
+    if (ok) {
+      resetItems('p_');
+      document.getElementById('fProperty').value = '';
+      renderHistory();
+    }
   }
 
-  function saveWashRun() {
-    const date = document.getElementById('wDate').value;
+  // ── Wash run ──────────────────────────────────────────────────────────────
+  async function saveWashRun() {
+    const date  = document.getElementById('wDate').value;
     const notes = document.getElementById('wNotes').value.trim();
     if (!date) { showToast('Please set a date'); return; }
-    const { items, total } = collectItems('w_');
-    if (total === 0) { showToast('No items entered'); return; }
+    const { items } = collectItems('w_');
 
-    const history = loadHistory();
-    history.unshift({ id: Date.now(), type: 'washrun', date, notes, items });
-    saveHistory(history);
-    showToast(`Wash run saved — ${total} items onto shelves`);
-    resetItems('w_');
-    document.getElementById('wNotes').value = '';
-    renderHistory();
-  }
-
-  function saveRegencyDelivery() {
-    const delivery = document.getElementById('rDelivery').value;
-    const date = document.getElementById('rDate').value;
-    const notes = document.getElementById('rNotes').value.trim();
-    if (!date) { showToast('Please set a date'); return; }
-    const { items, total } = collectItems('r_');
-    if (total === 0) { showToast('No items entered'); return; }
-
-    const history = loadHistory();
-    history.unshift({ id: Date.now(), type: 'regency', date, delivery, notes, items });
-    saveHistory(history);
-    showToast(`Regency Delivery ${delivery} saved — ${total} items`);
-    resetItems('r_');
-    document.getElementById('rNotes').value = '';
-    renderHistory();
-  }
-
-  function deleteEntry(id) {
-    saveHistory(loadHistory().filter(r => r.id !== id));
-    renderHistory();
-  }
-
-  function renderHistory() {
-    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
-    const history = loadHistory().filter(r => new Date(r.date) >= cutoff);
-    const el = document.getElementById('historyList');
-    if (!history.length) {
-      el.innerHTML = '<div class="history-empty">No entries in the last 30 days</div>';
-      return;
+    const ok = await postInflow({
+      mode: 'washrun',
+      section: 'own',
+      items, date,
+      notes,
+      headerName: 'Own laundry — off the line.',
+    });
+    if (ok) {
+      resetItems('w_');
+      document.getElementById('wNotes').value = '';
+      renderHistory();
     }
-    el.innerHTML = history.map(r => {
-      const itemStr = Object.values(r.items).map(i => `${i.qty} ${i.label}`).join(' · ');
-      const d = new Date(r.date).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
-      const isRegencyDelivery = r.type === 'regency';
-      const isWashRun         = r.type === 'washrun';
-      const isRegencyLinen    = r.type === 'property' && r.linenType === 'regency';
-      const header = isRegencyDelivery
-        ? `Regency Delivery ${r.delivery}`
-        : isWashRun
-          ? 'Own Laundry — off the line'
-          : (r.property || 'Unknown property');
-      const badgeCls  = isRegencyDelivery || isRegencyLinen ? 'regency'
-                      : isWashRun ? 'washrun' : 'property';
-      const badgeText = isRegencyDelivery ? 'Regency Delivery'
-                      : isRegencyLinen    ? 'Regency Return'
-                      : isWashRun         ? 'Wash Run'
-                      :                     'Own Laundry Return';
-      const entryCls  = isRegencyDelivery || isRegencyLinen ? 'regency'
-                      : isWashRun ? 'washrun' : '';
-      const sub = (isRegencyDelivery || isWashRun) && r.notes
-                  ? `<div class="hist-date">${r.notes}</div>` : '';
-      return `<div class="hist-entry ${entryCls}">
-        <button class="hist-delete" onclick="deleteEntry(${r.id})" title="Delete">✕</button>
-        <div><span class="hist-type ${badgeCls}">${badgeText}</span></div>
-        <div class="hist-header">${header}</div>
-        <div class="hist-date">${d}</div>
-        ${sub}
-        <div class="hist-items">${itemStr}</div>
-      </div>`;
-    }).join('');
   }
 
+  // ── Regency delivery ──────────────────────────────────────────────────────
+  async function saveRegencyDelivery() {
+    const delivery = document.getElementById('rDelivery').value;
+    const date     = document.getElementById('rDate').value;
+    const notes    = document.getElementById('rNotes').value.trim();
+    if (!date) { showToast('Please set a date'); return; }
+    const { items } = collectItems('r_');
+
+    const ok = await postInflow({
+      mode: 'regency',
+      section: 'regency',
+      items, date,
+      notes,
+      headerName: `Regency Delivery ${delivery}.`,
+    });
+    if (ok) {
+      resetItems('r_');
+      document.getElementById('rNotes').value = '';
+      renderHistory();
+    }
+  }
+
+  // ── History (read from Movements board) ───────────────────────────────────
+  async function fetchHistoryMovements() {
+    const cols = LINEN.movementsColumns;
+    const data = await mondayFetch(
+      `query { boards(ids:["${LINEN.boards.movements}"]) { items_page(limit:200) { items {
+         id name
+         column_values(ids:["${cols.type}","${cols.linenType}","${cols.qty}","${cols.notes}","${cols.recordedAt}"]) {
+           id text
+         }
+       } } } }`
+    );
+    const rows = data.boards[0].items_page.items.map(it => {
+      const cv = {};
+      for (const c of it.column_values) cv[c.id] = c.text;
+      return {
+        id:       it.id,
+        name:     it.name,
+        type:     cv[cols.type] || '',
+        linen:    cv[cols.linenType] || '',
+        qty:      parseInt(cv[cols.qty]) || 0,
+        notes:    cv[cols.notes] || '',
+        recorded: cv[cols.recordedAt] || '',
+      };
+    });
+    return rows;
+  }
+
+  // Group movements posted in the same save action so the history reads like
+  // the old per-submission entries: same date + type + first sentence of Notes
+  // (which is "Logged by NAME. <header>" — so equal across an entire save).
+  function groupHistory(rows) {
+    const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 30);
+    const groups = new Map();
+    for (const r of rows) {
+      // Only show inflow/return types in this view
+      if (!['Property return','Wash run in','Regency in'].includes(r.type)) continue;
+      if (!r.recorded) continue;
+      const d = new Date(r.recorded + 'T12:00:00');
+      if (d < cutoff) continue;
+      // Group key: date · type · linen · notes-prefix (first two sentences)
+      const notePrefix = (r.notes || '').split('.').slice(0,2).join('.').trim();
+      const key = `${r.recorded}|${r.type}|${r.linen}|${notePrefix}`;
+      if (!groups.has(key)) {
+        groups.set(key, {
+          date: r.recorded,
+          type: r.type,
+          linen: r.linen,
+          notePrefix,
+          items: [],
+          total: 0,
+        });
+      }
+      const g = groups.get(key);
+      // Extract item label from movement name: "<Type> · <Linen> · <Item> · <Date>"
+      const parts = (r.name || '').split(' · ');
+      const itemLabel = parts.length >= 3 ? parts[2] : '(item)';
+      g.items.push({ label: itemLabel, qty: r.qty });
+      g.total += r.qty;
+    }
+    return [...groups.values()].sort((a,b) => b.date.localeCompare(a.date));
+  }
+
+  async function renderHistory() {
+    const el = document.getElementById('historyList');
+    el.innerHTML = '<div class="history-empty">Loading…</div>';
+    try {
+      const rows = await fetchHistoryMovements();
+      const groups = groupHistory(rows);
+      if (!groups.length) {
+        el.innerHTML = '<div class="history-empty">No entries in the last 30 days</div>';
+        return;
+      }
+      el.innerHTML = groups.map(g => {
+        const itemStr = g.items.map(i => `${i.qty} ${i.label}`).join(' · ');
+        const d = new Date(g.date + 'T12:00:00')
+          .toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+        const isWashRun = g.type === 'Wash run in';
+        const isRegencyIn = g.type === 'Regency in';
+        const isRegencyReturn = g.type === 'Property return' && g.linen === 'Regency';
+        const badgeCls  = isWashRun ? 'washrun'
+                        : (isRegencyIn || isRegencyReturn) ? 'regency'
+                        : 'property';
+        const badgeText = isWashRun ? 'Wash Run'
+                        : isRegencyIn ? 'Regency Delivery'
+                        : isRegencyReturn ? 'Regency Return'
+                        : 'Own Laundry Return';
+        const entryCls  = isWashRun ? 'washrun'
+                        : (isRegencyIn || isRegencyReturn) ? 'regency'
+                        : '';
+        const header = isWashRun ? 'Own Laundry — off the line'
+                     : g.notePrefix || (isRegencyIn ? 'Regency delivery' : 'Property return');
+        return `<div class="hist-entry ${entryCls}">
+          <div><span class="hist-type ${badgeCls}">${badgeText}</span></div>
+          <div class="hist-header">${header}<span class="total-chip">${g.total}</span></div>
+          <div class="hist-date">${d}</div>
+          <div class="hist-items">${itemStr}</div>
+        </div>`;
+      }).join('');
+    } catch (e) {
+      console.error(e);
+      el.innerHTML = '<div class="history-empty">Could not load history — ' + (e.message || 'see console') + '</div>';
+    }
+  }
+
+  async function reloadHistory() {
+    await renderHistory();
+    showToast('History refreshed');
+  }
+
+  // ── Counted-by ────────────────────────────────────────────────────────────
+  function onStaffNameInput() {
+    staffName = document.getElementById('staffName').value.trim();
+    localStorage.setItem(STAFF_NAME_KEY, staffName);
+  }
+
+  // ── Toast ─────────────────────────────────────────────────────────────────
   function showToast(msg) {
     const t = document.getElementById('toast');
     t.textContent = msg; t.classList.add('show');
     setTimeout(() => t.classList.remove('show'), 3000);
   }
 
+  // ── Init ──────────────────────────────────────────────────────────────────
+  buildItemsGrid('propertyItems', 'p_');
+  buildItemsGrid('washrunItems',  'w_', 'washrun');
+  buildItemsGrid('regencyItems',  'r_', 'amber');
+  applyLinenColorToProperty();
+
+  document.getElementById('fDate').value = todayStr;
+  document.getElementById('wDate').value = todayStr;
+  document.getElementById('rDate').value = todayStr;
+
+  document.getElementById('staffName').value = staffName;
+  loadProperties();
   renderHistory();
 </script>
 </body>

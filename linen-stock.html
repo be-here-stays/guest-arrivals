@@ -14,18 +14,41 @@
       --amber: #AF926A; --amber-light: #faf3e8;
       --red: #B98B73; --text: #1a1a1a; --muted: #888; --border: #e0ddd6;
       --card: #ffffff; --bg: #D5D0C4;
+      --plus: #2d6a4f; --plus-bg: #d4edda;
+      --minus: #b91c1c; --minus-bg: #fde8e8;
     }
     body { font-family: 'Instrument Sans', system-ui, sans-serif;
            background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 40px; }
     #header { height: 52px; background: var(--green-dark);
-              display: flex; align-items: center; padding: 0 20px; gap: 14px; }
+              display: flex; align-items: center; padding: 0 16px; gap: 12px; }
     .back-btn { background: rgba(255,255,255,0.12); border: none; color: #fff;
                 padding: 5px 12px; border-radius: 7px; font-size: 13px;
                 font-family: inherit; cursor: pointer; text-decoration: none;
-                display: flex; align-items: center; gap: 5px; }
+                display: flex; align-items: center; gap: 5px; white-space: nowrap; }
     .back-btn:hover { background: rgba(255,255,255,0.22); }
-    .header-title { color: #fff; font-size: 15px; font-weight: 600; }
+    .header-title { color: #fff; font-size: 15px; font-weight: 600; flex: 1; }
     .header-sub   { color: rgba(255,255,255,0.55); font-size: 12px; }
+    .header-btn { background: rgba(255,255,255,0.12); border: none; color: #fff;
+                  padding: 5px 11px; border-radius: 7px; font-size: 12px;
+                  font-family: inherit; cursor: pointer; white-space: nowrap; }
+    .header-btn:hover { background: rgba(255,255,255,0.22); }
+
+    /* Loading bar */
+    #loadingBar { display: none; height: 3px;
+                  background: linear-gradient(90deg, var(--green), var(--amber));
+                  animation: loadpulse 1.2s ease-in-out infinite; }
+    @keyframes loadpulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+    /* Counted-by row */
+    .countedby-row { background: var(--green-dark);
+                     padding: 0 16px 10px; display: flex; align-items: center; gap: 10px; }
+    .countedby-label { color: rgba(255,255,255,0.7); font-size: 12px;
+                       font-weight: 600; text-transform: uppercase; letter-spacing: 0.4px; }
+    .countedby-input { flex: 1; background: rgba(255,255,255,0.12); border: none;
+                       border-radius: 7px; color: #fff; font-family: inherit;
+                       font-size: 13px; padding: 6px 10px; }
+    .countedby-input::placeholder { color: rgba(255,255,255,0.4); }
+    .countedby-input:focus { outline: none; background: rgba(255,255,255,0.22); }
 
     .page-wrap { max-width: 700px; margin: 24px auto; padding: 0 16px; }
 
@@ -54,23 +77,24 @@
     .section-label { font-size: 10px; font-weight: 700; text-transform: uppercase;
                      letter-spacing: 0.7px; color: var(--muted);
                      grid-column: 1 / -1; margin: 8px 0 2px; }
-    .item-row { display: flex; align-items: center; justify-content: space-between;
-                padding: 10px 13px; border-radius: 9px;
+    .item-row { padding: 10px 13px; border-radius: 9px;
                 border-left: 3px solid var(--green); position: relative; }
     .item-row.ok    { background: var(--green-light); }
     .item-row.low   { background: var(--amber-light); border-left-color: var(--amber); }
     .item-row.empty { background: #f9ecec; border-left-color: var(--red); }
 
     /* Amber tint for Regency rows */
-    .regency-section .item-row.ok { background: var(--amber-light); border-left-color: var(--amber); }
+    .regency-section .item-row.ok    { background: var(--amber-light); border-left-color: var(--amber); }
     .regency-section .item-row.low   { background: #f5e0ca; border-left-color: #c07840; }
     .regency-section .item-row.empty { background: #f9ecec; border-left-color: var(--red); }
     .regency-section .item-input     { color: var(--amber); }
     .regency-section .qty-btn        { color: var(--amber); }
     .regency-section .qty-btn:hover  { background: var(--amber-light); }
 
-    .item-label { font-size: 13px; color: #444; }
-    .item-controls { display: flex; align-items: center; gap: 6px; }
+    .item-top { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+    .item-label { font-size: 13px; color: #444; flex: 1; min-width: 0;
+                  white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .item-controls { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
     .qty-btn { width: 28px; height: 28px; border-radius: 7px;
                border: 1.5px solid var(--border); background: #fff;
                font-size: 16px; font-weight: 700; cursor: pointer;
@@ -82,8 +106,17 @@
                   font-size: 16px; font-weight: 700; font-family: inherit;
                   color: var(--green); background: #fff; }
     .item-input:focus { outline: none; border-color: var(--green); }
-    .min-badge { position: absolute; right: 6px; top: 4px;
-                 font-size: 9px; color: #bbb; font-weight: 600; }
+    .item-input:disabled { opacity: 0.4; cursor: wait; }
+
+    .item-bottom { display: flex; justify-content: space-between; align-items: center;
+                   gap: 8px; margin-top: 5px; min-height: 14px; }
+    .item-current { font-size: 10px; color: #999; font-weight: 600;
+                    letter-spacing: 0.2px; }
+    .delta-pill { font-size: 10px; font-weight: 700; padding: 1px 6px;
+                  border-radius: 4px; line-height: 1.3; }
+    .delta-pill.surplus { background: var(--plus-bg); color: var(--plus); }
+    .delta-pill.deficit { background: var(--minus-bg); color: var(--minus); }
+    .delta-pill.zero    { background: #efeae0; color: #999; }
 
     /* Minimums */
     .min-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
@@ -102,6 +135,7 @@
                 font-size: 15px; font-weight: 700; font-family: inherit;
                 cursor: pointer; margin-top: 10px; transition: background 0.15s; }
     .save-btn:hover { background: #545943; }
+    .save-btn:disabled { opacity: 0.5; cursor: wait; }
     .save-btn.amber { background: var(--amber); }
     .save-btn.amber:hover { background: #9a7e56; }
 
@@ -122,10 +156,21 @@
     .summary-min   { font-size: 11px; color: var(--muted); }
     .summary-empty { font-size: 13px; color: var(--muted); padding: 8px 0; }
 
+    /* Variance summary line */
+    .variance-line { font-size: 12px; color: #666; padding: 6px 13px;
+                     border-radius: 7px; background: #f4f1ea; margin-bottom: 12px;
+                     display: flex; gap: 14px; flex-wrap: wrap; }
+    .variance-line strong { color: var(--text); }
+    .variance-line .surplus-text { color: var(--plus); font-weight: 700; }
+    .variance-line .deficit-text { color: var(--minus); font-weight: 700; }
+    .variance-line .nochange-text { color: #888; font-weight: 700; }
+
     #toast { position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
              background: var(--green-dark); color: #fff;
              padding: 12px 24px; border-radius: 10px; font-size: 14px;
-             opacity: 0; transition: opacity 0.3s; pointer-events: none; white-space: nowrap; }
+             opacity: 0; transition: opacity 0.3s; pointer-events: none;
+             white-space: nowrap; max-width: calc(100vw - 32px);
+             overflow: hidden; text-overflow: ellipsis; }
     #toast.show { opacity: 1; }
 
     @media (max-width: 480px) {
@@ -137,10 +182,15 @@
 
 <div id="header">
   <a href="hub.html" class="back-btn">← Hub</a>
-  <div>
-    <div class="header-title">Linen Stock</div>
-    <div class="header-sub">Shelf counts for Regency &amp; own laundry</div>
-  </div>
+  <div class="header-title">Linen Stock</div>
+  <button class="header-btn" onclick="reloadFromMonday()">↻ Refresh</button>
+</div>
+<div id="loadingBar"></div>
+
+<div class="countedby-row">
+  <span class="countedby-label">Counted by</span>
+  <input type="text" class="countedby-input" id="staffName"
+         placeholder="Your name" oninput="onStaffNameInput()">
 </div>
 
 <div class="page-wrap">
@@ -154,21 +204,22 @@
   <div id="ownSection">
     <div class="card">
       <div class="card-title">Own laundry — current status</div>
-      <div class="card-sub" id="ownStatusSub">No stock count recorded yet</div>
+      <div class="card-sub" id="ownStatusSub">Loading…</div>
       <div id="ownStatusList"></div>
     </div>
     <div class="card">
-      <div class="card-title">Update own laundry shelf count</div>
-      <div class="card-sub">Count own laundry items currently on the shelf.</div>
+      <div class="card-title">Stock take · own laundry</div>
+      <div class="card-sub">The values below are what the system thinks is on the shelf right now. Confirm or correct each one as you count.</div>
+      <div class="variance-line" id="ownVariance" style="display:none"></div>
       <div class="items-grid" id="ownGrid"></div>
-      <button class="save-btn" onclick="saveStock('own')">Save Own Laundry Count</button>
+      <button class="save-btn" id="ownSaveBtn" onclick="saveStock('own')">Save Own Laundry Count</button>
       <div class="last-updated" id="ownLastUpdated"></div>
     </div>
     <div class="card">
       <div class="card-title">Own laundry minimum levels</div>
       <div class="card-sub">Items below minimum will be flagged amber.</div>
       <div class="min-grid" id="ownMinGrid"></div>
-      <button class="save-btn amber" onclick="saveMins('own')">Save Minimums</button>
+      <button class="save-btn amber" id="ownMinsSaveBtn" onclick="saveMins('own')">Save Minimums</button>
     </div>
   </div>
 
@@ -176,21 +227,22 @@
   <div id="regencySection" style="display:none">
     <div class="card regency-accent">
       <div class="card-title">Regency — current status</div>
-      <div class="card-sub" id="regencyStatusSub">No stock count recorded yet</div>
+      <div class="card-sub" id="regencyStatusSub">Loading…</div>
       <div id="regencyStatusList"></div>
     </div>
     <div class="card regency-accent">
-      <div class="card-title">Update Regency shelf count</div>
-      <div class="card-sub">Count Regency items currently on the shelf (returned, clean, ready to use).</div>
+      <div class="card-title">Stock take · Regency</div>
+      <div class="card-sub">The values below are what the system thinks is on the shelf right now. Confirm or correct each one as you count.</div>
+      <div class="variance-line" id="regencyVariance" style="display:none"></div>
       <div class="items-grid regency-section" id="regencyGrid"></div>
-      <button class="save-btn amber" onclick="saveStock('regency')">Save Regency Count</button>
+      <button class="save-btn amber" id="regencySaveBtn" onclick="saveStock('regency')">Save Regency Count</button>
       <div class="last-updated" id="regencyLastUpdated"></div>
     </div>
     <div class="card regency-accent">
       <div class="card-title">Regency minimum levels</div>
       <div class="card-sub">Items below minimum will be flagged amber.</div>
       <div class="min-grid" id="regencyMinGrid"></div>
-      <button class="save-btn amber" onclick="saveMins('regency')">Save Minimums</button>
+      <button class="save-btn amber" id="regencyMinsSaveBtn" onclick="saveMins('regency')">Save Minimums</button>
     </div>
   </div>
 
@@ -198,50 +250,107 @@
 
 <div id="toast"></div>
 
+<!-- Shared schema (board IDs, column IDs, item list) -->
+<script src="linen-schema.js"></script>
+
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
+
 <script>
-  const ITEMS = [
-    { id:'skDuvets',     label:'Super King Duvets',    section:'Duvets' },
-    { id:'kingDuvets',   label:'King Duvets',           section:'Duvets' },
-    { id:'doubleDuvets', label:'Double Duvets',         section:'Duvets' },
-    { id:'singleDuvets', label:'Single Duvets',         section:'Duvets' },
-    { id:'kingSheets',   label:'Superking Sheets',       section:'Sheets' },
-    { id:'doubleSheets', label:'Double Sheets',         section:'Sheets' },
-    { id:'singleSheets', label:'Single Sheets',         section:'Sheets' },
-    { id:'oxford',       label:'Oxford Pillow Cases',   section:'Pillows & Towels' },
-    { id:'standard',     label:'Standard Pillow Cases', section:'Pillows & Towels' },
-    { id:'bathTowels',   label:'Bath Towels',           section:'Pillows & Towels' },
-    { id:'handTowels',   label:'Hand Towels',           section:'Pillows & Towels' },
-    { id:'hotTubTowels', label:'Hot Tub Towels',        section:'Pillows & Towels' },
-    { id:'bathrobes',    label:'Bathrobes',             section:'Pillows & Towels' },
-    { id:'teaTowels',    label:'Tea Towels',            section:'Pillows & Towels' },
-    { id:'bathMats',     label:'Bath Mats',             section:'Pillows & Towels' },
-  ];
+  const MONDAY_API_TOKEN = window.MONDAY_API_TOKEN;
+  const ITEMS = LINEN.items;
+  const STAFF_NAME_KEY = 'linenStaffName';
 
-  const DEFAULT_MINS = {
-    skDuvets:4, kingDuvets:4, doubleDuvets:6, singleDuvets:8,
-    kingSheets:8, doubleSheets:10, singleSheets:12,
-    oxford:20, standard:20, bathTowels:20, handTowels:20,
-    hotTubTowels:10, bathrobes:10, teaTowels:12, bathMats:12,
-  };
+  // ── State (loaded from Monday) ────────────────────────────────────────────
+  // stockState[section][itemId] = { count, rowId, lastCounted }
+  // minsState [section][itemId] = number
+  const stockState = { own: {}, regency: {} };
+  const minsState  = { own: {}, regency: {} };
+  let staffName = localStorage.getItem(STAFF_NAME_KEY) || '';
+  let isLoaded = false;
 
-  // ── Storage ───────────────────────────────────────────────────────────────
-  function stockKey(section) { return section === 'own' ? 'linenStock' : 'linenStock_regency'; }
-  function minsKey(section)  { return section === 'own' ? 'linenMins'  : 'linenMins_regency'; }
-
-  function loadStock(section) {
-    try { return JSON.parse(localStorage.getItem(stockKey(section)) || 'null'); } catch { return null; }
+  // ── Monday API ────────────────────────────────────────────────────────────
+  async function mondayFetch(query, variables) {
+    const res = await fetch('https://api.monday.com/v2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json',
+                 'Authorization': MONDAY_API_TOKEN,
+                 'API-Version': '2024-01' },
+      body: JSON.stringify({ query, variables: variables || {} })
+    });
+    const j = await res.json();
+    if (j.errors) throw new Error(j.errors[0].message);
+    return j.data;
   }
-  function loadMins(section) {
-    try { return JSON.parse(localStorage.getItem(minsKey(section)) || 'null'); } catch { return null; }
-  }
-  function saveStockData(section, d) { localStorage.setItem(stockKey(section), JSON.stringify(d)); }
-  function saveMinsData(section, d)  { localStorage.setItem(minsKey(section),  JSON.stringify(d)); }
 
-  // Per-section mins state
-  const minsState = {
-    own:     { ...DEFAULT_MINS, ...(loadMins('own')     || {}) },
-    regency: { ...DEFAULT_MINS, ...(loadMins('regency') || {}) },
-  };
+  function setLoading(on) {
+    document.getElementById('loadingBar').style.display = on ? 'block' : 'none';
+    document.querySelectorAll('.item-input').forEach(el => el.disabled = on);
+    document.querySelectorAll('.save-btn').forEach(el => el.disabled = on);
+  }
+
+  async function loadFromMonday() {
+    setLoading(true);
+    try {
+      const cols = LINEN.stockColumns;
+      const q = `query { boards(ids:["${LINEN.boards.stock}"]) {
+        items_page(limit:50) {
+          items {
+            id name
+            column_values(ids:["${cols.type}","${cols.currentCount}","${cols.minLevel}","${cols.lastCounted}"]) {
+              id text
+            }
+          }
+        }
+      } }`;
+      const data = await mondayFetch(q);
+      const items = data.boards[0].items_page.items;
+      stockState.own = {}; stockState.regency = {};
+      minsState.own  = {}; minsState.regency  = {};
+      for (const it of items) {
+        const cv = {};
+        for (const c of it.column_values) cv[c.id] = c.text;
+        const typeText = cv[cols.type];
+        const section  = typeText === 'Own' ? 'own'
+                       : typeText === 'Regency' ? 'regency' : null;
+        if (!section) continue;
+        const item = ITEMS.find(i => i.label === it.name);
+        if (!item) continue;
+        stockState[section][item.id] = {
+          count: parseInt(cv[cols.currentCount]) || 0,
+          rowId: it.id,
+          lastCounted: cv[cols.lastCounted] || '',
+        };
+        minsState[section][item.id] = parseInt(cv[cols.minLevel]) || 0;
+      }
+      isLoaded = true;
+      // Repopulate inputs from fresh state
+      ['own','regency'].forEach(s => {
+        ITEMS.forEach(item => {
+          const el = document.getElementById(s + '_' + item.id);
+          if (el) el.value = stockState[s][item.id]?.count ?? 0;
+          updateRow(s + '_', item.id);
+          const minEl = document.getElementById(`mininput_${s}_${item.id}`);
+          if (minEl) minEl.value = minsState[s][item.id] || 0;
+        });
+        renderStatus(s);
+        renderVariance(s);
+        updateLastUpdated(s);
+      });
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function reloadFromMonday() {
+    try {
+      await loadFromMonday();
+      showToast('Reloaded from Monday');
+    } catch (e) {
+      console.error(e);
+      showToast('Reload failed — see console');
+    }
+  }
 
   // ── Grid builders ─────────────────────────────────────────────────────────
   function buildGrid(containerId, prefix) {
@@ -253,14 +362,19 @@
         lastSection = item.section;
       }
       html += `<div class="item-row ok" id="row_${prefix}${item.id}">
-        <span class="item-label">${item.label}</span>
-        <div class="item-controls">
-          <button class="qty-btn" onclick="adj('${prefix}','${item.id}',-1)">−</button>
-          <input class="item-input" type="number" id="${prefix}${item.id}" value="0" min="0"
-                 oninput="updateRow('${prefix}','${item.id}')">
-          <button class="qty-btn" onclick="adj('${prefix}','${item.id}',1)">+</button>
+        <div class="item-top">
+          <span class="item-label" title="${item.label}">${item.label}</span>
+          <div class="item-controls">
+            <button class="qty-btn" onclick="adj('${prefix}','${item.id}',-1)">−</button>
+            <input class="item-input" type="number" id="${prefix}${item.id}" value="0" min="0"
+                   oninput="updateRow('${prefix}','${item.id}')" disabled>
+            <button class="qty-btn" onclick="adj('${prefix}','${item.id}',1)">+</button>
+          </div>
         </div>
-        <span class="min-badge" id="minbadge_${prefix}${item.id}"></span>
+        <div class="item-bottom">
+          <span class="item-current" id="cur_${prefix}${item.id}">…</span>
+          <span class="delta-pill zero" id="delta_${prefix}${item.id}" style="display:none">·</span>
+        </div>
       </div>`;
     });
     grid.innerHTML = html;
@@ -278,15 +392,15 @@
         <span class="min-label">${item.label}</span>
         <input class="min-input" type="number"
                id="mininput_${section}_${item.id}"
-               value="${minsState[section][item.id] || 0}" min="0">
+               value="0" min="0">
       </div>`;
     });
     grid.innerHTML = html;
   }
 
-  // ── Row status ────────────────────────────────────────────────────────────
+  // ── Row status (uses live entered value) ──────────────────────────────────
   function getStatus(section, id, qty) {
-    const m = minsState[section][id] || 0;
+    const m = minsState[section]?.[id] || 0;
     if (qty === 0) return 'empty';
     if (qty < m)  return 'low';
     return 'ok';
@@ -298,77 +412,212 @@
     const section = prefixSection(prefix);
     const qty = parseInt(document.getElementById(prefix + id)?.value) || 0;
     const row = document.getElementById('row_' + prefix + id);
-    const badge = document.getElementById('minbadge_' + prefix + id);
     if (!row) return;
     row.className = 'item-row ' + getStatus(section, id, qty);
-    if (badge) badge.textContent = 'min ' + (minsState[section][id] || 0);
+
+    // Currently shown beneath input
+    const curEl = document.getElementById('cur_' + prefix + id);
+    const liveCount = stockState[section]?.[id]?.count;
+    if (curEl) {
+      if (liveCount === undefined) curEl.textContent = isLoaded ? '— not on board' : 'loading…';
+      else curEl.textContent = `system: ${liveCount}  ·  min ${minsState[section]?.[id] ?? 0}`;
+    }
+
+    // Delta pill
+    const delta = liveCount === undefined ? null : qty - liveCount;
+    const dEl = document.getElementById('delta_' + prefix + id);
+    if (dEl) {
+      if (delta === null) {
+        dEl.style.display = 'none';
+      } else if (delta === 0) {
+        dEl.style.display = '';
+        dEl.className = 'delta-pill zero';
+        dEl.textContent = 'OK';
+      } else if (delta > 0) {
+        dEl.style.display = '';
+        dEl.className = 'delta-pill surplus';
+        dEl.textContent = `+${delta} surplus`;
+      } else {
+        dEl.style.display = '';
+        dEl.className = 'delta-pill deficit';
+        dEl.textContent = `${delta} deficit`;
+      }
+    }
+
+    // Refresh variance summary
+    renderVariance(section);
   }
 
   function adj(prefix, id, delta) {
     const el = document.getElementById(prefix + id);
-    if (!el) return;
+    if (!el || el.disabled) return;
     el.value = Math.max(0, (parseInt(el.value) || 0) + delta);
     updateRow(prefix, id);
   }
 
-  // ── Save / load ───────────────────────────────────────────────────────────
-  function saveStock(section) {
+  // ── Variance summary ──────────────────────────────────────────────────────
+  function renderVariance(section) {
+    const el = document.getElementById(section + 'Variance');
+    if (!el || !isLoaded) return;
     const prefix = section + '_';
-    const data = { ts: Date.now(), items: {} };
+    let surplus = 0, deficit = 0, unchanged = 0, missing = 0;
     ITEMS.forEach(item => {
-      data.items[item.id] = parseInt(document.getElementById(prefix + item.id)?.value) || 0;
+      const liveCount = stockState[section]?.[item.id]?.count;
+      const entered = parseInt(document.getElementById(prefix + item.id)?.value) || 0;
+      if (liveCount === undefined) { missing++; return; }
+      const d = entered - liveCount;
+      if      (d > 0) surplus  += d;
+      else if (d < 0) deficit  += Math.abs(d);
+      else            unchanged++;
     });
-    saveStockData(section, data);
-    showToast('Count saved');
-    renderStatus(section);
-    updateLastUpdated(section);
+    const parts = [];
+    if (surplus)  parts.push(`<span class="surplus-text">+${surplus} surplus</span>`);
+    if (deficit)  parts.push(`<span class="deficit-text">−${deficit} deficit</span>`);
+    parts.push(`<span class="nochange-text">${unchanged}/${ITEMS.length - missing} confirmed</span>`);
+    el.innerHTML = `<strong>Variance:</strong> ${parts.join('  ·  ')}`;
+    el.style.display = '';
   }
 
-  function saveMins(section) {
-    ITEMS.forEach(item => {
-      const el = document.getElementById(`mininput_${section}_${item.id}`);
-      if (el) minsState[section][item.id] = parseInt(el.value) || 0;
-    });
-    saveMinsData(section, minsState[section]);
-    const prefix = section + '_';
-    const stock = loadStock(section);
-    ITEMS.forEach(item => {
-      if (stock) document.getElementById(prefix + item.id).value = stock.items[item.id] || 0;
-      updateRow(prefix, item.id);
-    });
-    showToast('Minimums saved');
-    renderStatus(section);
-  }
-
-  function initSection(section) {
-    const prefix = section + '_';
-    const stock = loadStock(section);
-    ITEMS.forEach(item => {
-      const el = document.getElementById(prefix + item.id);
-      if (el && stock) el.value = stock.items[item.id] || 0;
-      updateRow(prefix, item.id);
-    });
-    renderStatus(section);
-    updateLastUpdated(section);
-  }
-
-  function renderStatus(section) {
-    const prefix = section + '_';
-    const stock = loadStock(section);
-    const listEl = document.getElementById(section + 'StatusList');
-    const subEl  = document.getElementById(section + 'StatusSub');
-    if (!stock) {
-      subEl.textContent = 'No stock count recorded yet';
-      listEl.innerHTML  = '<div class="summary-empty">Save a shelf count to see status here.</div>';
+  // ── Save: stock take ──────────────────────────────────────────────────────
+  async function saveStock(section) {
+    if (!isLoaded) { showToast('Still loading from Monday — try again in a moment'); return; }
+    if (!staffName) {
+      showToast('Please enter your name in "Counted by" before saving');
+      document.getElementById('staffName').focus();
       return;
     }
-    const d = new Date(stock.ts).toLocaleDateString('en-GB',
-      { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
-    subEl.textContent = 'Last counted: ' + d;
+    const prefix = section + '_';
+    const today = new Date().toISOString().split('T')[0];
+    const linenLabel = section === 'own' ? 'Own' : 'Regency';
+
+    // Gather all items
+    const rows = ITEMS.map(item => {
+      const entered  = parseInt(document.getElementById(prefix + item.id)?.value) || 0;
+      const liveRow  = stockState[section]?.[item.id];
+      return { item, entered, liveRow };
+    }).filter(r => r.liveRow); // only items that exist on the stock board
+
+    if (!rows.length) { showToast('No matching stock rows found'); return; }
+
+    setLoading(true);
+    const cols = LINEN.stockColumns;
+    const mvCols = LINEN.movementsColumns;
+
+    // Build a single batched mutation:
+    //   stock_NN: change_multiple_column_values to update Current count + Last counted
+    //   move_NN: create_item on Movements board for non-zero deltas only
+    const ops = [];
+    const vars = {};
+    let mIdx = 0, sIdx = 0;
+    for (const r of rows) {
+      const delta = r.entered - r.liveRow.count;
+      // Always stamp Last counted (and update count if changed)
+      const stockCV = { [cols.lastCounted]: { date: today } };
+      if (delta !== 0) stockCV[cols.currentCount] = String(r.entered);
+      const stockKey = `cvs${sIdx}`;
+      vars[stockKey] = JSON.stringify(stockCV);
+      ops.push(`s${sIdx}: change_multiple_column_values(board_id: "${LINEN.boards.stock}", item_id: "${r.liveRow.rowId}", column_values: $${stockKey}) { id }`);
+      sIdx++;
+
+      if (delta !== 0) {
+        const noteText = `Counted by ${staffName}. Was ${r.liveRow.count}, counted ${r.entered}.`;
+        const mvCV = {
+          [mvCols.type]:          { label: 'Stock take' },
+          [mvCols.linenType]:     { label: linenLabel },
+          [mvCols.item]:          { item_ids: [Number(r.liveRow.rowId)] },
+          [mvCols.qty]:           String(delta),
+          [mvCols.notes]:         noteText,
+          [mvCols.recordedAt]:    { date: today },
+        };
+        const mvKey = `cvm${mIdx}`;
+        vars[mvKey] = JSON.stringify(mvCV);
+        const itemName = `Stock take · ${linenLabel} · ${r.item.label} · ${today}`;
+        ops.push(`m${mIdx}: create_item(board_id: "${LINEN.boards.movements}", item_name: ${JSON.stringify(itemName)}, column_values: $${mvKey}) { id }`);
+        mIdx++;
+      }
+    }
+
+    const varDecls = Object.keys(vars).map(k => `$${k}: JSON!`).join(', ');
+    const mutation = `mutation StockTake(${varDecls}) { ${ops.join(' ')} }`;
+
+    try {
+      await mondayFetch(mutation, vars);
+      // Refresh from Monday so local state is canonical
+      await loadFromMonday();
+      const moved = mIdx;
+      showToast(moved
+        ? `Saved · ${moved} adjustment${moved === 1 ? '' : 's'} logged`
+        : 'Counts confirmed (no changes)');
+    } catch (e) {
+      console.error(e);
+      showToast('Save failed — ' + (e.message || 'see console'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Save: minimum levels ──────────────────────────────────────────────────
+  async function saveMins(section) {
+    if (!isLoaded) { showToast('Still loading from Monday — try again in a moment'); return; }
+    const cols = LINEN.stockColumns;
+    const ops  = [];
+    const vars = {};
+    let i = 0;
+    for (const item of ITEMS) {
+      const liveRow = stockState[section]?.[item.id];
+      if (!liveRow) continue;
+      const newMin = parseInt(document.getElementById(`mininput_${section}_${item.id}`)?.value) || 0;
+      const oldMin = minsState[section]?.[item.id] || 0;
+      if (newMin === oldMin) continue;
+      const cv  = { [cols.minLevel]: String(newMin) };
+      const key = `cv${i}`;
+      vars[key] = JSON.stringify(cv);
+      ops.push(`u${i}: change_multiple_column_values(board_id: "${LINEN.boards.stock}", item_id: "${liveRow.rowId}", column_values: $${key}) { id }`);
+      i++;
+    }
+    if (!ops.length) { showToast('No changes to save'); return; }
+
+    setLoading(true);
+    try {
+      const varDecls = Object.keys(vars).map(k => `$${k}: JSON!`).join(', ');
+      await mondayFetch(`mutation Mins(${varDecls}) { ${ops.join(' ')} }`, vars);
+      await loadFromMonday();
+      showToast(`Saved · ${ops.length} minimum${ops.length === 1 ? '' : 's'} updated`);
+    } catch (e) {
+      console.error(e);
+      showToast('Save failed — ' + (e.message || 'see console'));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Status summary ────────────────────────────────────────────────────────
+  function renderStatus(section) {
+    const listEl = document.getElementById(section + 'StatusList');
+    const subEl  = document.getElementById(section + 'StatusSub');
+    if (!isLoaded) {
+      subEl.textContent = 'Loading…';
+      listEl.innerHTML  = '<div class="summary-empty">Fetching current shelf state from Monday.</div>';
+      return;
+    }
+    // Pick the most recent lastCounted across this section
+    let mostRecent = '';
+    let counted = 0;
+    ITEMS.forEach(item => {
+      const lc = stockState[section]?.[item.id]?.lastCounted;
+      if (lc) { counted++; if (lc > mostRecent) mostRecent = lc; }
+    });
+    if (counted === 0) {
+      subEl.textContent = 'No stock take recorded yet — first save will set the baseline.';
+    } else {
+      const d = new Date(mostRecent + 'T12:00:00');
+      subEl.textContent = 'Last stock take: ' + d.toLocaleDateString('en-GB',
+        { weekday: 'short', day: 'numeric', month: 'short' });
+    }
     listEl.innerHTML = ITEMS.map(item => {
-      const qty = stock.items[item.id] || 0;
-      const st  = getStatus(section, item.id, qty);
-      const min = minsState[section][item.id] || 0;
+      const qty = stockState[section]?.[item.id]?.count ?? 0;
+      const min = minsState[section]?.[item.id] ?? 0;
+      const st  = qty === 0 ? 'empty' : (qty < min ? 'low' : 'ok');
       return `<div class="summary-row ${st}">
         <span class="summary-dot dot-${st}"></span>
         <span class="summary-label">${item.label}</span>
@@ -379,13 +628,17 @@
   }
 
   function updateLastUpdated(section) {
-    const stock = loadStock(section);
     const el = document.getElementById(section + 'LastUpdated');
     if (!el) return;
-    if (!stock) { el.textContent = ''; return; }
-    const d = new Date(stock.ts).toLocaleDateString('en-GB',
-      { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
-    el.textContent = 'Last saved: ' + d;
+    let mostRecent = '';
+    ITEMS.forEach(item => {
+      const lc = stockState[section]?.[item.id]?.lastCounted;
+      if (lc && lc > mostRecent) mostRecent = lc;
+    });
+    if (!mostRecent) { el.textContent = ''; return; }
+    const d = new Date(mostRecent + 'T12:00:00');
+    el.textContent = 'Last saved: ' + d.toLocaleDateString('en-GB',
+      { weekday: 'short', day: 'numeric', month: 'short' });
   }
 
   // ── Toggle ────────────────────────────────────────────────────────────────
@@ -394,6 +647,12 @@
     document.getElementById('btnRegency').classList.toggle('active', section === 'regency');
     document.getElementById('ownSection').style.display     = section === 'own'     ? '' : 'none';
     document.getElementById('regencySection').style.display = section === 'regency' ? '' : 'none';
+  }
+
+  // ── Counted-by ────────────────────────────────────────────────────────────
+  function onStaffNameInput() {
+    staffName = document.getElementById('staffName').value.trim();
+    localStorage.setItem(STAFF_NAME_KEY, staffName);
   }
 
   // ── Toast ─────────────────────────────────────────────────────────────────
@@ -408,8 +667,11 @@
   buildGrid('regencyGrid', 'regency_');
   buildMinGrid('ownMinGrid',     'own');
   buildMinGrid('regencyMinGrid', 'regency');
-  initSection('own');
-  initSection('regency');
+  document.getElementById('staffName').value = staffName;
+  loadFromMonday().catch(e => {
+    console.error(e);
+    showToast('Could not load from Monday — ' + (e.message || 'see console'));
+  });
 </script>
 </body>
 </html>

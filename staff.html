@@ -486,6 +486,8 @@ const HC_NOTES    = 'long_text_mm2rsrdj';
 
 const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const SESSION_KEY = 'bh.staffCode';
+const ME_CACHE_KEY = 'bh.me';   // cached resolved staff record so we can skip
+                                 // the PIN re-validation round-trip on reload
 
 let me = null;          // resolved staff { id, name, role }
 let cleans = [];
@@ -623,6 +625,10 @@ async function submitCode() {
       status: hit.column_values.find(c=>c.id===ST_STATUS)?.text || ''
     };
     sessionStorage.setItem(SESSION_KEY, code);
+    // Cache the resolved staff record so the next page-load (e.g. coming
+    // back from hot-tub.html via the "‹ My day" link) can skip the Monday
+    // round-trip and render the day view immediately.
+    try { localStorage.setItem(ME_CACHE_KEY, JSON.stringify(me)); } catch(_) {}
     await boot();
   } catch (e) {
     err.textContent = 'Could not reach Monday: ' + e.message;
@@ -632,6 +638,7 @@ async function submitCode() {
 
 function logout() {
   sessionStorage.removeItem(SESSION_KEY);
+  try { localStorage.removeItem(ME_CACHE_KEY); } catch(_) {}
   me = null; cleans = []; shifts = []; hotTubCleans = []; maintTasks = [];
   document.getElementById('dayWrap').style.display = 'none';
   document.getElementById('codeWrap').style.display = '';
@@ -1197,7 +1204,7 @@ function renderDay() {
   // regardless of whether they have an assigned card today.
   if (maint) {
     parts.push(`<div style="margin-top:18px">
-      <a href="hot-tub.html?from=staff" class="cc-btn secondary" style="display:block; text-align:center; padding:12px; font-weight:700; text-decoration:none; border-radius:10px; background:#1a5276; color:#fff">
+      <a href="hot-tub.html?from=staff&name=${encodeURIComponent(me.name)}" class="cc-btn secondary" style="display:block; text-align:center; padding:12px; font-weight:700; text-decoration:none; border-radius:10px; background:#1a5276; color:#fff">
         ♨ Open hot tub log (readings & chemicals)
       </a>
     </div>`);
@@ -1416,7 +1423,7 @@ function renderHotTubCleanCard(h) {
   // Hot-tub log link, prefilled for this property + date + visit type
   const visitMap = { 'Changeover':'full', 'Mid-stay':'mid-stay', 'Mid-vacancy':'mid-vac' };
   const visitParam = visitMap[h.type] || 'full';
-  const formUrl = `hot-tub.html?property=${encodeURIComponent(h.property)}&date=${encodeURIComponent(h.day)}&visit=${visitParam}&from=staff`;
+  const formUrl = `hot-tub.html?property=${encodeURIComponent(h.property)}&date=${encodeURIComponent(h.day)}&visit=${visitParam}&from=staff&name=${encodeURIComponent(me.name)}`;
 
   // Status buttons — Start, Complete, Reset. They write back to Monday immediately.
   // Changeover cleans (full property service) get the checklist modal on
@@ -2082,16 +2089,65 @@ function cleanIsAbsorbed(c) {
   return c.checkinDate && partner.checkinDate && c.checkinDate > partner.checkinDate;
 }
 
-/* ─── Boot: restore code from session if present ─────────────── */
+/* ─── Boot: restore code from session if present ─────────────────
+   If we already have a cached `me` from a previous successful PIN, jump
+   straight to the day view and only re-validate the code in the background.
+   This stops the PIN screen from flashing every time the user comes back
+   from hot-tub.html / changeover-form.html, and — more importantly — stops
+   `boot()` from running twice in quick succession (which used to wipe the
+   freshly-rendered day cards while the user was already tapping ▶ Start). */
 (async function restore() {
   const saved = sessionStorage.getItem(SESSION_KEY);
-  if (saved && /^\d{4}$/.test(saved)) {
-    document.getElementById('codeInput').value = saved;
-    submitCode();
-  } else {
+  if (!saved || !/^\d{4}$/.test(saved)) {
     setTimeout(() => document.getElementById('codeInput').focus(), 100);
+    return;
+  }
+  document.getElementById('codeInput').value = saved;
+
+  let cached = null;
+  try { cached = JSON.parse(localStorage.getItem(ME_CACHE_KEY) || 'null'); } catch(_) {}
+
+  if (cached && cached.id && cached.name) {
+    // Fast path — use cached identity to render immediately.
+    me = cached;
+    await boot();
+    // Silently re-validate in the background. If the code is no longer
+    // valid (e.g. office rotated it), boot back to the PIN screen.
+    setTimeout(() => { revalidateInBackground(saved); }, 1500);
+  } else {
+    // No cache (first time on this device, or after logout) — fall back to
+    // the original blocking validation.
+    submitCode();
   }
 })();
+
+async function revalidateInBackground(code) {
+  try {
+    const data = await mondayFetch(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:200){ items{
+      id name column_values(ids:["${ST_CODE}","${ST_ROLE}","${ST_STATUS}"]){ id text }
+    } } } }`);
+    const items = data.boards?.[0]?.items_page?.items || [];
+    const hit = items.find(it => (it.column_values.find(c=>c.id===ST_CODE)?.text || '').trim() === code);
+    if (!hit) {
+      // Code revoked — kick the user back to the PIN screen.
+      logout();
+      document.getElementById('codeError').textContent = 'Your code is no longer valid — please re-enter.';
+      return;
+    }
+    // Refresh the cache; if the role/status changed silently update the page.
+    const fresh = {
+      id:   hit.id,
+      name: hit.name,
+      role: hit.column_values.find(c=>c.id===ST_ROLE)?.text || '',
+      status: hit.column_values.find(c=>c.id===ST_STATUS)?.text || ''
+    };
+    me = fresh;
+    try { localStorage.setItem(ME_CACHE_KEY, JSON.stringify(fresh)); } catch(_) {}
+  } catch (e) {
+    // Network blip — keep the cached identity, the user can carry on.
+    console.warn('Background re-validation failed:', e);
+  }
+}
 
 /* ─── Service worker ─────────────────────────────────────────── */
 if ('serviceWorker' in navigator) {

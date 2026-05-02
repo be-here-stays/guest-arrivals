@@ -18,7 +18,10 @@
       --blue:#1a5276; --blue-bg:#eaf4fb;
     }
     * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
-    body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:48px; }
+    /* Bottom padding keeps the Submit button clear of mobile browser chrome
+       (Safari URL bar, iOS home indicator). env(safe-area-inset-bottom) covers
+       devices with a home bar; the +96px ensures the URL bar can't overlap. */
+    body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 96px); }
 
     /* ── Header ─────────────────────────────────────── */
     header { background:var(--dark); color:#fff; padding:18px 24px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; }
@@ -146,11 +149,17 @@
     .submit-btn:disabled { opacity:.45; cursor:not-allowed; }
 
     /* ── Messages ───────────────────────────────────── */
-    .msg { padding:14px 16px; border-radius:10px; font-size:14px; font-weight:600; margin-bottom:14px; display:none; }
+    .msg { padding:14px 16px; border-radius:10px; font-size:14px; font-weight:600; margin-bottom:14px; display:none; scroll-margin-top:16px; }
     .msg.show { display:block; }
     .msg.success { background:var(--green-bg); color:var(--green); border:1px solid var(--green-bdr); }
     .msg.error   { background:var(--red-bg); color:var(--red); border:1px solid #c0392b; }
     .msg.loading { background:var(--amber-bg); color:var(--amber); border:1px solid #d4a017; }
+
+    /* Visibly mark required fields the user missed on Submit. */
+    .field input.missing, .field select.missing, .field textarea.missing {
+      border-color:var(--red) !important; background:var(--red-bg) !important;
+    }
+    .vt-row.missing .vt-btn { border-color:var(--red); }
 
     /* ── Hidden sections ────────────────────────────── */
     .hide { display:none !important; }
@@ -197,6 +206,9 @@
   </div>
   <a href="hub.html" id="backLink" class="hdr-back">‹ Hub</a>
 </header>
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
+
 <script>
   // Route the back link to wherever the user came from. Maintenance staff
   // launching this page from staff.html should land back in their day view,
@@ -488,7 +500,7 @@
 
 <script>
 // ── Config ───────────────────────────────────────────────
-const API_TOKEN      = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const API_TOKEN = window.MONDAY_API_TOKEN;
 const CHARGING_BOARD = 1621263971;
 const STATUS_BOARD   = 1918769299;
 
@@ -548,7 +560,7 @@ let statusItems = {}; // name → { id, cv }
 
 // ── Init ─────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
-  // Set datetime to now (local)
+  // Set datetime to now (local). Will be overridden by ?date= below if present.
   const now = new Date();
   now.setSeconds(0, 0);
   const off = now.getTimezoneOffset();
@@ -556,6 +568,90 @@ document.addEventListener('DOMContentLoaded', async () => {
   document.getElementById('fDateTime').value = local.toISOString().slice(0, 16);
 
   await loadProperties();
+  applyUrlPrefill();
+});
+
+// Pre-fill the visit setup from URL params handed in by staff.html so the
+// engineer doesn't have to re-pick property + their own name on every clean.
+// Supported params: property, name (=tester), date (YYYY-MM-DD), visit
+// (full | mid-stay | mid-vac).
+function applyUrlPrefill() {
+  try {
+    const p = new URLSearchParams(location.search);
+
+    // Property — must match an option already loaded from the status board.
+    const propParam = p.get('property');
+    if (propParam) {
+      const sel = document.getElementById('fProperty');
+      const match = Array.from(sel.options).find(o => o.value === propParam);
+      if (match) {
+        sel.value = propParam;
+        // Trigger the same status-card load the user would get manually.
+        if (typeof onPropertyChange === 'function') onPropertyChange();
+      }
+    }
+
+    // Tester — match the staff name against the dropdown. The dropdown uses
+    // first names, but staff records often hold the full name, so accept a
+    // first-token match too. If nothing matches, add the name as a new option
+    // so we still pre-select it rather than silently falling back to "Select…".
+    const nameParam = p.get('name');
+    if (nameParam) {
+      const tSel = document.getElementById('fTester');
+      const opts = Array.from(tSel.options);
+      const lc = nameParam.trim().toLowerCase();
+      const firstTok = lc.split(/\s+/)[0];
+      let hit = opts.find(o => o.value && o.value.toLowerCase() === lc);
+      if (!hit) hit = opts.find(o => o.value && o.value.toLowerCase() === firstTok);
+      if (!hit) {
+        const o = document.createElement('option');
+        o.value = nameParam; o.textContent = nameParam;
+        tSel.insertBefore(o, tSel.options[1] || null);
+        hit = o;
+      }
+      tSel.value = hit.value;
+    }
+
+    // Date — accept YYYY-MM-DD; combine with the current time so it lands as
+    // a valid datetime-local value.
+    const dateParam = p.get('date');
+    if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+      const dtEl = document.getElementById('fDateTime');
+      const t = (dtEl.value.split('T')[1]) || '09:00';
+      dtEl.value = dateParam + 'T' + t.slice(0, 5);
+    }
+
+    // Visit type — map to the existing buttons.
+    const visitParam = p.get('visit');
+    if (visitParam) {
+      const map = { 'full':'.vt-btn.full', 'mid-stay':'.vt-btn.mid-stay', 'mid-vac':'.vt-btn.mid-vac' };
+      const sel = map[visitParam];
+      if (sel) {
+        const btn = document.querySelector(sel);
+        if (btn && typeof setVisitType === 'function') setVisitType(visitParam, btn);
+      }
+    }
+  } catch (e) {
+    console.warn('Pre-fill from URL failed:', e);
+  }
+}
+
+// If the form is restored from the back/forward cache (common on iOS Safari
+// when the user nav's back from staff.html or away mid-submit), the submit
+// button can be left disabled and the success/loading message can still be
+// showing. Force a clean state every time the page is shown.
+window.addEventListener('pageshow', (e) => {
+  if (e.persisted) {
+    // BFCache restore — wipe transient state.
+    const btn = document.getElementById('submitBtn');
+    if (btn) { btn.disabled = false; btn.textContent = 'Submit Log'; }
+    const box = document.getElementById('msgBox');
+    if (box) { box.className = 'msg'; box.textContent = ''; }
+    // If a previous submission left the timer running, stop it cleanly.
+    if (typeof timerRunning !== 'undefined' && timerRunning && typeof timerStop === 'function') {
+      try { timerStop(); } catch (_) {}
+    }
+  }
 });
 
 let _outbox = JSON.parse(localStorage.getItem('outbox') || '[]');
@@ -807,21 +903,60 @@ function esc(s) { return s.replace(/\\/g,'\\\\').replace(/"/g,'\\"'); }
 
 // ── Submit ───────────────────────────────────────────────
 async function submitForm() {
+  // Clear any prior "missing" highlights from a previous failed submit.
+  document.querySelectorAll('.missing').forEach(el => el.classList.remove('missing'));
+  document.querySelector('.vt-row')?.classList.remove('missing');
+
   // ── Validation ──
+  // Pair each rule with the field id so we can highlight + scroll-to the
+  // first thing that's missing. The user complained that the error message
+  // appears above the fold and the Submit button is right at the bottom, so
+  // they couldn't tell submission had been rejected.
+  const rules = [
+    ['fProperty',   'Property'],
+    ['fTester',     'Tester'],
+    [null,          'Visit type', () => !visitType],
+    ['fInitPH',     'Initial PH'],
+    ['fInitBrom',   'Initial Bromine'],
+    ['fInitTA',     'TA'],
+    ['fInitTDS',    'TDS'],
+    ['fFinalPH',    'Final PH'],
+    ['fFinalBrom',  'Final Bromine'],
+  ];
   const errs = [];
-  if (!g('fProperty'))  errs.push('Property required');
-  if (!g('fTester'))    errs.push('Tester required');
-  if (!visitType)       errs.push('Visit type required');
-  if (!g('fInitPH'))    errs.push('Initial PH required');
-  if (!g('fInitBrom'))  errs.push('Initial Bromine required');
-  if (!g('fInitTA'))    errs.push('TA required');
-  if (!g('fInitTDS'))   errs.push('TDS required');
-  if (!g('fFinalPH'))   errs.push('Final PH required');
-  if (!g('fFinalBrom')) errs.push('Final Bromine required');
-  if (errs.length) { showMsg(errs.join(' · '), 'error'); return; }
+  let firstMissingEl = null;
+  for (const [id, label, customCheck] of rules) {
+    const missing = customCheck ? customCheck() : !g(id);
+    if (!missing) continue;
+    errs.push(label + ' required');
+    if (id) {
+      const el = document.getElementById(id);
+      if (el) {
+        el.classList.add('missing');
+        if (!firstMissingEl) firstMissingEl = el;
+      }
+    } else {
+      // Visit type — no single input, so highlight the row of buttons.
+      document.querySelector('.vt-row')?.classList.add('missing');
+      if (!firstMissingEl) firstMissingEl = document.querySelector('.vt-btn');
+    }
+  }
+  if (errs.length) {
+    showMsg('Missing: ' + errs.join(' · '), 'error');
+    // Scroll the error message into view at the top of the screen, then
+    // focus the first missing field so iOS opens the keyboard on it.
+    const box = document.getElementById('msgBox');
+    if (box && box.scrollIntoView) box.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    if (firstMissingEl && firstMissingEl.focus) {
+      // Slight delay so the smooth-scroll completes before the keyboard pops.
+      setTimeout(() => { try { firstMissingEl.focus({ preventScroll: true }); } catch(_) { firstMissingEl.focus(); } }, 350);
+    }
+    return;
+  }
 
   const btn = document.getElementById('submitBtn');
   btn.disabled = true;
+  btn.textContent = 'Submitting…';
   showMsg('Submitting…', 'loading');
 
   try {
@@ -895,6 +1030,7 @@ async function submitForm() {
     }
     showMsg('Submission error: ' + e.message, 'error');
     btn.disabled = false;
+    btn.textContent = 'Submit Log';
   }
 }
 
@@ -956,8 +1092,14 @@ function resetForm() {
   document.getElementById('flagPill')?.classList.remove('on');
   document.getElementById('wcFlag')?.classList.remove('on');
 
-  // Re-enable submit
-  document.getElementById('submitBtn').disabled = false;
+  // Re-enable submit (and restore label in case it was left as "Submitting…")
+  const submitBtn = document.getElementById('submitBtn');
+  submitBtn.disabled = false;
+  submitBtn.textContent = 'Submit Log';
+
+  // Clear any "missing" highlights from a prior failed submit.
+  document.querySelectorAll('.missing').forEach(el => el.classList.remove('missing'));
+  document.querySelector('.vt-row')?.classList.remove('missing');
 }
 
 function showMsg(text, type) {

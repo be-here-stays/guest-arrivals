@@ -503,6 +503,9 @@
 
 <div id="toast"></div>
 
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
+
 <script>
 /* ═══════════════════════════════════════════════════════════════════
    CONFIG — Hot Tub Rota
@@ -510,7 +513,7 @@
 const HTROTA_BUILD = 'hot-tub-rota v1.0';
 console.log(`%c${HTROTA_BUILD}`, 'color:#1a5276;font-weight:bold');
 
-const MONDAY_API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const MONDAY_API_TOKEN = window.MONDAY_API_TOKEN;
 
 // Boards
 const PROP_CONFIG_BOARD  = '5094466278';   // Property Config — master record (which props need maintenance, durations, hasTub)
@@ -545,6 +548,7 @@ const LS_NEXT_OUT = 'date_mkqw4cf6';
 
 // Hot Tub Cleans columns (this board's columns)
 const HC_DATE     = 'date_mm2rvsp9';
+const HC_CHECKIN  = 'date_mm2v4gm3';
 const HC_PROP     = 'board_relation_mm2rjw3';
 const HC_TYPE     = 'color_mm2rr4cv';            // Clean Type (status)
 const HC_PERSON   = 'dropdown_mm2rjwkr';         // Person Name (dropdown — staff names)
@@ -1100,8 +1104,12 @@ function autoDeriveCleans() {
       // ── Phase 1: Changeover on check-in day (always) ─────────────
       if (isCheckin) {
         if (suppressedCheckins.has(d)) {
-          // We brought this changeover forward to yesterday — don't double-up.
-          continue;
+          // Pre-pass planned a bring-forward for yesterday. Only honour the
+          // suppression if the 48h clock actually landed on yesterday — i.e.
+          // a clean was emitted there. If daysSince was < 2 yesterday the
+          // bring-forward never fired and this check-in needs its own Changeover.
+          const yesterday = addDaysISO(d, -1);
+          if (lastClean === yesterday) continue;
         }
         // Real Changeover on yesterday means a manual bring-forward has already
         // covered this turnover. Skip the auto-changeover today.
@@ -1132,12 +1140,13 @@ function autoDeriveCleans() {
 
       if (!want) continue;
 
-      // Real Monday row wins — even if we'd derive something, defer to it.
-      const hasReal = cleans.some(c => c.property === p.name && c.day === d && !c.virtual);
-      if (hasReal) {
-        lastClean = d;
-        // If a real Changeover is sitting on a check-in day, the bring-forward
-        // suppression doesn't apply to it (the planner has explicitly set it).
+      // Real Monday row suppresses any virtual for this day.
+      // Only advance lastClean (the 48h clock) if the row is actually Completed —
+      // a Scheduled row is just a plan; the tub hasn't been cleaned yet, so the
+      // clock stays anchored to the last confirmed clean (p.lastCleaned / TUB_STATUS_BOARD).
+      const realRow = cleans.find(c => c.property === p.name && c.day === d && !c.virtual);
+      if (realRow) {
+        if (realRow.status === 'Completed') lastClean = d;
         continue;
       }
 
@@ -1160,6 +1169,7 @@ function autoDeriveCleans() {
         isNew: false,
       });
       lastClean = d;
+      break; // one virtual per property per run — planner sees the next due clean only
     }
   }
   return out;
@@ -2462,6 +2472,16 @@ function buildColumnValuesPayload(c) {
   const prop = c.unlisted ? null : properties.find(p => p.name === c.property);
   const propId = prop?.id;
   const [hh, mm] = (c.start || '10:00').split(':').map(Number);
+  // Work out which check-in date this clean is serving (same logic as render)
+  const propStays = staysFor(c.property);
+  let servingCheckIn = null;
+  if (isCheckinOn(propStays, c.day)) {
+    servingCheckIn = c.day;
+  } else {
+    const fut = propStays.filter(s => s.checkIn && s.checkIn > c.day).sort((a,b) => a.checkIn.localeCompare(b.checkIn));
+    if (fut[0]) servingCheckIn = fut[0].checkIn;
+  }
+
   const cv = {
     [HC_DATE]:     { date: c.day },
     [HC_TYPE]:     { label: c.type },
@@ -2473,6 +2493,7 @@ function buildColumnValuesPayload(c) {
     [HC_AUTOGEN]:  c.autoGen ? { checked: 'true' } : { checked: 'false' },
   };
   if (propId) cv[HC_PROP] = { item_ids: [parseInt(propId, 10)] };
+  if (servingCheckIn) cv[HC_CHECKIN] = { date: servingCheckIn };
   return cv;
 }
 

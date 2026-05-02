@@ -173,7 +173,7 @@
 <div id="header">
   <a href="hub.html" class="back-btn">← Hub</a>
   <div class="header-title">Linen Dashboard</div>
-  <a href="laundry-rota.html" class="header-btn">📋 Rota</a>
+  <a href="laundry-rota.html?from=linen-dashboard" class="header-btn">📋 Rota</a>
   <button class="header-btn" onclick="reload()">↻ Refresh</button>
 </div>
 <div id="loadingBar"></div>
@@ -213,22 +213,27 @@
 
   <!-- Quick actions -->
   <div class="quick-actions">
-    <a href="linen-stock.html" class="qa-btn">
+    <a href="linen-readiness.html?from=linen-dashboard" class="qa-btn">
+      <div class="qa-icon">✅</div>
+      <div class="qa-label">Readiness</div>
+      <div class="qa-sub">Arrivals: bagged + beds confirmed?</div>
+    </a>
+    <a href="linen-stock.html?from=linen-dashboard" class="qa-btn">
       <div class="qa-icon">📦</div>
       <div class="qa-label">Stock take</div>
       <div class="qa-sub">Confirm shelf counts</div>
     </a>
-    <a href="linen-returns.html" class="qa-btn">
+    <a href="linen-returns.html?from=linen-dashboard" class="qa-btn">
       <div class="qa-icon">↩️</div>
       <div class="qa-label">Log delivery</div>
       <div class="qa-sub">Returns / wash runs / Regency in</div>
     </a>
-    <a href="laundry-rota.html" class="qa-btn">
+    <a href="laundry-rota.html?from=linen-dashboard" class="qa-btn">
       <div class="qa-icon">📋</div>
       <div class="qa-label">Bagging rota</div>
       <div class="qa-sub">Bag for arrivals</div>
     </a>
-    <a href="linen-transport.html" class="qa-btn">
+    <a href="linen-transport.html?from=linen-dashboard" class="qa-btn">
       <div class="qa-icon">🚚</div>
       <div class="qa-label">Transport</div>
       <div class="qa-sub">Dispatch &amp; deliver</div>

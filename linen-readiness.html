@@ -1,0 +1,538 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Bagging Readiness — Be Here</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    :root {
+      --green: #646955; --green-dark: #272F2E; --green-light: #eaede4;
+      --amber: #AF926A; --amber-light: #faf3e8;
+      --text: #1a1a1a; --muted: #888; --border: #e0ddd6;
+      --card: #ffffff; --bg: #D5D0C4;
+      --plus: #2d6a4f; --plus-bg: #d4edda;
+      --warn: #a86c00; --warn-bg: #fdf5e8;
+      --crit: #8B2020; --crit-bg: #fdf0ec;
+      --beds: #5a3e8f; --beds-bg: #ede1fa;
+    }
+    body { font-family: 'Instrument Sans', system-ui, sans-serif;
+           background: var(--bg); color: var(--text); min-height: 100vh; padding-bottom: 60px; }
+
+    #header { height: 52px; background: var(--green-dark);
+              display: flex; align-items: center; padding: 0 16px; gap: 12px; }
+    .back-btn { background: rgba(255,255,255,0.12); border: none; color: #fff;
+                padding: 5px 12px; border-radius: 7px; font-size: 13px;
+                font-family: inherit; cursor: pointer; text-decoration: none;
+                display: flex; align-items: center; gap: 5px; white-space: nowrap; }
+    .back-btn:hover { background: rgba(255,255,255,0.22); }
+    .header-title { color: #fff; font-size: 15px; font-weight: 600; flex: 1; }
+    .header-btn { background: rgba(255,255,255,0.12); border: none; color: #fff;
+                  padding: 5px 11px; border-radius: 7px; font-size: 12px;
+                  font-family: inherit; cursor: pointer; white-space: nowrap;
+                  text-decoration: none; }
+    .header-btn:hover { background: rgba(255,255,255,0.22); }
+
+    /* Loading bar */
+    #loadingBar { display: none; height: 3px;
+                  background: linear-gradient(90deg, var(--crit), var(--amber));
+                  animation: loadpulse 1.2s ease-in-out infinite; }
+    @keyframes loadpulse { 0%,100% { opacity: 0.4; } 50% { opacity: 1; } }
+
+    .page-wrap { max-width: 960px; margin: 18px auto; padding: 0 16px; }
+
+    /* Counter cards */
+    .counters { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr));
+                gap: 10px; margin-bottom: 16px; }
+    .counter { background: #fff; border-radius: 12px; padding: 14px 16px;
+               box-shadow: 0 1px 4px rgba(0,0,0,0.06);
+               border-left: 4px solid var(--border);
+               cursor: pointer; transition: transform 0.12s, box-shadow 0.12s; }
+    .counter:hover { transform: translateY(-1px); box-shadow: 0 3px 10px rgba(0,0,0,0.1); }
+    .counter.active { box-shadow: 0 0 0 2px var(--text), 0 1px 4px rgba(0,0,0,0.06); }
+    .counter.crit { border-left-color: var(--crit); }
+    .counter.needs-bag  { border-left-color: var(--warn); }
+    .counter.needs-beds { border-left-color: var(--beds); }
+    .counter.ready { border-left-color: var(--plus); }
+    .counter-val { font-size: 28px; font-weight: 800; line-height: 1.05; }
+    .counter.crit .counter-val      { color: var(--crit); }
+    .counter.needs-bag .counter-val  { color: var(--warn); }
+    .counter.needs-beds .counter-val { color: var(--beds); }
+    .counter.ready .counter-val { color: var(--plus); }
+    .counter-lbl { font-size: 10px; font-weight: 700; text-transform: uppercase;
+                   letter-spacing: 0.5px; color: var(--muted); margin-top: 4px; }
+    .counter-sub { font-size: 11px; color: var(--muted); margin-top: 4px; line-height: 1.35; }
+
+    /* Filter row + window selector */
+    .control-row { display: flex; align-items: center; gap: 10px;
+                    margin-bottom: 12px; flex-wrap: wrap; }
+    .filter-chip { background: #fff; border: 1.5px solid var(--border);
+                   color: var(--text); padding: 6px 13px;
+                   border-radius: 14px; font-size: 12px; font-weight: 700;
+                   font-family: inherit; cursor: pointer; transition: all 0.15s;
+                   white-space: nowrap; }
+    .filter-chip.active { background: var(--text); color: #fff; border-color: var(--text); }
+    .filter-chip:hover { border-color: var(--text); }
+    .control-row select { padding: 7px 10px; border: 1.5px solid var(--border);
+                          border-radius: 8px; font-family: inherit; font-size: 12px;
+                          background: #fff; margin-left: auto; }
+
+    /* List rows */
+    .arrivals-list { display: flex; flex-direction: column; gap: 8px; }
+    .arrival-row { background: #fff; border-radius: 10px; padding: 12px 14px;
+                   box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+                   border-left: 4px solid var(--border);
+                   display: grid; gap: 6px; }
+    .arrival-row.crit       { border-left-color: var(--crit); background: #fff5f3; }
+    .arrival-row.needs-bag  { border-left-color: var(--warn); }
+    .arrival-row.needs-beds { border-left-color: var(--beds); }
+    .arrival-row.ready      { border-left-color: var(--plus); background: #f4faf6; }
+
+    .arrival-top { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+    .arrival-prop { font-size: 16px; font-weight: 800; flex: 1; min-width: 0;
+                    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .arrival-when { font-size: 12px; color: var(--muted); font-weight: 600;
+                    flex-shrink: 0; }
+    .arrival-when .countdown { font-weight: 800; color: var(--text); }
+    .arrival-when .countdown.urgent { color: var(--crit); }
+
+    .arrival-meta { font-size: 12px; color: var(--muted); display: flex;
+                    flex-wrap: wrap; gap: 12px; }
+
+    .pill-row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center;
+                margin-top: 2px; }
+    .pill { font-size: 10px; font-weight: 700; padding: 3px 9px; border-radius: 5px;
+            text-transform: uppercase; letter-spacing: 0.3px; white-space: nowrap; }
+    .pill.crit       { background: var(--crit); color: #fff; }
+    .pill.needs-bag  { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
+    .pill.needs-beds { background: var(--beds-bg); color: var(--beds); border: 1px solid var(--beds); }
+    .pill.ready      { background: var(--plus-bg); color: var(--plus); }
+    .pill.confirmed  { background: var(--plus-bg); color: var(--plus); }
+    .pill.fixed      { background: var(--green-light); color: var(--green); }
+    .pill.assumed    { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
+    .pill.has-bag    { background: var(--plus-bg); color: var(--plus); }
+    .pill.no-bag     { background: var(--crit-bg); color: var(--crit); border: 1px solid var(--crit); }
+    .pill.partial    { background: var(--warn-bg); color: var(--warn); border: 1px solid var(--warn); }
+
+    .arrival-action { padding: 6px 12px; border-radius: 7px;
+                      font-size: 12px; font-weight: 700; font-family: inherit;
+                      text-decoration: none; cursor: pointer; border: none;
+                      background: var(--green-dark); color: #fff;
+                      white-space: nowrap; flex-shrink: 0; }
+    .arrival-action:hover { background: var(--green); }
+    .arrival-action.ghost { background: transparent; color: var(--text);
+                            border: 1.5px solid var(--border); }
+    .arrival-action.ghost:hover { border-color: var(--text); }
+
+    .empty-state { font-size: 13px; color: var(--muted); font-style: italic;
+                   text-align: center; padding: 30px 12px;
+                   background: rgba(255,255,255,0.3); border-radius: 12px; }
+
+    @media (max-width: 600px) {
+      .counters { grid-template-columns: repeat(2, 1fr); }
+      .counter-val { font-size: 22px; }
+      .arrival-row { padding: 10px 12px; }
+      .control-row select { margin-left: 0; }
+    }
+    @media (max-width: 380px) {
+      .counters { grid-template-columns: 1fr 1fr; }
+    }
+  </style>
+</head>
+<body>
+
+<div id="header">
+  <a href="hub.html" class="back-btn">← Hub</a>
+  <div class="header-title">Bagging Readiness</div>
+  <a href="linen-dashboard.html" class="header-btn">📊 Dashboard</a>
+  <a href="laundry-rota.html" class="header-btn">📋 Rota</a>
+  <button class="header-btn" onclick="reload()">↻ Refresh</button>
+</div>
+<div id="loadingBar"></div>
+
+<div class="page-wrap">
+
+  <div class="counters" id="counters">
+    <div class="counter crit" data-filter="crit">
+      <div class="counter-val" id="cVal-crit">…</div>
+      <div class="counter-lbl">Critical</div>
+      <div class="counter-sub">Arriving within 24h, no bag</div>
+    </div>
+    <div class="counter needs-bag" data-filter="needs-bag">
+      <div class="counter-val" id="cVal-needs-bag">…</div>
+      <div class="counter-lbl">Needs bagging</div>
+      <div class="counter-sub">No bag yet, &gt;24h to arrival</div>
+    </div>
+    <div class="counter needs-beds" data-filter="needs-beds">
+      <div class="counter-val" id="cVal-needs-beds">…</div>
+      <div class="counter-lbl">Needs bed confirmation</div>
+      <div class="counter-sub">Bagged but config assumed</div>
+    </div>
+    <div class="counter ready" data-filter="ready">
+      <div class="counter-val" id="cVal-ready">…</div>
+      <div class="counter-lbl">Fully ready</div>
+      <div class="counter-sub">Bagged + beds confirmed</div>
+    </div>
+  </div>
+
+  <div class="control-row">
+    <button class="filter-chip active" data-filter="all"        onclick="setFilter('all')">All</button>
+    <button class="filter-chip"        data-filter="crit"       onclick="setFilter('crit')">Critical</button>
+    <button class="filter-chip"        data-filter="needs-bag"  onclick="setFilter('needs-bag')">Needs bagging</button>
+    <button class="filter-chip"        data-filter="needs-beds" onclick="setFilter('needs-beds')">Needs beds</button>
+    <button class="filter-chip"        data-filter="ready"      onclick="setFilter('ready')">Ready</button>
+    <select id="windowSelect" onchange="setWindow(this.value)">
+      <option value="3">Next 3 days</option>
+      <option value="7" selected>Next 7 days</option>
+      <option value="14">Next 14 days</option>
+      <option value="30">Next 30 days</option>
+    </select>
+  </div>
+
+  <div id="arrivalsList" class="arrivals-list">
+    <div class="empty-state">Loading…</div>
+  </div>
+
+</div>
+
+<!-- Shared schema + token routing -->
+<script src="linen-nav.js"></script>
+<script src="linen-schema.js"></script>
+<script src="secrets.js"></script>
+
+<script>
+  'use strict';
+
+  const MONDAY_API_TOKEN = '';   // proxy attaches the real token
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let arrivals = [];           // [{ id, property, arrivalDate, bedConfig, adults, children, pets }]
+  let bagsByArrival = {};      // arrivalId -> [{ type, status, ... }]
+  let propConfigs = {};        // by property name
+  let filter = 'all';
+  let windowDays = 7;
+
+  // ── Monday helpers ───────────────────────────────────────────────────────
+  async function mondayFetch(query, variables) {
+    const r = await fetch('https://api.monday.com/v2', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json',
+                 'Authorization': MONDAY_API_TOKEN,
+                 'API-Version': '2024-01' },
+      body: JSON.stringify({ query, variables: variables || {} })
+    });
+    const j = await r.json();
+    if (j.errors) throw new Error(j.errors[0].message);
+    return j.data;
+  }
+
+  function setLoading(on) {
+    document.getElementById('loadingBar').style.display = on ? 'block' : 'none';
+  }
+
+  // ── Date utils ───────────────────────────────────────────────────────────
+  function localStr(d) {
+    return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+  }
+  function fmtDate(iso) {
+    const d = new Date(iso + 'T12:00:00');
+    return d.toLocaleDateString('en-GB', { weekday: 'short', day: 'numeric', month: 'short' });
+  }
+
+  // ── Bed parsing (mirrors laundry-rota.html) ──────────────────────────────
+  function parseBedString(str) {
+    if (!str) return { superKing: 0, king: 0, double: 0, single: 0 };
+    let s = str
+      .replace(/super[\s-]?king/gi, 'SUPERKING')
+      .replace(/\(?[+&]?\s*optional\b[^)]*\)?/gi, '')
+      .replace(/\bsofa\s*bed\b/gi, '').replace(/\bsofa\b/gi, '')
+      .replace(/\bcot\b/gi, '').replace(/\bbunk\b/gi, '');
+    function numOf(pattern, text) {
+      let total = 0, m;
+      const re = new RegExp('(\\d+)\\s*' + pattern + 's?\\b', 'gi');
+      while ((m = re.exec(text)) !== null) total += parseInt(m[1]);
+      if (total === 0 && new RegExp('\\b' + pattern + 's?\\b', 'i').test(text)) total = 1;
+      return total;
+    }
+    const superKing = numOf('SUPERKING', s);
+    const noSK = s.replace(/\d*\s*SUPERKINGS?\b/gi, '');
+    const king = numOf('king', noSK);
+    const double_ = numOf('double', s);
+    let twinBeds = 0, m;
+    const tRe = /(\d+)\s*twins?\b/gi;
+    while ((m = tRe.exec(s)) !== null) twinBeds += parseInt(m[1]);
+    if (twinBeds === 0 && /\btwins?\b/i.test(s)) twinBeds = 2;
+    return { superKing, king, double: double_, single: numOf('single', s) + twinBeds };
+  }
+
+  function getBedStatus(arrival, cfg) {
+    cfg = cfg || {};
+    const hasOptions = cfg.bedOptions && cfg.bedOptions.length > 0;
+    if (arrival.bedConfig && arrival.bedConfig.trim()) return 'confirmed';
+    if (!hasOptions) return 'fixed';
+    return 'assumed';
+  }
+
+  // ── Fetch arrivals ───────────────────────────────────────────────────────
+  async function fetchArrivals() {
+    let items = [], cursor = null;
+    do {
+      const cp = cursor ? `, cursor: "${cursor}"` : '';
+      const d = await mondayFetch(`{ boards(ids:[${LINEN.boards.arrivals}]) { items_page(limit:500${cp}) { cursor items {
+        id name column_values(ids:[
+          "date_mm2adtwg","text_mm2ahbrx","text_mm2ab56m",
+          "numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x"
+        ]) { id value } } } } }`);
+      const page = d.boards[0].items_page;
+      items = items.concat(page.items);
+      cursor = page.cursor;
+    } while (cursor);
+    arrivals = items.map(item => {
+      const cv = {};
+      for (const c of item.column_values) cv[c.id] = c.value;
+      const p = v => { try { return JSON.parse(v); } catch { return null; } };
+      const dv = p(cv['date_mm2adtwg']);
+      const prop = p(cv['text_mm2ahbrx']) || item.name || '';
+      return {
+        id:          item.id,
+        property:    (prop || '').trim(),
+        arrivalDate: dv?.date || null,
+        bedConfig:   p(cv['text_mm2ab56m']) || '',
+        adults:      parseInt(p(cv['numeric_mm2a5s8r'])) || 0,
+        children:    parseInt(p(cv['numeric_mm2add81'])) || 0,
+        pets:        parseInt(p(cv['numeric_mm2ahz0x'])) || 0,
+      };
+    }).filter(i => i.arrivalDate && i.property);
+  }
+
+  // ── Fetch property configs ───────────────────────────────────────────────
+  async function fetchPropConfigs() {
+    const pc = LINEN.propertyColumns;
+    const data = await mondayFetch(
+      `{ boards(ids:["${LINEN.boards.propertyConfig}"]) { items_page(limit:200) { items {
+         id name column_values(ids:["${pc.fixedBeds}","${pc.bedOptions}","${pc.supplier}"]) {
+           id text value
+         } } } } }`
+    );
+    propConfigs = {};
+    for (const it of (data.boards?.[0]?.items_page?.items || [])) {
+      const cv = {}; for (const c of it.column_values) cv[c.id] = c;
+      const p = v => { try { return JSON.parse(v); } catch { return null; } };
+      const opts = (p(cv[pc.bedOptions]?.value)?.text || '').split('|').map(s => s.trim()).filter(Boolean);
+      const dropRaw  = p(cv[pc.supplier]?.value);
+      const dropText = (typeof dropRaw === 'string' ? dropRaw : (dropRaw?.text || dropRaw?.label || '')).toLowerCase().trim();
+      const supplier = dropText.includes('regency') ? 'regency'
+                     : (dropText.includes('house') || dropText.includes('internal') || dropText.includes('own')) ? 'own'
+                     : null;
+      propConfigs[it.name] = {
+        fixedBeds:  p(cv[pc.fixedBeds]?.value) || '',
+        bedOptions: opts,
+        supplier,
+      };
+    }
+  }
+
+  // ── Fetch bags and group by arrival ──────────────────────────────────────
+  async function fetchBags() {
+    const bc = LINEN.bagsColumns;
+    const data = await mondayFetch(
+      `{ boards(ids:[${LINEN.boards.bags}]) { items_page(limit:200) { items {
+         id name
+         column_values(ids:["${bc.arrival}","${bc.linenType}","${bc.status}"]) {
+           id text
+           ... on BoardRelationValue { linked_item_ids }
+         } } } } }`
+    );
+    bagsByArrival = {};
+    for (const it of (data.boards?.[0]?.items_page?.items || [])) {
+      const cv = {}; for (const c of it.column_values) cv[c.id] = c;
+      const linked = cv[bc.arrival]?.linked_item_ids || [];
+      const arrId  = linked.length ? String(linked[0]) : null;
+      if (!arrId) continue;
+      (bagsByArrival[arrId] ||= []).push({
+        id: it.id,
+        type:   cv[bc.linenType]?.text === 'Regency' ? 'regency' : 'own',
+        status: cv[bc.status]?.text || 'Planned',
+      });
+    }
+  }
+
+  // ── Compute readiness for one arrival ────────────────────────────────────
+  function readinessFor(arrival, today) {
+    const cfg = propConfigs[arrival.property] || {};
+    const arrivalBags = bagsByArrival[arrival.id] || [];
+    // Which laundry type does this property use?
+    const supplier = cfg.supplier;  // 'own' | 'regency' | null
+
+    let bagged;
+    if (supplier === 'own')          bagged = arrivalBags.some(b => b.type === 'own');
+    else if (supplier === 'regency') bagged = arrivalBags.some(b => b.type === 'regency');
+    else                              bagged = arrivalBags.length > 0;
+
+    const bedStatus = getBedStatus(arrival, cfg);
+
+    const arrivalDate = new Date(arrival.arrivalDate + 'T00:00:00');
+    const daysUntil = Math.round((arrivalDate - today) / (1000 * 60 * 60 * 24));
+
+    let category;
+    if (!bagged && daysUntil <= 1) category = 'crit';
+    else if (!bagged)              category = 'needs-bag';
+    else if (bedStatus === 'assumed') category = 'needs-beds';
+    else                              category = 'ready';
+
+    return {
+      category, bagged, bedStatus, daysUntil, supplier,
+      bagsForArrival: arrivalBags,
+    };
+  }
+
+  // ── Render ───────────────────────────────────────────────────────────────
+  function render() {
+    const today = new Date(); today.setHours(0,0,0,0);
+    const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + windowDays);
+
+    // Filter arrivals to the window and compute readiness
+    const enriched = arrivals
+      .filter(a => {
+        const d = new Date(a.arrivalDate + 'T00:00:00');
+        return d >= today && d <= cutoff;
+      })
+      .map(a => ({ a, r: readinessFor(a, today) }))
+      .sort((x, y) => {
+        // Order: crit > needs-bag > needs-beds > ready, then by date
+        const order = c => c === 'crit' ? 0 : c === 'needs-bag' ? 1 : c === 'needs-beds' ? 2 : 3;
+        const ox = order(x.r.category), oy = order(y.r.category);
+        if (ox !== oy) return ox - oy;
+        return x.a.arrivalDate.localeCompare(y.a.arrivalDate);
+      });
+
+    // Counter values
+    const counts = { crit: 0, 'needs-bag': 0, 'needs-beds': 0, ready: 0 };
+    enriched.forEach(e => counts[e.r.category]++);
+    document.getElementById('cVal-crit').textContent       = counts.crit;
+    document.getElementById('cVal-needs-bag').textContent  = counts['needs-bag'];
+    document.getElementById('cVal-needs-beds').textContent = counts['needs-beds'];
+    document.getElementById('cVal-ready').textContent      = counts.ready;
+
+    // Apply filter
+    const filtered = filter === 'all' ? enriched : enriched.filter(e => e.r.category === filter);
+
+    const list = document.getElementById('arrivalsList');
+    if (!filtered.length) {
+      list.innerHTML = `<div class="empty-state">${
+        filter === 'all'
+          ? 'No arrivals in this window.'
+          : 'Nothing in this category — nice work.'
+      }</div>`;
+      return;
+    }
+
+    list.innerHTML = filtered.map(({ a, r }) => renderRow(a, r)).join('');
+  }
+
+  function renderRow(arrival, r) {
+    const dateStr = fmtDate(arrival.arrivalDate);
+    let countdown;
+    if (r.daysUntil < 0) countdown = 'Past';
+    else if (r.daysUntil === 0) countdown = 'TODAY';
+    else if (r.daysUntil === 1) countdown = 'Tomorrow';
+    else countdown = `In ${r.daysUntil} days`;
+    const urgent = r.daysUntil <= 1;
+
+    const cfg = propConfigs[arrival.property] || {};
+    const bedConfig = arrival.bedConfig || cfg.fixedBeds || '— no config set —';
+    const bedPill = `<span class="pill ${r.bedStatus}">${
+      r.bedStatus === 'confirmed' ? '✓ Beds confirmed'
+      : r.bedStatus === 'fixed'    ? '✓ Beds fixed'
+      :                              '? Beds assumed'
+    }</span>`;
+
+    let bagPill;
+    const bags = r.bagsForArrival;
+    if (!bags.length) {
+      bagPill = `<span class="pill no-bag">✗ No bag</span>`;
+    } else {
+      const types = bags.map(b => b.type === 'own' ? 'Own' : 'Regency');
+      bagPill = `<span class="pill has-bag">✓ ${[...new Set(types)].join(' + ')} bagged</span>`;
+    }
+
+    const catPill = r.category === 'crit'      ? `<span class="pill crit">CRITICAL</span>`
+                  : r.category === 'needs-bag' ? `<span class="pill needs-bag">NEEDS BAGGING</span>`
+                  : r.category === 'needs-beds'? `<span class="pill needs-beds">CONFIRM BEDS</span>`
+                  :                              `<span class="pill ready">READY</span>`;
+
+    const guests = [];
+    if (arrival.adults)   guests.push(`${arrival.adults} adult${arrival.adults > 1 ? 's' : ''}`);
+    if (arrival.children) guests.push(`${arrival.children} child${arrival.children > 1 ? 'ren' : ''}`);
+    if (arrival.pets)     guests.push(`🐾 ${arrival.pets}`);
+    const guestStr = guests.length ? guests.join(', ') : 'guests TBC';
+
+    // Action — straight to the rota for the arrival's day
+    const dayParam = encodeURIComponent(arrival.arrivalDate);
+    const action = `<a class="arrival-action" href="laundry-rota.html?from=linen-readiness&day=${dayParam}">Open in rota</a>`;
+
+    return `<div class="arrival-row ${r.category}">
+      <div class="arrival-top">
+        <div class="arrival-prop" title="${escapeHtml(arrival.property)}">${escapeHtml(arrival.property)}</div>
+        <div class="arrival-when">
+          <span class="countdown ${urgent ? 'urgent' : ''}">${countdown}</span> · ${dateStr}
+        </div>
+        ${action}
+      </div>
+      <div class="arrival-meta">
+        <span><strong>${escapeHtml(bedConfig)}</strong></span>
+        <span>${guestStr}</span>
+        ${r.supplier ? `<span>Supplier: ${r.supplier === 'own' ? 'Own laundry' : 'Regency'}</span>` : ''}
+      </div>
+      <div class="pill-row">${catPill}${bedPill}${bagPill}</div>
+    </div>`;
+  }
+
+  function escapeHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+  // ── Filters ──────────────────────────────────────────────────────────────
+  function setFilter(f) {
+    filter = f;
+    document.querySelectorAll('.filter-chip').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+    document.querySelectorAll('.counter').forEach(c => c.classList.toggle('active', c.dataset.filter === f));
+    render();
+  }
+
+  function setWindow(d) {
+    windowDays = parseInt(d) || 7;
+    render();
+  }
+
+  // Counter clicks act as filter chips too
+  document.querySelectorAll('.counter').forEach(c => {
+    c.addEventListener('click', () => setFilter(c.dataset.filter));
+  });
+
+  // ── Load + reload ────────────────────────────────────────────────────────
+  async function reload() {
+    setLoading(true);
+    try {
+      await Promise.all([fetchArrivals(), fetchPropConfigs(), fetchBags()]);
+      render();
+    } catch (e) {
+      console.error(e);
+      document.getElementById('arrivalsList').innerHTML =
+        `<div class="empty-state">Could not load — ${(e.message || 'see console')}</div>`;
+    } finally { setLoading(false); }
+  }
+
+  // ── Init ─────────────────────────────────────────────────────────────────
+  setLoading(true);
+  Promise.all([fetchArrivals(), fetchPropConfigs(), fetchBags()])
+    .then(() => { render(); setLoading(false); })
+    .catch(e => {
+      console.error(e); setLoading(false);
+      document.getElementById('arrivalsList').innerHTML =
+        `<div class="empty-state">Could not load — ${(e.message || 'see console')}</div>`;
+    });
+</script>
+</body>
+</html>

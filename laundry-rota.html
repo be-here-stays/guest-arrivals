@@ -249,8 +249,23 @@
     .daily-bag-list { margin-top: 8px; padding-top: 8px;
                       border-top: 1px dashed #c5e3d0; }
     .daily-bag-row { display: flex; align-items: center; gap: 8px;
-                     padding: 4px 0; font-size: 12px; color: #444; }
+                     padding: 4px 0; font-size: 12px; color: #444;
+                     flex-wrap: wrap; }
     .daily-bag-row .type-badge { padding: 1px 6px; font-size: 9px; }
+
+    /* Bag colour + count chip — used on daily card and elsewhere */
+    .bag-color-chip { display: inline-flex; align-items: center; gap: 5px;
+                      font-size: 10px; font-weight: 700; padding: 2px 7px;
+                      border-radius: 4px; background: var(--swatch-bg, #efeae0);
+                      color: var(--swatch-text, #777);
+                      letter-spacing: 0.2px; flex-shrink: 0; }
+    .bag-color-chip::before { content: ''; display: inline-block;
+                              width: 9px; height: 9px; border-radius: 2px;
+                              border: 1px solid rgba(0,0,0,0.18);
+                              background: var(--swatch, transparent); }
+    .bag-count-only { font-size: 10px; font-weight: 700; padding: 2px 7px;
+                      border-radius: 4px; background: #efeae0; color: #777;
+                      letter-spacing: 0.2px; flex-shrink: 0; }
     .daily-bag-status { font-size: 9px; font-weight: 700; padding: 1px 6px;
                         border-radius: 4px; background: #d4edda; color: #2d6a4f;
                         text-transform: uppercase; letter-spacing: 0.3px; flex-shrink: 0; }
@@ -325,6 +340,30 @@
                               background: #fafaf8; }
     @media (max-width: 480px) {
       .bag-driver-grid { grid-template-columns: 1fr; }
+    }
+
+    /* Bag count + bag colour chip in the modal */
+    .bag-pack-row { display: grid; grid-template-columns: 1fr 1fr; gap: 8px;
+                    margin: 0 0 12px; }
+    .bag-pack-cell { display: flex; flex-direction: column; gap: 3px; }
+    .bag-pack-lbl  { font-size: 10px; font-weight: 700; color: var(--muted);
+                     text-transform: uppercase; letter-spacing: 0.4px; padding-left: 2px; }
+    .bag-pack-cell input { padding: 8px 10px; border: 1.5px solid var(--border);
+                           border-radius: 7px; font-family: inherit; font-size: 14px;
+                           background: #fafaf8; }
+    .bag-colour-chip { padding: 6px 10px; border: 1.5px solid var(--border);
+                       border-radius: 7px; font-family: inherit; font-size: 12px;
+                       font-weight: 700; background: #fafaf8; color: #888;
+                       display: flex; align-items: center; gap: 8px; margin-top: 4px; }
+    .bag-colour-chip.set { background: var(--swatch-bg, #fafaf8); color: var(--swatch-text, #333); }
+    .bag-colour-chip::before { content: ''; display: inline-block; width: 14px; height: 14px;
+                               border-radius: 4px; border: 1px solid rgba(0,0,0,0.15);
+                               background: var(--swatch, transparent); flex-shrink: 0; }
+    .bag-pack-cell select { padding: 8px 10px; border: 1.5px solid var(--border);
+                            border-radius: 7px; font-family: inherit; font-size: 13px;
+                            background: #fafaf8; }
+    @media (max-width: 480px) {
+      .bag-pack-row { grid-template-columns: 1fr; }
     }
 
     /* Bag override + breakdown */
@@ -507,6 +546,19 @@
       <ul id="bagBreakdownList"></ul>
     </details>
     <div class="bag-total" id="bagTotal"><strong>0</strong> items</div>
+    <div class="bag-pack-row">
+      <div class="bag-pack-cell">
+        <label class="bag-pack-lbl">Number of bags</label>
+        <input type="number" id="bagNumberOfBags" min="1" value="1">
+      </div>
+      <div class="bag-pack-cell">
+        <label class="bag-pack-lbl">Bag colour</label>
+        <select id="bagColourSel" onchange="onBagColourChange()">
+          <option value="">— pick colour —</option>
+        </select>
+        <div id="bagColourPreview" class="bag-colour-chip" style="display:none"></div>
+      </div>
+    </div>
     <div class="bag-status-section">
       <select id="bagStatus">
         <option value="Bagged">Bagged (off shelf)</option>
@@ -541,6 +593,7 @@
       Saving creates a Bag on Monday, links it to this arrival, and decrements the matching shelf counts. Logged movements write to the audit log.
     </div>
     <button class="modal-save-btn" onclick="saveBag()">Save bag &amp; decrement shelf</button>
+    <button class="modal-clear-btn" id="bagPrintBtn" onclick="openBagSlip()" style="display:none">🖨 Print bag slip</button>
     <button class="modal-clear-btn" id="bagDeleteBtn" onclick="deleteBag()" style="display:none">Delete bag (return items to shelf)</button>
   </div>
 </div>
@@ -697,7 +750,7 @@
 
   async function fetchPropConfigs() {
     const pd = await mondayFetch(`{ boards(ids:[${PROP_BOARD}]){ items_page(limit:200){ items{
-      id name column_values(ids:["text_mm2a2a78","long_text_mm2a30dy","dropdown_mm2k2p4p","numeric_mm2drc46","boolean_mm2rpzzh"]){ id text value }
+      id name column_values(ids:["text_mm2a2a78","long_text_mm2a30dy","dropdown_mm2k2p4p","numeric_mm2drc46","boolean_mm2rpzzh","color_mm2zj3ya"]){ id text value }
     } } } }`);
     propConfigs = {};
     for (const it of pd.boards[0].items_page.items) {
@@ -717,6 +770,8 @@
       const hotVal    = p(cv['boolean_mm2rpzzh']?.value);
       const hasHotTub = !!(hotVal?.checked === 'true' || hotVal?.checked === true) ||
                         (cv['boolean_mm2rpzzh']?.text || '').toLowerCase() === 'v';
+      // Bag colour — per-property, status text e.g. "Black", "Blue"
+      const bagColour = (cv['color_mm2zj3ya']?.text || '').trim();
       propConfigs[it.name] = {
         id:        it.id,
         fixedBeds: p(cv['text_mm2a2a78']?.value) || '',
@@ -724,6 +779,7 @@
         supplier,
         bathrooms,
         hasHotTub,
+        bagColour,
       };
     }
   }
@@ -764,6 +820,7 @@
                     c.driver, c.driverStaff, c.dirtiesDriverStaff,
                     c.baggedAt, c.pickedUpAt, c.deliveredAt,
                     c.dirtiesCollectedAt, c.dirtiesCollectedBy, c.notes,
+                    c.numberOfBags, c.bagColour,
                     ...itemColIds].map(id => `"${id}"`).join(',');
     // board_relation columns return null on text/value — must use the BoardRelationValue fragment
     const data = await mondayFetch(`{ boards(ids:[${LINEN.boards.bags}]){ items_page(limit:200){ items {
@@ -812,6 +869,8 @@
         dirtiesCollectedAt:    cv[c.dirtiesCollectedAt]?.text || '',
         dirtiesCollectedById:  dirtiesByIds.length ? String(dirtiesByIds[0]) : null,
         dirtiesCollectedByName: cv[c.dirtiesCollectedBy]?.display_value || '',
+        numberOfBags: parseInt(cv[c.numberOfBags]?.text) || 1,
+        bagColour:   (cv[c.bagColour]?.text || '').trim(),
         notes:       cv[c.notes]?.text || '',
         items,
         total: Object.values(items).reduce((a,b) => a + b, 0),
@@ -1093,6 +1152,9 @@
     const typeBadge = `<span class="type-badge ${typeCls}">${entry.type === 'own' ? 'Own' : 'Regency'}</span>`;
 
     // Bag list section
+    const cfg = propConfigs[entry.property] || {};
+    const propDefaultColour = cfg.bagColour || '';
+
     let bagListHtml = '';
     if (bags.length) {
       const rows = bags.map(b => {
@@ -1105,17 +1167,36 @@
                     : b.status === 'Planned'    ? 'planned'
                     :                              '';
         const trans = b.transport ? ` · ${b.transport}` : '';
+        const bagCount = b.numberOfBags || 1;
+        // Use the bag's own colour first, fall back to the property default
+        const colourName = b.bagColour || propDefaultColour;
+        const sw = (typeof bagColourSwatch === 'function') ? bagColourSwatch(colourName) : null;
+        const colourStyle = (colourName && sw)
+          ? `style="--swatch:${sw.swatch};--swatch-bg:${sw.bg};--swatch-text:${sw.text}"` : '';
+        const colourChip = (colourName && sw)
+          ? `<span class="bag-color-chip" ${colourStyle}>${colourName} ×${bagCount}</span>`
+          : `<span class="bag-count-only">${bagCount} bag${bagCount === 1 ? '' : 's'}</span>`;
         return `<div class="daily-bag-row">
           <span class="type-badge ${b.type === 'own' ? 'own' : 'regency'}">${b.type === 'own' ? 'Own' : 'Regency'}</span>
+          ${colourChip}
           <span class="daily-bag-status ${stCls}">${b.status}</span>
           <span class="daily-bag-content" onclick="openBagModal('${entry.id}','${b.id}')" title="Edit bag">
             ${b.total} item${b.total === 1 ? '' : 's'}: ${itemsStr}${trans}
           </span>
         </div>`;
       }).join('');
-      bagListHtml = `<div class="daily-bag-list">${rows}
-        <button class="daily-bag-add" onclick="openBagModal('${entry.id}')">+ Add another bag</button>
-      </div>`;
+      // Smarter add button: only show when a type is missing — Own + Regency
+      // can co-exist (different deliveries) but same-type duplicates are
+      // unnecessary now that Number-of-bags handles physical bag counts.
+      const hasOwn     = bags.some(b => b.type === 'own');
+      const hasRegency = bags.some(b => b.type === 'regency');
+      let addLabel = '';
+      if      (!hasOwn)     addLabel = '+ Add Own bag';
+      else if (!hasRegency) addLabel = '+ Add Regency bag';
+      const addBtnHtml = addLabel
+        ? `<button class="daily-bag-add" onclick="openBagModal('${entry.id}')">${addLabel}</button>`
+        : '';
+      bagListHtml = `<div class="daily-bag-list">${rows}${addBtnHtml}</div>`;
     }
     const bagAddBtn = !bags.length ? `<button class="daily-bag-add" onclick="openBagModal('${entry.id}')">+ Bag this property</button>` : '';
 
@@ -1494,8 +1575,58 @@
         : (existingBag?.driverId || driverSel?.value || '');
     }
 
+    // Number of bags
+    const numEl = document.getElementById('bagNumberOfBags');
+    if (numEl) numEl.value = existingBag ? (existingBag.numberOfBags || 1) : 1;
+
+    // Bag colour dropdown — picks the colour for THIS delivery.
+    // Pre-fill order:
+    //   1. The bag's saved colour (if editing)
+    //   2. The property's default colour from Property Config (if set)
+    //   3. Empty
+    const colourSel = document.getElementById('bagColourSel');
+    if (colourSel) {
+      const opts = ['<option value="">— pick colour —</option>'];
+      const palette = (typeof BAG_COLOUR_PALETTE === 'object') ? BAG_COLOUR_PALETTE : {};
+      for (const name of Object.keys(palette)) {
+        opts.push(`<option value="${name}">${name}</option>`);
+      }
+      colourSel.innerHTML = opts.join('');
+      const initialColour = existingBag?.bagColour || cfg.bagColour || '';
+      colourSel.value = initialColour;
+      onBagColourChange();
+    }
+
     document.getElementById('bagDeleteBtn').style.display = existingBag ? '' : 'none';
+    // Show "Print slip" only when the bag exists on Monday already
+    const printBtn = document.getElementById('bagPrintBtn');
+    if (printBtn) printBtn.style.display = existingBag ? '' : 'none';
     document.getElementById('bagModal').style.display = 'flex';
+  }
+
+  function openBagSlip() {
+    if (!editingBagId) return;
+    window.open('bag-slip.html?id=' + encodeURIComponent(editingBagId), '_blank');
+  }
+
+  // Update the colour-preview chip when the dropdown changes
+  function onBagColourChange() {
+    const sel = document.getElementById('bagColourSel');
+    const chip = document.getElementById('bagColourPreview');
+    if (!sel || !chip) return;
+    const colour = sel.value || '';
+    const swatch = (typeof bagColourSwatch === 'function') ? bagColourSwatch(colour) : null;
+    if (colour && swatch) {
+      chip.style.display = '';
+      chip.classList.add('set');
+      chip.style.setProperty('--swatch',      swatch.swatch);
+      chip.style.setProperty('--swatch-bg',   swatch.bg);
+      chip.style.setProperty('--swatch-text', swatch.text);
+      chip.textContent = colour;
+    } else {
+      chip.style.display = 'none';
+      chip.classList.remove('set');
+    }
   }
 
   function onBagDriverChange() {
@@ -1614,6 +1745,11 @@
       bagCV[bc.dirtiesDriverStaff] = dirtiesDriverId
         ? { item_ids: [Number(dirtiesDriverId)] }
         : { item_ids: [] };
+      const numberOfBags = parseInt(document.getElementById('bagNumberOfBags')?.value) || 1;
+      bagCV[bc.numberOfBags] = String(Math.max(1, numberOfBags));
+      const chosenColour = document.getElementById('bagColourSel')?.value || '';
+      // Status columns: empty string clears the value; non-empty sets the label
+      bagCV[bc.bagColour] = chosenColour ? { label: chosenColour } : null;
       for (const item of LINEN.items) {
         bagCV[bc.items[item.id]] = String(items[item.id] || 0);
       }

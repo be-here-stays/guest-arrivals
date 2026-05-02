@@ -19,6 +19,16 @@ const LINEN = {
     staff:     '5095127554',  // Staff           — existing, used for driver assignment
   },
 
+  // ── Property Config columns (just the ones used by linen flow) ───────────
+  propertyColumns: {
+    fixedBeds:  'text_mm2a2a78',
+    bedOptions: 'long_text_mm2a30dy',
+    supplier:   'dropdown_mm2k2p4p',
+    bathrooms:  'numeric_mm2drc46',
+    hasHotTub:  'boolean_mm2rpzzh',
+    bagColour:  'color_mm2zj3ya',  // OPTIONAL default colour for this property — used to pre-fill the bag modal. The actual colour is stored per-bag on Linen Bags.
+  },
+
   // ── Staff board columns ───────────────────────────────────────────────────
   staffColumns: {
     role:       'color_mm2psadz', // status: A Team / Housekeeper / Maintenance / Checker / Van driver / Owner / Manager
@@ -57,6 +67,13 @@ const LINEN = {
     dirtiesDriverStaff: 'board_relation_mm2yc98d',  // → Staff board (dirties pickup — may differ from cleans driver)
     dirtiesCollectedAt: 'date_mm2ypphk',
     dirtiesCollectedBy: 'board_relation_mm2yavqf',  // → Staff board (who actually did the pickup)
+
+    // Bag count (added 2026-05-01) — how many physical bags the delivery
+    // is split across.
+    numberOfBags:       'numeric_mm2z324m',
+    // Bag colour (per-delivery). Pre-fills from the property's default (on
+    // Property Config) but can be overridden each changeover.
+    bagColour:          'color_mm2z7dy',
 
     // Item count columns — one per linen item (all numbers)
     items: {
@@ -183,6 +200,29 @@ function transportForRole(roleLabel) {
   return LINEN.roleToTransport[r] || 'Staff (own car)';
 }
 
+// ── Bag colour palette ────────────────────────────────────────────────────
+// Maps the Property Config "Bag colour" status labels to CSS colours used by
+// the swatch chips throughout the UI. Each entry has:
+//   swatch — the colour of the small square shown next to the label
+//   bg     — background tint when the chip is filled
+//   text   — text colour over that background
+const BAG_COLOUR_PALETTE = {
+  'Black':  { swatch: '#1a1a1a', bg: '#1a1a1a', text: '#fff' },
+  'Blue':   { swatch: '#1a6fba', bg: '#dceaff', text: '#0d3d6e' },
+  'Green':  { swatch: '#2d6a4f', bg: '#d4edda', text: '#1e4a37' },
+  'Yellow': { swatch: '#f5c518', bg: '#fff5cc', text: '#7a5800' },
+  'Red':    { swatch: '#c0392b', bg: '#fde8e8', text: '#7a1f15' },
+  'Pink':   { swatch: '#e484bd', bg: '#fbe7f3', text: '#8a3a6a' },
+  'Orange': { swatch: '#fdab3d', bg: '#fff2d8', text: '#9c5e10' },
+  'Purple': { swatch: '#9d50dd', bg: '#ede1fa', text: '#5d2891' },
+  'White':  { swatch: '#ffffff', bg: '#fafafa', text: '#333' },
+  'Clear':  { swatch: 'transparent', bg: '#f0f0ee', text: '#666' },
+  'Other':  { swatch: '#999999', bg: '#eeeeee', text: '#555' },
+};
+function bagColourSwatch(name) {
+  return BAG_COLOUR_PALETTE[(name || '').trim()] || null;
+}
+
 // ─────────────────────────────────────────────────────────────────────────────
 // BAGGING TEMPLATE — rules confirmed by Barry on 2026-05-01.
 // Per-bed bedding plus per-guest, per-bathroom and per-property extras.
@@ -293,4 +333,6 @@ if (typeof window !== 'undefined') {
   window.BAG_TEMPLATE = BAG_TEMPLATE;
   window.computeBagTemplate = computeBagTemplate;
   window.describeBagTemplate = describeBagTemplate;
+  window.BAG_COLOUR_PALETTE = BAG_COLOUR_PALETTE;
+  window.bagColourSwatch = bagColourSwatch;
 }

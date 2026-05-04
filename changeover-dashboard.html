@@ -180,31 +180,50 @@
   </table>
 </div>
 
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
+
 <script>
 // ── Config ───────────────────────────────────────────────────
-const API_TOKEN        = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
-const LODGE_BOARD      = 1928673949;
-const LOG_BOARD        = 5094663022;
-const HOT_TUB_BOARD    = 1918769299;
-const HT_CLEANS_BOARD  = 5095259581;   // Hot Tub Cleans — Maintenance team's records
-// Hot Tub Cleans columns
+// Arrivals is the canonical source of booking data — every consumer
+// derives from here. See docs/arrivals-architecture.md.
+// Refactored 2026-05-04 to drop Lodge Status reads (Phase 5).
+const API_TOKEN = window.MONDAY_API_TOKEN;
+const ARRIVALS_BOARD   = 5094453064; // Guest Arrivals — single source of truth
+const LOG_BOARD        = 5094663022; // Activity Logs
+const HOT_TUB_BOARD    = 1918769299; // Property HT list
+const HT_CLEANS_BOARD  = 5095259581; // Maintenance HT records
+const CLEANS_BOARD     = 5095134636; // Planned Cleans (assignment data — links to Arrivals via CL_ARRIVAL)
+
+// Arrivals columns
+const AR_DATE     = 'date_mm2adtwg';   // arrival date (check-in)
+const AR_CHECKOUT = 'date_mm31c5jt';   // departure date (check-out) — added 2026-05-04
+const AR_PROP     = 'text_mm2ahbrx';   // property name (text snapshot)
+const AR_BOOKREF  = 'text_mm2ah8s';    // booking reference / Guesty confirmationCode
+
+// Planned Cleans columns
+const CL_CHECKIN   = 'date_mm2p6tck';
+const CL_COMPLETED = 'date_mm2qxh4a';
+const CL_PROP_REL  = 'board_relation_mm2psy0b';
+const CL_ARRIVAL   = 'board_relation_mm31mkyp'; // → Arrivals (added 2026-05-04)
+
+// Hot Tub Cleans
 const HC_DATE   = 'date_mm2rvsp9';
 const HC_STATUS = 'color_mm2rqkeq';
 const HC_PROP   = 'board_relation_mm2rjw3';
 
-// Properties that have outside clean but NO hot tub
-const OUTSIDE_NO_HT    = new Set(['Green Haven', 'Serenity', 'Goose Landing']);
-// Properties with NO outside clean (and no hot tub)
-const NO_OUTSIDE       = new Set(['Essitone House']);
+// Fixed properties config
+const OUTSIDE_NO_HT = new Set(['Green Haven', 'Serenity', 'Goose Landing']);
+const NO_OUTSIDE    = new Set(['Essitone House']);
 
-// Activity index → meaning
-// 0 = House Cleaned, 1 = Laundry Dropped, 2 = Restocked, 3 = House Checked, 4 = Outside Clean
+// Activity name → index
+const ACT_MAP = { 'House Cleaned': 0, 'Laundry Dropped': 1, 'Restocked': 2, 'House Checked': 3, 'Outside Clean': 4 };
 
 // ── API ──────────────────────────────────────────────────────
 async function gql(query) {
   const r = await fetch('https://api.monday.com/v2', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': API_TOKEN },
+    headers: { 'Content-Type': 'application/json', 'Authorization': API_TOKEN, 'API-Version': '2024-01' },
     body: JSON.stringify({ query })
   });
   return r.json();
@@ -216,176 +235,189 @@ async function load() {
   btn.disabled = true; btn.textContent = '↺ Loading…';
 
   try {
-    const today = new Date();
-    const todayStr = today.toISOString().split('T')[0];
+    const todayStr = new Date().toISOString().split('T')[0];
 
-    // 1. Lodge Status — fetch all, filter CheckOut(3) or SameDay(4) in JS
-    const lodgeQ = `{
-      boards(ids: [${LODGE_BOARD}]) {
-        items_page(limit: 200) {
-          items {
-            name
-            column_values(ids: ["color_mkqs71ry"]) { id value text }
-          }
-        }
-      }
-    }`;
+    // 1. Arrivals — single source of truth. Pull the whole board (paginated)
+    //    and build today's changeovers from the per-property timeline.
+    async function fetchArrivals() {
+      let cursor = null, all = [];
+      const cols = `["${AR_DATE}","${AR_CHECKOUT}","${AR_PROP}","${AR_BOOKREF}"]`;
+      do {
+        const q = cursor
+          ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${cols}){ id text value } } } }`
+          : `{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${cols}){ id text value } } } } }`;
+        const r = await gql(q);
+        const page = cursor ? r.data?.next_items_page : r.data?.boards?.[0]?.items_page;
+        if (!page) break;
+        all = all.concat(page.items || []);
+        cursor = page.cursor;
+      } while (cursor);
+      return all;
+    }
 
-    // 2. Changeover Log — ALL items (filter by date in JS)
-    const logQ = `{
-      boards(ids: [${LOG_BOARD}]) {
-        items_page(limit: 500) {
-          items {
-            name
-            created_at
-            column_values(ids: ["date_mm2e4wj5"]) { id value text }
-          }
-        }
-      }
-    }`;
+    // 2. Changeover Log — Last 7 days
+    const logQ = `{ boards(ids:[${LOG_BOARD}]){ items_page(limit:500){ items{ name created_at
+      column_values(ids:["date_mm2e4wj5"]){ id text value }
+    } } } }`;
 
-    // 3. Hot Tub Status — just property names
-    const htQ = `{
-      boards(ids: [${HOT_TUB_BOARD}]) {
-        items_page(limit: 100) { items { name } }
-      }
-    }`;
+    // 3. Planned Cleans — completion date + relation back to Arrivals (so we
+    //    can match by arrivalId, not the fragile property+date heuristic).
+    //    Typed BoardRelationValue fragment exposes linked_item_ids.
+    const cleansQ = `{ boards(ids:[${CLEANS_BOARD}]){ items_page(limit:500){ items{ name
+      column_values(ids:["${CL_CHECKIN}","${CL_COMPLETED}","${CL_PROP_REL}","${CL_ARRIVAL}"]){ id text value ... on BoardRelationValue { linked_item_ids } }
+    } } } }`;
 
-    // 4. Hot Tub Cleans — completed today → counts as Outside Clean done.
-    //    The Maintenance team's full clean covers cobwebbing/BBQ/decking +
-    //    the tub itself, so a Completed entry here ticks the Outside column.
-    const htCleansQ = `{
-      boards(ids: [${HT_CLEANS_BOARD}]) {
-        items_page(limit: 200) {
-          items {
-            name
-            column_values(ids: ["${HC_DATE}","${HC_STATUS}","${HC_PROP}"]) { id text value }
-          }
-        }
-      }
-    }`;
+    // 4. Hot Tub Cleans + List
+    const htListQ = `{ boards(ids:[${HOT_TUB_BOARD}]){ items_page(limit:100){ items{ name } } } }`;
+    const htCleansQ = `{ boards(ids:[${HT_CLEANS_BOARD}]){ items_page(limit:300){ items{ name
+      column_values(ids:["${HC_DATE}","${HC_STATUS}","${HC_PROP}"]){ id text value }
+    } } } }`;
 
-    const [lodgeRes, logRes, htRes, htCleansRes] = await Promise.all([
-      gql(lodgeQ), gql(logQ), gql(htQ), gql(htCleansQ)
+    const [arrivalsRaw, logRes, cleansRes, htListRes, htCleansRes] = await Promise.all([
+      fetchArrivals(), gql(logQ), gql(cleansQ), gql(htListQ), gql(htCleansQ)
     ]);
 
-    if (lodgeRes.errors)    throw new Error('Lodge Status: ' + lodgeRes.errors[0].message);
-    if (logRes.errors)      throw new Error('Changeover Log: ' + logRes.errors[0].message);
-    if (htRes.errors)       throw new Error('Hot Tub Status: ' + htRes.errors[0].message);
-    if (htCleansRes.errors) throw new Error('Hot Tub Cleans: ' + htCleansRes.errors[0].message);
+    // ── Build today's changeovers from the Arrivals timeline ─────────────
+    // Per-property bookings sorted by check-in. A changeover happens on a
+    // property whenever there's an Arrivals row whose AR_CHECKOUT == today
+    // (a guest is leaving today). The arriving guest = the next booking on
+    // the same property; if its AR_DATE == today it's a SameDay turnover,
+    // otherwise the windowEnd is just the next check-in.
+    const arrivalsParsed = arrivalsRaw.map(it => {
+      const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+      const pj = (s) => { try { return JSON.parse(s); } catch { return null; } };
+      return {
+        arrivalId: String(it.id),
+        property:  pj(cv[AR_PROP]?.value)    || cv[AR_PROP]?.text    || it.name,
+        checkin:   pj(cv[AR_DATE]?.value)?.date     || cv[AR_DATE]?.text     || '',
+        checkout:  pj(cv[AR_CHECKOUT]?.value)?.date || cv[AR_CHECKOUT]?.text || '',
+        bookingRef: pj(cv[AR_BOOKREF]?.value) || cv[AR_BOOKREF]?.text || '',
+      };
+    }).filter(a => a.property && a.checkin);
 
-    // Filter changeovers: status index 1 (CheckOut) or 0 (SameDay)
-    const changeovers = (lodgeRes.data?.boards?.[0]?.items_page?.items || [])
-      .filter(i => {
-        const col = i.column_values?.[0];
-        if (!col?.value) return false;
-        try {
-          const idx = JSON.parse(col.value)?.index;
-          return idx === 1 || idx === 0;
-        } catch(_) { return false; }
-      })
-      .map(i => i.name).sort();
-
-    // Hot tub properties set
-    const hotTubProps = new Set((htRes.data?.boards?.[0]?.items_page?.items || []).map(i => i.name));
-
-    // Process log entries — filter to today
-    const logItems = logRes.data?.boards?.[0]?.items_page?.items || [];
-    // Map: property → { activityDone: Set<index>, activityTimes: Map<index, timestamp> }
-    const actLog = {};
-
-    // Activity name → index map
-    const ACT_MAP = {
-      'House Cleaned': 0, 'Laundry Dropped': 1,
-      'Restocked': 2, 'House Checked': 3, 'Outside Clean': 4
-    };
-
-    for (const item of logItems) {
-      // Filter by date
-      const dateCol = item.column_values.find(c => c.id === 'date_mm2e4wj5');
-      let dateVal = '';
-      if (dateCol?.value) {
-        try { dateVal = JSON.parse(dateCol.value)?.date || ''; } catch(_) {}
-      }
-      if (!dateVal) dateVal = dateCol?.text || '';
-      if (dateVal !== todayStr) continue;
-
-      // Parse property and activity from item name: "Property • Activity Label"
-      const parts   = item.name.split(' • ');
-      const prop    = parts[0]?.trim();
-      const actName = parts[1]?.trim();
-      const actIdx  = ACT_MAP[actName] ?? null;
-
-      if (!prop || actIdx === null) continue;
-
-      if (!actLog[prop]) actLog[prop] = { done: new Set(), times: {} };
-      actLog[prop].done.add(actIdx);
-      actLog[prop].times[actIdx] = item.created_at;
+    const byProp = new Map();
+    for (const a of arrivalsParsed) {
+      if (!byProp.has(a.property)) byProp.set(a.property, []);
+      byProp.get(a.property).push(a);
     }
+    for (const list of byProp.values()) list.sort((x, y) => (x.checkin || '').localeCompare(y.checkin || ''));
 
-    // Merge in Hot Tub Cleans completions for today as Outside Clean (idx 4).
-    // Maintenance team's full clean covers the whole property's outside service.
-    const htCleanItems = htCleansRes.data?.boards?.[0]?.items_page?.items || [];
-    for (const item of htCleanItems) {
-      const cv = Object.fromEntries(item.column_values.map(c => [c.id, c]));
-      let dateVal = '';
-      try { dateVal = JSON.parse(cv[HC_DATE]?.value || 'null')?.date || ''; } catch(_) {}
-      if (dateVal !== todayStr) continue;
-      const status = cv[HC_STATUS]?.text || '';
-      if (status !== 'Completed') continue;
-      // Skip unlisted entries — they aren't tied to a property changeover
-      if ((item.name || '').startsWith('[Unlisted]')) continue;
-      // Monday's API silently fails board_relation writes, so HC_PROP is often
-      // empty. Fall back to the item name's "Property — YYYY-MM-DD" format.
-      let prop = (cv[HC_PROP]?.text || '').trim();
-      if (!prop) {
-        let n = (item.name || '').trim();
-        const i = n.lastIndexOf(' — ');
-        if (i > 0) n = n.slice(0, i);
-        prop = n.trim();
+    const arrivals = [];
+    for (const [property, list] of byProp) {
+      for (let i = 0; i < list.length; i++) {
+        const cur = list[i];
+        const nxt = list[i + 1] || null;
+        if (cur.checkout !== todayStr) continue;        // only today's check-outs
+        // checkIn = next guest's arrival (today for SameDay, future for plain CheckOut, today fallback if no next)
+        const checkIn = nxt ? nxt.checkin : todayStr;
+        arrivals.push({
+          name: property,
+          prevOut: todayStr,
+          checkIn,
+          // arrivalId of the *arriving* guest — used to match the planned clean
+          // by relation rather than property+date heuristic.
+          nextArrivalId: nxt ? nxt.arrivalId : null,
+        });
       }
-      if (!prop) continue;
-      if (!actLog[prop]) actLog[prop] = { done: new Set(), times: {} };
-      actLog[prop].done.add(4);  // Outside Clean
     }
+    // Properties may have duplicate Arrivals rows; dedupe by name.
+    const seenProp = new Set();
+    arrivals.splice(0, arrivals.length, ...arrivals.filter(a => {
+      if (seenProp.has(a.name)) return false;
+      seenProp.add(a.name);
+      return true;
+    }).sort((a, b) => a.name.localeCompare(b.name)));
 
-    render({ changeovers, hotTubProps, actLog, todayStr });
+    const hotTubProps = new Set((htListRes.data?.boards?.[0]?.items_page?.items || []).map(i => i.name));
+    const logs = logRes.data?.boards?.[0]?.items_page?.items || [];
+    const planned = cleansRes.data?.boards?.[0]?.items_page?.items || [];
+    const htCleans = htCleansRes.data?.boards?.[0]?.items_page?.items || [];
+
+    // Map completions for each active changeover
+    const dashboardData = arrivals.map(arr => {
+      const prop = arr.name;
+      const windowStart = arr.prevOut;
+      const windowEnd = arr.checkIn;
+
+      const done = new Set();
+
+      // A. Activity Logs Check (Laundry, Restock, Check, Outside)
+      logs.forEach(l => {
+        const parts = l.name.split(' • ');
+        if (parts[0]?.trim() !== prop) return;
+        const actIdx = ACT_MAP[parts[1]?.trim()];
+        if (actIdx === undefined) return;
+
+        const logDate = JSON.parse(l.column_values[0]?.value || 'null')?.date || l.created_at.split('T')[0];
+        if (logDate >= windowStart) done.add(actIdx);
+      });
+
+      // B. Planned Cleans Check (The canonical House Cleaned record).
+      //    Prefer matching by arrivalId — the canonical join. Fall back to
+      //    property+CL_CHECKIN equality for any Cleans row that hasn't been
+      //    backfilled with CL_ARRIVAL yet.
+      planned.forEach(p => {
+        const cv = Object.fromEntries(p.column_values.map(c => [c.id, c]));
+        const linkedIds = cv[CL_ARRIVAL]?.linked_item_ids || [];
+        const linkedArrivalId = linkedIds.length ? String(linkedIds[0]) : null;
+        const pComp = JSON.parse(cv[CL_COMPLETED]?.value || 'null')?.date;
+        if (!pComp) return;
+
+        // Step 1: relation match (canonical)
+        if (arr.nextArrivalId && linkedArrivalId && linkedArrivalId === arr.nextArrivalId) {
+          done.add(0); // Cleaned
+          return;
+        }
+        // Step 2: legacy fallback — property+CL_CHECKIN
+        const pProp = cv[CL_PROP_REL]?.text || p.name;
+        if (!pProp.includes(prop)) return;
+        const pCheckin = JSON.parse(cv[CL_CHECKIN]?.value || 'null')?.date;
+        if (pCheckin === windowEnd) done.add(0); // Cleaned
+      });
+
+      // C. Hot Tub Cleans Check (Outside Clean alternative)
+      htCleans.forEach(h => {
+        const cv = Object.fromEntries(h.column_values.map(c=>[c.id, c]));
+        let hProp = cv[HC_PROP]?.text || '';
+        if (!hProp) hProp = h.name.split(' — ')[0];
+        if (!hProp.includes(prop)) return;
+
+        const hDate = JSON.parse(cv[HC_DATE]?.value || 'null')?.date;
+        const hSta = cv[HC_STATUS]?.text;
+        if (hDate >= windowStart && hSta === 'Completed') done.add(4); // Outside
+      });
+
+      return { prop, done, hasHT: hasOutside(prop, hotTubProps) };
+    });
+
+    render(dashboardData);
 
     document.getElementById('last-refresh').textContent =
       'Updated ' + new Date().toLocaleTimeString('en-GB', { hour: '2-digit', minute: '2-digit' });
 
   } catch (err) {
-    console.error('Dashboard error:', err);
-    document.getElementById('state-msg').innerHTML =
-      `<div class="icon">⚠️</div><div>Error: ${err.message}</div>`;
-    document.getElementById('state-msg').style.display = '';
-    document.getElementById('prop-table').style.display = 'none';
-    document.getElementById('summary-bar').style.display = 'none';
+    console.error(err);
+    document.getElementById('state-msg').innerHTML = `<div class="icon">⚠️</div>Error: ${err.message}`;
   } finally {
     btn.disabled = false; btn.textContent = '↺ Refresh';
   }
 }
 
-// ── Render ───────────────────────────────────────────────────
 function hasOutside(prop, hotTubProps) {
-  if (hotTubProps.has(prop)) return true;
-  if (OUTSIDE_NO_HT.has(prop)) return true;
-  return false;
+  return hotTubProps.has(prop) || OUTSIDE_NO_HT.has(prop);
 }
 
-function render({ changeovers, hotTubProps, actLog, todayStr }) {
-  const today = new Date();
-  document.getElementById('hdr-date').textContent =
-    today.toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' });
+function render(data) {
+  const hb = document.getElementById('hdr-date');
+  hb.textContent = new Date().toLocaleDateString('en-GB', { weekday: 'long', day: 'numeric', month: 'long' });
 
   const stateMsg = document.getElementById('state-msg');
-  const table    = document.getElementById('prop-table');
-  const tbody    = document.getElementById('table-body');
+  const table = document.getElementById('prop-table');
+  const tbody = document.getElementById('table-body');
 
-  if (changeovers.length === 0) {
-    stateMsg.innerHTML = '<div class="icon">✓</div>No changeovers today';
-    stateMsg.style.display = '';
-    table.style.display = 'none';
+  if (!data.length) {
+    stateMsg.innerHTML = '<div class="icon">✓</div>No arrivals or check-outs today.';
+    stateMsg.style.display = ''; table.style.display = 'none';
     document.getElementById('summary-bar').style.display = 'none';
     return;
   }
@@ -396,57 +428,36 @@ function render({ changeovers, hotTubProps, actLog, todayStr }) {
 
   let cntDone = 0, cntPart = 0, cntNone = 0;
 
-  tbody.innerHTML = changeovers.map(prop => {
-    const log   = actLog[prop] || { done: new Set(), times: {} };
-    const done  = log.done;
-    const outside = hasOutside(prop, hotTubProps);
-
-    const cleanDone   = done.has(0);
-    const laundryDone = done.has(1);
-    const restockDone = done.has(2);
-    const checkedDone = done.has(3);
-    const outsideDone = done.has(4);
-
-    // Check blocked if clean not yet done
+  tbody.innerHTML = data.map(item => {
+    const { prop, done, hasHT } = item;
+    const cleanDone = done.has(0), laundryDone = done.has(1), restockDone = done.has(2), checkedDone = done.has(3), outsideDone = done.has(4);
+    
     const checkBlocked = !cleanDone && !checkedDone;
-    const checkCounts  = cleanDone && checkedDone; // quality check only valid after clean
+    const checkCounts  = cleanDone && checkedDone;
+    const total = hasHT ? 5 : 4;
+    const doneN = (cleanDone?1:0) + (laundryDone?1:0) + (restockDone?1:0) + (checkCounts?1:0) + (hasHT && outsideDone?1:0);
+    const pct = Math.round((doneN/total)*100);
 
-    const totalTasks = outside ? 5 : 4;
-    const doneTasks  = (cleanDone ? 1 : 0) + (laundryDone ? 1 : 0) + (restockDone ? 1 : 0)
-                     + (checkCounts ? 1 : 0) + (outside && outsideDone ? 1 : 0);
-    const pct = Math.round((doneTasks / totalTasks) * 100);
+    if (pct === 100) cntDone++; else if (doneN > 0) cntPart++; else cntNone++;
 
-    let rowClass = 'none-done';
-    if (pct === 100) { rowClass = 'all-done'; cntDone++; }
-    else if (doneTasks > 0) { rowClass = 'part-done'; cntPart++; }
-    else cntNone++;
-
-    const td = (isDone, isBlocked = false, isNA = false) => {
-      let cls, label;
-      if (isNA)      { cls = 'tdot tdot-na';      label = '—'; }
-      else if (isBlocked) { cls = 'tdot tdot-blocked'; label = '⏸'; }
-      else if (isDone)    { cls = 'tdot tdot-done';    label = '●'; }
-      else                { cls = 'tdot tdot-todo';    label = '○'; }
-      return `<td class="task-cell"><span class="${cls}">${label}</span></td>`;
+    const td = (isDone, blocked=false, na=false) => {
+      let cls = 'tdot tdot-todo', lbl = '○';
+      if (na) { cls = 'tdot tdot-na'; lbl = '—'; }
+      else if (blocked) { cls = 'tdot tdot-blocked'; lbl = '⏸'; }
+      else if (isDone) { cls = 'tdot tdot-done'; lbl = '●'; }
+      return `<td class="task-cell"><span class="${cls}">${lbl}</span></td>`;
     };
 
-    const fillCls = pct === 100 ? 'prog-fill-full' : (doneTasks > 0 ? 'prog-fill-part' : 'prog-fill-empty');
-
-    return `
-      <tr class="${rowClass}">
-        <td><span class="prop-name">${esc(prop)}</span></td>
-        ${td(cleanDone)}
-        ${td(laundryDone)}
-        ${td(restockDone)}
-        ${td(checkCounts, checkBlocked)}
-        ${td(outsideDone, false, !outside)}
-        <td class="prog-cell">
-          <div class="prog-wrap">
-            <div class="prog-bar-bg"><div class="prog-bar-fill ${fillCls}" style="width:${pct}%"></div></div>
-            <span class="prog-label">${doneTasks}/${totalTasks}</span>
-          </div>
-        </td>
-      </tr>`;
+    return `<tr class="${pct===100?'all-done':(doneN>0?'part-done':'none-done')}">
+      <td><span class="prop-name">${esc(prop)}</span></td>
+      ${td(cleanDone)} ${td(laundryDone)} ${td(restockDone)} ${td(checkCounts, checkBlocked)} ${td(outsideDone, false, !hasHT)}
+      <td class="prog-cell">
+        <div class="prog-wrap">
+          <div class="prog-bar-bg"><div class="prog-bar-fill ${pct===100?'prog-fill-full':'prog-fill-part'}" style="width:${pct}%"></div></div>
+          <span class="prog-label">${doneN}/${total}</span>
+        </div>
+      </td>
+    </tr>`;
   }).join('');
 
   document.getElementById('sum-done').textContent = cntDone;
@@ -454,15 +465,9 @@ function render({ changeovers, hotTubProps, actLog, todayStr }) {
   document.getElementById('sum-none').textContent = cntNone;
 }
 
-function esc(str) {
-  return str.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
-}
+function esc(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
 
-// ── Auto-refresh + init ──────────────────────────────────────
-window.addEventListener('DOMContentLoaded', () => {
-  load();
-  setInterval(load, 60000);
-});
+window.addEventListener('DOMContentLoaded', () => { load(); setInterval(load, 60000); });
 </script>
 </body>
 </html>

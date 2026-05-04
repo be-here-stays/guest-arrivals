@@ -351,10 +351,21 @@
 
 const API_TOKEN = window.MONDAY_API_TOKEN;
 const ANTHROPIC_KEY = window.ANTHROPIC_KEY;
+// Arrivals is the canonical source of booking data for every consumer.
+// See docs/arrivals-architecture.md. staff.html reads booking shape (guest
+// name, check-in, check-out, property) from Arrivals and uses Cleans /
+// Hot Tub Cleans purely for the rota assignment data (cleaner, hours, etc.).
+const ARRIVALS_BOARD = 5094453064;
 const STAFF_BOARD  = 5095127554;
 const CLEANS_BOARD = 5095134636;
 const SHIFTS_BOARD = 5095155773;
 const HT_CLEANS_BOARD = 5095259581; // Hot Tub Cleans (created 2026-04-25)
+
+// Arrivals columns
+const AR_DATE     = 'date_mm2adtwg';   // check-in
+const AR_CHECKOUT = 'date_mm31c5jt';   // check-out (added 2026-05-04)
+const AR_PROP     = 'text_mm2ahbrx';
+const AR_BOOKREF  = 'text_mm2ah8s';
 
 /* ─── Other maintenance source boards. Each row is one PROPERTY for the
        recurring boards (Windows / Decking / PAT) and one TASK for Ad-hoc.
@@ -474,6 +485,7 @@ const CL_REVIEW_NT  = 'text_mm2qbgrt';
 const CL_LINKED_REF = 'text_mm2qh78j';
 const CL_LINKED_NT  = 'long_text_mm2qp4ay';
 const CL_COMPLETED  = 'date_mm2qxh4a';
+const CL_ARRIVAL    = 'board_relation_mm31mkyp';   // → Arrivals (added 2026-05-04)
 
 // Staff Shifts
 const SH_STAFF = 'text_mm2p1gqx';
@@ -490,6 +502,7 @@ const HC_START    = 'hour_mm2r90d7';
 const HC_STATUS   = 'color_mm2rqkeq';
 const HC_DURATION = 'numeric_mm2r9e9h';
 const HC_NOTES    = 'long_text_mm2rsrdj';
+const HC_ARRIVAL  = 'board_relation_mm31mzvh';   // → Arrivals (added 2026-05-04)
 
 const DOW = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'];
 const SESSION_KEY = 'bh.staffCode';
@@ -677,6 +690,14 @@ async function boot() {
     }
   } catch(e) {}
 
+  // Load Arrivals first so loadCleans / loadHotTubCleans can join against it.
+  // Cheap (one paginated fetch) and runs in parallel with localStorage cache
+  // rendering above. If it fails (e.g. transient network blip) loadCleans
+  // still works — it falls back to the legacy CL_CHECKIN/CL_CHECKOUT/CL_PROP
+  // fields stored on each Cleans row.
+  try { await loadArrivals(); }
+  catch (e) { console.warn('loadArrivals failed — cleans/HT will use legacy CL/HC fields:', e); }
+
   // Run loaders independently
   const results = await Promise.allSettled([loadCleans(), loadShifts(), loadHotTubCleans(), loadMaintenanceTasks(), loadLinenBags()]);
   const labels = ['cleans', 'shifts', 'hot tub cleans', 'maintenance tasks', 'linen bags'];
@@ -701,15 +722,88 @@ async function boot() {
 }
 
 /* ─── Load Cleans in the visible window (today + 6 days) ───── */
-async function loadCleans() {
+/* ─── Arrivals lookup — populated by loadArrivals(), keyed by item id ───
+   Each entry is the parsed booking shape (property, checkin, checkout,
+   guestName, bookingRef). Cleans / HT Cleans rows look up their linked
+   booking here via CL_ARRIVAL / HC_ARRIVAL board_relation columns. */
+let arrivalsById = new Map();
+
+async function loadArrivals() {
   const startISO = todayISO();
-  const endISO   = addDaysISO(startISO, 6);
-  const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_CHECKOUT}","${CL_PROP}","${CL_START}","${CL_HRS}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_SAMEDAY}","${CL_LINEN_MTHD}","${CL_LINEN_DRV}","${CL_LINEN_DATE}","${CL_DIRT_MTHD}","${CL_DIRT_DRV}","${CL_LINEN_SRC}","${CL_NOTES}","${CL_CHECKTYPE}","${CL_REVIEW}","${CL_REVIEW_NT}","${CL_LINKED_REF}","${CL_LINKED_NT}","${CL_COMPLETED}"]`;
+  const endISO   = addDaysISO(startISO, 14);   // wider than cleans window so
+                                                // late-booked arrivals aren't
+                                                // missed when their clean is
+                                                // within range.
+  const colIds = `["${AR_DATE}","${AR_CHECKOUT}","${AR_PROP}","${AR_BOOKREF}"]`;
   let cursor = null, all = [];
   do {
     const q = cursor
-      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${colIds}){ id value text } } } }`
-      : `{ boards(ids:[${CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id value text } } } } }`;
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${colIds}){ id text value } } } }`
+      : `{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id text value } } } } }`;
+    const data = await mondayFetch(q);
+    const page = cursor ? data?.next_items_page : data?.boards?.[0]?.items_page;
+    if (!page) break;
+    cursor = page.cursor;
+    all = all.concat(page.items || []);
+  } while (cursor);
+
+  arrivalsById = new Map();
+  for (const it of all) {
+    const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+    const checkin  = pj(cv[AR_DATE]?.value)?.date     || cv[AR_DATE]?.text     || '';
+    const checkout = pj(cv[AR_CHECKOUT]?.value)?.date || cv[AR_CHECKOUT]?.text || '';
+    if (!checkin) continue;
+    // Filter to our visible window — the rota only renders 7 days, but the
+    // parent index keeps a wider buffer so cleans can find their arrival
+    // even when the booking starts/ends a few days outside the window.
+    if (checkin > endISO) continue;
+    arrivalsById.set(String(it.id), {
+      id: String(it.id),
+      guestName:  it.name || '',
+      property:   pj(cv[AR_PROP]?.value)    || cv[AR_PROP]?.text    || '',
+      checkin,
+      checkout,
+      bookingRef: pj(cv[AR_BOOKREF]?.value) || cv[AR_BOOKREF]?.text || '',
+    });
+  }
+}
+
+// Helper: read the linked Arrivals row id from a Cleans/HT row's column_values.
+// Uses the typed BoardRelationValue's linked_item_ids when present (preferred —
+// reliable across API versions); falls back to parsing `value` JSON for
+// older API responses that didn't include the typed fragment.
+function arrivalIdFromCol(col) {
+  if (!col) return null;
+  // typed fragment
+  if (Array.isArray(col.linked_item_ids) && col.linked_item_ids.length) {
+    return String(col.linked_item_ids[0]);
+  }
+  // legacy parsed value
+  const v = pj(col.value);
+  if (v && typeof v === 'object') {
+    const lists = [v.linkedPulseIds, v.item_ids, v.linked_pulses_ids, v.linked_pulse_ids];
+    for (const list of lists) {
+      if (Array.isArray(list) && list.length) {
+        const x = list[0];
+        const id = (x && typeof x === 'object') ? (x.linkedPulseId || x.linkedItemId) : x;
+        if (id != null) return String(id);
+      }
+    }
+  }
+  return null;
+}
+
+async function loadCleans() {
+  const startISO = todayISO();
+  const endISO   = addDaysISO(startISO, 6);
+  const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_CHECKOUT}","${CL_PROP}","${CL_START}","${CL_HRS}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_SAMEDAY}","${CL_LINEN_MTHD}","${CL_LINEN_DRV}","${CL_LINEN_DATE}","${CL_DIRT_MTHD}","${CL_DIRT_DRV}","${CL_LINEN_SRC}","${CL_NOTES}","${CL_CHECKTYPE}","${CL_REVIEW}","${CL_REVIEW_NT}","${CL_LINKED_REF}","${CL_LINKED_NT}","${CL_COMPLETED}","${CL_ARRIVAL}"]`;
+  let cursor = null, all = [];
+  do {
+    // Note typed BoardRelationValue fragment so CL_ARRIVAL exposes
+    // linked_item_ids reliably (otherwise we have to parse `value` JSON).
+    const q = cursor
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${colIds}){ id value text ... on BoardRelationValue { linked_item_ids } } } } }`
+      : `{ boards(ids:[${CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id value text ... on BoardRelationValue { linked_item_ids } } } } } }`;
     const data = await mondayFetch(q);
     const page = cursor ? data?.next_items_page : data?.boards?.[0]?.items_page;
     if (!page) break;
@@ -734,12 +828,23 @@ async function loadCleans() {
 
     const startObj = pj(cv[CL_START]?.value);
     const start = startObj ? `${String(startObj.hour||0).padStart(2,'0')}:${String(startObj.minute||0).padStart(2,'0')}` : '';
-    const checkinDate = pj(cv[CL_CHECKIN]?.value)?.date || dateObj.date;
-    const checkoutDate = pj(cv[CL_CHECKOUT]?.value)?.date || '';
+
+    // ── Arrivals-first booking shape ────────────────────────────────────
+    // Prefer property/checkin/checkout from the linked Arrivals row; fall
+    // back to the legacy CL_PROP / CL_CHECKIN / CL_CHECKOUT fields when no
+    // relation has been backfilled (older rows or transient relation drops).
+    const arrivalId = arrivalIdFromCol(cv[CL_ARRIVAL]);
+    const arrival   = arrivalId ? arrivalsById.get(arrivalId) : null;
+
+    const checkinDate  = (arrival && arrival.checkin)  || pj(cv[CL_CHECKIN]?.value)?.date  || dateObj.date;
+    const checkoutDate = (arrival && arrival.checkout) || pj(cv[CL_CHECKOUT]?.value)?.date || '';
+    const propText     = (arrival && arrival.property) || cv[CL_PROP]?.text || it.name;
+    const guestName    = (arrival && arrival.guestName) || '';
+    const bookingRef   = (arrival && arrival.bookingRef) || '';
+
     const linenDate = pj(cv[CL_LINEN_DATE]?.value)?.date || '';
     const completedAt = pj(cv[CL_COMPLETED]?.value)?.date || '';
     const sameDay = !!(pj(cv[CL_SAMEDAY]?.value)?.checked);
-    const propText = cv[CL_PROP]?.text || it.name;
 
     // My role on this clean (for display)
     const roles = [];
@@ -752,6 +857,9 @@ async function loadCleans() {
     cleans.push({
       id: it.id,
       name: it.name,
+      arrivalId,
+      guestName,
+      bookingRef,
       property: propText,
       day: dateObj.date,
       checkinDate,
@@ -783,12 +891,13 @@ async function loadCleans() {
 async function loadHotTubCleans() {
   const startISO = todayISO();
   const endISO   = addDaysISO(startISO, 6);
-  const colIds = `["${HC_DATE}","${HC_PROP}","${HC_TYPE}","${HC_PERSON}","${HC_START}","${HC_STATUS}","${HC_DURATION}","${HC_NOTES}"]`;
+  const colIds = `["${HC_DATE}","${HC_PROP}","${HC_TYPE}","${HC_PERSON}","${HC_START}","${HC_STATUS}","${HC_DURATION}","${HC_NOTES}","${HC_ARRIVAL}"]`;
   let cursor = null, all = [];
   do {
+    // Typed BoardRelationValue fragment so HC_ARRIVAL exposes linked_item_ids.
     const q = cursor
-      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${colIds}){ id value text } } } }`
-      : `{ boards(ids:[${HT_CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id value text } } } } }`;
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${colIds}){ id value text ... on BoardRelationValue { linked_item_ids } } } } }`
+      : `{ boards(ids:[${HT_CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id value text ... on BoardRelationValue { linked_item_ids } } } } } }`;
     const data = await mondayFetch(q);
     const page = cursor ? data?.next_items_page : data?.boards?.[0]?.items_page;
     if (!page) break;
@@ -807,12 +916,22 @@ async function loadHotTubCleans() {
     if (!personText.split(',').map(s=>s.trim()).includes(me.name)) continue;
     const startObj = pj(cv[HC_START]?.value);
     const start = startObj ? `${String(startObj.hour||0).padStart(2,'0')}:${String(startObj.minute||0).padStart(2,'0')}` : '10:00';
+
+    // ── Arrivals-first property derivation ──────────────────────────────
+    // Prefer property from the linked Arrivals row. Fall back to HC_PROP
+    // (often blank — Monday silently drops board_relation writes from Make)
+    // and finally to the item name with the trailing " — YYYY-MM-DD" stripped.
+    const arrivalId = arrivalIdFromCol(cv[HC_ARRIVAL]);
+    const arrival   = arrivalId ? arrivalsById.get(arrivalId) : null;
+    const propFromName = (function(){ let n=(it.name||'').trim(); const i=n.lastIndexOf(' — '); return i>0 ? n.slice(0,i) : n; })();
+    const property = (arrival && arrival.property) || cv[HC_PROP]?.text || propFromName;
+
     hotTubCleans.push({
       id: it.id,
-      // Monday's API silently fails board_relation writes, so HC_PROP is often
-      // empty. Fall back to the item name (format: "Property — YYYY-MM-DD")
-      // and strip the trailing date so the property name shows cleanly.
-      property: (cv[HC_PROP]?.text || (function(){ let n=(it.name||'').trim(); const i=n.lastIndexOf(' — '); return i>0 ? n.slice(0,i) : n; })()),
+      arrivalId,
+      guestName:  (arrival && arrival.guestName)  || '',
+      bookingRef: (arrival && arrival.bookingRef) || '',
+      property,
       day: dateObj.date,
       type: cv[HC_TYPE]?.text || 'Changeover',
       start,

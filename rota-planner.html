@@ -612,23 +612,26 @@
    ═══════════════════════════════════════════════════════════════════ */
 // Bumped alongside sw.js — look for this in devtools to confirm the
 // freshest build is actually running (service workers can be sticky).
-const PLANNER_BUILD = 'rota-planner v50 (board_relation writes removed)';
+const PLANNER_BUILD = 'rota-planner v51 (Arrivals-driven; Lodge Status removed 2026-05-04)';
 console.log(`%c${PLANNER_BUILD}`, 'color:#2c7;font-weight:bold');
 
 const MONDAY_API_TOKEN = window.MONDAY_API_TOKEN;
 
-const LODGE_STATUS_BOARD = '1928673949';  // current + next checkin/checkout
+// Arrivals is the canonical source of booking data — every consumer derives
+// from here. See docs/arrivals-architecture.md for the full principle.
+const ARRIVALS_BOARD     = '5094453064';  // Guest Arrivals — single source of truth
 const PROP_CONFIG_BOARD  = '5094466278';  // property metadata
 const STAFF_BOARD        = '5095127554';
-const CLEANS_BOARD       = '5095134636';
+const CLEANS_BOARD       = '5095134636';  // rota assignments — derived; each row links to its Arrivals row via CL_ARRIVAL
 const SHIFTS_BOARD       = '5095155773';  // Staff Shifts (rostered hours per person per day)
 
-// Lodge Status columns
-const LS_CURR_IN  = 'date4';
-const LS_CURR_OUT = 'date_mkqaea46';
-const LS_NEXT_IN  = 'date_mkqwfyfx';
-const LS_NEXT_OUT = 'date_mkqw4cf6';
-const LS_TODAY    = 'color_mkqs71ry';
+// Arrivals columns
+const AR_DATE     = 'date_mm2adtwg';   // arrival date (check-in)
+const AR_PROP     = 'text_mm2ahbrx';   // property name (text snapshot)
+const AR_BOOKREF  = 'text_mm2ah8s';    // booking reference / Guesty confirmationCode
+const AR_FORM_ST  = 'color_mm2aw8fx';  // form status (Pending/Sent/Received) — surfaced in card chip
+const AR_REVIEW   = 'color_mm2qfrrz';  // booking-watcher review flag (Cancelled/Moved/Last minute)
+const AR_REVIEW_NT= 'text_mm2qt65n';   // review note breadcrumb
 
 // Property Config columns
 const PC_STD_HRS     = 'numeric_mm2pbsy1';
@@ -677,6 +680,7 @@ const CL_REVIEW_NT  = 'text_mm2qbgrt';    // Review note (breadcrumb from scenar
 const CL_LINKED_REF = 'text_mm2qh78j';    // partner Cleans row's Monday item id
 const CL_LINKED_NT  = 'long_text_mm2qp4ay'; // human-readable link note
 const CL_COMPLETED  = 'date_mm2qxh4a';    // Completion date (set by staff changeover submit)
+const CL_ARRIVAL    = 'board_relation_mm31mkyp'; // → Arrivals — links this clean to its booking (added 2026-05-04 after duplicate-Arrivals-board cleanup; backfilled by backfill-arrival-relations.html)
 
 // Staff Shifts columns (read-only from here — staff-shifts.html is the editor)
 const SH_STAFF = 'text_mm2p1gqx';   // Staff item id as plain text
@@ -852,30 +856,155 @@ async function fetchStaff() {
   });
 }
 
+/* ─── Arrivals → bookings ──────────────────────────────────────────────
+   Every booking we plan against comes from the Arrivals board. The page
+   used to read Lodge Status (current + next per property only — too narrow
+   to plan more than two bookings out per property). Now reads every
+   Arrivals row in one paginated pass and aggregates per-property timelines
+   so the rest of the planner code (derivedCleans, findPlannedClean, etc.)
+   keeps operating on the same `bookings[]` shape it always has.
+   ──────────────────────────────────────────────────────────────────── */
+// Cached parsed Arrivals rows so re-aggregation after fetchCleans doesn't
+// require a second Monday round-trip. Reset on every fetchBookings() call.
+let _arrivalsCache = [];
+
 async function fetchBookings() {
-  const data = await mondayFetch(`{ boards(ids:[${LODGE_STATUS_BOARD}]){ items_page(limit:200){ items{
-    id name column_values(ids:["${LS_CURR_IN}","${LS_CURR_OUT}","${LS_NEXT_IN}","${LS_NEXT_OUT}","${LS_TODAY}"]){ id value text }
-  } } } }`);
-  bookings = [];
-  for (const it of data.boards[0].items_page.items) {
+  // 1. Pull the entire Arrivals board, paginated. Same shape as fetchCleans
+  //    so the page load cost is one extra paginated fetch, not a flood.
+  const cols = `["${AR_DATE}","${AR_PROP}","${AR_BOOKREF}","${AR_FORM_ST}","${AR_REVIEW}","${AR_REVIEW_NT}"]`;
+  let cursor = null;
+  let raw = [];
+  do {
+    const q = cursor
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${cols}){ id value text } } } }`
+      : `{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${cols}){ id value text } } } } }`;
+    const d = await mondayFetch(q);
+    const page = cursor ? d.next_items_page : d.boards[0].items_page;
+    raw = raw.concat(page.items);
+    cursor = page.cursor;
+  } while (cursor);
+
+  // 2. Parse each Arrivals row into a flat per-booking object.
+  //    Arrivals rows hold check-in only; check-out is *not* on this board.
+  //    We rely on the existing Cleans rows' CL_CHECKOUT for that — and for
+  //    bookings that don't yet have a Cleans row, we infer the check-out
+  //    from the next booking's check-in for the same property (i.e. the
+  //    booking ends when the next guest arrives). This is the same
+  //    accommodation Lodge Status used to make implicitly.
+  const arrivals = raw.map(it => {
     const cv = {};
     for (const c of it.column_values) cv[c.id] = { value: c.value, text: c.text };
-    const currIn = pj(cv[LS_CURR_IN]?.value)?.date || null;
-    const currOut = pj(cv[LS_CURR_OUT]?.value)?.date || null;
-    const nextIn = pj(cv[LS_NEXT_IN]?.value)?.date || null;
-    const nextOut = pj(cv[LS_NEXT_OUT]?.value)?.date || null;
-    const todayStatus = cv[LS_TODAY]?.text || '';
-    if (!currIn && !currOut && !nextIn && !nextOut) continue;
-    bookings.push({
-      property: it.name,
-      currIn, currOut, nextIn, nextOut,
-      todayStatus,
-      source: 'monday',
-    });
-  }
-  // Merge manual bookings (non-managed properties)
+    return {
+      arrivalId:   it.id,
+      property:    pj(cv[AR_PROP]?.value)    || cv[AR_PROP]?.text    || it.name,
+      checkin:     pj(cv[AR_DATE]?.value)?.date || cv[AR_DATE]?.text || '',
+      bookingRef:  pj(cv[AR_BOOKREF]?.value) || cv[AR_BOOKREF]?.text || '',
+      formStatus:  cv[AR_FORM_ST]?.text || '',
+      reviewFlag:  cv[AR_REVIEW]?.text || '',
+      reviewNote:  pj(cv[AR_REVIEW_NT]?.value) || cv[AR_REVIEW_NT]?.text || '',
+    };
+  }).filter(a => a.property && a.checkin);
+
+  // 3. Cache for re-aggregation after fetchCleans completes (the first
+  //    aggregation runs before cleans is loaded, so checkout dates fall
+  //    back to next-check-in; re-running after cleans is loaded picks up
+  //    the real CL_CHECKOUT values from each row).
+  _arrivalsCache = arrivals;
+
+  // 4. Aggregate into per-booking entries shaped like the old Lodge Status
+  //    output, so derivedCleans() / findPlannedClean() / etc. need no change.
+  reAggregateBookings();
+}
+
+/* Re-run the per-property timeline aggregation. Called once during
+   fetchBookings (before cleans is loaded — uses fallback checkouts) and
+   again after fetchCleans has populated the cleans cache (so checkouts
+   come from real CL_CHECKOUT data on each row). Idempotent.            */
+function reAggregateBookings() {
+  bookings = aggregateBookings(_arrivalsCache);
+  // Merge manual bookings for non-managed properties (unchanged).
   const ext = loadExt();
   for (const b of ext) bookings.push({ ...b, source: 'manual' });
+}
+
+/* Convert flat per-Arrivals-row list into the per-property timeline shape
+   the rest of the planner expects.
+     For each property, sort its bookings by check-in. For each booking, emit
+     one entry where:
+       currIn  = this booking's check-in
+       currOut = this booking's check-out (from a linked Cleans row's
+                 CL_CHECKOUT if present; otherwise the next booking's
+                 check-in — matches the "stay ends when next guest arrives"
+                 model used elsewhere)
+       nextIn  = the NEXT booking's check-in for the same property (or null)
+       nextOut = the NEXT booking's check-out (or null)
+   We also synthesise todayStatus from the dates so the property-card chip
+   on the rota stays accurate without depending on Lodge Status's automation.
+*/
+function aggregateBookings(arrivals) {
+  const today = localStr(new Date());
+
+  // Build a quick lookup of Cleans rows by arrivalId so we can read the
+  // already-stored CL_CHECKOUT value for each booking. This avoids a Guesty
+  // round-trip — Make's daily/watcher scenarios populate CL_CHECKOUT every
+  // time they create a Cleans row, so the data's already there.
+  const checkoutByArrivalId = new Map();
+  for (const c of cleans) {
+    if (!c.deleted && c.arrivalId && c.checkoutDate) {
+      // Only set the first time we see an arrival id — multiple cleans
+      // tied to the same arrival is rare but happens (orphan-night links).
+      if (!checkoutByArrivalId.has(c.arrivalId)) {
+        checkoutByArrivalId.set(c.arrivalId, c.checkoutDate);
+      }
+    }
+  }
+
+  // Group Arrivals by property, sort each group by check-in.
+  const byProp = new Map();
+  for (const a of arrivals) {
+    if (!byProp.has(a.property)) byProp.set(a.property, []);
+    byProp.get(a.property).push(a);
+  }
+  for (const list of byProp.values()) {
+    list.sort((x, y) => (x.checkin || '').localeCompare(y.checkin || ''));
+  }
+
+  const out = [];
+  for (const [property, list] of byProp) {
+    for (let i = 0; i < list.length; i++) {
+      const cur  = list[i];
+      const nxt  = list[i + 1] || null;
+      const currOut = checkoutByArrivalId.get(cur.arrivalId)
+                   || (nxt ? nxt.checkin : null);  // best-guess fallback
+      const nextIn  = nxt ? nxt.checkin : null;
+      const nextOut = nxt ? (checkoutByArrivalId.get(nxt.arrivalId) || null) : null;
+
+      // Synthesise todayStatus to match what Lodge Status used to emit, so
+      // the chip on each property card stays right.
+      let todayStatus = '';
+      if (cur.checkin === today && currOut === today)        todayStatus = 'SameDay';
+      else if (currOut === today)                            todayStatus = 'Check Out';
+      else if (cur.checkin === today)                        todayStatus = 'Check In';
+      else if (cur.checkin <= today && currOut > today)      todayStatus = 'Stay';
+      else                                                   todayStatus = '';
+
+      out.push({
+        property,
+        arrivalId:   cur.arrivalId,
+        bookingRef:  cur.bookingRef,
+        currIn:      cur.checkin,
+        currOut,
+        nextIn,
+        nextOut,
+        nextArrivalId: nxt ? nxt.arrivalId : null,
+        todayStatus,
+        formStatus:  cur.formStatus,
+        reviewFlag:  cur.reviewFlag,
+        source:      'monday',
+      });
+    }
+  }
+  return out;
 }
 
 // Fall-back parser for when the Cleans board item has no board_relation link
@@ -900,13 +1029,17 @@ function parsePropertyFromItemName(name) {
 
 async function fetchCleans() {
   // Paginate the Cleans board — it runs well past 500 items in a busy season.
-  const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_EARLIEST}","${CL_CHECKOUT}","${CL_PROP}","${CL_START}","${CL_END}","${CL_HRS}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_LAUNDRY}","${CL_LAUN_DRV}","${CL_LINEN_MTHD}","${CL_LINEN_DRV}","${CL_LINEN_DATE}","${CL_LINEN_SRC}","${CL_DIRT_MTHD}","${CL_DIRT_DRV}","${CL_SAMEDAY}","${CL_STATUS}","${CL_NOTES}","${CL_CHECKTYPE}","${CL_REVIEW}","${CL_REVIEW_NT}","${CL_LINKED_REF}","${CL_LINKED_NT}","${CL_COMPLETED}"]`;
+  // CL_ARRIVAL added 2026-05-04 — links each row to its Arrivals booking.
+  const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_EARLIEST}","${CL_CHECKOUT}","${CL_PROP}","${CL_START}","${CL_END}","${CL_HRS}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_LAUNDRY}","${CL_LAUN_DRV}","${CL_LINEN_MTHD}","${CL_LINEN_DRV}","${CL_LINEN_DATE}","${CL_LINEN_SRC}","${CL_DIRT_MTHD}","${CL_DIRT_DRV}","${CL_SAMEDAY}","${CL_STATUS}","${CL_NOTES}","${CL_CHECKTYPE}","${CL_REVIEW}","${CL_REVIEW_NT}","${CL_LINKED_REF}","${CL_LINKED_NT}","${CL_COMPLETED}","${CL_ARRIVAL}"]`;
   let cursor = null;
   let allItems = [];
+  // The `... on BoardRelationValue` typed fragment is required to read the
+  // CL_ARRIVAL board_relation column — generic `text` and `value` return null
+  // for board_relation columns regardless of whether items are linked.
   do {
     const q = cursor
-      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${colIds}){ id value text } } } }`
-      : `{ boards(ids:[${CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id value text } } } } }`;
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${colIds}){ id value text type ... on BoardRelationValue { linked_item_ids } } } } }`
+      : `{ boards(ids:[${CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id value text type ... on BoardRelationValue { linked_item_ids } } } } } }`;
     const d = await mondayFetch(q);
     const page = cursor ? d.next_items_page : d.boards[0].items_page;
     allItems = allItems.concat(page.items);
@@ -967,10 +1100,20 @@ async function fetchCleans() {
     const dirtiesDriver = (cv[CL_DIRT_DRV]?.text || '').split(',').map(s=>s.trim()).filter(Boolean)[0] || '';
     const linenSrcText = cv[CL_LINEN_SRC]?.text || '';
 
+    // Arrival board_relation — added 2026-05-04. Each clean points back to
+    // the Arrivals row it serves, providing a stable join key (rather than
+    // the fragile property-name + date-window heuristic). Read via the
+    // typed BoardRelationValue fragment — `linked_item_ids` is a clean array
+    // of numeric ids, populated reliably whether the column was just written
+    // or has been linked for weeks.
+    const arrivalLinkedIds = cv[CL_ARRIVAL]?.linked_item_ids || [];
+    const arrivalId = arrivalLinkedIds.length ? String(arrivalLinkedIds[0]) : null;
+
     fresh.push({
       id: local?.id || uid(),
       mondayId: it.id,
       property: propText || parsePropertyFromItemName(it.name),
+      arrivalId,           // NEW — Monday item id of the linked Arrivals row, or null if unbacked
       day: dateObj.date,
       checkinDate,
       earliestDate,
@@ -1053,6 +1196,10 @@ async function refreshAll() {
   try {
     await Promise.all([fetchProperties(), fetchStaff(), fetchBookings(), fetchShifts()]);
     await fetchCleans();
+    // Re-aggregate now that cleans is populated — picks up real CL_CHECKOUT
+    // values that the first aggregation pass had to fall back on. Cheap
+    // (no network), idempotent.
+    reAggregateBookings();
     render();
     toast('Refreshed');
   } catch (e) {
@@ -1093,15 +1240,33 @@ function derivedCleans() {
       windowEnd: windowEndDate ? localStr(windowEndDate) : b.currOut,
       source: b.source,
       todayStatus: b.todayStatus,
+      // NEW — pass the Arrivals board_relation through so findPlannedClean
+      // can do a strict id-based join. The "next" booking is the one whose
+      // check-in we're cleaning *for*, so the next booking's arrivalId is
+      // what a freshly-created clean should link to.
+      arrivalId: b.nextArrivalId || null,
+      bookingRef: b.bookingRef || '',
     });
   }
   return out;
 }
 
-/* Planned clean exists for a booking? match by property+windowStart (checkout date or within the window) */
+/* Planned clean exists for a booking?
+   First try matching on the new arrival board_relation — that's the canonical
+   join key now that every Cleans row points back to its Arrivals row. Falls
+   back to property + date-window match for cleans that haven't been backfilled
+   (e.g. local in-progress edits, manual ext bookings, or freshly-created rows
+   before save). The fallback preserves the pre-refactor behaviour as a safety
+   net while the relation propagates through the codebase. */
 function findPlannedClean(d) {
-  // Match by property and day in [windowStart..windowEnd]. Guard against an
-  // inverted window (windowEnd < windowStart) which would silently match nothing.
+  // Step 1 — relation match. The derived clean carries `arrivalId` from the
+  // booking it was generated from (when the booking comes from Arrivals).
+  if (d.arrivalId) {
+    const byRelation = cleans.find(c => !c.deleted && c.arrivalId === d.arrivalId);
+    if (byRelation) return byRelation;
+  }
+  // Step 2 — fallback: match by property and day in [windowStart..windowEnd].
+  // Guard against an inverted window which would silently match nothing.
   const winEnd = (d.windowEnd && d.windowEnd >= d.windowStart) ? d.windowEnd : d.windowStart;
   return cleans.find(c => !c.deleted && c.property === d.property &&
     c.day >= d.windowStart && c.day <= winEnd);
@@ -1914,6 +2079,7 @@ function planNewClean(key, dayStr) {
     id: uid(),
     mondayId: null,
     property: d.property,
+    arrivalId: d.arrivalId || null,   // NEW — link to the next booking's Arrivals row
     day: dayStr,
     hoursTotal: prop.stdHrs || 1.5,
     primary: '',
@@ -2729,6 +2895,15 @@ function buildColumnValues(c) {
   cv[CL_STATUS] = { label: c.status || (c.primary ? 'Planned' : 'Unassigned') };
   if (c.checkType) cv[CL_CHECKTYPE] = { label: c.checkType };
   if (c.notes) cv[CL_NOTES] = c.notes;
+  // Arrival board_relation — write only if we actually have an Arrivals row
+  // id to point at. Manual ext bookings (non-managed properties) won't have
+  // one and that's fine — the relation is optional. Unlike CL_PROP and
+  // CL_LINEN_SRC (other board_relation columns mentioned above), CL_ARRIVAL
+  // is correctly configured to connect to the Arrivals board (5094453064),
+  // so writes are accepted.
+  if (c.arrivalId) {
+    cv[CL_ARRIVAL] = { item_ids: [parseInt(c.arrivalId, 10)] };
+  }
   return cv;
 }
 

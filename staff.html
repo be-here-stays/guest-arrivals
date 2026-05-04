@@ -279,9 +279,13 @@
 
 <style>
   /* Checklist modal */
-  .cl-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; z-index:200; padding:14px; }
+  .cl-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.55); display:none; align-items:center; justify-content:center; z-index:200; padding:14px; padding-bottom:calc(14px + env(safe-area-inset-bottom, 0px)); }
   .cl-overlay.show { display:flex; }
-  .cl-box { background:#fff; border-radius:14px; max-width:460px; width:100%; max-height:92vh; overflow-y:auto; padding:18px 18px 16px; display:flex; flex-direction:column; gap:10px; }
+  /* Cap height so on portrait iPhone the modal can never extend behind Safari's
+     bottom URL bar — leave at least ~110px of breathing room. The action row
+     (Cancel / Mark complete) is sticky to the bottom of the modal so it's
+     always reachable, even on a long property checklist. */
+  .cl-box { background:#fff; border-radius:14px; max-width:460px; width:100%; max-height:calc(100vh - 110px - env(safe-area-inset-bottom, 0px)); overflow-y:auto; padding:18px 18px calc(16px + env(safe-area-inset-bottom, 0px)); display:flex; flex-direction:column; gap:10px; position:relative; }
   .cl-title { display:flex; justify-content:space-between; align-items:center; font-size:17px; font-weight:700; color:var(--dark); }
   .cl-x { background:none; border:0; font-size:18px; cursor:pointer; color:var(--muted); padding:0 4px; }
   .cl-sub { font-size:12px; color:var(--muted); margin-top:-6px; }
@@ -299,9 +303,12 @@
   .cl-notes-row { margin-top:6px; }
   .cl-lbl { display:block; font-size:11px; font-weight:700; color:var(--sage); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:4px; }
   .cl-notes { width:100%; padding:9px 11px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:13px; min-height:50px; resize:vertical; }
-  .cl-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:6px; flex-wrap:wrap; }
-  .cl-btn-cancel { background:#eee; color:var(--dark); border:0; padding:9px 14px; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
-  .cl-btn-go { background:#2d6a4f; color:#fff; border:0; padding:9px 16px; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  /* Stick the action row to the bottom of the modal, with a soft top fade so
+     long lists don't visually run into the buttons. This means Submit is
+     always one tap away regardless of how long the checklist is. */
+  .cl-actions { display:flex; gap:8px; justify-content:flex-end; margin-top:6px; flex-wrap:wrap; position:sticky; bottom:0; background:#fff; padding:10px 0 4px; z-index:2; box-shadow:0 -10px 12px -10px rgba(0,0,0,0.18); }
+  .cl-btn-cancel { background:#eee; color:var(--dark); border:0; padding:11px 18px; border-radius:8px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; min-height:44px; }
+  .cl-btn-go { background:#2d6a4f; color:#fff; border:0; padding:11px 20px; border-radius:8px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; min-height:44px; }
   .cl-btn-go:disabled { opacity:0.5; cursor:not-allowed; }
 
   /* Decking photo inspection */
@@ -1423,7 +1430,7 @@ function renderHotTubCleanCard(h) {
   // Hot-tub log link, prefilled for this property + date + visit type
   const visitMap = { 'Changeover':'full', 'Mid-stay':'mid-stay', 'Mid-vacancy':'mid-vac' };
   const visitParam = visitMap[h.type] || 'full';
-  const formUrl = `hot-tub.html?property=${encodeURIComponent(h.property)}&date=${encodeURIComponent(h.day)}&visit=${visitParam}&from=staff&name=${encodeURIComponent(me.name)}`;
+  const formUrl = `hot-tub.html?property=${encodeURIComponent(h.property)}&date=${encodeURIComponent(h.day)}&visit=${visitParam}&from=staff&name=${encodeURIComponent(me.name)}&htCleanId=${encodeURIComponent(h.id)}`;
 
   // Status buttons — Start, Complete, Reset. They write back to Monday immediately.
   // Changeover cleans (full property service) get the checklist modal on
@@ -1581,6 +1588,12 @@ function openChangeoverChecklist(htId) {
   document.getElementById('clSub').textContent = 'Tick everything you actually did. The list gets saved to the clean record.';
   document.getElementById('clNotes').value = '';
 
+  // Always reset the submit button — without this, a previous successful
+  // submission left it stuck on "Saving…" + disabled, so the second house
+  // looked permanently locked.
+  const goBtn = document.getElementById('clGo');
+  if (goBtn) { goBtn.disabled = false; goBtn.textContent = '✓ Mark complete'; }
+
   const list = document.getElementById('clList');
   const noTub = OUTSIDE_NO_HT.has((h.property || '').trim());
   const items = CHECKLIST_TEMPLATE.filter(it => !(it.hotTubOnly && noTub));
@@ -1615,6 +1628,10 @@ function closeChecklist() {
   document.getElementById('clOverlay').classList.remove('show');
   _checklistFor = null;
   _checklistChecked = {};
+  // Belt-and-braces: ensure the submit button is back to its idle state so it
+  // never reopens stuck on "Saving…" after a successful previous submission.
+  const goBtn = document.getElementById('clGo');
+  if (goBtn) { goBtn.disabled = false; goBtn.textContent = '✓ Mark complete'; }
 }
 
 async function submitChecklist() {

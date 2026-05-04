@@ -496,6 +496,25 @@
 
   <button class="submit-btn" id="submitBtn" onclick="submitForm()">Submit Log</button>
 
+  <!-- Success state — replaces the form once a log has been saved.
+       Stays visible until the user explicitly chooses to log another or
+       go back to staff.html, so there is no ambiguity about whether the
+       last submit went through. -->
+  <div id="doneCard" class="card hide" style="background:#edf7f2; border:2px solid #52b788; margin-top:18px">
+    <div style="display:flex; align-items:center; gap:10px; margin-bottom:10px">
+      <div style="font-size:28px">✓</div>
+      <div>
+        <div style="font-size:16px; font-weight:700; color:#1e5c3a">Reading submitted</div>
+        <div id="doneSub" style="font-size:13px; color:#2d6a4f; margin-top:2px">—</div>
+      </div>
+    </div>
+    <div id="doneSummary" style="background:#fff; border-radius:10px; padding:12px; font-size:13px; color:#2d6a4f; margin-bottom:12px"></div>
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:8px">
+      <button class="submit-btn" style="background:#1a5276; padding:13px; font-size:14px" onclick="logAnother()">+ Log another reading</button>
+      <a id="doneBack" href="staff.html" class="submit-btn" style="background:#272F2E; padding:13px; font-size:14px; text-decoration:none; text-align:center; line-height:1.3">‹ Back to My Day</a>
+    </div>
+  </div>
+
 </div><!-- /container -->
 
 <script>
@@ -549,6 +568,13 @@ const SC = {
   waterChange:  'dropdown_mm1jd6ar',
 };
 
+// Hot Tub Cleans board (the rota of scheduled cleans rendered on staff.html).
+// When this form is launched from a clean card we update that record so the
+// staff app can show "Readings logged" / mark the visit Completed.
+const HT_CLEANS_BOARD = 5095259581;
+const HC_STATUS = 'color_mm2rqkeq';
+const HC_NOTES  = 'long_text_mm2rsrdj';
+
 // State
 let visitType  = null;
 let waterChange = 'none';
@@ -557,6 +583,7 @@ let timerSecs  = 0;
 let timerRunning = false;
 let timerInt   = null;
 let statusItems = {}; // name → { id, cv }
+let htCleanId  = null;   // populated from ?htCleanId= when present
 
 // ── Init ─────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', async () => {
@@ -578,6 +605,17 @@ document.addEventListener('DOMContentLoaded', async () => {
 function applyUrlPrefill() {
   try {
     const p = new URLSearchParams(location.search);
+
+    // Hot Tub Cleans record id — set from staff.html when this form is
+    // launched from a scheduled clean card. We use it on submit to mark
+    // that record as logged/completed.
+    htCleanId = p.get('htCleanId') || null;
+
+    // Make the post-submit "Back to My Day" link sticky to the same context.
+    if (p.get('from') === 'staff') {
+      const back = document.getElementById('doneBack');
+      if (back) back.href = 'staff.html';
+    }
 
     // Property — must match an option already loaded from the status board.
     const propParam = p.get('property');
@@ -1009,29 +1047,120 @@ async function submitForm() {
     const itemName = esc(property);
 
     // Create record in charging board
-    await mq(`mutation($b:ID!,$n:String!,$v:JSON!){ create_item(board_id:$b,item_name:$n,column_values:$v){ id } }`, 
+    await mq(`mutation($b:ID!,$n:String!,$v:JSON!){ create_item(board_id:$b,item_name:$n,column_values:$v){ id } }`,
       { b: CHARGING_BOARD, n: itemName, v: JSON.parse(colValsStr) }, true);
 
     // Status board updated by Make automation triggered by new charging record
 
-    // Success — show message then reset form
-    showMsg('✓ Log submitted — ' + property + ' · ' + vtLabel, 'success');
-    window.scrollTo({ top: 0, behavior: 'smooth' });
+    // If this form was launched from a scheduled card on staff.html, update
+    // the matching Hot Tub Cleans record so the engineer's "My Day" view
+    // reflects the work. Mid-stay & Mid-vac visits are tub-only — logging
+    // readings IS the job, so mark the record Completed. For Full Cleans
+    // (changeovers) we just append an audit line; the engineer still has to
+    // run the changeover checklist before the record is marked complete.
+    if (htCleanId) {
+      try { await markHtCleanLogged(htCleanId, vtLabel, property, tester, dtVal); }
+      catch (e) { console.warn('Could not update Hot Tub Cleans record:', e); }
+    }
+
+    // Stop the timer so the success card shows the final duration cleanly.
     if (timerRunning) timerStop();
-    setTimeout(resetForm, 2500);
+
+    // Switch into the visible "submitted" state — the form stays put with
+    // its values intact so the user has a record of what they sent, but
+    // we lock the inputs and show a green confirmation card with explicit
+    // "Log another" / "Back to My Day" actions instead of an auto-reset.
+    enterDoneState({ property, vtLabel, dt: dtVal, queued: false });
 
   } catch (e) {
     if (e.message === 'OFFLINE_QUEUED') {
-      showMsg('✓ Offline: Log saved to outbox. It will sync automatically.', 'success');
-      window.scrollTo({ top: 0, behavior: 'smooth' });
       if (timerRunning) timerStop();
-      setTimeout(resetForm, 2500);
+      enterDoneState({ property: g('fProperty'), vtLabel: (visitType === 'full' ? 'Full Clean' : visitType === 'mid-stay' ? 'Mid-Stay' : 'Mid-Vac'), dt: g('fDateTime'), queued: true });
       return;
     }
     showMsg('Submission error: ' + e.message, 'error');
     btn.disabled = false;
     btn.textContent = 'Submit Log';
   }
+}
+
+// Update the Hot Tub Cleans rota record (board 5095259581) so that staff.html
+// reflects the work in My Day. Mid-stay / Mid-vac → Completed. Full Clean →
+// still In Progress (changeover checklist must be done separately) but with a
+// "Readings logged" audit line in the notes.
+async function markHtCleanLogged(itemId, vtLabel, property, tester, dt) {
+  const stamp = new Date().toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  const auditLine = `[${stamp} — ${tester}] Hot tub readings logged (${vtLabel} · ${property}).`;
+
+  // Fetch existing notes so we append rather than overwrite.
+  let existingNotes = '';
+  try {
+    const d = await mq(`{ items(ids:[${itemId}]) { column_values(ids:["${HC_NOTES}"]) { text } } }`);
+    existingNotes = d?.items?.[0]?.column_values?.[0]?.text || '';
+  } catch (_) {}
+  const newNotes = existingNotes ? (existingNotes + '\n\n' + auditLine) : auditLine;
+
+  const cv = { [HC_NOTES]: newNotes };
+  // Mid-stay & Mid-vac are tub-only — readings = job done. Full Cleans need
+  // their changeover checklist completed in staff.html before the visit is
+  // marked complete, so we leave status alone for those.
+  if (visitType === 'mid-stay' || visitType === 'mid-vac') {
+    cv[HC_STATUS] = { label: 'Completed' };
+  }
+
+  const q = `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`;
+  await mq(q, { b: HT_CLEANS_BOARD, i: itemId, v: JSON.stringify(cv) }, true);
+}
+
+function enterDoneState({ property, vtLabel, dt, queued }) {
+  // Hide the form's primary submit, show the success card.
+  document.getElementById('submitBtn').classList.add('hide');
+  const done = document.getElementById('doneCard');
+  if (!done) return;
+  done.classList.remove('hide');
+
+  // Header line — different copy when offline.
+  const sub = document.getElementById('doneSub');
+  if (sub) sub.textContent = queued
+    ? 'Saved offline — will sync automatically when back in coverage.'
+    : 'Saved to the charging board. Status board will refresh shortly.';
+
+  // Summary card showing the values that were just submitted, so it's easy
+  // to verify at a glance without scrolling around.
+  const summary = document.getElementById('doneSummary');
+  if (summary) {
+    const initPH    = g('fInitPH'),    finalPH    = g('fFinalPH');
+    const initBrom  = g('fInitBrom'),  finalBrom  = g('fFinalBrom');
+    const initTemp  = g('fInitTemp'),  initTDS    = g('fInitTDS');
+    const dur       = g('fDuration');
+    const wcLabel   = waterChange === 'none' ? 'No water change' : waterChange === 'partial' ? 'Partial water change' : 'Full water change';
+    const dtPretty  = (dt || '').replace('T',' ');
+    const rows = [
+      `<strong>${property}</strong> · ${vtLabel} · ${dtPretty}`,
+      `Tester: ${g('fTester')}`,
+      `Initial — Temp ${initTemp || '—'}°C · pH ${initPH || '—'} · Brom ${initBrom || '—'} · TDS ${initTDS || '—'}`,
+      `Final — pH ${finalPH || '—'} · Brom ${finalBrom || '—'}`,
+      `${wcLabel}${dur ? ' · ' + dur + ' min' : ''}`,
+    ];
+    summary.innerHTML = rows.join('<br>');
+  }
+
+  // Scroll the success card into view.
+  done.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  // Also clear any stale message banner.
+  const box = document.getElementById('msgBox');
+  if (box) { box.className = 'msg'; box.textContent = ''; }
+}
+
+// Triggered by "+ Log another reading" — clear the form and bring the user
+// back to a fresh, blank state without a full page reload.
+function logAnother() {
+  document.getElementById('doneCard').classList.add('hide');
+  document.getElementById('submitBtn').classList.remove('hide');
+  resetForm();
+  // Don't carry the previous htCleanId into the next reading.
+  htCleanId = null;
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 function resetForm() {

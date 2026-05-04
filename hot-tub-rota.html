@@ -1074,16 +1074,16 @@ function autoDeriveCleans() {
         if (ds < 2)                 continue;
         if (occupied)               { lc = d; continue; }
         // Vacant or check-out today, 48h up:
-        if (hasCheckinNextDay(stays, d) && !isCheckout) {
-          // Empty day before a check-in → bring forward Changeover today.
+        if (hasCheckinNextDay(stays, d)) {
+          // Day before a check-in (whether fully vacant OR a check-out day),
+          // and 48h since last clean is up. We auto-bring-forward the
+          // Changeover to today, suppressing tomorrow's check-in Changeover.
+          // Invariant: there's exactly ONE clean across these two days —
+          //   • Default state: Changeover on today (this branch), or
+          //   • Planner moves it back: Mid-vac on today + Changeover tomorrow
+          //     (handled in shiftCleanToCheckin).
           broughtForwardOn.add(d);
           suppressedCheckins.add(addDaysISO(d, 1));
-          lc = d;
-        } else if (hasCheckinNextDay(stays, d) && isCheckout) {
-          // Check-out today and check-in tomorrow → planner can decide:
-          // by default we leave Mid-vac today + Changeover tomorrow as TWO visits
-          // (matches Barry's "we accept 2 visits in 2 days" rule for back-to-back).
-          // The "drag earlier" UI lets the planner consolidate manually if they prefer.
           lc = d;
         } else {
           // Plain mid-vac (no check-in tomorrow)
@@ -1127,9 +1127,14 @@ function autoDeriveCleans() {
           // Mid-stay (guests in midnight-to-midnight — tub-only service)
           want = { type: 'Mid-stay', start: '10:00' };
         } else if (broughtForwardOn.has(d)) {
-          // Pre-pass decided this vacant day should host a brought-forward Changeover.
-          want = { type: 'Changeover', start: '09:00' };
+          // Pre-pass decided this day should host a brought-forward
+          // Changeover. Earliest start is 10:00 if guests are leaving today
+          // (checkout day, must wait for them to leave) otherwise 09:00.
+          // Covers BOTH the fully-vacant-day and the checkout-day-with-
+          // checkin-tomorrow cases — they auto-bring-forward identically.
+          want = { type: 'Changeover', start: isCheckout ? '10:00' : '09:00' };
         } else if (isCheckout) {
+          // Check-out today and NOT a back-to-back (no check-in tomorrow).
           // Vacant from this morning. Mid-vac at 10:00 (after guests leave).
           want = { type: 'Mid-vacancy', start: '10:00' };
         } else {
@@ -1906,12 +1911,37 @@ function shiftCleanEarlier(cleanId) {
   const stays = staysFor(c.property);
   // Earliest start: if the new day is a check-out day, can't start before 10:00
   const isCheckout = isCheckoutOn(stays, newDay);
+
+  // If a Mid-vac is sitting on the destination day for this property, the
+  // brought-forward Changeover supersedes it (a Changeover already covers
+  // the tub service). Remove the now-redundant Mid-vac to keep the
+  // "exactly one clean per checkout day" invariant.
+  const supersededIdx = cleans.findIndex(x => !x.deleted
+    && x.property === c.property
+    && x.day === newDay
+    && x.type === 'Mid-vacancy'
+    && x.id !== c.id);
+  let supersededMsg = '';
+  if (supersededIdx !== -1) {
+    const superseded = cleans[supersededIdx];
+    if (superseded.mondayId) {
+      // Real Monday row — flag for delete on Save (don't splice locally
+      // or the row never gets removed upstream).
+      superseded.deleted = true;
+      superseded.dirty = true;
+    } else {
+      // Local-only — splice it out cleanly.
+      cleans.splice(supersededIdx, 1);
+    }
+    supersededMsg = ' · Mid-vac removed';
+  }
+
   c.day = newDay;
   c.start = isCheckout ? '10:00' : '09:00';
   c.dirty = true;
   // Step the visible day with the card so the planner sees it land
   viewStart = new Date(newDay + 'T00:00:00');
-  toast(`Moved to ${newDay}`);
+  toast(`Moved to ${newDay}${supersededMsg}`);
   render();
 }
 
@@ -1929,11 +1959,52 @@ function shiftCleanToCheckin(cleanId) {
   const future = stays.filter(s => s.checkIn && s.checkIn > c.day).sort((a,b) => a.checkIn.localeCompare(b.checkIn));
   if (!future.length) { toast('No upcoming check-in to move this back to'); return; }
   const target = future[0].checkIn;
+
+  // Capture the day/checkout state of the card BEFORE we mutate it. If the
+  // source day was a check-out day (back-to-back: guests left today, new
+  // guests arrive tomorrow), the tub still needs servicing on the source
+  // day to satisfy the 48h rule — so we replace the moved Changeover with
+  // a Mid-vac on that day. Invariant: on a check-out day before a check-in,
+  // there is always exactly ONE clean (Changeover OR Mid-vac, never both).
+  const sourceDay         = c.day;
+  const sourceWasCheckout = isCheckoutOn(stays, sourceDay);
+
   c.day = target;
   c.start = '10:00';
   c.dirty = true;
+
+  let extraToast = '';
+  if (sourceWasCheckout) {
+    const p = properties.find(x => x.name === c.property);
+    if (p && p.hasTub) {
+      const exists = cleans.some(x => !x.deleted && x.property === c.property
+        && x.day === sourceDay && x.type === 'Mid-vacancy');
+      if (!exists) {
+        cleans.push({
+          id: uid(),
+          mondayId: null,
+          property: c.property,
+          propertyId: p.id || null,
+          day: sourceDay,
+          type: 'Mid-vacancy',
+          person: '',
+          start: '10:00',                 // checkout day → earliest 10:00
+          status: 'Scheduled',
+          duration: durationForType(p, 'Mid-vacancy'),
+          notes: '',
+          autoGen: true,
+          virtual: false,
+          hasTub: p.hasTub,
+          dirty: true,
+          isNew: true,
+        });
+        extraToast = ` · Mid-vac kept on ${sourceDay}`;
+      }
+    }
+  }
+
   viewStart = new Date(target + 'T00:00:00');
-  toast(`Moved back to ${target}`);
+  toast(`Moved back to ${target}${extraToast}`);
   render();
 }
 

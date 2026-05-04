@@ -1228,6 +1228,15 @@ function renderDay() {
     </a>
   </div>`);
 
+  // App feedback — separate from "Report issue" (which is for property
+  // defects). This is for bugs in the staff apps themselves and ideas to
+  // make the workflow better. Goes to its own Monday board for triage.
+  parts.push(`<div style="margin-top:8px">
+    <a href="report-feedback.html?from=staff&name=${encodeURIComponent(me.name)}" class="cc-btn secondary" style="display:block; text-align:center; padding:11px; font-weight:700; text-decoration:none; border-radius:10px; background:#fff; color:#272F2E; border:1.5px solid #989782">
+      🐞 Bug or suggestion in the app
+    </a>
+  </div>`);
+
   // Empty state: nothing for me today
   const nothing = !dayShifts.length && !dayHotTubs.length && !dayMaint.length
     && (maint || (!cleansMine.length && !dayLinenDrops.length && !dirtiesMine.length));
@@ -1455,8 +1464,17 @@ function renderHotTubCleanCard(h) {
                   ${completeAction}`;
   }
 
+  // Log readings link. On Completed cards we keep the button visible (sometimes
+  // you legitimately want a retest reading after corrective treatment), but
+  // require a confirm so accidental taps after the card has greyed out don't
+  // silently fire off an extra reading. The label changes to "Log additional
+  // reading" so the secondary nature is obvious. Cancelled → button hidden.
+  const logBtnLabel  = completed ? '♨ Log additional reading' : '♨ Log readings';
+  const logBtnGuard  = completed
+    ? `onclick="if (!confirm('This clean is already marked complete. Log an additional reading anyway?')) { event.preventDefault(); return false; }"`
+    : '';
   const logBtn = !cancelled
-    ? `<a class="cc-btn secondary" href="${formUrl}" style="background:#1a5276; color:#fff">♨ Log readings</a>`
+    ? `<a class="cc-btn secondary" href="${formUrl}" ${logBtnGuard} style="background:#1a5276; color:#fff${completed ? '; opacity:0.85' : ''}">${logBtnLabel}</a>`
     : '';
 
   // Quick issue link — pre-fills the property + reporter so the form is one tap from logged.

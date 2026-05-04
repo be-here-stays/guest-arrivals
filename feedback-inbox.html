@@ -1,0 +1,447 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Feedback inbox — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; }
+  header { background:var(--dark); color:#fff; padding:18px 24px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+  header h1 { font-size:18px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.6; margin-top:2px; }
+  .hdr-actions { display:flex; gap:8px; }
+  .hdr-btn { color:rgba(255,255,255,0.85); text-decoration:none; font-size:13px; font-weight:600; padding:7px 12px; border:1px solid rgba(255,255,255,0.25); border-radius:8px; background:transparent; cursor:pointer; font-family:inherit; }
+  .hdr-btn:hover { background:rgba(255,255,255,0.08); }
+
+  .container { max-width:1100px; margin:0 auto; padding:18px 22px 60px; }
+
+  .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+  .filter-pill { padding:7px 13px; background:#fff; border:1.5px solid var(--border); border-radius:18px; font-size:13px; font-weight:600; color:var(--sage); cursor:pointer; user-select:none; }
+  .filter-pill.on { background:var(--dark); color:#fff; border-color:var(--dark); }
+  .stats { margin-left:auto; font-size:13px; color:var(--sage-mid); }
+
+  .group-hdr { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--sage-mid); margin:18px 4px 8px; }
+  .group-hdr .count { background:var(--sage); color:#fff; padding:1px 8px; border-radius:10px; font-size:11px; margin-left:6px; }
+
+  .row { background:#fff; border-radius:12px; padding:12px 14px; margin-bottom:8px; box-shadow:0 1px 3px rgba(0,0,0,0.05); display:grid; grid-template-columns:auto 1fr auto; gap:10px; align-items:start; cursor:pointer; transition:background .12s; }
+  .row:hover { background:#fafaf6; }
+  .row.expanded { background:#fafaf6; cursor:default; }
+  .row .badge { font-size:11px; font-weight:700; padding:3px 8px; border-radius:10px; white-space:nowrap; }
+  .badge.bug { background:var(--red-bg); color:var(--red); }
+  .badge.enh { background:var(--blue-bg); color:var(--blue); }
+  .badge.sev-Critical { background:var(--red); color:#fff; }
+  .badge.sev-High     { background:var(--amber); color:#fff; }
+  .badge.sev-Normal   { background:var(--green); color:#fff; }
+  .badge.sev-Low      { background:var(--blue); color:#fff; }
+
+  .row .title { font-size:14px; font-weight:700; color:var(--dark); line-height:1.3; }
+  .row .meta { font-size:12px; color:var(--sage-mid); margin-top:3px; display:flex; flex-wrap:wrap; gap:10px; }
+
+  .row-detail { grid-column:1/-1; padding:10px 4px 4px; border-top:1px dashed var(--border); margin-top:6px; }
+  .row-detail h4 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--sage); margin-bottom:4px; }
+  .row-detail p { font-size:13px; color:var(--dark); line-height:1.45; white-space:pre-wrap; margin-bottom:10px; }
+  .row-actions { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+  .row-actions select, .row-actions button {
+    padding:6px 10px; border:1.5px solid var(--border); border-radius:7px; background:#fff;
+    font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; color:var(--dark);
+  }
+  .row-actions button.primary { background:var(--dark); color:#fff; border-color:var(--dark); }
+  .row-actions textarea { padding:8px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:13px; resize:vertical; min-height:60px; flex:1 1 100%; }
+
+  .empty { text-align:center; color:var(--sage-mid); padding:50px 20px; }
+
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--dark); color:#fff; padding:10px 18px; border-radius:24px; font-size:13px; font-weight:600; opacity:0; transition:opacity .15s; pointer-events:none; z-index:200; }
+  .toast.show { opacity:1; }
+
+  .setup-card { background:var(--amber-bg); border:1.5px solid var(--amber); border-radius:14px; padding:16px 18px; margin-bottom:14px; }
+  .setup-card h3 { font-size:14px; color:var(--amber); margin-bottom:6px; }
+  .setup-card p { font-size:13px; color:var(--dark); margin-bottom:10px; }
+  .setup-btn { padding:9px 14px; background:var(--amber); color:#fff; border:0; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+
+  .loading { color:var(--sage-mid); font-size:13px; padding:30px; text-align:center; }
+  .hide { display:none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Feedback inbox</h1>
+    <div class="sub">Bugs and enhancement requests from the team</div>
+  </div>
+  <div class="hdr-actions">
+    <a href="report-feedback.html" class="hdr-btn">+ New feedback</a>
+    <button class="hdr-btn" onclick="exportMarkdown()">⬇ Export to OneDrive</button>
+    <a href="hub.html" class="hdr-btn">‹ Hub</a>
+  </div>
+</header>
+
+<script src="secrets.js"></script>
+<script src="feedback-schema.js"></script>
+
+<div class="container">
+  <div id="setupCard" class="setup-card hide">
+    <h3>Feedback board not set up yet</h3>
+    <p>The App Feedback board doesn't exist on Monday yet. Press once to create it (board name: <strong>Be Here — App Feedback</strong>).</p>
+    <button class="setup-btn" id="setupBtn" onclick="bootstrapBoard()">Create the feedback board</button>
+  </div>
+
+  <div class="toolbar" id="toolbar"></div>
+  <div id="content" class="loading">Loading…</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const TOKEN   = window.MONDAY_API_TOKEN;
+const URL_API = 'https://api.monday.com/v2';
+
+const STATUS_ORDER = ['New','In review','Planned','In progress','Done',"Won't fix"];
+const SEV_ORDER    = ['Critical','High','Normal','Low'];
+
+let _config = null;
+let _items  = [];
+let _filter = { kind: 'all', status: 'open' };  // 'all'/'Bug'/'Enhancement', 'open'/'all'/specific status
+let _expanded = new Set();   // ids currently expanded
+
+async function mq(query, variables) {
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization: TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  try {
+    _config = await window.FeedbackSchema.getFeedbackConfig(mq);
+    if (!_config) {
+      document.getElementById('setupCard').classList.remove('hide');
+      document.getElementById('content').innerHTML = '';
+      return;
+    }
+    await loadItems();
+    renderToolbar();
+    render();
+  } catch (e) {
+    document.getElementById('content').innerHTML = `<div class="empty">Error: ${e.message}</div>`;
+  }
+});
+
+async function bootstrapBoard() {
+  const btn = document.getElementById('setupBtn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    let cfg = await window.FeedbackSchema.findFeedbackBoard(mq);
+    if (!cfg) cfg = await window.FeedbackSchema.createFeedbackBoard(mq);
+    _config = cfg;
+    document.getElementById('setupCard').classList.add('hide');
+    await loadItems();
+    renderToolbar();
+    render();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Create the feedback board';
+    toast('Setup failed: ' + e.message);
+  }
+}
+
+async function loadItems() {
+  const cols = _config.columns;
+  const want = ['type','status','severity','page','reporter','description','steps','submitted','resolution']
+    .map(k => cols[k]).filter(Boolean);
+  const colsArg = want.map(c => `"${c}"`).join(',');
+  let items = [], cursor = null;
+  do {
+    const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+    const data = await mq(`{
+      boards(ids:[${_config.boardId}]) {
+        items_page(limit: 200${cursorPart}) {
+          cursor
+          items {
+            id name created_at updated_at
+            column_values(ids:[${colsArg}]) { id text value }
+          }
+        }
+      }
+    }`);
+    const page = data.boards[0].items_page;
+    items = items.concat(page.items);
+    cursor = page.cursor;
+  } while (cursor);
+
+  _items = items.map(it => {
+    const cv = {}; for (const c of it.column_values) cv[c.id] = c.text || '';
+    const get = (key) => (cols[key] ? cv[cols[key]] : '') || '';
+    return {
+      id:          it.id,
+      name:        it.name,
+      created_at:  it.created_at,
+      updated_at:  it.updated_at,
+      type:        get('type'),
+      status:      get('status'),
+      severity:    get('severity'),
+      page:        get('page'),
+      reporter:    get('reporter'),
+      description: get('description'),
+      steps:       get('steps'),
+      submitted:   get('submitted'),
+      resolution:  get('resolution'),
+    };
+  });
+}
+
+function renderToolbar() {
+  const tb = document.getElementById('toolbar');
+  const pill = (key, val, label, cur) =>
+    `<span class="filter-pill ${cur===val?'on':''}" onclick="setFilter('${key}','${val}')">${label}</span>`;
+  const k = _filter.kind, s = _filter.status;
+  tb.innerHTML =
+    pill('kind','all','All', k) +
+    pill('kind','Bug','🐞 Bugs', k) +
+    pill('kind','Enhancement','✨ Enhancements', k) +
+    '<span style="width:14px"></span>' +
+    pill('status','open','Open', s) +
+    pill('status','all','All statuses', s) +
+    STATUS_ORDER.map(st => pill('status', st, st, s)).join('') +
+    `<span class="stats" id="stats"></span>`;
+}
+
+function setFilter(key, val) {
+  _filter[key] = val;
+  render();
+}
+
+function isOpen(item) {
+  const st = (item.status || 'New').trim();
+  return st !== 'Done' && st !== "Won't fix";
+}
+
+function visibleItems() {
+  return _items.filter(i => {
+    if (_filter.kind !== 'all' && i.type !== _filter.kind) return false;
+    if (_filter.status === 'open') return isOpen(i);
+    if (_filter.status === 'all') return true;
+    return (i.status || 'New') === _filter.status;
+  });
+}
+
+function render() {
+  const vis = visibleItems();
+  document.getElementById('stats').textContent = `${vis.length} of ${_items.length}`;
+  const c = document.getElementById('content');
+  if (!vis.length) {
+    c.innerHTML = `<div class="empty">No feedback matches this filter.</div>`;
+    return;
+  }
+  // Group by status, in priority order.
+  const groups = {};
+  for (const i of vis) {
+    const k = i.status || 'New';
+    (groups[k] = groups[k] || []).push(i);
+  }
+  // Within each group, sort by severity (Critical first), then submitted desc.
+  const sevRank = { Critical:0, High:1, Normal:2, Low:3 };
+  for (const k of Object.keys(groups)) {
+    groups[k].sort((a,b) =>
+      (sevRank[a.severity] ?? 99) - (sevRank[b.severity] ?? 99)
+      || (b.submitted || b.created_at).localeCompare(a.submitted || a.created_at));
+  }
+  // Render in STATUS_ORDER, then any unknown statuses appended.
+  const seen = new Set();
+  const order = STATUS_ORDER.filter(s => groups[s]).concat(Object.keys(groups).filter(s => !STATUS_ORDER.includes(s)));
+  c.innerHTML = order.map(st => {
+    seen.add(st);
+    const group = groups[st];
+    return `<div>
+      <div class="group-hdr">${st} <span class="count">${group.length}</span></div>
+      ${group.map(renderRow).join('')}
+    </div>`;
+  }).join('');
+}
+
+function renderRow(i) {
+  const isExp = _expanded.has(i.id);
+  const typeBadge = i.type
+    ? `<span class="badge ${i.type==='Bug'?'bug':'enh'}">${i.type==='Bug'?'🐞 Bug':'✨ Enh'}</span>`
+    : '';
+  const sevBadge = i.severity
+    ? `<span class="badge sev-${i.severity}">${i.severity}</span>`
+    : '';
+  const meta = [];
+  if (i.reporter)  meta.push(`👤 ${escapeHtml(i.reporter)}`);
+  if (i.page)      meta.push(`📄 ${escapeHtml(i.page)}`);
+  if (i.submitted) meta.push(`📅 ${i.submitted}`);
+  else if (i.created_at) meta.push(`📅 ${(i.created_at || '').slice(0,10)}`);
+
+  // Strip the leading emoji from the title (item name carries 🐞/✨).
+  const title = (i.name || '').replace(/^([\p{Emoji_Presentation}\p{Extended_Pictographic}]\s*)/u, '').trim() || '(no title)';
+
+  return `<div class="row ${isExp?'expanded':''}" onclick="toggleRow('${i.id}', event)">
+    <div>${typeBadge}<br>${sevBadge}</div>
+    <div>
+      <div class="title">${escapeHtml(title)}</div>
+      <div class="meta">${meta.join(' · ')}</div>
+    </div>
+    <div style="font-size:11px;color:var(--sage-mid);align-self:center">${isExp?'▴ collapse':'▾'}</div>
+    ${isExp ? renderDetail(i) : ''}
+  </div>`;
+}
+
+function renderDetail(i) {
+  const desc = (i.description || '').trim() || '— (no description)';
+  const stepsBlock = (i.steps || '').trim()
+    ? `<h4>Steps to reproduce</h4><p>${escapeHtml(i.steps)}</p>`
+    : '';
+  const resBlock = (i.resolution || '').trim()
+    ? `<h4>Notes / resolution</h4><p>${escapeHtml(i.resolution)}</p>`
+    : '';
+  return `<div class="row-detail" onclick="event.stopPropagation()">
+    <h4>Description</h4>
+    <p>${escapeHtml(desc)}</p>
+    ${stepsBlock}
+    ${resBlock}
+    <div class="row-actions">
+      <select onchange="updateField('${i.id}','status', this.value, this)">
+        ${STATUS_ORDER.map(s => `<option ${s===i.status?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <select onchange="updateField('${i.id}','severity', this.value, this)">
+        ${SEV_ORDER.map(s => `<option ${s===i.severity?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <textarea id="note-${i.id}" placeholder="Add a note (saved to Notes / resolution)…"></textarea>
+      <button class="primary" onclick="saveNote('${i.id}', this)">Save note</button>
+    </div>
+  </div>`;
+}
+
+function toggleRow(id, ev) {
+  // Don't toggle when clicking inside the detail block.
+  if (ev?.target && ev.target.closest && ev.target.closest('.row-detail')) return;
+  if (_expanded.has(id)) _expanded.delete(id); else _expanded.add(id);
+  render();
+}
+
+async function updateField(itemId, key, value, selectEl) {
+  const colId = _config.columns[key];
+  if (!colId) { toast('Column not found: ' + key); return; }
+  const item = _items.find(x => x.id === itemId);
+  if (!item) return;
+  const prev = item[key];
+  item[key] = value;
+  selectEl.disabled = true;
+  try {
+    await mq(
+      `mutation($b:ID!,$i:ID!,$c:String!,$v:JSON!){ change_simple_column_value(board_id:$b, item_id:$i, column_id:$c, value:$v){ id } }`,
+      { b: _config.boardId, i: itemId, c: colId, v: value }
+    );
+    toast('Updated');
+  } catch (e) {
+    item[key] = prev;
+    toast('Update failed: ' + e.message);
+  } finally {
+    selectEl.disabled = false;
+  }
+  render();
+}
+
+async function saveNote(itemId, btn) {
+  const ta = document.getElementById('note-' + itemId);
+  const note = (ta?.value || '').trim();
+  if (!note) { toast('Type a note first'); return; }
+  const item = _items.find(x => x.id === itemId);
+  if (!item) return;
+  const stamp = new Date().toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+  const newRes = (item.resolution ? item.resolution + '\n\n' : '') + `[${stamp}] ${note}`;
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const colId = _config.columns.resolution;
+    await mq(
+      `mutation($b:ID!,$i:ID!,$c:String!,$v:JSON!){ change_column_value(board_id:$b, item_id:$i, column_id:$c, value:$v){ id } }`,
+      { b: _config.boardId, i: itemId, c: colId, v: JSON.stringify(newRes) }
+    );
+    item.resolution = newRes;
+    if (ta) ta.value = '';
+    toast('Note saved');
+  } catch (e) {
+    toast('Save failed: ' + e.message);
+  } finally {
+    btn.disabled = false; btn.textContent = 'Save note';
+  }
+  render();
+}
+
+/* Export the current visible feedback list as a Markdown file the user can
+   save into the OneDrive HTML Files folder. This is how Claude reads the
+   inbox in future sessions — point Claude at feedback-snapshot.md and it
+   has the full context to reason about the bugs and enhancements. */
+function exportMarkdown() {
+  const vis = visibleItems();
+  const today = new Date().toISOString().slice(0,10);
+  const lines = [];
+  lines.push(`# Be Here — App Feedback snapshot`);
+  lines.push(`Exported ${today} · ${vis.length} of ${_items.length} items shown`);
+  lines.push(`Filters: kind=${_filter.kind} status=${_filter.status}`);
+  lines.push('');
+
+  const groups = {};
+  for (const i of vis) (groups[i.status || 'New'] = groups[i.status || 'New'] || []).push(i);
+  const order = STATUS_ORDER.filter(s => groups[s]).concat(Object.keys(groups).filter(s => !STATUS_ORDER.includes(s)));
+
+  for (const st of order) {
+    lines.push(`## ${st} (${groups[st].length})`);
+    lines.push('');
+    for (const i of groups[st]) {
+      const icon = i.type === 'Bug' ? '🐞' : i.type === 'Enhancement' ? '✨' : '·';
+      const title = (i.name || '').replace(/^([\p{Emoji_Presentation}\p{Extended_Pictographic}]\s*)/u, '').trim();
+      lines.push(`### ${icon} ${i.severity ? '['+i.severity+'] ' : ''}${title}  \`#${i.id}\``);
+      const meta = [];
+      if (i.type)      meta.push('**Type:** ' + i.type);
+      if (i.reporter)  meta.push('**Reporter:** ' + i.reporter);
+      if (i.page)      meta.push('**Page:** ' + i.page);
+      if (i.submitted) meta.push('**Submitted:** ' + i.submitted);
+      lines.push(meta.join(' · '));
+      lines.push('');
+      if (i.description) { lines.push('**Description:**'); lines.push(i.description); lines.push(''); }
+      if (i.steps)       { lines.push('**Steps to reproduce:**'); lines.push(i.steps); lines.push(''); }
+      if (i.resolution)  { lines.push('**Notes / resolution:**'); lines.push(i.resolution); lines.push(''); }
+      lines.push('---');
+      lines.push('');
+    }
+  }
+
+  const blob = new Blob([lines.join('\n')], { type: 'text/markdown;charset=utf-8' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `feedback-snapshot-${today}.md`;
+  document.body.appendChild(a);
+  a.click();
+  setTimeout(() => { URL.revokeObjectURL(url); a.remove(); }, 500);
+  toast('Snapshot downloaded — save it in the HTML Files folder so Claude can read it next session.');
+}
+
+function escapeHtml(s) { return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+</script>
+</body>
+</html>

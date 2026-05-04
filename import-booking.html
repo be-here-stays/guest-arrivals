@@ -93,15 +93,37 @@
   </div>
 </section>
 
-<!-- ── 2. Lookup ──────────────────────────────────────────────────────── -->
+<!-- ── 2. Find booking ─────────────────────────────────────────────────── -->
 <section>
-  <h2>2. Lookup booking</h2>
+  <h2>2. Find the booking</h2>
+  <div class="auth-tabs">
+    <span class="auth-tab active" id="tabBrowse" onclick="setLookupMode('browse')">Browse Guesty (recommended)</span>
+    <span class="auth-tab" id="tabId" onclick="setLookupMode('id')">Look up by ID</span>
+  </div>
 
-  <label>Booking reference</label>
-  <input type="text" id="bookingRef" placeholder="e.g. CWPR-2026-4821 or a Guesty internal id">
-  <div class="hint">The page tries the Guesty internal id endpoint first if the value looks like a 24-char hex; otherwise it searches by confirmation code / source booking number.</div>
+  <div id="lookupBrowse">
+    <div class="row">
+      <div>
+        <label>From (check-in)</label>
+        <input type="date" id="browseFrom">
+      </div>
+      <div>
+        <label>To (check-in)</label>
+        <input type="date" id="browseTo">
+      </div>
+    </div>
+    <label>Property filter <span style="font-weight:400;text-transform:none;color:#989782">(optional — narrows the list)</span></label>
+    <input type="text" id="browseProperty" placeholder="e.g. Aintree">
+    <button id="browseBtn" onclick="browseReservations()">Browse Guesty reservations</button>
+    <div class="hint">Lists every reservation in Guesty whose check-in falls in the date window. Click a row to import it.</div>
+  </div>
 
-  <button id="fetchBtn" onclick="lookupBooking()">Fetch from Guesty</button>
+  <div id="lookupId" style="display:none">
+    <label>Booking reference</label>
+    <input type="text" id="bookingRef" placeholder="Guesty internal _id (24-char hex), confirmationCode, or source booking number">
+    <div class="hint">Tries <code>/reservations/{id}</code> if it looks like a Guesty _id, otherwise filters by <code>confirmationCode</code> then <code>source.confirmationCode</code> then <code>source.bookingNumber</code>.</div>
+    <button id="fetchBtn" onclick="lookupBooking()">Fetch from Guesty</button>
+  </div>
 
   <div id="lookupOut"></div>
 </section>
@@ -162,6 +184,12 @@
 
   <div id="commitLog" style="margin-top:14px"></div>
 </section>
+
+<!-- Cloudflare proxy redirect — without this, fetch('https://open-api.guesty.com/...')
+     goes direct to Guesty (which has no CORS for null origins) and is blocked
+     by the browser. With secrets.js loaded, those calls are rewritten to the
+     proxy, which holds the OAuth credentials server-side. -->
+<script src="secrets.js"></script>
 
 <script>
 const URL_API           = 'https://api.monday.com/v2';
@@ -266,17 +294,149 @@ async function guesty(path) {
     const t = await getGuestyToken();
     headers['Authorization'] = 'Bearer ' + t;
   }
-  // In proxy mode we still need to authenticate — but the proxy supplies its
-  // own. We just need any value so the request looks well-formed.
   const r = await fetch(url, { headers });
   if (!r.ok) {
     const txt = await r.text();
+    // Stash the raw response so the UI can show it in the diagnostic panel.
+    _lastGuestyError = { status: r.status, statusText: r.statusText, body: txt, url };
     if (r.status === 403 && _authMode === 'proxy') {
       throw new Error('Cloudflare proxy refused (Origin not allowlisted). Switch to "Direct credentials" or "Pre-fetched token" tab.');
     }
+    if (r.status === 401) throw new Error('Guesty 401 — token rejected. If using credentials, double-check client_id / client_secret.');
     throw new Error('Guesty HTTP ' + r.status + ': ' + txt.slice(0, 240));
   }
   return r.json();
+}
+
+// Diagnostic state — last error from a Guesty call; surfaced when a lookup
+// returns nothing so we can see *why* (vs the generic "no reservation found").
+let _lastGuestyError = null;
+
+function setLookupMode(m) {
+  document.getElementById('tabBrowse').classList.toggle('active', m === 'browse');
+  document.getElementById('tabId').classList.toggle('active', m === 'id');
+  document.getElementById('lookupBrowse').style.display = m === 'browse' ? '' : 'none';
+  document.getElementById('lookupId').style.display = m === 'id' ? '' : 'none';
+}
+
+// Set sensible default browse window: today → +30 days. Catches almost all
+// last-minute bookings in one go.
+(function setDefaultBrowseWindow() {
+  const today = new Date();
+  const end   = new Date(today); end.setDate(end.getDate() + 30);
+  const fmt = d => d.toISOString().slice(0,10);
+  document.addEventListener('DOMContentLoaded', () => {
+    const f = document.getElementById('browseFrom');
+    const t = document.getElementById('browseTo');
+    if (f && !f.value) f.value = fmt(today);
+    if (t && !t.value) t.value = fmt(end);
+  });
+})();
+
+async function browseReservations() {
+  const out  = document.getElementById('lookupOut');
+  const btn  = document.getElementById('browseBtn');
+  const from = document.getElementById('browseFrom').value;
+  const to   = document.getElementById('browseTo').value;
+  const propFilter = (document.getElementById('browseProperty').value || '').trim().toLowerCase();
+  if (!from || !to) { out.innerHTML = '<p class="reason">Set both dates.</p>'; return; }
+
+  btn.disabled = true; btn.textContent = 'Loading…';
+  out.innerHTML = '<p class="muted">Fetching Guesty reservations from ' + from + ' to ' + to + '…</p>';
+  _lastGuestyError = null;
+
+  try {
+    // Guesty Open API: query operator syntax is `field[$operator]=value`.
+    // `fields=` whitelists what we get back to keep the response light.
+    // Pull both confirmed and inquiry-pending reservations because last-minute
+    // direct bookings can sit in 'reserved' rather than 'confirmed' briefly.
+    const fields = 'listing checkIn checkOut guest confirmationCode source numberOfPets guestsCount status';
+    const url = `/v1/reservations?checkIn[$gte]=${encodeURIComponent(from)}&checkIn[$lte]=${encodeURIComponent(to)}&limit=100&fields=${encodeURIComponent(fields)}`;
+    const j = await guesty(url);
+    const all = j?.results || [];
+
+    // Filter by property if specified.
+    let rows = all.map(parseReservation);
+    if (propFilter) rows = rows.filter(r => (r.propName || '').toLowerCase().includes(propFilter));
+
+    if (!rows.length) {
+      out.innerHTML = '<p class="reason">No reservations in Guesty for ' + from + ' → ' + to + (propFilter ? ' matching property "' + escapeHtml(propFilter) + '"' : '') + '.</p>'
+                    + '<p class="muted">Found ' + all.length + ' total in window before filtering.</p>'
+                    + lastGuestyDiag();
+      return;
+    }
+
+    rows.sort((a,b) => (a.checkIn||'').localeCompare(b.checkIn||'') || a.propName.localeCompare(b.propName));
+    out.innerHTML = '<p class="ok">Found ' + rows.length + ' reservation(s)' + (propFilter ? ' (filtered)' : '') + '. Click one to import.</p>'
+      + '<table style="width:100%; border-collapse:collapse; font-size:13px"><thead><tr>'
+      + '<th style="text-align:left;padding:6px;border-bottom:2px solid #e0ddd6">Property</th>'
+      + '<th style="text-align:left;padding:6px;border-bottom:2px solid #e0ddd6">Check-in</th>'
+      + '<th style="text-align:left;padding:6px;border-bottom:2px solid #e0ddd6">Check-out</th>'
+      + '<th style="text-align:left;padding:6px;border-bottom:2px solid #e0ddd6">Guest</th>'
+      + '<th style="text-align:left;padding:6px;border-bottom:2px solid #e0ddd6">Conf code</th>'
+      + '<th style="text-align:left;padding:6px;border-bottom:2px solid #e0ddd6">Status</th>'
+      + '<th style="text-align:left;padding:6px;border-bottom:2px solid #e0ddd6"></th>'
+      + '</tr></thead><tbody>'
+      + rows.map((r, i) => {
+          // Stash each parsed reservation on the window so the click handler
+          // can pick it up by index without re-fetching.
+          window._browseRows = rows;
+          return `<tr style="border-bottom:1px solid #ece9df">
+            <td style="padding:6px"><strong>${escapeHtml(r.propName || '—')}</strong></td>
+            <td style="padding:6px"><code>${r.checkIn}</code></td>
+            <td style="padding:6px"><code>${r.checkOut}</code></td>
+            <td style="padding:6px">${escapeHtml(r.guestName || '')}</td>
+            <td style="padding:6px"><code>${escapeHtml(r.bookRef || '')}</code></td>
+            <td style="padding:6px">${escapeHtml(r.raw?.status || '')}</td>
+            <td style="padding:6px;text-align:right"><button onclick="pickBrowseRow(${i})" style="margin:0;padding:5px 12px;font-size:12px">Import →</button></td>
+          </tr>`;
+        }).join('')
+      + '</tbody></table>';
+  } catch (e) {
+    out.innerHTML = '<p class="reason">Browse failed: ' + escapeHtml(e.message) + '</p>' + lastGuestyDiag();
+  } finally {
+    btn.disabled = false; btn.textContent = 'Browse Guesty reservations';
+  }
+}
+
+function pickBrowseRow(i) {
+  const r = (window._browseRows || [])[i];
+  if (!r) return;
+  _booking = r;
+  loadPropertyOptions().then(() => {
+    populatePreview();
+    document.getElementById('previewSection').style.display = '';
+    document.getElementById('previewSection').scrollIntoView({ behavior:'smooth', block:'start' });
+  });
+}
+
+function lastGuestyDiag() {
+  if (!_lastGuestyError) return '';
+  return '<details style="margin-top:10px"><summary style="cursor:pointer;font-size:12px;color:#646955">Show last Guesty response</summary>'
+    + '<pre>' + escapeHtml(JSON.stringify(_lastGuestyError, null, 2)) + '</pre></details>';
+}
+
+// Shared parser used by both browse + ID lookup so the preview gets the same
+// fields regardless of how the reservation arrived.
+function parseReservation(res) {
+  const guest    = res.guest || {};
+  const listing  = res.listing || {};
+  const checkIn  = (res.checkInDateLocalized  || res.checkIn  || '').slice(0, 10);
+  const checkOut = (res.checkOutDateLocalized || res.checkOut || '').slice(0, 10);
+  const numAdults   = Number(res.guestsCount?.adults  ?? res.numAdults    ?? res.adults   ?? 0) || 0;
+  const numChildren = Number(res.guestsCount?.children ?? res.numChildren ?? res.children ?? 0) || 0;
+  const numPets     = Number(res.numberOfPets ?? res.pets ?? 0) || 0;
+  const guestName   = guest.fullName || [guest.firstName, guest.lastName].filter(Boolean).join(' ') || '';
+  const guestEmail  = guest.email    || '';
+  const propName    = listing.nickname || listing.title || '';
+  const bookRef     = res.confirmationCode || res.source?.confirmationCode || res.source?.bookingNumber || '';
+  return {
+    raw: res,
+    guesty_id: res._id || res.id || '',
+    bookRef, propName, guestName, guestEmail,
+    checkIn, checkOut,
+    numAdults, numChildren, numPets,
+  };
 }
 
 // ── Lookup flow ──────────────────────────────────────────────────────
@@ -287,82 +447,100 @@ async function lookupBooking() {
   if (!ref) { out.innerHTML = '<p class="reason">Enter a booking reference.</p>'; return; }
   btn.disabled = true; btn.textContent = 'Fetching…';
   out.innerHTML = '<p class="muted">Looking up <code>' + escapeHtml(ref) + '</code>…</p>';
+  _lastGuestyError = null;
+
+  // Tracked for the diagnostic panel — every URL we tried + its outcome.
+  const tried = [];
+
+  async function tryUrl(url, label) {
+    try {
+      const j = await guesty(url);
+      tried.push({ label, url, ok: true, count: (j.results?.length ?? (j._id ? 1 : 0)) });
+      return j;
+    } catch (e) {
+      tried.push({ label, url, ok: false, error: e.message });
+      return null;
+    }
+  }
 
   try {
     let res = null;
 
-    // 1. If it looks like a Guesty internal _id (24-char hex), hit /reservations/{id} directly.
+    // 1. Guesty internal _id direct hit.
     if (/^[a-f0-9]{24}$/i.test(ref)) {
-      try { res = await guesty('/v1/reservations/' + ref); } catch (_) {}
+      const j = await tryUrl('/v1/reservations/' + ref, 'GET /reservations/{id}');
+      if (j && (j._id || j.id)) res = j;
     }
 
-    // 2. Otherwise (or as fallback) search by confirmation code / source code / generic q.
+    // 2. confirmationCode / source.confirmationCode / source.bookingNumber
+    //    using the operator syntax Guesty actually accepts.
     if (!res) {
-      const fields = ['confirmationCode','source.confirmationCode','source.bookingNumber'];
-      for (const f of fields) {
-        try {
-          const j = await guesty('/v1/reservations?' + f + '=' + encodeURIComponent(ref) + '&limit=1');
-          if (j?.results?.length) { res = j.results[0]; break; }
-        } catch (e) { console.warn(f + ' lookup failed', e); }
+      const fields = [
+        ['confirmationCode',         'confirmationCode'],
+        ['source.confirmationCode',  'source.confirmationCode'],
+        ['source.bookingNumber',     'source.bookingNumber'],
+      ];
+      for (const [field, label] of fields) {
+        const url = '/v1/reservations?' + encodeURIComponent(field) + '%5B%24eq%5D=' + encodeURIComponent(ref) + '&limit=5';
+        const j = await tryUrl(url, field + '[$eq]');
+        if (j?.results?.length) { res = j.results[0]; break; }
       }
     }
-    // 3. Last try — generic q search.
+
+    // 3. Generic q search as a last resort.
     if (!res) {
-      try {
-        const j = await guesty('/v1/reservations?q=' + encodeURIComponent(ref) + '&limit=5');
-        if (j?.results?.length) {
-          if (j.results.length > 1) {
-            out.innerHTML = '<p class="reason">Multiple matches for that reference — be more specific. Found ' + j.results.length + ' reservations.</p>';
-            btn.disabled = false; btn.textContent = 'Fetch from Guesty';
-            return;
-          }
-          res = j.results[0];
+      const j = await tryUrl('/v1/reservations?q=' + encodeURIComponent(ref) + '&limit=5', 'q= search');
+      if (j?.results?.length) {
+        if (j.results.length > 1) {
+          out.innerHTML = '<p class="reason">Multiple matches for that reference — be more specific. Found ' + j.results.length + ' reservations.</p>'
+                        + '<p class="muted">Or use Browse mode and pick from the list.</p>'
+                        + lookupDiag(tried);
+          btn.disabled = false; btn.textContent = 'Fetch from Guesty';
+          return;
         }
-      } catch (_) {}
+        res = j.results[0];
+      }
     }
 
     if (!res) {
-      out.innerHTML = '<p class="reason">No reservation found in Guesty for <code>' + escapeHtml(ref) + '</code>.</p><p class="muted">Things to check: typo in the reference, the booking is on a different Guesty account, or the booking was created within the last few minutes (Guesty open-api can lag a moment).</p>';
-      btn.disabled = false; btn.textContent = 'Fetch from Guesty';
+      out.innerHTML = '<p class="reason">No reservation found in Guesty for <code>' + escapeHtml(ref) + '</code>.</p>'
+                    + '<p class="muted">Try Browse mode (recommended) — list all bookings in a date window and pick the right one. Or check the reference against what Guesty calls it (Guest Inbox → reservation → "Confirmation code").</p>'
+                    + lookupDiag(tried);
       return;
     }
 
-    // Parse the relevant fields.
-    const guest    = res.guest || {};
-    const listing  = res.listing || {};
-    const checkIn  = (res.checkInDateLocalized  || res.checkIn  || '').slice(0, 10);
-    const checkOut = (res.checkOutDateLocalized || res.checkOut || '').slice(0, 10);
-    const numAdults   = Number(res.guestsCount?.adults  ?? res.numAdults    ?? res.adults   ?? 0) || 0;
-    const numChildren = Number(res.guestsCount?.children ?? res.numChildren ?? res.children ?? 0) || 0;
-    const numPets     = Number(res.numberOfPets ?? res.pets ?? 0) || 0;
-    const guestName   = guest.fullName || [guest.firstName, guest.lastName].filter(Boolean).join(' ') || '';
-    const guestEmail  = guest.email    || '';
-    const propName    = listing.nickname || listing.title || '';
-    const bookRef     = res.confirmationCode || res.source?.confirmationCode || res.source?.bookingNumber || ref;
-
-    _booking = {
-      raw: res,
-      guesty_id: res._id || res.id || '',
-      bookRef, propName, guestName, guestEmail,
-      checkIn, checkOut,
-      numAdults, numChildren, numPets,
-    };
-
+    _booking = parseReservation(res);
     out.innerHTML = '<p class="ok">✓ Found reservation</p><pre>' + escapeHtml(JSON.stringify({
       guesty_id: _booking.guesty_id,
-      bookRef, propName, guestName, guestEmail,
-      checkIn, checkOut, numAdults, numChildren, numPets,
-    }, null, 2)) + '</pre>';
+      bookRef: _booking.bookRef, propName: _booking.propName,
+      guestName: _booking.guestName, guestEmail: _booking.guestEmail,
+      checkIn: _booking.checkIn, checkOut: _booking.checkOut,
+      numAdults: _booking.numAdults, numChildren: _booking.numChildren, numPets: _booking.numPets,
+    }, null, 2)) + '</pre>' + lookupDiag(tried);
 
     await loadPropertyOptions();
     populatePreview();
     document.getElementById('previewSection').style.display = '';
     document.getElementById('previewSection').scrollIntoView({ behavior:'smooth', block:'start' });
   } catch (e) {
-    out.innerHTML = '<p class="reason">Lookup failed:</p><pre>' + escapeHtml(e.message) + '</pre>';
+    out.innerHTML = '<p class="reason">Lookup failed:</p><pre>' + escapeHtml(e.message) + '</pre>' + lookupDiag(tried);
   } finally {
     btn.disabled = false; btn.textContent = 'Fetch from Guesty';
   }
+}
+
+function lookupDiag(tried) {
+  if (!tried.length) return '';
+  const rows = tried.map(t =>
+    `<tr><td style="padding:3px 8px;font-size:11px"><code>${escapeHtml(t.label)}</code></td>` +
+    `<td style="padding:3px 8px;font-size:11px">${t.ok
+      ? `<span class="ok">${t.count} hit${t.count===1?'':'s'}</span>`
+      : `<span class="reason">${escapeHtml(t.error)}</span>`}</td></tr>`
+  ).join('');
+  return '<details style="margin-top:8px"><summary style="cursor:pointer;font-size:12px;color:#646955">Show what was tried</summary>'
+    + '<table style="margin-top:6px"><tbody>' + rows + '</tbody></table>'
+    + lastGuestyDiag()
+    + '</details>';
 }
 
 async function loadPropertyOptions() {

@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Cleans rota diagnostic — Be Here</title>
+<style>
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; background:#D5D0C4; color:#272F2E; margin:0; padding:24px; line-height:1.45; }
+  h1 { font-size:22px; margin:0 0 6px; }
+  .sub { color:#646955; font-size:13px; margin-bottom:18px; }
+  .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:18px; }
+  input[type=date], input[type=text], input[type=password] { padding:8px 10px; border:1.5px solid #c9c4b3; border-radius:8px; font-family:inherit; font-size:14px; min-width:160px; background:#fff; }
+  button { padding:9px 16px; background:#272F2E; color:#F3E3C3; border:none; border-radius:8px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+  button:disabled { opacity:0.5; cursor:not-allowed; }
+  section { background:#fff; border-radius:12px; padding:18px 20px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+  section h2 { font-size:15px; margin:0 0 10px; color:#272F2E; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:14px; font-size:11px; font-weight:700; margin-left:6px; }
+  .pill.ok { background:#edf7f2; color:#1e5c3a; }
+  .pill.warn { background:#fdf5e8; color:#a86c00; }
+  .pill.bad { background:#fdf0ec; color:#8B2020; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:6px 8px; border-bottom:1px solid #ece9df; vertical-align:top; }
+  th { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#646955; font-weight:700; }
+  code { background:#f1eee5; padding:1px 5px; border-radius:4px; font-size:12px; }
+  .reason { color:#8B2020; font-weight:600; font-size:13px; }
+  .ok { color:#2d6a4f; font-weight:600; }
+  pre { background:#f7f5ee; padding:10px; border-radius:8px; font-size:12px; overflow:auto; white-space:pre-wrap; }
+  .muted { color:#989782; font-size:12px; }
+  .grid3 { display:grid; grid-template-columns:repeat(auto-fit, minmax(280px,1fr)); gap:14px; }
+</style>
+</head>
+<body>
+
+<h1>Cleans rota diagnostic</h1>
+<div class="sub">Check the Cleans board <code>5095134636</code> for housekeeping rota rows. Use this when properties are missing from <code>rota-planner.html</code> on a given day.</div>
+
+<section style="margin-bottom:14px; background:#fdf5e8; border:1px solid #e2c06a">
+  <h2 style="color:#7a5c35">One-time setup — paste your Monday API token</h2>
+  <p class="muted" style="margin-bottom:10px">This file is opened from OneDrive (<code>file://</code>), so the Cloudflare proxy refuses it. Paste a Monday personal token below — it stays in memory only, never saved. Get it from monday.com → click your avatar (top-right) → <strong>Developers</strong> → <strong>My access tokens</strong>.</p>
+  <input type="password" id="tokenInp" placeholder="Paste Monday API token" style="width:100%;max-width:520px" autocomplete="off">
+</section>
+
+<div class="controls">
+  <label>Clean date <input type="date" id="dateInp"></label>
+  <label>Properties (comma-separated) <input type="text" id="propsInp" value="Aintree, Kingfisher" style="min-width:340px"></label>
+  <button id="goBtn" onclick="run()">Run check</button>
+</div>
+
+<div id="out"></div>
+
+<script>
+const CLEANS_BOARD       = '5095134636';
+const LODGE_STATUS_BOARD = '1928673949';   // booking source; tells us if a booking exists
+const PROP_CONFIG_BOARD  = '5094466278';   // canonical property list
+
+// Column ids reused from rota-planner.html so we read the same columns the
+// real planner reads.
+const COL = {
+  date:        'date_mm2pphc',     // current scheduled clean day (movable)
+  checkin:     'date_mm2p6tck',    // immovable check-in anchor
+  checkout:    'date_mm2pb8rs',    // current booking's check-out
+  prop:        'board_relation_mm2psy0b',
+  start:       'hour_mm2pskhh',
+  hrs:         'numeric_mm2pmqdt',
+  primary:     'dropdown_mm2pntvm',
+  partner:     'dropdown_mm2pbcnq',
+  status:      'color_mm2prq2f',
+  notes:       'long_text_mm2pedn3',
+};
+// Lodge status board columns. Match the ids in rota-planner.html exactly —
+// the previous values here were swapped (currIn was actually currOut), which
+// also caused the whole query to fail when the API rejected an unknown id.
+const LS = {
+  currIn:  'date4',
+  currOut: 'date_mkqaea46',
+  nextIn:  'date_mkqwfyfx',
+  nextOut: 'date_mkqw4cf6',
+};
+
+(function setDefaultDate() {
+  const t = new Date(); t.setDate(t.getDate() + 2);
+  document.getElementById('dateInp').value = t.toISOString().slice(0,10);
+})();
+
+function p(v) { try { return v ? JSON.parse(v) : null; } catch { return null; } }
+function norm(s) { return (s || '').toLowerCase().replace(/[\s'’.,/-]+/g, ' ').trim(); }
+
+async function mq(query) {
+  const token = (document.getElementById('tokenInp').value || '').trim();
+  if (!token) throw new Error('Paste your Monday API token in the box at the top of the page first.');
+  const r = await fetch('https://api.monday.com/v2', {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', 'Authorization':token, 'API-Version':'2024-01' },
+    body: JSON.stringify({ query })
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  if (!j.data) throw new Error('Empty response from Monday — token may be invalid.');
+  return j.data;
+}
+
+async function run() {
+  const out = document.getElementById('out');
+  const goBtn = document.getElementById('goBtn');
+  goBtn.disabled = true; goBtn.textContent = 'Working…';
+  out.innerHTML = '<section><div>Loading…</div></section>';
+
+  const dateStr = document.getElementById('dateInp').value;
+  const wanted  = document.getElementById('propsInp').value
+    .split(',').map(s => s.trim()).filter(Boolean);
+
+  try {
+    // 1. Pull the entire Cleans board (paginated).
+    const colsList = Object.values(COL).map(c => `"${c}"`).join(',');
+    let items = [], cursor = null;
+    do {
+      const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+      const data = await mq(`{ boards(ids:[${CLEANS_BOARD}]) { items_page(limit:500${cursorPart}) { cursor items { id name created_at column_values(ids:[${colsList}]) { id text value } } } } }`);
+      const page = data.boards[0].items_page;
+      items = items.concat(page.items);
+      cursor = page.cursor;
+    } while (cursor);
+
+    // 2. Pull the lodge status board so we can confirm which properties have
+    //    bookings around this date — useful when a row is missing entirely.
+    const lodgeData = await mq(`{ boards(ids:[${LODGE_STATUS_BOARD}]) { items_page(limit:200) { items { id name column_values(ids:["${LS.currIn}","${LS.currOut}","${LS.nextIn}","${LS.nextOut}"]) { id text value } } } } }`);
+    const lodgeRows = (lodgeData?.boards?.[0]?.items_page?.items || []).map(it => {
+      const cv = {}; for (const c of it.column_values) cv[c.id] = c;
+      return {
+        name: it.name,
+        currIn:  p(cv[LS.currIn]?.value)?.date  || cv[LS.currIn]?.text  || '',
+        currOut: p(cv[LS.currOut]?.value)?.date || cv[LS.currOut]?.text || '',
+        nextIn:  p(cv[LS.nextIn]?.value)?.date  || cv[LS.nextIn]?.text  || '',
+        nextOut: p(cv[LS.nextOut]?.value)?.date || cv[LS.nextOut]?.text || '',
+      };
+    });
+    const lodgeNorm = new Set(lodgeRows.map(r => norm(r.name)));
+
+    // 3. Parse Cleans rows.
+    const rows = items.map(it => {
+      const cv = {};
+      for (const c of it.column_values) cv[c.id] = c;
+      // Property: prefer the linked board_relation text; fall back to the item
+      // name parser (matches rota-planner's parsePropertyFromItemName logic).
+      const propText = cv[COL.prop]?.text || '';
+      const property = propText || parsePropertyFromItemName(it.name);
+      const cleanDate    = p(cv[COL.date]?.value)?.date    || cv[COL.date]?.text    || '';
+      const checkinDate  = p(cv[COL.checkin]?.value)?.date || cv[COL.checkin]?.text || '';
+      const checkoutDate = p(cv[COL.checkout]?.value)?.date|| cv[COL.checkout]?.text|| '';
+      return {
+        id: it.id,
+        name: it.name,
+        created_at: it.created_at,
+        property, propText,
+        cleanDate, checkinDate, checkoutDate,
+        primary: cv[COL.primary]?.text || '',
+        partner: cv[COL.partner]?.text || '',
+        status: cv[COL.status]?.text || '',
+        hrs: parseFloat(p(cv[COL.hrs]?.value)) || 0,
+      };
+    });
+
+    // Index by normalised property name (look up by both .property and .name
+    // to catch rows whose item name is parseable but property column is blank).
+    const byProp = new Map();
+    for (const r of rows) {
+      const keys = new Set([norm(r.property), norm(r.name)].filter(Boolean));
+      for (const k of keys) {
+        if (!byProp.has(k)) byProp.set(k, []);
+        byProp.get(k).push(r);
+      }
+    }
+
+    // 4. Per-property analysis.
+    const perPropertyHtml = wanted.map(prop => {
+      const key = norm(prop);
+      const matches = byProp.get(key) || [];
+      const lodgeOk = lodgeNorm.has(key);
+      const lodge = lodgeRows.find(r => norm(r.name) === key);
+
+      let header = `<h2>${prop}</h2>`;
+      header += lodgeOk
+        ? '<span class="pill ok">Lodge exists</span>'
+        : '<span class="pill bad">Not in Lodge board</span>';
+
+      // Bookings context.
+      let lodgeMsg = '';
+      if (lodge) {
+        const parts = [];
+        if (lodge.currIn)  parts.push(`current check-in <code>${lodge.currIn}</code>`);
+        if (lodge.currOut) parts.push(`check-out <code>${lodge.currOut}</code>`);
+        if (lodge.nextIn)  parts.push(`next check-in <code>${lodge.nextIn}</code>`);
+        if (lodge.nextOut) parts.push(`next check-out <code>${lodge.nextOut}</code>`);
+        if (parts.length) lodgeMsg = `<p class="muted">Lodge Status board says: ${parts.join(' · ')}.</p>`;
+      }
+
+      if (!matches.length) {
+        return `<section>${header}${lodgeMsg}
+          <p class="reason">✗ No row on the Cleans board for this property at all.</p>
+          <p class="muted">Check that the upstream booking sync (Make/Zapier) is creating Cleans rows. Most often: the property name on the booking source doesn't match exactly what the sync expects, so no row gets created.</p>
+        </section>`;
+      }
+
+      // Are any matching the requested clean day?
+      const onDate = matches.filter(r => r.cleanDate === dateStr);
+      // Closest neighbours so the user can see what date the row IS on.
+      const nearby = matches
+        .filter(r => r.cleanDate)
+        .map(r => ({ ...r, delta: Math.abs(diffDays(r.cleanDate, dateStr)) }))
+        .sort((a,b) => a.delta - b.delta)
+        .slice(0, 6);
+      const blanks = matches.filter(r => !r.cleanDate);
+
+      let body = '';
+      if (onDate.length) {
+        body += `<p class="ok">✓ ${onDate.length} row(s) dated ${dateStr} — should appear on the rota.</p>`;
+      } else if (blanks.length) {
+        body += `<p class="reason">✗ ${blanks.length} row(s) for this property exist but have <code>${COL.date}</code> blank — they're invisible to rota-planner.</p>`;
+      } else {
+        body += `<p class="reason">✗ No row dated ${dateStr}. Closest dates the planner has rows for:</p>`;
+      }
+
+      const list = onDate.length ? onDate : nearby.length ? nearby : blanks;
+      body += `<table><thead><tr>
+        <th>Item id</th><th>Item name</th><th>Property col</th><th>Clean date</th><th>Check-in</th><th>Check-out</th><th>Primary</th><th>Status</th>
+      </tr></thead><tbody>` +
+        list.map(r => `<tr>
+          <td><code>${r.id}</code></td>
+          <td>${escapeHtml(r.name)}</td>
+          <td>${r.propText ? escapeHtml(r.propText) : '<em class="muted">(blank — using name parser)</em>'}</td>
+          <td>${r.cleanDate ? `<code>${r.cleanDate}</code>${r.cleanDate===dateStr?' <span class="pill ok">match</span>':''}` : '<span class="reason">empty</span>'}</td>
+          <td>${r.checkinDate ? `<code>${r.checkinDate}</code>` : '—'}</td>
+          <td>${r.checkoutDate ? `<code>${r.checkoutDate}</code>` : '—'}</td>
+          <td>${escapeHtml(r.primary || '')}</td>
+          <td>${escapeHtml(r.status || '')}</td>
+        </tr>`).join('') +
+        '</tbody></table>';
+
+      if (!onDate.length && nearby.length) {
+        body += `<p class="muted">→ Most likely fix: open the closest row and reset its <code>${COL.date}</code> to ${dateStr}, or fix it on the upstream booking source so the next sync overwrites it.</p>`;
+      }
+      if (blanks.length && !onDate.length) {
+        body += `<p class="muted">→ Or pick the right blank row above and set its <code>${COL.date}</code> directly in Monday.</p>`;
+      }
+
+      return `<section>${header}${lodgeMsg}${body}</section>`;
+    }).join('');
+
+    // 5. All rows currently dated this day so the user can compare against
+    //    the expected list (matches what rota-planner will render).
+    const allOnDate = rows.filter(r => r.cleanDate === dateStr);
+    const allOnDateHtml = `<section>
+      <h2>All Cleans rows currently dated ${dateStr}</h2>
+      <p class="muted">${allOnDate.length} row(s). This is roughly what rota-planner will render for that day.</p>
+      <table><thead><tr><th>Property</th><th>Item name</th><th>Check-in</th><th>Check-out</th><th>Primary</th><th>Partner</th><th>Status</th><th>Item id</th></tr></thead>
+      <tbody>${allOnDate.sort((a,b)=>(a.property||a.name).localeCompare(b.property||b.name)).map(r=>`<tr>
+        <td>${escapeHtml(r.property || '<em>(blank)</em>')}</td>
+        <td>${escapeHtml(r.name)}</td>
+        <td>${r.checkinDate || '—'}</td>
+        <td>${r.checkoutDate || '—'}</td>
+        <td>${escapeHtml(r.primary || '')}</td>
+        <td>${escapeHtml(r.partner || '')}</td>
+        <td>${escapeHtml(r.status || '')}</td>
+        <td><code>${r.id}</code></td>
+      </tr>`).join('')}</tbody></table>
+    </section>`;
+
+    out.innerHTML = `<div class="grid3">${perPropertyHtml}</div>` + allOnDateHtml;
+  } catch (e) {
+    out.innerHTML = `<section><h2>Error</h2><pre>${escapeHtml(e.message || String(e))}</pre></section>`;
+  } finally {
+    goBtn.disabled = false; goBtn.textContent = 'Run check';
+  }
+}
+
+function parsePropertyFromItemName(name) {
+  if (!name) return '';
+  let n = name.trim();
+  const emIdx = n.indexOf(' — ');
+  if (emIdx >= 0) n = n.slice(0, emIdx).trim();
+  const bulletMatch = n.match(/^[A-Za-z]{3}\s+\d{1,2}\s+·\s+(.+)$/);
+  if (bulletMatch) n = bulletMatch[1].trim();
+  n = n.replace(/^CL\s+/i, '').trim();
+  return n;
+}
+
+function diffDays(a, b) {
+  if (!a || !b) return 999;
+  return Math.round((new Date(a) - new Date(b)) / 86400000);
+}
+
+function escapeHtml(s) { return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+</script>
+</body>
+</html>

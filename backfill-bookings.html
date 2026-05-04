@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Backfill missing bookings — Be Here</title>
+<style>
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; background:#D5D0C4; color:#272F2E; margin:0; padding:24px; line-height:1.45; max-width:820px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 6px; }
+  .sub { color:#646955; font-size:13px; margin-bottom:18px; }
+  section { background:#fff; border-radius:12px; padding:18px 20px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+  section h2 { font-size:15px; margin:0 0 12px; color:#272F2E; }
+  section h2 small { color:#989782; font-weight:400; font-size:12px; }
+  label { display:block; font-size:12px; font-weight:700; color:#646955; margin-top:12px; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px; }
+  label .opt { font-weight:400; text-transform:none; letter-spacing:0; color:#989782; margin-left:4px; }
+  input[type=date], input[type=text], input[type=email], input[type=number], input[type=password], select, textarea {
+    width:100%; padding:10px 12px; border:1.5px solid #c9c4b3; border-radius:8px;
+    font-family:inherit; font-size:14px; background:#fff; box-sizing:border-box;
+  }
+  textarea { min-height:60px; resize:vertical; font-size:13px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  button { padding:12px 18px; background:#272F2E; color:#F3E3C3; border:none; border-radius:8px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; margin-top:14px; }
+  button:disabled { opacity:0.5; cursor:not-allowed; }
+  button.secondary { background:#646955; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:14px; font-size:11px; font-weight:700; margin-left:6px; }
+  .pill.ok { background:#edf7f2; color:#1e5c3a; }
+  .pill.warn { background:#fdf5e8; color:#a86c00; }
+  .pill.bad { background:#fdf0ec; color:#8B2020; }
+  code { background:#f1eee5; padding:1px 5px; border-radius:4px; font-size:12px; }
+  .ok { color:#2d6a4f; font-weight:600; }
+  .reason { color:#8B2020; font-weight:600; }
+  pre { background:#f7f5ee; padding:10px; border-radius:8px; font-size:12px; overflow:auto; white-space:pre-wrap; }
+  .muted { color:#989782; font-size:12px; }
+  .preview { background:#fdf5e8; border:1px solid #e2c06a; border-radius:8px; padding:10px 12px; margin-top:12px; font-size:13px; }
+  .log-row { padding:8px 0; border-bottom:1px solid #ece9df; font-size:13px; display:flex; gap:10px; align-items:flex-start; }
+  .log-row:last-child { border-bottom:none; }
+  .log-row .when { color:#989782; font-size:11px; flex:0 0 60px; }
+  .toggle-row { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:10px; padding:10px 12px; background:#f7f5ee; border-radius:8px; }
+  .toggle-row label { display:flex; gap:6px; align-items:center; font-weight:600; color:#272F2E; cursor:pointer; text-transform:none; letter-spacing:0; font-size:13px; margin:0; }
+  .toggle-row input { width:auto; }
+  .step { margin-bottom:6px; padding:8px 12px; border-radius:8px; font-size:13px; }
+  .step.todo  { background:#f7f5ee; color:#646955; }
+  .step.doing { background:#fdf5e8; color:#7a5c35; }
+  .step.done  { background:#edf7f2; color:#1e5c3a; }
+  .step.fail  { background:#fdf0ec; color:#8B2020; }
+</style>
+</head>
+<body>
+
+<h1>Backfill missing bookings</h1>
+<div class="sub">Creates rows on the <strong>Cleans board</strong> (so the booking shows on rota-planner, laundry rota, hot tub rota) and the <strong>Arrivals board</strong> (so arrivals-hub and the guest-form pipeline pick it up). Use when a booking didn't make the weekly Guesty report — typically a last-minute direct booking. Sets the <strong>Last minute</strong> review flag so staff see the row marked as an exception.</div>
+
+<!-- secrets.js routes Monday + Guesty calls through the Cloudflare proxy when
+     it's reachable. Now that `null` is in the proxy allowlist, this works
+     even when the file is opened from OneDrive (file://). The token field
+     below remains as a fallback in case the proxy is unreachable. -->
+<script src="secrets.js"></script>
+
+<section style="background:#fdf5e8; border:1px solid #e2c06a">
+  <h2 style="color:#7a5c35">Setup</h2>
+  <p class="muted" style="margin-bottom:10px">When opened from the deployed site or with the Cloudflare proxy reachable from <code>file://</code> (allowlist includes <code>null</code>), no token is needed — the proxy attaches its own server-side. Paste a personal Monday token below only if the proxy isn't available.</p>
+  <input type="password" id="tokenInp" placeholder="Paste Monday API token (optional)" autocomplete="off">
+  <button onclick="loadProperties()" id="loadBtn">Load properties</button>
+  <button onclick="testProxy()" id="testBtn" class="secondary">Test proxy connection</button>
+  <div id="setupStatus" class="muted" style="margin-top:6px"></div>
+  <pre id="testOut" style="display:none; margin-top:10px"></pre>
+</section>
+
+<section id="formCard" style="display:none">
+  <h2>Booking details <small>· read off Guesty's web UI</small></h2>
+
+  <label for="fProperty">Property</label>
+  <select id="fProperty"></select>
+  <div class="muted" id="propMatchHint" style="margin-top:4px"></div>
+
+  <div class="row">
+    <div>
+      <label for="fCheckin">Check-in date</label>
+      <input type="date" id="fCheckin">
+    </div>
+    <div>
+      <label for="fCheckout">Check-out date</label>
+      <input type="date" id="fCheckout">
+    </div>
+  </div>
+
+  <label for="fGuest">Guest name <span class="opt">(needed for Arrivals board)</span></label>
+  <input type="text" id="fGuest" placeholder="e.g. James Mitchell">
+
+  <label for="fEmail">Guest email <span class="opt">(optional)</span></label>
+  <input type="email" id="fEmail" placeholder="optional">
+
+  <div class="row3">
+    <div>
+      <label for="fAdults">Adults</label>
+      <input type="number" id="fAdults" min="0" step="1" value="2">
+    </div>
+    <div>
+      <label for="fChildren">Children</label>
+      <input type="number" id="fChildren" min="0" step="1" value="0">
+    </div>
+    <div>
+      <label for="fPets">Pets</label>
+      <input type="number" id="fPets" min="0" step="1" value="0">
+    </div>
+  </div>
+
+  <label for="fBookRef">Booking reference <span class="opt">(Guesty confirmation code or source ref)</span></label>
+  <input type="text" id="fBookRef" placeholder="e.g. CWPR-2026-4821 or HM12345">
+
+  <label for="fNote">Reason / note <span class="opt">(appended to the Review note)</span></label>
+  <textarea id="fNote" placeholder="e.g. Direct booking phoned in 04 May for 06 May arrival — not yet on weekly report"></textarea>
+
+  <div class="toggle-row">
+    <strong style="font-size:13px">Write to:</strong>
+    <label><input type="checkbox" id="optCleans" checked> Cleans board (rota)</label>
+    <label><input type="checkbox" id="optArrivals" checked> Arrivals board (guest form / waiver)</label>
+    <label><input type="checkbox" id="optLastMinute" checked> Tag <strong>Last minute</strong></label>
+  </div>
+
+  <button onclick="createBooking()" id="createBtn">Create booking</button>
+  <button class="secondary" onclick="clearForm()">Clear form</button>
+
+  <div id="commitLog" style="margin-top:14px"></div>
+</section>
+
+<section id="logCard" style="display:none">
+  <h2>Created so far this session</h2>
+  <div id="logList"></div>
+</section>
+
+<script>
+const URL_API           = 'https://api.monday.com/v2';
+const CLEANS_BOARD      = '5095134636';
+const ARRIVALS_BOARD    = '5094453064';
+const PROP_CONFIG_BOARD = '5094466278';
+
+// ── Cleans-board column ids — same as rota-planner.html. Keeping these in sync
+//    is essential; if any of these drift, the planner won't pick up the row.
+const CL_DATE      = 'date_mm2pphc';
+const CL_CHECKIN   = 'date_mm2p6tck';
+const CL_CHECKOUT  = 'date_mm2pb8rs';
+const CL_REVIEW    = 'color_mm2q5qzp';
+const CL_REVIEW_NT = 'text_mm2qbgrt';
+// NB: CL_PROP (board_relation_mm2psy0b) is deliberately NOT written. The
+// planner-side comment explains: the connected board on that column doesn't
+// match the planner's property source, so writing wrong item_ids makes
+// Monday reject the entire mutation. Item-name parser will pick up the
+// property name instead, which is why we format the name carefully below.
+
+// ── Arrivals-board column ids — same as arrivals-hub.html.
+const AR_DATE     = 'date_mm2adtwg';
+const AR_FORM_ST  = 'color_mm2aw8fx';
+const AR_PROP     = 'text_mm2ahbrx';
+const AR_BEDCFG   = 'text_mm2ab56m';
+const AR_ADULTS   = 'numeric_mm2a5s8r';
+const AR_CHILDREN = 'numeric_mm2add81';
+const AR_PETS     = 'numeric_mm2ahz0x';
+const AR_BOOKREF  = 'text_mm2ah8s';
+
+let _properties = [];     // [{ id, name }] from Property Config
+let _created    = [];     // session log
+
+async function mq(query) {
+  const token = (document.getElementById('tokenInp').value || '').trim();
+  // Token is optional now: if secrets.js redirected fetch to the proxy, the
+  // proxy attaches its own server-side token and ignores whatever's in the
+  // Authorization header. If the proxy isn't reachable and there's no token,
+  // tell the user clearly rather than letting fetch silently fail.
+  let r;
+  try {
+    r = await fetch(URL_API, {
+      method: 'POST',
+      headers: { 'Content-Type':'application/json', Authorization: token, 'API-Version':'2024-01' },
+      body: JSON.stringify({ query }),
+    });
+  } catch (e) {
+    // Network-layer failure (CORS rejection, DNS, offline, etc). Distinguish
+    // between proxy-not-reachable and direct-Monday-blocked so the user knows
+    // which lever to pull.
+    const proxyMode = (typeof window.LINEN_API_BASE === 'string' && window.LINEN_API_BASE);
+    if (proxyMode) {
+      throw new Error('Cloudflare proxy unreachable. Either the worker is down or your Origin (`null` for file://) is no longer in ALLOWED_ORIGINS. Visit ' + window.LINEN_API_BASE + ' in a tab to confirm the worker responds.');
+    }
+    if (!token) {
+      throw new Error('Direct Monday call failed at the network layer (probably CORS) and no token is set for the proxy fallback. Paste a Monday API token in the box at the top.');
+    }
+    throw new Error('Network error reaching api.monday.com (' + (e.message || e) + '). Check your connection or any browser blocker.');
+  }
+  if (r.status === 401 || r.status === 403) {
+    throw new Error('Monday rejected the request (HTTP ' + r.status + '). If using direct token, double-check it. If using proxy, confirm the worker has MONDAY_API_TOKEN set.');
+  }
+  if (!r.ok) throw new Error('HTTP ' + r.status + ' ' + r.statusText);
+  const j = await r.json();
+  if (j.errors) {
+    const first = j.errors[0];
+    const ext = first.extensions || {};
+    const detail = [
+      ext.column_id ? `column ${ext.column_id}` : null,
+      ext.column_value !== undefined ? `value ${JSON.stringify(ext.column_value)}` : null,
+      ext.code ? `code ${ext.code}` : null,
+    ].filter(Boolean).join(' · ');
+    throw new Error(detail ? `${first.message} (${detail})` : first.message);
+  }
+  return j.data;
+}
+
+// On load, tell the user whether the proxy is wired up so they can decide
+// whether to bother pasting a Monday token.
+document.addEventListener('DOMContentLoaded', () => {
+  const status = document.getElementById('setupStatus');
+  if (!status) return;
+  if (typeof window.LINEN_API_BASE === 'string' && window.LINEN_API_BASE) {
+    status.innerHTML = '<span class="ok">✓ Cloudflare proxy detected (' + window.LINEN_API_BASE + '). Token paste optional.</span>';
+  } else {
+    status.innerHTML = '<span style="color:#a86c00">⚠ Cloudflare proxy not detected — Monday calls will go direct, you must paste a token.</span>';
+  }
+});
+
+// Proxy diagnostic — runs three probes that together pinpoint where the
+// transport breaks down:
+//   1. GET health endpoint (no preflight, no auth)
+//   2. POST /monday with NO custom headers (no preflight)
+//   3. POST /monday with the headers our real call uses (triggers preflight)
+// The first failing step tells us if it's the worker, the preflight, or
+// something specific to our request.
+async function testProxy() {
+  const btn  = document.getElementById('testBtn');
+  const out  = document.getElementById('testOut');
+  out.style.display = '';
+  out.textContent  = 'Running probes…';
+  btn.disabled = true; btn.textContent = 'Testing…';
+
+  const proxyBase = (typeof window.LINEN_API_BASE === 'string' && window.LINEN_API_BASE)
+    ? window.LINEN_API_BASE
+    : 'https://be-here-api-proxy.joanne-950.workers.dev';
+
+  const lines = [];
+  lines.push('Proxy base: ' + proxyBase);
+  lines.push('Page origin: ' + window.location.origin + '  (Origin header sent: ' + (window.location.origin === 'null' || window.location.protocol === 'file:' ? '"null"' : window.location.origin) + ')');
+  lines.push('');
+
+  // Probe 1 — bare GET
+  lines.push('1. GET ' + proxyBase + '/');
+  try {
+    const r = await window.fetch.__original ? window.fetch.__original(proxyBase + '/') : fetch(proxyBase + '/');
+    const txt = await r.text();
+    lines.push('   ✓ HTTP ' + r.status + ' · ACAO=' + (r.headers.get('Access-Control-Allow-Origin') || '(missing)'));
+    lines.push('   body: ' + txt.slice(0, 240));
+  } catch (e) {
+    lines.push('   ✗ ' + (e.message || e));
+  }
+  lines.push('');
+
+  // Probe 2 — POST with NO custom headers (CORS-simple, no preflight)
+  lines.push('2. POST ' + proxyBase + '/monday  (simple, no preflight)');
+  try {
+    const r = await fetch(proxyBase + '/monday', {
+      method: 'POST',
+      // text/plain keeps it CORS-simple (no preflight). Body is still JSON,
+      // which the proxy / Monday will parse identically.
+      headers: { 'Content-Type': 'text/plain' },
+      body: JSON.stringify({ query: '{ me { id name } }' }),
+    });
+    const txt = await r.text();
+    lines.push('   ' + (r.ok ? '✓' : '✗') + ' HTTP ' + r.status + ' · ACAO=' + (r.headers.get('Access-Control-Allow-Origin') || '(missing)'));
+    lines.push('   body: ' + txt.slice(0, 480));
+  } catch (e) {
+    lines.push('   ✗ ' + (e.message || e));
+  }
+  lines.push('');
+
+  // Probe 3 — POST WITH custom headers (triggers preflight)
+  lines.push('3. POST ' + proxyBase + '/monday  (with Authorization header → preflight)');
+  try {
+    const r = await fetch(proxyBase + '/monday', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': 'test-token',
+        'API-Version': '2024-01',
+      },
+      body: JSON.stringify({ query: '{ me { id name } }' }),
+    });
+    const txt = await r.text();
+    lines.push('   ' + (r.ok ? '✓' : '✗') + ' HTTP ' + r.status + ' · ACAO=' + (r.headers.get('Access-Control-Allow-Origin') || '(missing)'));
+    lines.push('   body: ' + txt.slice(0, 480));
+  } catch (e) {
+    lines.push('   ✗ ' + (e.message || e));
+    lines.push('   (likely CORS preflight rejected — check Network tab for the OPTIONS request)');
+  }
+  lines.push('');
+
+  out.textContent = lines.join('\n');
+  btn.disabled = false; btn.textContent = 'Test proxy connection';
+}
+
+async function loadProperties() {
+  const btn = document.getElementById('loadBtn');
+  btn.disabled = true; btn.textContent = 'Loading…';
+  try {
+    const data = await mq(`{ boards(ids:[${PROP_CONFIG_BOARD}]) { items_page(limit:200) { items { id name } } } }`);
+    const items = data?.boards?.[0]?.items_page?.items || [];
+    _properties = items
+      .map(it => ({ id: it.id, name: it.name }))
+      .sort((a,b) => a.name.localeCompare(b.name));
+    const sel = document.getElementById('fProperty');
+    sel.innerHTML = '<option value="">— Select property —</option>' +
+      _properties.map(p => `<option value="${escapeHtml(p.name)}">${escapeHtml(p.name)}</option>`).join('');
+    document.getElementById('formCard').style.display = '';
+
+    // Default check-in to two days out (the kind of last-minute booking
+    // most likely to be missed by a weekly report).
+    const t = new Date(); t.setDate(t.getDate() + 2);
+    document.getElementById('fCheckin').value = t.toISOString().slice(0,10);
+    const out = new Date(); out.setDate(out.getDate() + 5);
+    document.getElementById('fCheckout').value = out.toISOString().slice(0,10);
+
+    btn.textContent = 'Reload properties';
+  } catch (e) {
+    alert('Could not load properties: ' + e.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Build the item name that the rota-planner's parsePropertyFromItemName()
+// can read back. Make's Guesty scenario produces names like "Thu 30 · Firefly".
+function buildCleansItemName(prop, isoDate) {
+  const d = new Date(isoDate + 'T12:00:00');
+  const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+  return `${dow} ${d.getDate()} · ${prop}`;
+}
+
+async function createBooking() {
+  // Read inputs
+  const prop      = document.getElementById('fProperty').value;
+  const checkin   = document.getElementById('fCheckin').value;
+  const checkout  = document.getElementById('fCheckout').value;
+  const guest     = document.getElementById('fGuest').value.trim();
+  const email     = document.getElementById('fEmail').value.trim();
+  const adults    = parseInt(document.getElementById('fAdults').value)   || 0;
+  const children  = parseInt(document.getElementById('fChildren').value) || 0;
+  const pets      = parseInt(document.getElementById('fPets').value)     || 0;
+  const bookRef   = document.getElementById('fBookRef').value.trim();
+  const userNote  = document.getElementById('fNote').value.trim();
+  const wantClean = document.getElementById('optCleans').checked;
+  const wantArr   = document.getElementById('optArrivals').checked;
+  const tagLast   = document.getElementById('optLastMinute').checked;
+
+  // Validation — only what's needed for the boards we're actually writing to.
+  if (!prop)     return alert('Pick a property.');
+  if (!checkin)  return alert('Set the check-in date.');
+  if (!checkout) return alert('Set the check-out date.');
+  if (checkout < checkin) return alert("Check-out can't be before check-in.");
+  if (!wantClean && !wantArr) return alert('Pick at least one board to write to.');
+  if (wantArr && !guest) {
+    if (!confirm('No guest name set — the Arrivals row will be created with the property name as a placeholder. Continue?')) return;
+  }
+
+  const btn = document.getElementById('createBtn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+
+  // Reset commit log
+  const log = document.getElementById('commitLog');
+  log.innerHTML = '';
+
+  const stamp = new Date().toISOString().slice(0,16).replace('T',' ');
+  const note  = `Backfilled manually ${stamp} — booking missed by weekly Guesty sync${userNote ? '. ' + userNote : '.'}`;
+
+  // Track which boards succeeded so we can record this booking in the session log.
+  const result = { prop, checkin, checkout, cleansId: null, arrivalsId: null, errors: [] };
+
+  // ── 1. Cleans board (rota) ─────────────────────────────────────────
+  if (wantClean) {
+    addStep('cleans', 'doing', 'Creating Cleans-board row…');
+    try {
+      const itemName = buildCleansItemName(prop, checkin);
+      // Per-column structures match rota-planner's buildColumnValues:
+      //   date columns → { date: 'YYYY-MM-DD' }
+      //   status (color) → { label: 'Last minute' } (create_labels_if_missing handles it)
+      //   text → bare string
+      const cv = {
+        [CL_DATE]:      { date: checkin },
+        [CL_CHECKIN]:   { date: checkin },
+        [CL_CHECKOUT]:  { date: checkout },
+        [CL_REVIEW_NT]: note,
+      };
+      if (tagLast) cv[CL_REVIEW] = { label: 'Last minute' };
+      const cvStr = JSON.stringify(JSON.stringify(cv));
+      const q = `mutation { create_item(board_id:${CLEANS_BOARD}, item_name:${JSON.stringify(itemName)}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
+      const data = await mq(q);
+      const newId = data?.create_item?.id;
+      result.cleansId = newId;
+      replaceLastStep('cleans', 'done',
+        `✓ Cleans row created · item <code>${newId}</code> · "${escapeHtml(itemName)}". Refresh rota-planner.html to see it.`);
+    } catch (e) {
+      result.errors.push('Cleans: ' + e.message);
+      replaceLastStep('cleans', 'fail', '✗ Cleans row failed: ' + escapeHtml(e.message));
+    }
+  }
+
+  // ── 2. Arrivals board (guest form / waiver) ────────────────────────
+  if (wantArr) {
+    addStep('arrivals', 'doing', 'Creating Arrivals-board row…');
+    try {
+      // Item name format mirrors what the Make scenario produces: "<Guest> — <date>".
+      // Falls back to the property name if guest is empty so we never end up
+      // with " — 2026-05-06" as the title.
+      const itemName = `${guest || prop} — ${checkin}`;
+      const cv = {
+        [AR_DATE]:      { date: checkin },
+        [AR_PROP]:      prop,
+        [AR_BOOKREF]:   bookRef || '',
+        [AR_FORM_ST]:   { label: 'Pending' },
+        [AR_ADULTS]:    String(adults),
+        [AR_CHILDREN]:  String(children),
+        [AR_PETS]:      String(pets),
+      };
+      const cvStr = JSON.stringify(JSON.stringify(cv));
+      const q = `mutation { create_item(board_id:${ARRIVALS_BOARD}, item_name:${JSON.stringify(itemName)}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
+      const data = await mq(q);
+      const newId = data?.create_item?.id;
+      result.arrivalsId = newId;
+      replaceLastStep('arrivals', 'done',
+        `✓ Arrivals row created · item <code>${newId}</code> · "${escapeHtml(itemName)}". Form Status set to Pending — the existing Make webhook for guest form submissions will treat this row like any normal arrival.`);
+    } catch (e) {
+      result.errors.push('Arrivals: ' + e.message);
+      replaceLastStep('arrivals', 'fail', '✗ Arrivals row failed: ' + escapeHtml(e.message));
+    }
+  }
+
+  // ── Log the result, even if partial. ───────────────────────────────
+  _created.unshift({
+    when: new Date().toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' }),
+    ...result,
+  });
+  renderLog();
+
+  // Wipe just the per-booking inputs so the next entry is fast — keep the
+  // property selected since it's a common case to backfill several days
+  // for the same property in one sitting.
+  document.getElementById('fGuest').value = '';
+  document.getElementById('fEmail').value = '';
+  document.getElementById('fBookRef').value = '';
+  document.getElementById('fNote').value = '';
+
+  btn.disabled = false; btn.textContent = 'Create booking';
+}
+
+function addStep(key, state, html) {
+  const log = document.getElementById('commitLog');
+  const div = document.createElement('div');
+  div.className = 'step ' + state;
+  div.dataset.key = key;
+  div.innerHTML = html;
+  log.appendChild(div);
+}
+function replaceLastStep(key, state, html) {
+  const log = document.getElementById('commitLog');
+  // Find the most-recent step with that key and update it in place — keeps
+  // the running flow looking like a checklist rather than a log dump.
+  const all = log.querySelectorAll(`[data-key="${key}"]`);
+  const last = all[all.length - 1];
+  if (!last) return addStep(key, state, html);
+  last.className = 'step ' + state;
+  last.innerHTML = html;
+}
+
+function renderLog() {
+  const card = document.getElementById('logCard');
+  if (!_created.length) { card.style.display = 'none'; return; }
+  card.style.display = '';
+  document.getElementById('logList').innerHTML = _created.map(r => {
+    const bits = [];
+    if (r.cleansId)   bits.push(`Cleans <code>${r.cleansId}</code>`);
+    if (r.arrivalsId) bits.push(`Arrivals <code>${r.arrivalsId}</code>`);
+    if (r.errors.length) bits.push(`<span class="reason">errors: ${r.errors.length}</span>`);
+    return `<div class="log-row">
+      <span class="when">${r.when}</span>
+      <span><strong>${escapeHtml(r.prop)}</strong> · check-in ${r.checkin} · check-out ${r.checkout} · ${bits.join(' · ')}</span>
+    </div>`;
+  }).join('');
+}
+
+function clearForm() {
+  document.getElementById('fProperty').value = '';
+  document.getElementById('fGuest').value = '';
+  document.getElementById('fEmail').value = '';
+  document.getElementById('fBookRef').value = '';
+  document.getElementById('fNote').value = '';
+  document.getElementById('fAdults').value = '2';
+  document.getElementById('fChildren').value = '0';
+  document.getElementById('fPets').value = '0';
+  document.getElementById('commitLog').innerHTML = '';
+  // Reset dates back to defaults
+  const t = new Date(); t.setDate(t.getDate() + 2);
+  document.getElementById('fCheckin').value = t.toISOString().slice(0,10);
+  const out = new Date(); out.setDate(out.getDate() + 5);
+  document.getElementById('fCheckout').value = out.toISOString().slice(0,10);
+}
+
+function escapeHtml(s) { return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+</script>
+</body>
+</html>

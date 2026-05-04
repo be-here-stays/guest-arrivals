@@ -603,6 +603,9 @@
 <div id="toast"></div>
 
 <script src="work-dispatch.js"></script>
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
+
 <script>
 /* ═══════════════════════════════════════════════════════════════════
    CONFIG
@@ -612,7 +615,7 @@
 const PLANNER_BUILD = 'rota-planner v50 (board_relation writes removed)';
 console.log(`%c${PLANNER_BUILD}`, 'color:#2c7;font-weight:bold');
 
-const MONDAY_API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const MONDAY_API_TOKEN = window.MONDAY_API_TOKEN;
 
 const LODGE_STATUS_BOARD = '1928673949';  // current + next checkin/checkout
 const PROP_CONFIG_BOARD  = '5094466278';  // property metadata
@@ -779,7 +782,25 @@ async function mondayFetch(query, variables) {
     body: JSON.stringify(variables ? { query, variables } : { query })
   });
   const j = await r.json();
-  if (j.errors) throw new Error(j.errors[0].message);
+  if (j.errors) {
+    const first = j.errors[0];
+    // Monday's API returns useful detail in `extensions` (column id, the
+    // value it choked on, etc.) — surface that on the Error so the save
+    // failure toast can tell the planner which column is rejecting the row.
+    // Without this, every column-value error looks identical ("invalid value
+    // for this column") and is impossible to diagnose without dev tools.
+    const ext = first.extensions || {};
+    const detail = [
+      ext.column_id ? `column ${ext.column_id}` : null,
+      ext.column_value !== undefined ? `value ${JSON.stringify(ext.column_value)}` : null,
+      ext.code ? `code ${ext.code}` : null,
+    ].filter(Boolean).join(' · ');
+    const msg = detail ? `${first.message} (${detail})` : first.message;
+    const err = new Error(msg);
+    err.extensions = ext;
+    err.allErrors  = j.errors;
+    throw err;
+  }
   return j.data;
 }
 
@@ -2798,8 +2819,9 @@ async function saveToMonday(opts = {}) {
   try {
     // Create
     for (const c of toCreate) {
+      let cv;
       try {
-        const cv = stripUnsafeColumns(buildColumnValues(c));
+        cv = stripUnsafeColumns(buildColumnValues(c));
         const cvStr = JSON.stringify(JSON.stringify(cv));
         const itemName = `${c.property} — ${c.day}`;
         const q = `mutation { create_item(board_id:${CLEANS_BOARD}, item_name:${JSON.stringify(itemName)}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
@@ -2808,22 +2830,26 @@ async function saveToMonday(opts = {}) {
         c.new = false; c.dirty = false;
         ok++;
       } catch (e) {
-        console.error('create failed', c, e);
+        // Log the full payload so the offending column value is visible in
+        // dev tools without needing to repro. The Error message also now
+        // contains the column id (see mondayFetch).
+        console.error('create failed', { ref: `${c.property} ${c.day}`, cv, error: e, extensions: e.extensions });
         failed.push({ ref: `${c.property} ${c.day}`, reason: e.message });
       }
       await sleep(GAP_MS);
     }
     // Update
     for (const c of toUpdate) {
+      let cv;
       try {
-        const cv = stripUnsafeColumns(buildColumnValues(c));
+        cv = stripUnsafeColumns(buildColumnValues(c));
         const cvStr = JSON.stringify(JSON.stringify(cv));
         const q = `mutation { change_multiple_column_values(board_id:${CLEANS_BOARD}, item_id:${c.mondayId}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
         await mondayFetchWithRetry(q);
         c.dirty = false;
         ok++;
       } catch (e) {
-        console.error('update failed', c, e);
+        console.error('update failed', { ref: `${c.property} ${c.day}`, mondayId: c.mondayId, cv, error: e, extensions: e.extensions });
         failed.push({ ref: `${c.property} ${c.day}`, reason: e.message });
       }
       await sleep(GAP_MS);

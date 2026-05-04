@@ -1,0 +1,505 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Import booking from Guesty — Be Here</title>
+<style>
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; background:#D5D0C4; color:#272F2E; margin:0; padding:24px; line-height:1.45; max-width:880px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 6px; }
+  .sub { color:#646955; font-size:13px; margin-bottom:18px; }
+  section { background:#fff; border-radius:12px; padding:18px 20px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+  section h2 { font-size:15px; margin:0 0 12px; color:#272F2E; }
+  section h2 small { color:#989782; font-weight:400; font-size:12px; }
+  label { display:block; font-size:12px; font-weight:700; color:#646955; margin-top:12px; margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px; }
+  input[type=text], input[type=password], input[type=date], input[type=number], select, textarea {
+    width:100%; padding:10px 12px; border:1.5px solid #c9c4b3; border-radius:8px;
+    font-family:inherit; font-size:14px; background:#fff; box-sizing:border-box;
+  }
+  textarea { min-height:60px; resize:vertical; font-size:13px; }
+  .row { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .row3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  button { padding:11px 16px; background:#272F2E; color:#F3E3C3; border:none; border-radius:8px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; margin-top:14px; }
+  button:disabled { opacity:0.5; cursor:not-allowed; }
+  button.secondary { background:#646955; }
+  button.danger    { background:#8B2020; }
+  .hint { font-size:11px; color:#989782; font-weight:400; text-transform:none; letter-spacing:0; margin-top:4px; }
+  .pill { display:inline-block; padding:2px 10px; border-radius:14px; font-size:11px; font-weight:700; margin-left:6px; }
+  .pill.ok { background:#edf7f2; color:#1e5c3a; }
+  .pill.warn { background:#fdf5e8; color:#a86c00; }
+  .pill.bad { background:#fdf0ec; color:#8B2020; }
+  code { background:#f1eee5; padding:1px 5px; border-radius:4px; font-size:12px; }
+  .ok { color:#2d6a4f; font-weight:600; }
+  .reason { color:#8B2020; font-weight:600; }
+  pre { background:#f7f5ee; padding:10px; border-radius:8px; font-size:12px; overflow:auto; white-space:pre-wrap; max-height:240px; }
+  .muted { color:#989782; font-size:12px; }
+  .step { margin-bottom:8px; padding:8px 12px; border-radius:8px; }
+  .step.todo  { background:#f7f5ee; color:#646955; }
+  .step.doing { background:#fdf5e8; color:#7a5c35; }
+  .step.done  { background:#edf7f2; color:#1e5c3a; }
+  .step.fail  { background:#fdf0ec; color:#8B2020; }
+  .preview-grid { display:grid; grid-template-columns:140px 1fr; gap:6px 14px; font-size:13px; margin-top:8px; }
+  .preview-grid > div:nth-child(odd) { color:#646955; font-weight:600; }
+  .toggle-row { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-top:10px; }
+  .toggle-row label { display:flex; gap:6px; align-items:center; font-weight:600; color:#272F2E; cursor:pointer; text-transform:none; letter-spacing:0; font-size:13px; margin:0; }
+  .toggle-row input { width:auto; }
+  .auth-tabs { display:flex; gap:8px; margin-bottom:8px; }
+  .auth-tab { padding:6px 12px; background:#f1eee5; border-radius:7px; font-size:12px; font-weight:700; color:#646955; cursor:pointer; }
+  .auth-tab.active { background:#272F2E; color:#F3E3C3; }
+</style>
+</head>
+<body>
+
+<h1>Import booking from Guesty</h1>
+<div class="sub">Pulls a reservation from Guesty by booking reference, then writes rows to the Cleans board (so it appears on rota-planner, laundry rota, hot tub rota) and the Arrivals board (so the guest form / waiver pipeline picks it up). Use when a booking didn't make the weekly Guesty report.</div>
+
+<!-- ── 1. Auth ─────────────────────────────────────────────────────────── -->
+<section>
+  <h2>1. Tokens <small>· paste once, kept in memory only</small></h2>
+
+  <label>Monday API token</label>
+  <input type="password" id="mondayTok" placeholder="Monday personal token" autocomplete="off">
+  <div class="hint">monday.com → click your avatar → Developers → My access tokens.</div>
+
+  <label style="margin-top:18px">Guesty access</label>
+  <div class="auth-tabs">
+    <span class="auth-tab active" id="tabProxy" onclick="setAuthMode('proxy')">Via Cloudflare proxy</span>
+    <span class="auth-tab" id="tabCreds" onclick="setAuthMode('creds')">Direct credentials</span>
+    <span class="auth-tab" id="tabToken" onclick="setAuthMode('token')">Pre-fetched token</span>
+  </div>
+
+  <div id="authProxy">
+    <div class="hint">Use this if the page is opened from the deployed site (be-here-stays.github.io). The proxy attaches Guesty OAuth server-side so no credentials are needed here. <strong>Won't work when this file is opened directly from OneDrive (file://)</strong> — switch to one of the other tabs.</div>
+  </div>
+
+  <div id="authCreds" style="display:none">
+    <div class="row">
+      <div>
+        <label>Guesty client_id</label>
+        <input type="password" id="guestyClientId" placeholder="6XXXXXXXXXXXX">
+      </div>
+      <div>
+        <label>Guesty client_secret</label>
+        <input type="password" id="guestyClientSecret" placeholder="••••">
+      </div>
+    </div>
+    <div class="hint">Page does the OAuth exchange against <code>auth.guesty.com</code>. Token kept in memory only.</div>
+  </div>
+
+  <div id="authToken" style="display:none">
+    <label>Guesty access token (Bearer)</label>
+    <input type="password" id="guestyToken" placeholder="eyJ…">
+    <div class="hint">Use a token you've already exchanged. Skips OAuth entirely.</div>
+  </div>
+</section>
+
+<!-- ── 2. Lookup ──────────────────────────────────────────────────────── -->
+<section>
+  <h2>2. Lookup booking</h2>
+
+  <label>Booking reference</label>
+  <input type="text" id="bookingRef" placeholder="e.g. CWPR-2026-4821 or a Guesty internal id">
+  <div class="hint">The page tries the Guesty internal id endpoint first if the value looks like a 24-char hex; otherwise it searches by confirmation code / source booking number.</div>
+
+  <button id="fetchBtn" onclick="lookupBooking()">Fetch from Guesty</button>
+
+  <div id="lookupOut"></div>
+</section>
+
+<!-- ── 3. Preview ─────────────────────────────────────────────────────── -->
+<section id="previewSection" style="display:none">
+  <h2>3. Confirm before import</h2>
+  <div class="hint" style="margin-bottom:10px">Edit any field if Guesty's data needs correcting before it lands on Monday.</div>
+
+  <label>Property (must match Property Config board)</label>
+  <select id="pProperty"></select>
+  <div class="hint" id="pPropertyHint"></div>
+
+  <div class="row">
+    <div>
+      <label>Check-in</label>
+      <input type="date" id="pCheckin">
+    </div>
+    <div>
+      <label>Check-out</label>
+      <input type="date" id="pCheckout">
+    </div>
+  </div>
+
+  <label>Guest name</label>
+  <input type="text" id="pGuest">
+
+  <label>Guest email</label>
+  <input type="text" id="pEmail">
+
+  <div class="row3">
+    <div>
+      <label>Adults</label>
+      <input type="number" id="pAdults" min="0" step="1" value="0">
+    </div>
+    <div>
+      <label>Children</label>
+      <input type="number" id="pChildren" min="0" step="1" value="0">
+    </div>
+    <div>
+      <label>Pets</label>
+      <input type="number" id="pPets" min="0" step="1" value="0">
+    </div>
+  </div>
+
+  <label>Booking reference (used as text on both boards)</label>
+  <input type="text" id="pBookingRef">
+
+  <div class="toggle-row">
+    <strong style="font-size:13px">Write to:</strong>
+    <label><input type="checkbox" id="optCleans" checked> Cleans board (rota)</label>
+    <label><input type="checkbox" id="optArrivals" checked> Arrivals board (guest form)</label>
+    <label><input type="checkbox" id="optLastMinute" checked> Tag as <strong>Last minute</strong></label>
+  </div>
+
+  <button id="importBtn" onclick="commitImport()">Import to Monday</button>
+  <button class="secondary" onclick="resetPreview()">Cancel</button>
+
+  <div id="commitLog" style="margin-top:14px"></div>
+</section>
+
+<script>
+const URL_API           = 'https://api.monday.com/v2';
+const CLEANS_BOARD      = '5095134636';
+const ARRIVALS_BOARD    = '5094453064';
+const PROP_CONFIG_BOARD = '5094466278';
+
+// Cleans-board column ids (mirror rota-planner.html exactly).
+const CL_DATE      = 'date_mm2pphc';
+const CL_CHECKIN   = 'date_mm2p6tck';
+const CL_CHECKOUT  = 'date_mm2pb8rs';
+const CL_REVIEW    = 'color_mm2q5qzp';
+const CL_REVIEW_NT = 'text_mm2qbgrt';
+// CL_PROP (board_relation_mm2psy0b) deliberately NOT written — see rota-planner
+// for the full reason; the planner reads property from the item-name parser.
+
+// Arrivals-board column ids (mirror arrivals-hub.html).
+const AR_DATE     = 'date_mm2adtwg';
+const AR_FORM_ST  = 'color_mm2aw8fx';
+const AR_PROP     = 'text_mm2ahbrx';
+const AR_BEDCFG   = 'text_mm2ab56m';
+const AR_ADULTS   = 'numeric_mm2a5s8r';
+const AR_CHILDREN = 'numeric_mm2add81';
+const AR_PETS     = 'numeric_mm2ahz0x';
+const AR_BOOKREF  = 'text_mm2ah8s';
+
+let _authMode      = 'proxy';     // 'proxy' | 'creds' | 'token'
+let _guestyToken   = null;        // cached after OAuth (creds mode)
+let _guestyTokenExp= 0;
+let _properties    = [];          // [{ id, name }] from Property Config
+let _booking       = null;        // last fetched reservation (parsed)
+
+function setAuthMode(m) {
+  _authMode = m;
+  for (const id of ['Proxy','Creds','Token']) {
+    document.getElementById('tab'+id).classList.toggle('active', id.toLowerCase() === m);
+    document.getElementById('auth'+id).style.display = id.toLowerCase() === m ? '' : 'none';
+  }
+}
+
+// ── Monday helper ────────────────────────────────────────────────────
+async function mq(query, variables) {
+  const tok = (document.getElementById('mondayTok').value || '').trim();
+  if (!tok) throw new Error('Paste a Monday API token at the top first.');
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization: tok, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  });
+  if (!r.ok) throw new Error('Monday HTTP ' + r.status + ' ' + r.statusText);
+  const j = await r.json();
+  if (j.errors) {
+    const f = j.errors[0];
+    const ext = f.extensions || {};
+    const detail = [
+      ext.column_id ? 'column ' + ext.column_id : null,
+      ext.column_value !== undefined ? 'value ' + JSON.stringify(ext.column_value) : null,
+      ext.code ? 'code ' + ext.code : null,
+    ].filter(Boolean).join(' · ');
+    throw new Error(detail ? `${f.message} (${detail})` : f.message);
+  }
+  return j.data;
+}
+
+// ── Guesty helpers ───────────────────────────────────────────────────
+async function getGuestyToken() {
+  if (_authMode === 'token') {
+    const t = (document.getElementById('guestyToken').value || '').trim();
+    if (!t) throw new Error('Paste a Guesty access token, or switch tab to use credentials/proxy.');
+    return t;
+  }
+  if (_authMode === 'creds') {
+    if (_guestyToken && _guestyTokenExp > Date.now() + 60000) return _guestyToken;
+    const id     = (document.getElementById('guestyClientId').value || '').trim();
+    const secret = (document.getElementById('guestyClientSecret').value || '').trim();
+    if (!id || !secret) throw new Error('Paste Guesty client_id and client_secret.');
+    const r = await fetch('https://auth.guesty.com/oauth/token', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        scope: 'open-api',
+        client_id: id,
+        client_secret: secret,
+      }),
+    });
+    if (!r.ok) throw new Error('Guesty OAuth failed: HTTP ' + r.status + ' ' + (await r.text()).slice(0, 200));
+    const j = await r.json();
+    _guestyToken    = j.access_token;
+    _guestyTokenExp = Date.now() + ((j.expires_in || 86400) * 1000);
+    return _guestyToken;
+  }
+  // proxy mode — Worker attaches its own server-side token, so any token here
+  // is a placeholder. The Worker only inspects the Origin.
+  return 'handled-by-proxy';
+}
+
+async function guesty(path) {
+  const url = 'https://open-api.guesty.com' + path;
+  const headers = { 'Accept': 'application/json' };
+  if (_authMode !== 'proxy') {
+    const t = await getGuestyToken();
+    headers['Authorization'] = 'Bearer ' + t;
+  }
+  // In proxy mode we still need to authenticate — but the proxy supplies its
+  // own. We just need any value so the request looks well-formed.
+  const r = await fetch(url, { headers });
+  if (!r.ok) {
+    const txt = await r.text();
+    if (r.status === 403 && _authMode === 'proxy') {
+      throw new Error('Cloudflare proxy refused (Origin not allowlisted). Switch to "Direct credentials" or "Pre-fetched token" tab.');
+    }
+    throw new Error('Guesty HTTP ' + r.status + ': ' + txt.slice(0, 240));
+  }
+  return r.json();
+}
+
+// ── Lookup flow ──────────────────────────────────────────────────────
+async function lookupBooking() {
+  const out = document.getElementById('lookupOut');
+  const btn = document.getElementById('fetchBtn');
+  const ref = (document.getElementById('bookingRef').value || '').trim();
+  if (!ref) { out.innerHTML = '<p class="reason">Enter a booking reference.</p>'; return; }
+  btn.disabled = true; btn.textContent = 'Fetching…';
+  out.innerHTML = '<p class="muted">Looking up <code>' + escapeHtml(ref) + '</code>…</p>';
+
+  try {
+    let res = null;
+
+    // 1. If it looks like a Guesty internal _id (24-char hex), hit /reservations/{id} directly.
+    if (/^[a-f0-9]{24}$/i.test(ref)) {
+      try { res = await guesty('/v1/reservations/' + ref); } catch (_) {}
+    }
+
+    // 2. Otherwise (or as fallback) search by confirmation code / source code / generic q.
+    if (!res) {
+      const fields = ['confirmationCode','source.confirmationCode','source.bookingNumber'];
+      for (const f of fields) {
+        try {
+          const j = await guesty('/v1/reservations?' + f + '=' + encodeURIComponent(ref) + '&limit=1');
+          if (j?.results?.length) { res = j.results[0]; break; }
+        } catch (e) { console.warn(f + ' lookup failed', e); }
+      }
+    }
+    // 3. Last try — generic q search.
+    if (!res) {
+      try {
+        const j = await guesty('/v1/reservations?q=' + encodeURIComponent(ref) + '&limit=5');
+        if (j?.results?.length) {
+          if (j.results.length > 1) {
+            out.innerHTML = '<p class="reason">Multiple matches for that reference — be more specific. Found ' + j.results.length + ' reservations.</p>';
+            btn.disabled = false; btn.textContent = 'Fetch from Guesty';
+            return;
+          }
+          res = j.results[0];
+        }
+      } catch (_) {}
+    }
+
+    if (!res) {
+      out.innerHTML = '<p class="reason">No reservation found in Guesty for <code>' + escapeHtml(ref) + '</code>.</p><p class="muted">Things to check: typo in the reference, the booking is on a different Guesty account, or the booking was created within the last few minutes (Guesty open-api can lag a moment).</p>';
+      btn.disabled = false; btn.textContent = 'Fetch from Guesty';
+      return;
+    }
+
+    // Parse the relevant fields.
+    const guest    = res.guest || {};
+    const listing  = res.listing || {};
+    const checkIn  = (res.checkInDateLocalized  || res.checkIn  || '').slice(0, 10);
+    const checkOut = (res.checkOutDateLocalized || res.checkOut || '').slice(0, 10);
+    const numAdults   = Number(res.guestsCount?.adults  ?? res.numAdults    ?? res.adults   ?? 0) || 0;
+    const numChildren = Number(res.guestsCount?.children ?? res.numChildren ?? res.children ?? 0) || 0;
+    const numPets     = Number(res.numberOfPets ?? res.pets ?? 0) || 0;
+    const guestName   = guest.fullName || [guest.firstName, guest.lastName].filter(Boolean).join(' ') || '';
+    const guestEmail  = guest.email    || '';
+    const propName    = listing.nickname || listing.title || '';
+    const bookRef     = res.confirmationCode || res.source?.confirmationCode || res.source?.bookingNumber || ref;
+
+    _booking = {
+      raw: res,
+      guesty_id: res._id || res.id || '',
+      bookRef, propName, guestName, guestEmail,
+      checkIn, checkOut,
+      numAdults, numChildren, numPets,
+    };
+
+    out.innerHTML = '<p class="ok">✓ Found reservation</p><pre>' + escapeHtml(JSON.stringify({
+      guesty_id: _booking.guesty_id,
+      bookRef, propName, guestName, guestEmail,
+      checkIn, checkOut, numAdults, numChildren, numPets,
+    }, null, 2)) + '</pre>';
+
+    await loadPropertyOptions();
+    populatePreview();
+    document.getElementById('previewSection').style.display = '';
+    document.getElementById('previewSection').scrollIntoView({ behavior:'smooth', block:'start' });
+  } catch (e) {
+    out.innerHTML = '<p class="reason">Lookup failed:</p><pre>' + escapeHtml(e.message) + '</pre>';
+  } finally {
+    btn.disabled = false; btn.textContent = 'Fetch from Guesty';
+  }
+}
+
+async function loadPropertyOptions() {
+  if (_properties.length) return;
+  const data = await mq(`{ boards(ids:[${PROP_CONFIG_BOARD}]) { items_page(limit:200) { items { id name } } } }`);
+  _properties = (data?.boards?.[0]?.items_page?.items || [])
+    .map(i => ({ id: i.id, name: i.name }))
+    .sort((a,b) => a.name.localeCompare(b.name));
+}
+
+function populatePreview() {
+  const sel = document.getElementById('pProperty');
+  const guestyName = (_booking.propName || '').toLowerCase().trim();
+  let matched = null;
+  for (const p of _properties) {
+    if (p.name.toLowerCase().trim() === guestyName) { matched = p.name; break; }
+  }
+  if (!matched) {
+    // softer match: substring either way
+    for (const p of _properties) {
+      const a = p.name.toLowerCase(); const b = guestyName;
+      if (b && (a.includes(b) || b.includes(a))) { matched = p.name; break; }
+    }
+  }
+  sel.innerHTML = '<option value="">— Select property —</option>' +
+    _properties.map(p => `<option value="${escapeHtml(p.name)}" ${p.name===matched?'selected':''}>${escapeHtml(p.name)}</option>`).join('');
+  document.getElementById('pPropertyHint').innerHTML = matched
+    ? `<span class="ok">✓ Matched Guesty listing "${escapeHtml(_booking.propName)}" → Property Config "${escapeHtml(matched)}"</span>`
+    : `<span class="reason">No exact match for Guesty listing "${escapeHtml(_booking.propName)}" in Property Config — pick the right one above.</span>`;
+
+  document.getElementById('pCheckin').value  = _booking.checkIn;
+  document.getElementById('pCheckout').value = _booking.checkOut;
+  document.getElementById('pGuest').value    = _booking.guestName;
+  document.getElementById('pEmail').value    = _booking.guestEmail;
+  document.getElementById('pAdults').value   = _booking.numAdults;
+  document.getElementById('pChildren').value = _booking.numChildren;
+  document.getElementById('pPets').value     = _booking.numPets;
+  document.getElementById('pBookingRef').value = _booking.bookRef;
+}
+
+function resetPreview() {
+  _booking = null;
+  document.getElementById('previewSection').style.display = 'none';
+  document.getElementById('lookupOut').innerHTML = '';
+  document.getElementById('bookingRef').value = '';
+}
+
+// ── Item-name format used by the Make scenario for the Cleans board.
+function buildCleansItemName(prop, isoDate) {
+  const d = new Date(isoDate + 'T12:00:00');
+  const dow = ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'][d.getDay()];
+  return `${dow} ${d.getDate()} · ${prop}`;
+}
+
+// ── Commit ───────────────────────────────────────────────────────────
+async function commitImport() {
+  const prop      = document.getElementById('pProperty').value;
+  const checkin   = document.getElementById('pCheckin').value;
+  const checkout  = document.getElementById('pCheckout').value;
+  const guest     = document.getElementById('pGuest').value.trim();
+  const email     = document.getElementById('pEmail').value.trim();
+  const adults    = parseInt(document.getElementById('pAdults').value) || 0;
+  const children  = parseInt(document.getElementById('pChildren').value) || 0;
+  const pets      = parseInt(document.getElementById('pPets').value) || 0;
+  const bookRef   = document.getElementById('pBookingRef').value.trim();
+  const wantClean = document.getElementById('optCleans').checked;
+  const wantArr   = document.getElementById('optArrivals').checked;
+  const tagLast   = document.getElementById('optLastMinute').checked;
+
+  if (!prop)     return alert('Pick a property.');
+  if (!checkin)  return alert('Set the check-in date.');
+  if (!checkout) return alert('Set the check-out date.');
+  if (!wantClean && !wantArr) return alert('Pick at least one board to write to.');
+
+  const btn = document.getElementById('importBtn');
+  btn.disabled = true; btn.textContent = 'Importing…';
+
+  const log = document.getElementById('commitLog');
+  log.innerHTML = '';
+  const stamp = new Date().toISOString().slice(0,16).replace('T',' ');
+  const note  = `Backfilled manually ${stamp} from Guesty ${_booking?.guesty_id || ''} — ref ${bookRef}.`;
+
+  // 1. Cleans board
+  if (wantClean) {
+    addStep('cleans', 'doing', 'Creating Cleans-board row…');
+    try {
+      const itemName = buildCleansItemName(prop, checkin);
+      const cv = {
+        [CL_DATE]:      { date: checkin },
+        [CL_CHECKIN]:   { date: checkin },
+        [CL_CHECKOUT]:  { date: checkout },
+        [CL_REVIEW_NT]: note,
+      };
+      if (tagLast) cv[CL_REVIEW] = { label: 'Last minute' };
+      const cvStr = JSON.stringify(JSON.stringify(cv));
+      const data = await mq(`mutation { create_item(board_id:${CLEANS_BOARD}, item_name:${JSON.stringify(itemName)}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`);
+      addStep('cleans', 'done', `✓ Cleans row created · item <code>${data.create_item.id}</code> · "${escapeHtml(itemName)}"`);
+    } catch (e) {
+      addStep('cleans', 'fail', '✗ Cleans row failed: ' + escapeHtml(e.message));
+    }
+  }
+
+  // 2. Arrivals board
+  if (wantArr) {
+    addStep('arrivals', 'doing', 'Creating Arrivals-board row…');
+    try {
+      const itemName = `${guest || prop} — ${checkin}`;
+      const cv = {
+        [AR_DATE]:    { date: checkin },
+        [AR_PROP]:    prop,
+        [AR_BOOKREF]: bookRef,
+        [AR_FORM_ST]: { label: 'Pending' },
+        [AR_ADULTS]:    String(adults),
+        [AR_CHILDREN]:  String(children),
+        [AR_PETS]:      String(pets),
+      };
+      const cvStr = JSON.stringify(JSON.stringify(cv));
+      const data = await mq(`mutation { create_item(board_id:${ARRIVALS_BOARD}, item_name:${JSON.stringify(itemName)}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`);
+      addStep('arrivals', 'done', `✓ Arrivals row created · item <code>${data.create_item.id}</code> · "${escapeHtml(itemName)}". The guest-form Make scenario should now treat this as a normal arrival.`);
+    } catch (e) {
+      addStep('arrivals', 'fail', '✗ Arrivals row failed: ' + escapeHtml(e.message));
+    }
+  }
+
+  addStep('done', 'done', 'Refresh rota-planner.html and arrivals-hub.html to see the new rows.');
+  btn.disabled = false; btn.textContent = 'Import to Monday';
+}
+
+function addStep(key, state, html) {
+  const log = document.getElementById('commitLog');
+  const div = document.createElement('div');
+  div.className = 'step ' + state;
+  div.innerHTML = html;
+  log.appendChild(div);
+}
+
+function escapeHtml(s) { return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+</script>
+</body>
+</html>

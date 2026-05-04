@@ -510,23 +510,29 @@
 /* ═══════════════════════════════════════════════════════════════════
    CONFIG — Hot Tub Rota
    ═══════════════════════════════════════════════════════════════════ */
-const HTROTA_BUILD = 'hot-tub-rota v1.0';
+const HTROTA_BUILD = 'hot-tub-rota v1.1 (Arrivals-driven; 2026-05-04)';
 console.log(`%c${HTROTA_BUILD}`, 'color:#1a5276;font-weight:bold');
 
 const MONDAY_API_TOKEN = window.MONDAY_API_TOKEN;
 
 // Boards
+// Arrivals is the canonical source of booking data — every consumer derives
+// from here. See docs/arrivals-architecture.md.
+// Refactored 2026-05-04: fetchBookings reads Arrivals (was Cleans). Lodge
+// Status is now used only for the per-property location/lake snapshot
+// (no booking data) and will be retired once that metadata moves.
+const ARRIVALS_BOARD     = '5094453064';   // Guest Arrivals — single source of truth for booking shape
 const PROP_CONFIG_BOARD  = '5094466278';   // Property Config — master record (which props need maintenance, durations, hasTub)
 const TUB_STATUS_BOARD   = '1918769299';   // Hot Tub Status — last-cleaned anchor + tub readings
 const HT_CLEANS_BOARD    = '5095259581';   // Hot Tub Cleans — scheduled clean rows (created 2026-04-25)
-const LODGE_STATUS_BOARD = '1928673949';   // Lodge Status — booking dates (legacy, fallback)
-const HK_CLEANS_BOARD    = '5095134636';   // Cleans — every upcoming changeover (one row per turnover with check-in + check-out)
+const PROP_LOCATION_BOARD = '1928673949';  // Lodge Status — read ONLY for the lake/area metadata column (LS_LOCATION). No booking data.
 const STAFF_BOARD        = '5095127554';
 
-// Cleans board columns (housekeeping rota — used as the booking timeline source)
-const HK_CL_CHECKIN  = 'date_mm2p6tck';     // The new guest's arrival date
-const HK_CL_CHECKOUT = 'date_mm2pb8rs';     // The new guest's departure date
-const HK_CL_PROP     = 'board_relation_mm2psy0b';  // Linked property (often empty — fall back to item name)
+// Arrivals columns
+const AR_DATE     = 'date_mm2adtwg';   // arrival date (check-in)
+const AR_CHECKOUT = 'date_mm31c5jt';   // departure date (check-out) — added 2026-05-04
+const AR_PROP     = 'text_mm2ahbrx';   // property name (text snapshot)
+const AR_BOOKREF  = 'text_mm2ah8s';    // booking reference / Guesty confirmationCode
 
 // Property Config columns (master)
 const PC_NEEDS_MAINT  = 'boolean_mm2rvfsv';      // Maintenance clean — drives this rota
@@ -537,19 +543,16 @@ const PC_MID_MINS     = 'numeric_mm2rcbe6';      // Mid-stay / Mid-vac duration 
 // Hot Tub Status columns — only used to read the last-cleaned anchor
 const TS_LAST         = 'date4';                 // Last Cleaned Date
 
-// Lodge Status — used to read the property's lake/area Location.
+// Lodge Status — read ONLY for the property's lake/area Location.
+// (The four LS_CURR_*/LS_NEXT_* booking-date columns that used to live here
+// were dead code and were removed in the 2026-05-04 Arrivals refactor.)
 const LS_LOCATION     = 'text_mm1gza8p';
-
-// Lodge Status columns
-const LS_CURR_IN  = 'date4';
-const LS_CURR_OUT = 'date_mkqaea46';
-const LS_NEXT_IN  = 'date_mkqwfyfx';
-const LS_NEXT_OUT = 'date_mkqw4cf6';
 
 // Hot Tub Cleans columns (this board's columns)
 const HC_DATE     = 'date_mm2rvsp9';
 const HC_CHECKIN  = 'date_mm2v4gm3';
 const HC_PROP     = 'board_relation_mm2rjw3';
+const HC_ARRIVAL  = 'board_relation_mm31mzvh';   // → Arrivals (added 2026-05-04 — links each HT clean to its booking)
 const HC_TYPE     = 'color_mm2rr4cv';            // Clean Type (status)
 const HC_PERSON   = 'dropdown_mm2rjwkr';         // Person Name (dropdown — staff names)
 const HC_START    = 'hour_mm2r90d7';             // Earliest Start (hour)
@@ -672,7 +675,7 @@ async function fetchProperties() {
     mondayFetch(`{ boards(ids:[${TUB_STATUS_BOARD}]){ items_page(limit:200){ items{
       id name column_values(ids:${tsCols}){ id value text }
     } } } }`),
-    mondayFetch(`{ boards(ids:[${LODGE_STATUS_BOARD}]){ items_page(limit:200){ items{
+    mondayFetch(`{ boards(ids:[${PROP_LOCATION_BOARD}]){ items_page(limit:200){ items{
       id name column_values(ids:${lsCols}){ id value text }
     } } } }`),
   ]);
@@ -736,36 +739,26 @@ function durationForType(p, type) {
   return type === 'Changeover' ? (p.fullDuration || 45) : (p.midDuration || 20);
 }
 
-/* Each Cleans-board row represents one upcoming check-in. We aggregate them
+/* Each Arrivals-board row represents one upcoming check-in. We aggregate them
    per property to build a forward-looking timeline of stays:
        bookings[propertyName] = [
-         { checkIn: 'YYYY-MM-DD', checkOut: 'YYYY-MM-DD' },
-         { checkIn: ..., checkOut: ... },
+         { arrivalId, checkIn: 'YYYY-MM-DD', checkOut: 'YYYY-MM-DD', bookingRef },
+         { arrivalId, checkIn: ..., checkOut: ... },
          ...
        ]
    This gives full visibility of every booking the housekeeping team has been
    asked to plan for, not just current+next.
 
-   Fallback: parse property name from item name (e.g. "Mon 27 · Mayflower"
-   → "Mayflower"), since the board_relation column is sometimes empty. */
-function parsePropertyFromCleanItemName(name) {
-  if (!name) return '';
-  let n = name.trim();
-  const emIdx = n.indexOf(' — ');
-  if (emIdx >= 0) n = n.slice(0, emIdx).trim();
-  const bulletMatch = n.match(/^[A-Za-z]{3}\s+\d{1,2}\s+·\s+(.+)$/);
-  if (bulletMatch) n = bulletMatch[1].trim();
-  return n.replace(/^CL\s+/i, '').trim();
-}
-
+   Refactored 2026-05-04: source switched from Cleans to Arrivals (single
+   source of truth). Cleans rows are now just the operational *output* of
+   this rota, not its input. */
 async function fetchBookings() {
-  const cols = `["${HK_CL_CHECKIN}","${HK_CL_CHECKOUT}","${HK_CL_PROP}"]`;
-  // Paginate — the Cleans board can run past 500 entries in a busy season.
+  const cols = `["${AR_DATE}","${AR_CHECKOUT}","${AR_PROP}","${AR_BOOKREF}"]`;
   let cursor = null, all = [];
   do {
     const q = cursor
       ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${cols}){ id value text } } } }`
-      : `{ boards(ids:[${HK_CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${cols}){ id value text } } } } }`;
+      : `{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${cols}){ id value text } } } } }`;
     const d = await mondayFetch(q);
     const page = cursor ? d?.next_items_page : d?.boards?.[0]?.items_page;
     if (!page) break;
@@ -777,19 +770,24 @@ async function fetchBookings() {
   for (const it of all) {
     try {
       const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));
-      const checkIn  = pj(cv[HK_CL_CHECKIN]?.value)?.date  || null;
-      const checkOut = pj(cv[HK_CL_CHECKOUT]?.value)?.date || null;
+      const checkIn  = pj(cv[AR_DATE]?.value)?.date     || cv[AR_DATE]?.text     || null;
+      const checkOut = pj(cv[AR_CHECKOUT]?.value)?.date || cv[AR_CHECKOUT]?.text || null;
       // We need at least the check-in to anchor anything.
       if (!checkIn) continue;
-      // Property name: prefer the linked board_relation text, fall back to name parsing.
-      const relText = (cv[HK_CL_PROP]?.text || '').trim();
-      const fromName = parsePropertyFromCleanItemName(it.name);
-      const propName = relText || fromName;
+      // Property name comes straight from AR_PROP (text snapshot written by
+      // the Make scenarios from Guesty's listing.title). The Arrivals board
+      // does not use the fragile fallback the Cleans board needed.
+      const propName = (pj(cv[AR_PROP]?.value) || cv[AR_PROP]?.text || it.name || '').trim();
       if (!propName) continue;
       if (!bookings[propName]) bookings[propName] = [];
-      bookings[propName].push({ checkIn, checkOut });
+      bookings[propName].push({
+        arrivalId: String(it.id),
+        checkIn,
+        checkOut,
+        bookingRef: pj(cv[AR_BOOKREF]?.value) || cv[AR_BOOKREF]?.text || '',
+      });
     } catch (e) {
-      console.warn('fetchBookings: skipping clean', it?.id, e);
+      console.warn('fetchBookings: skipping arrival', it?.id, e);
     }
   }
   // Sort each property's stays by check-in date so the algorithm can sweep forward
@@ -921,12 +919,13 @@ function shiftRoleFor(staffId, dayStr) {
 }
 
 async function fetchCleans() {
-  const cols = `["${HC_DATE}","${HC_PROP}","${HC_TYPE}","${HC_PERSON}","${HC_START}","${HC_STATUS}","${HC_DURATION}","${HC_NOTES}","${HC_AUTOGEN}"]`;
+  const cols = `["${HC_DATE}","${HC_PROP}","${HC_TYPE}","${HC_PERSON}","${HC_START}","${HC_STATUS}","${HC_DURATION}","${HC_NOTES}","${HC_AUTOGEN}","${HC_ARRIVAL}"]`;
   let cursor = null, all = [];
   do {
+    // Typed BoardRelationValue fragment so HC_ARRIVAL exposes linked_item_ids.
     const q = cursor
-      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${cols}){ id value text } } } }`
-      : `{ boards(ids:[${HT_CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${cols}){ id value text } } } } }`;
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${cols}){ id value text ... on BoardRelationValue { linked_item_ids } } } } }`
+      : `{ boards(ids:[${HT_CLEANS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${cols}){ id value text ... on BoardRelationValue { linked_item_ids } } } } } }`;
     const d = await mondayFetch(q);
     const page = cursor ? d?.next_items_page : d?.boards?.[0]?.items_page;
     if (!page) break;
@@ -963,9 +962,13 @@ async function fetchCleans() {
         if (emIdx > 0) n = n.slice(0, emIdx);
         propLabel = n.trim();
       }
+      // Linked Arrivals row id (canonical join — added 2026-05-04).
+      const arrivalLinkedIds = cv[HC_ARRIVAL]?.linked_item_ids || [];
+      const arrivalId = arrivalLinkedIds.length ? String(arrivalLinkedIds[0]) : null;
       cleans.push({
         id: it.id,
         mondayId: it.id,
+        arrivalId,
         property: propLabel,
         unlisted: isUnlisted,
         day: dateObj.date,
@@ -2543,15 +2546,22 @@ function buildColumnValuesPayload(c) {
   const prop = c.unlisted ? null : properties.find(p => p.name === c.property);
   const propId = prop?.id;
   const [hh, mm] = (c.start || '10:00').split(':').map(Number);
-  // Work out which check-in date this clean is serving (same logic as render)
+  // Work out which booking this clean is serving (same logic as render).
+  // We also capture the Arrivals item id so we can write HC_ARRIVAL — the
+  // canonical link back to the booking, added 2026-05-04.
   const propStays = staysFor(c.property);
-  let servingCheckIn = null;
+  let servingStay = null;
   if (isCheckinOn(propStays, c.day)) {
-    servingCheckIn = c.day;
+    servingStay = propStays.find(s => s.checkIn === c.day) || null;
   } else {
     const fut = propStays.filter(s => s.checkIn && s.checkIn > c.day).sort((a,b) => a.checkIn.localeCompare(b.checkIn));
-    if (fut[0]) servingCheckIn = fut[0].checkIn;
+    if (fut[0]) servingStay = fut[0];
   }
+  const servingCheckIn = servingStay?.checkIn || null;
+  // Prefer the clean's own arrivalId if it already has one (e.g. from
+  // fetchCleans); fall back to the serving stay's arrivalId if we just
+  // matched one by date.
+  const servingArrivalId = c.arrivalId || servingStay?.arrivalId || null;
 
   const cv = {
     [HC_DATE]:     { date: c.day },
@@ -2565,6 +2575,7 @@ function buildColumnValuesPayload(c) {
   };
   if (propId) cv[HC_PROP] = { item_ids: [parseInt(propId, 10)] };
   if (servingCheckIn) cv[HC_CHECKIN] = { date: servingCheckIn };
+  if (servingArrivalId) cv[HC_ARRIVAL] = { item_ids: [parseInt(servingArrivalId, 10)] };
   return cv;
 }
 

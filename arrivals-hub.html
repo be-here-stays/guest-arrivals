@@ -389,21 +389,39 @@
   <div id="waiversContent"><div class="empty"><p>Loading…</p></div></div>
 </div>
 <div class="sup-toast" id="supToast"></div>
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
+
 <script>
-const BOARD_ID             = '5094453064';
+// Arrivals is the canonical source of booking data — every consumer derives
+// from here. See docs/arrivals-architecture.md.
+// Refactored 2026-05-04 to drop the Lodge Status read entirely (Phase 9).
+const ARRIVALS_BOARD       = '5094453064';   // Guest Arrivals — single source of truth
 const PROP_CONFIG_BOARD_ID = '5094466278';
 // Set this to the column ID of a "Waiver Signed" date column on the arrivals board.
 // Add a Date column called "Waiver Signed" to the board, then paste its ID here.
 const WAIVER_COL_ID        = 'date_mm2jrjej';
-const MONDAY_API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+// Arrivals checkout column — used to build the prevOut lookup for the
+// stay-aware changeover dashboard. Added 2026-05-04.
+const AR_CHECKOUT          = 'date_mm31c5jt';
+const MONDAY_API_TOKEN = window.MONDAY_API_TOKEN;
 const SUP_WRITE_TOKEN  = MONDAY_API_TOKEN;
 const STATUS       = { '0': 'Sent', '1': 'Received', '2': 'Pending', 'none': 'Not Set' };
 const STATUS_CLASS = { '0': 'form-sent', '1': 'form-received', '2': 'form-pending', 'none': '' };
 const BADGE_CLASS  = { '0': 'status-sent', '1': 'status-received', '2': 'status-pending', 'none': 'status-none' };
 const DAYS         = ['Sunday','Monday','Tuesday','Wednesday','Thursday','Friday','Saturday'];
+
+// Changeover Boards
+const LOG_BOARD        = 5094663022;
+const CLEANS_BOARD     = 5095134636;
+const HOT_TUB_BOARD    = 1918769299;
+const HT_CLEANS_BOARD  = 5095259581;
+
 let allItems    = [];
 let propConfigs = {};
 let currentDate = null;
+let coData      = null; // Cached changeover sync data
+const p = v => { try { return JSON.parse(v); } catch { return null; } };
 function formatBeds(str) {
   if (!str) return 'Not specified';
   if (/fixed\s*[-–]\s*no choice needed/i.test(str) || str.trim().toLowerCase() === 'fixed')
@@ -443,7 +461,7 @@ async function fetchAllItems(token) {
   let items = [], cursor = null;
   do {
     const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
-    const data = await mondayQuery(token, `{ boards(ids: [${BOARD_ID}]) { items_page(limit: 500${cursorPart}) { cursor items { id name column_values(ids: ["date_mm2adtwg","color_mm2aw8fx","text_mm2ahbrx","text_mm2ab56m","numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x","text_mm2ah8s"${WAIVER_COL_ID ? ',"'+WAIVER_COL_ID+'"' : ''}]) { id value } } } } }`);
+    const data = await mondayQuery(token, `{ boards(ids: [${ARRIVALS_BOARD}]) { items_page(limit: 500${cursorPart}) { cursor items { id name column_values(ids: ["date_mm2adtwg","${AR_CHECKOUT}","color_mm2aw8fx","text_mm2ahbrx","text_mm2ab56m","numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x","text_mm2ah8s"${WAIVER_COL_ID ? ',"'+WAIVER_COL_ID+'"' : ''}]) { id value } } } } }`);
     const page = data.boards[0].items_page;
     items = items.concat(page.items);
     cursor = page.cursor;
@@ -495,22 +513,38 @@ async function loadAll() {
 function parseItem(item) {
   const cv = {};
   for (const c of item.column_values) cv[c.id] = c.value;
-  const p = v => { try { return JSON.parse(v); } catch { return null; } };
-  const dateVal    = p(cv['date_mm2adtwg']);
-  const statusVal  = p(cv['color_mm2aw8fx']);
-  const bedCfgVal  = p(cv['text_mm2ab56m']);
+  // Use global p
+  const dateVal     = p(cv['date_mm2adtwg']);
+  const checkoutVal = p(cv[AR_CHECKOUT]);
+  const statusVal   = p(cv['color_mm2aw8fx']);
+  const bedCfgVal   = p(cv['text_mm2ab56m']);
+
   return {
     id: item.id, name: item.name,
-    property:    p(cv['text_mm2ahbrx']) || '',
-    arrivalDate: dateVal?.date || null,
-    formStatus:  statusVal ? String(statusVal.index ?? 'none') : 'none',
-    bedConfig:   bedCfgVal || '',
-    adults:      parseInt(p(cv['numeric_mm2a5s8r'])) || 0,
-    children:    parseInt(p(cv['numeric_mm2add81'])) || 0,
-    pets:        parseInt(p(cv['numeric_mm2ahz0x'])) || 0,
-    bookingRef:  p(cv['text_mm2ah8s']) || '',
+    property:     p(cv['text_mm2ahbrx']) || '',
+    arrivalDate:  dateVal?.date || null,
+    checkoutDate: checkoutVal?.date || null,    // departure date — drives the stay-aware dashboard prevOut lookup
+    formStatus:   statusVal ? String(statusVal.index ?? 'none') : 'none',
+    bedConfig:    bedCfgVal || '',
+    adults:       parseInt(p(cv['numeric_mm2a5s8r'])) || 0,
+    children:     parseInt(p(cv['numeric_mm2add81'])) || 0,
+    pets:         parseInt(p(cv['numeric_mm2ahz0x'])) || 0,
+    bookingRef:   p(cv['text_mm2ah8s']) || '',
     waiverSigned: WAIVER_COL_ID ? (p(cv[WAIVER_COL_ID])?.date || null) : null,
   };
+}
+
+async function fetchChangeoverData() {
+  // Arrivals data comes from `allItems` (already paginated by fetchAllItems).
+  // This query only pulls the *operational* boards: logs, cleans, hot tubs.
+  const q = `{
+    logs:  boards(ids:[${LOG_BOARD}]){  items_page(limit:500){ items{ name created_at column_values(ids:["date_mm2e4wj5"]){ id text value } } } }
+    cleans:boards(ids:[${CLEANS_BOARD}]){items_page(limit:500){ items{ name column_values(ids:["date_mm2p6tck","date_mm2qxh4a","board_relation_mm2psy0b"]){ id text value } } } }
+    hubs:  boards(ids:[${HOT_TUB_BOARD}]){ items_page(limit:100){ items{ name } } }
+    htc:   boards(ids:[${HT_CLEANS_BOARD}]){items_page(limit:300){ items{ name column_values(ids:["date_mm2rvsp9","date_mm2v4gm3","color_mm2rqkeq","board_relation_mm2rjw3"]){ id text value } } } }
+  }`;
+  const res = await mondayQuery(MONDAY_API_TOKEN, q);
+  return res;
 }
 function localDateStr(d) {
   return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
@@ -729,70 +763,148 @@ window.addEventListener('DOMContentLoaded', loadAll);
 // ════════════════════════════════════════════════════════════
 // CHANGEOVERS
 // ════════════════════════════════════════════════════════════
-const LOG_BOARD  = 5094663022;
 const NO_OUTSIDE = new Set(['Essitone House']);
 const ACT_MAP    = { 'House Cleaned': 0, 'Laundry Dropped': 1, 'Restocked': 2, 'House Checked': 3, 'Outside Clean': 4 };
-async function fetchChangeoverLog(todayStr) {
-  const data = await mondayQuery(MONDAY_API_TOKEN, `{ boards(ids: [${LOG_BOARD}]) { items_page(limit: 500) { items { name created_at } } } }`);
-  return (data?.boards?.[0]?.items_page?.items || []).filter(item => item.created_at?.split('T')[0] === todayStr);
-}
+
 async function renderChangeovers() {
   const container = document.getElementById('changeoversContent');
   const subtitle  = document.getElementById('co-subtitle');
   const summary   = document.getElementById('co-summary');
-  container.innerHTML = '<div class="loading">Loading sign-off data…</div>';
-  summary.textContent = '';
+  
+  container.innerHTML = '<div class="loading"><span class="sup-spinner"></span> Loading stay-aware changeover data…</div>';
+  
   const todayStr   = new Date().toISOString().split('T')[0];
   const todayLabel = new Date().toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'long' });
   subtitle.textContent = todayLabel;
-  if (!allItems.length) { container.innerHTML = '<div class="co-empty">Arrivals data not loaded — hit Refresh at the top first.</div>'; return; }
-  const todayArrivals = allItems.map(parseItem).filter(i => i.arrivalDate === todayStr);
-  const propMap = {};
-  for (const a of todayArrivals) {
-    if (!a.property) continue;
-    if (!propMap[a.property]) propMap[a.property] = { guests: 0 };
-    propMap[a.property].guests += (a.adults || 0) + (a.children || 0);
+
+  try {
+    const data = await fetchChangeoverData();
+
+    // Arrivals is the only source we need — fold every parsed booking into a
+    // per-property timeline. Each property's stays are sorted by check-in so
+    // we can compute prevOut (the most recent checkout before today) on the
+    // fly. Replaces the old Lodge Status read entirely.
+    const byPropTimeline = new Map();
+    for (const item of allItems.map(parseItem)) {
+      if (!item.property || !item.arrivalDate) continue;
+      if (!byPropTimeline.has(item.property)) byPropTimeline.set(item.property, []);
+      byPropTimeline.get(item.property).push(item);
+    }
+    for (const list of byPropTimeline.values()) {
+      list.sort((a, b) => a.arrivalDate.localeCompare(b.arrivalDate));
+    }
+
+    // Pick today's arrivals — one entry per property, preferring the row
+    // whose form status is most-progressed (Received > Pending > Sent > none),
+    // matching the original tie-break behaviour.
+    const byPropToday = {};
+    const priMap = { '1':0, '0':1, '2':2, 'none':3 };
+    for (const item of allItems.map(parseItem)) {
+      if (item.arrivalDate !== todayStr || !item.property) continue;
+      if (!byPropToday[item.property] || priMap[item.formStatus] < priMap[byPropToday[item.property].formStatus])
+        byPropToday[item.property] = item;
+    }
+
+    // For each of today's arrivals, look up the previous booking on the same
+    // property to get prevOut. AR_CHECKOUT (preferred) → fallback: the gap
+    // before the prior booking's checkin (back-to-back implied) → today.
+    const todayArrivals = Object.values(byPropToday).map(i => {
+      const stays = byPropTimeline.get(i.property) || [];
+      const prior = stays.filter(s => s.arrivalDate < todayStr).slice(-1)[0] || null;
+      const prevOut = (prior && prior.checkoutDate) || todayStr;
+      return { name: i.property, checkIn: todayStr, prevOut };
+    }).sort((a, b) => a.name.localeCompare(b.name));
+
+    if (todayArrivals.length === 0) {
+      container.innerHTML = '<div class="co-empty">No arrivals scheduled for today.</div>';
+      subtitle.textContent = `${todayLabel} · 0 properties`;
+      return;
+    }
+
+    const logsBoard = data.logs?.[0];
+    const rawLogs = logsBoard?.items_page?.items || [];
+    const cleansBoard = data.cleans?.[0];
+    const rawCleans = cleansBoard?.items_page?.items || [];
+    const htcBoard = data.htc?.[0];
+    const rawHTC = htcBoard?.items_page?.items || [];
+    const hotTubs   = new Set((data.hubs?.[0]?.items_page?.items || []).map(i => i.name));
+
+    const OUTSIDE_NO_HT = new Set(['Green Haven', 'Serenity', 'Goose Landing']);
+    const NO_OUTSIDE    = new Set(['Essitone House']);
+
+    let cntDone = 0, cntPart = 0, cntNone = 0;
+    const rows = todayArrivals.map(arr => {
+      const prop = arr.name;
+      const windowStart = arr.prevOut;
+      const windowEnd   = arr.checkIn;
+      const done = new Set();
+
+      // 1. Logs
+      rawLogs.forEach(l => {
+        const parts = l.name.split(' • ');
+        if (parts[0]?.trim() !== prop) return;
+        const actIdx = ACT_MAP[parts[1]?.trim()];
+        if (actIdx === undefined) return;
+        const lDate = JSON.parse(l.column_values[0]?.value || 'null')?.date || l.created_at.split('T')[0];
+        if (lDate >= windowStart) done.add(actIdx);
+      });
+
+      // 2. Planned Cleans
+      rawCleans.forEach(p => {
+        const cv = Object.fromEntries(p.column_values.map(c=>[c.id, c]));
+        const pProp = cv['board_relation_mm2psy0b']?.text || '';
+        if (!pProp.includes(prop)) return;
+        const pCheckin = JSON.parse(cv['date_mm2p6tck']?.value || 'null')?.date;
+        const pComp = JSON.parse(cv['date_mm2qxh4a']?.value || 'null')?.date;
+        if (pCheckin === windowEnd && pComp) done.add(0);
+      });
+
+      // 3. Maintenance
+      rawHTC.forEach(h => {
+        const cv = Object.fromEntries(h.column_values.map(c=>[c.id, c]));
+        let hProp = cv['board_relation_mm2rjw3']?.text || '';
+        if (!hProp) hProp = h.name.split(' — ')[0];
+        if (!hProp.includes(prop)) return;
+        const hCheckin = p(cv['date_mm2v4gm3']?.value)?.date;
+        const hDate    = p(cv['date_mm2rvsp9']?.value)?.date;
+        const hSta     = cv['color_mm2rqkeq']?.text;
+        if (hSta === 'Completed' && (hCheckin ? hCheckin === windowEnd : hDate >= windowStart)) done.add(4);
+      });
+
+      const hasOutside = hotTubs.has(prop) || OUTSIDE_NO_HT.has(prop);
+      const isNoOutside = NO_OUTSIDE.has(prop);
+
+      const cleanDone=done.has(0), laundryDone=done.has(1), restockDone=done.has(2), checkedDone=done.has(3), outsideDone=done.has(4);
+      const checkBlocked = !cleanDone && !checkedDone;
+      const checkCounts  = cleanDone && checkedDone;
+      const total = isNoOutside ? 4 : 5;
+      const doneN = (cleanDone?1:0)+(laundryDone?1:0)+(restockDone?1:0)+(checkCounts?1:0)+(!isNoOutside && outsideDone?1:0);
+      const pct   = Math.round((doneN / total) * 100);
+
+      if (pct === 100) cntDone++; else if (doneN>0) cntPart++; else cntNone++;
+
+      const tdot = (isDone, blocked=false, na=false) => {
+        if (na)      return `<td class="co-task-cell"><span class="co-tdot co-tdot-na">—</span></td>`;
+        if (blocked) return `<td class="co-task-cell"><span class="co-tdot co-tdot-blocked">⏸</span></td>`;
+        if (isDone)  return `<td class="co-task-cell"><span class="co-tdot co-tdot-done">●</span></td>`;
+        return         `<td class="co-task-cell"><span class="co-tdot co-tdot-todo">○</span></td>`;
+      };
+
+      return `<tr class="${pct===100?'co-all':(doneN>0?'co-part':'co-none')}">
+        <td><div class="co-prop-name">${esc(prop)}</div></td>
+        ${tdot(cleanDone)}${tdot(laundryDone)}${tdot(restockDone)}${tdot(checkCounts, checkBlocked)}${tdot(outsideDone, false, isNoOutside)}
+        <td class="co-prog-cell"><div class="co-prog-wrap"><div class="co-prog-bg"><div class="co-prog-fill ${pct===100?'co-fill-full':'co-fill-part'}" style="width:${pct}%"></div></div><span class="co-prog-lbl">${doneN}/${total}</span></div></td>
+      </tr>`;
+    }).join('');
+
+    subtitle.textContent = `${todayLabel} · ${todayArrivals.length} Arrivals`;
+    summary.innerHTML = `<span class="co-sum-dot" style="background:#5c7c59"></span>${cntDone} Ready &nbsp;<span class="co-sum-dot" style="background:#AF926A"></span>${cntPart} In Progress &nbsp;<span class="co-sum-dot" style="background:#B98B73"></span>${cntNone} Pending`;
+    container.innerHTML = `<table class="co-table"><thead><tr><th>Property</th><th class="co-th-task">🧹<br><span style="font-size:9px;font-weight:400;color:#bbb">Clean</span></th><th class="co-th-task">🚐<br><span style="font-size:9px;font-weight:400;color:#bbb">Laundry</span></th><th class="co-th-task">🛒<br><span style="font-size:9px;font-weight:400;color:#bbb">Restock</span></th><th class="co-th-task">✅<br><span style="font-size:9px;font-weight:400;color:#bbb">Check</span></th><th class="co-th-task">🌿<br><span style="font-size:9px;font-weight:400;color:#bbb">Outside</span></th><th class="co-th-prog">Progress</th></tr></thead><tbody>${rows}</tbody></table>`;
+
+  } catch (err) {
+    console.error(err);
+    container.innerHTML = `<div class="co-empty">⚠️ Failed to load stay-aware dashboard: ${err.message}</div>`;
   }
-  let logItems = [];
-  try { logItems = await fetchChangeoverLog(todayStr); } catch(e) { console.warn(e); }
-  const actLog = {};
-  for (const item of logItems) {
-    const parts = item.name.split(' • ');
-    const prop  = parts[0]?.trim();
-    const act   = ACT_MAP[parts[1]?.trim()];
-    if (!prop || act === undefined) continue;
-    if (!actLog[prop]) actLog[prop] = new Set();
-    actLog[prop].add(act);
-  }
-  for (const prop of Object.keys(actLog)) if (!propMap[prop]) propMap[prop] = { guests: 0 };
-  const properties = Object.keys(propMap).sort();
-  subtitle.textContent = `${todayLabel} · ${properties.length} propert${properties.length!==1?'ies':'y'} · ${logItems.length} sign-off${logItems.length!==1?'s':''} logged`;
-  if (properties.length === 0) { container.innerHTML = '<div class="co-empty">No arrivals or changeovers today.</div>'; return; }
-  let cntDone = 0, cntPart = 0, cntNone = 0;
-  const rows = properties.map(prop => {
-    const done    = actLog[prop] || new Set();
-    const outside = !NO_OUTSIDE.has(prop);
-    const info    = propMap[prop];
-    const cleanDone=done.has(0), laundryDone=done.has(1), restockDone=done.has(2), checkedDone=done.has(3), outsideDone=done.has(4);
-    const checkBlocked = !cleanDone && !checkedDone;
-    const checkCounts  = cleanDone && checkedDone;
-    const total = outside ? 5 : 4;
-    const doneN = (cleanDone?1:0)+(laundryDone?1:0)+(restockDone?1:0)+(checkCounts?1:0)+(outside&&outsideDone?1:0);
-    const pct   = Math.round((doneN / total) * 100);
-    let rowCls = 'co-none';
-    if (pct === 100) { rowCls = 'co-all'; cntDone++; } else if (doneN>0) { rowCls = 'co-part'; cntPart++; } else cntNone++;
-    const fillCls = pct===100 ? 'co-fill-full' : doneN>0 ? 'co-fill-part' : 'co-fill-none';
-    const tdot = (isDone, blocked=false, na=false) => {
-      if (na)      return `<td class="co-task-cell"><span class="co-tdot co-tdot-na">—</span></td>`;
-      if (blocked) return `<td class="co-task-cell"><span class="co-tdot co-tdot-blocked">⏸</span></td>`;
-      if (isDone)  return `<td class="co-task-cell"><span class="co-tdot co-tdot-done">●</span></td>`;
-      return         `<td class="co-task-cell"><span class="co-tdot co-tdot-todo">○</span></td>`;
-    };
-    const guestStr = info.guests ? `${info.guests} guest${info.guests!==1?'s':''}` : '';
-    return `<tr class="${rowCls}"><td><div class="co-prop-name">${esc(prop)}</div>${guestStr ? `<div class="co-guest-sub">${guestStr}</div>` : ''}</td>${tdot(cleanDone)}${tdot(laundryDone)}${tdot(restockDone)}${tdot(checkCounts, checkBlocked)}${tdot(outsideDone, false, !outside)}<td class="co-prog-cell"><div class="co-prog-wrap"><div class="co-prog-bg"><div class="co-prog-fill ${fillCls}" style="width:${pct}%"></div></div><span class="co-prog-lbl">${doneN}/${total}</span></div></td></tr>`;
-  }).join('');
-  summary.innerHTML = `<span class="co-sum-dot" style="background:#646955"></span>${cntDone} ready &nbsp;<span class="co-sum-dot" style="background:#AF926A"></span>${cntPart} in progress &nbsp;<span class="co-sum-dot" style="background:#B98B73"></span>${cntNone} not started`;
-  container.innerHTML = `<table class="co-table"><thead><tr><th>Property</th><th class="co-th-task">🧹<br><span style="font-size:9px;font-weight:400;color:#bbb">Clean</span></th><th class="co-th-task">🚐<br><span style="font-size:9px;font-weight:400;color:#bbb">Laundry</span></th><th class="co-th-task">🛒<br><span style="font-size:9px;font-weight:400;color:#bbb">Restock</span></th><th class="co-th-task">✅<br><span style="font-size:9px;font-weight:400;color:#bbb">Check</span></th><th class="co-th-task">🌿<br><span style="font-size:9px;font-weight:400;color:#bbb">Outside</span></th><th class="co-th-prog">Progress</th></tr></thead><tbody>${rows}</tbody></table>`;
 }
 function esc(s) {
   if (!s) return '';

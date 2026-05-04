@@ -1,0 +1,595 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Leave inbox — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; }
+
+  /* PIN gate */
+  #pinGate { position:fixed; inset:0; background:var(--dark); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; padding:20px; }
+  #pinGate h2 { color:#fff; font-size:18px; font-weight:600; margin-bottom:18px; }
+  #pinGate input { width:240px; padding:12px; font-size:20px; text-align:center; border-radius:8px; border:none; background:rgba(255,255,255,0.12); color:#fff; font-family:inherit; letter-spacing:8px; }
+  #pinGate input::placeholder { color:rgba(255,255,255,0.5); letter-spacing:normal; }
+  #pinGate .pin-err { color:#ff8a80; font-size:13px; margin-top:10px; min-height:18px; }
+  #pinGate .pin-back { color:rgba(255,255,255,0.5); margin-top:18px; font-size:12px; text-decoration:none; }
+
+  header { background:var(--dark); color:#fff; padding:18px 24px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+  header h1 { font-size:18px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.6; margin-top:2px; }
+  .hdr-actions { display:flex; gap:8px; }
+  .hdr-btn { color:rgba(255,255,255,0.85); text-decoration:none; font-size:13px; font-weight:600; padding:7px 12px; border:1px solid rgba(255,255,255,0.25); border-radius:8px; background:transparent; cursor:pointer; font-family:inherit; }
+  .hdr-btn:hover { background:rgba(255,255,255,0.08); }
+
+  .container { max-width:1100px; margin:0 auto; padding:18px 22px 60px; }
+
+  .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+  .filter-pill { padding:7px 13px; background:#fff; border:1.5px solid var(--border); border-radius:18px; font-size:13px; font-weight:600; color:var(--sage); cursor:pointer; user-select:none; }
+  .filter-pill.on { background:var(--dark); color:#fff; border-color:var(--dark); }
+  .stats { margin-left:auto; font-size:13px; color:var(--sage-mid); }
+
+  .group-hdr { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--sage-mid); margin:18px 4px 8px; }
+  .group-hdr .count { background:var(--sage); color:#fff; padding:1px 8px; border-radius:10px; font-size:11px; margin-left:6px; }
+
+  .row { background:#fff; border-radius:12px; padding:14px 16px; margin-bottom:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05); border-left:4px solid transparent; }
+  .row.conflict { border-left-color:var(--amber); background:var(--amber-bg); }
+  .row.pending  { border-left-color:var(--blue); }
+  .row.approved { border-left-color:var(--green); opacity:0.85; }
+  .row.declined { border-left-color:var(--red); opacity:0.7; }
+
+  .row-head { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .row-staff { font-size:15px; font-weight:700; color:var(--dark); flex:1 1 auto; }
+  .row-meta { font-size:12px; color:var(--sage-mid); margin-top:3px; display:flex; flex-wrap:wrap; gap:10px; }
+  .row .badge { font-size:11px; font-weight:700; padding:3px 8px; border-radius:10px; white-space:nowrap; }
+  .badge.annual   { background:var(--green-bg); color:var(--green); }
+  .badge.sick     { background:var(--red-bg); color:var(--red); }
+  .badge.personal { background:var(--blue-bg); color:var(--blue); }
+  .badge.pending  { background:var(--amber-bg); color:var(--amber); }
+  .badge.approved { background:var(--green-bg); color:var(--green); }
+  .badge.declined { background:var(--red-bg); color:var(--red); }
+  .badge.conflict { background:#fdebe2; color:var(--amber); }
+
+  .row-detail { margin-top:10px; padding-top:10px; border-top:1px dashed var(--border); }
+  .row-detail h4 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--sage); margin-bottom:4px; }
+  .row-detail p  { font-size:13px; color:var(--dark); line-height:1.45; white-space:pre-wrap; margin-bottom:10px; }
+  .day-list { font-size:12px; color:var(--sage); margin-top:6px; line-height:1.6; }
+  .day-list .tight { color:var(--amber); font-weight:700; }
+
+  .row-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  .row-actions button {
+    padding:8px 14px; border:1.5px solid var(--border); border-radius:8px; background:#fff;
+    font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; color:var(--dark);
+  }
+  .row-actions button:disabled { opacity:0.4; cursor:not-allowed; }
+  .row-actions button.approve { background:var(--green); color:#fff; border-color:var(--green); }
+  .row-actions button.decline { background:var(--red);   color:#fff; border-color:var(--red); }
+  .row-actions textarea { padding:8px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:13px; resize:vertical; min-height:50px; flex:1 1 100%; }
+  .override-wrap { font-size:12px; color:var(--amber); display:flex; align-items:center; gap:6px; flex:1 1 100%; padding:8px 10px; background:#fff; border:1px dashed var(--amber); border-radius:8px; }
+  .override-wrap input[type=checkbox] { width:16px; height:16px; cursor:pointer; }
+
+  .empty { text-align:center; color:var(--sage-mid); padding:50px 20px; }
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--dark); color:#fff; padding:10px 18px; border-radius:24px; font-size:13px; font-weight:600; opacity:0; transition:opacity .15s; pointer-events:none; z-index:200; }
+  .toast.show { opacity:1; }
+  .setup-card { background:var(--amber-bg); border:1.5px solid var(--amber); border-radius:14px; padding:16px 18px; margin-bottom:14px; }
+  .setup-card.hide { display:none; }
+  .setup-card h3 { font-size:14px; color:var(--amber); margin-bottom:6px; }
+  .setup-card p { font-size:13px; color:var(--dark); margin-bottom:10px; }
+  .setup-btn { padding:9px 14px; background:var(--amber); color:#fff; border:0; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  .loading { color:var(--sage-mid); font-size:13px; padding:30px; text-align:center; }
+  .hide { display:none !important; }
+</style>
+</head>
+<body>
+
+<!-- Manager PIN gate — same hash as the rota planner. -->
+<div id="pinGate">
+  <h2>Manager PIN</h2>
+  <input type="password" id="pinInp" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+  <div class="pin-err" id="pinErr"></div>
+  <a class="pin-back" href="hub.html">‹ Back to hub</a>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <div>
+      <h1>Leave inbox</h1>
+      <div class="sub" id="hdrSub">Staff leave requests — review and approve</div>
+    </div>
+    <div class="hdr-actions">
+      <a href="rota-planner.html" class="hdr-btn">Rota planner</a>
+      <a href="hub.html" class="hdr-btn">‹ Hub</a>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="setupCard" class="setup-card hide">
+      <h3>Leave Requests board not set up yet</h3>
+      <p>The Leave Requests board doesn't exist on Monday yet. Press once to create it.</p>
+      <button class="setup-btn" id="setupBtn" onclick="bootstrapBoard()">Create the leave board</button>
+    </div>
+
+    <div class="toolbar" id="toolbar"></div>
+    <div id="content" class="loading">Loading…</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="secrets.js"></script>
+<script src="leaves-schema.js"></script>
+
+<script>
+const TOKEN   = window.MONDAY_API_TOKEN;
+const URL_API = 'https://api.monday.com/v2';
+
+// Same PIN as rota-planner.html / staff-shifts.html (manager-only pages).
+const PIN_HASH = 'df8d602b7bcaf41725409b83af2a3df79722be244d9f33b5f128b81a269b955e';
+
+// Staff Shifts board — needed for the conflict count + the approve write.
+const SHIFTS_BOARD = '5095155773';
+const SH_DATE      = 'date_mm2phk9q';
+const SH_ROLE      = 'color_mm2pcrmp';
+const SH_STAFF     = 'text_mm2p1gqx';
+const SH_HOURS     = 'numeric_mm2pawya';
+
+// Staff board — used to resolve a Monday id from staff name when a request
+// row didn't capture the id at submission (older/edge cases).
+const STAFF_BOARD  = '5095127554';
+
+let _config     = null;
+let _items      = [];          // parsed Leave Requests rows
+let _shiftRows  = [];          // Staff Shifts rows (for conflict count)
+let _staffById  = new Map();   // staffId → { name }
+let _staffByName= new Map();   // lc(name) → staffId
+let _filter     = 'pending';   // 'pending' | 'all' | 'approved' | 'declined'
+let _expanded   = new Set();
+
+async function sha256(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function checkPin(v) {
+  if ((await sha256(v)) === PIN_HASH) {
+    sessionStorage.setItem('bh-mgmt', '1');
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    boot();
+  } else {
+    document.getElementById('pinErr').textContent = 'Wrong PIN';
+    document.getElementById('pinInp').value = '';
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  if (sessionStorage.getItem('bh-mgmt') === '1') {
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    boot();
+    return;
+  }
+  const inp = document.getElementById('pinInp');
+  inp.focus();
+  inp.addEventListener('input', () => {
+    if (inp.value.length === 6) checkPin(inp.value);
+  });
+});
+
+async function mq(query, variables) {
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization: TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtDate(iso) {
+  if (!iso) return '';
+  return new Date(iso+'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
+}
+function fmtDateRange(start, end) {
+  if (!start) return '';
+  if (!end || end === start) return fmtDate(start);
+  return `${fmtDate(start)} – ${fmtDate(end)}`;
+}
+
+async function boot() {
+  try {
+    _config = await window.LeavesSchema.getLeavesConfig(mq);
+    if (!_config) {
+      document.getElementById('setupCard').classList.remove('hide');
+      document.getElementById('content').innerHTML = '';
+      return;
+    }
+    await Promise.all([loadItems(), loadShifts(), loadStaff()]);
+    renderToolbar();
+    render();
+  } catch (e) {
+    console.error(e);
+    document.getElementById('content').innerHTML = `<div class="empty">Error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function bootstrapBoard() {
+  const btn = document.getElementById('setupBtn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    let cfg = await window.LeavesSchema.findLeavesBoard(mq);
+    if (!cfg) cfg = await window.LeavesSchema.createLeavesBoard(mq);
+    _config = cfg;
+    document.getElementById('setupCard').classList.add('hide');
+    await Promise.all([loadItems(), loadShifts(), loadStaff()]);
+    renderToolbar();
+    render();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Create the leave board';
+    toast('Setup failed: ' + e.message);
+  }
+}
+
+async function loadItems() {
+  const cols = _config.columns;
+  const want = ['type','status','staffName','staffId','startDate','endDate','days','reason','mgrNote','submitted','decided','override']
+    .map(k => cols[k]).filter(Boolean);
+  const colsArg = want.map(c => `"${c}"`).join(',');
+  let items = [], cursor = null;
+  do {
+    const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+    const data = await mq(`{
+      boards(ids:[${_config.boardId}]) {
+        items_page(limit: 200${cursorPart}) {
+          cursor
+          items {
+            id name created_at updated_at
+            column_values(ids:[${colsArg}]) { id text value }
+          }
+        }
+      }
+    }`);
+    const page = data.boards[0].items_page;
+    items = items.concat(page.items);
+    cursor = page.cursor;
+  } while (cursor);
+
+  _items = items.map(it => {
+    const cv = {}; for (const c of it.column_values) cv[c.id] = c;
+    const get = (key) => {
+      const id = cols[key]; if (!id) return '';
+      const c = cv[id]; if (!c) return '';
+      return c.text || '';
+    };
+    const getDate = (key) => {
+      const id = cols[key]; if (!id) return '';
+      try { return JSON.parse(cv[id]?.value || 'null')?.date || ''; } catch (_) { return ''; }
+    };
+    const getNum  = (key) => {
+      const id = cols[key]; if (!id) return 0;
+      try { return parseFloat(JSON.parse(cv[id]?.value || 'null')) || 0; } catch (_) { return 0; }
+    };
+    const getBool = (key) => {
+      const id = cols[key]; if (!id) return false;
+      try { return !!JSON.parse(cv[id]?.value || 'null')?.checked; } catch (_) { return false; }
+    };
+    return {
+      id:         it.id,
+      name:       it.name,
+      created_at: it.created_at,
+      type:       get('type')      || 'Annual leave',
+      status:     get('status')    || 'Pending',
+      staffName:  get('staffName') || '',
+      staffId:    get('staffId')   || '',
+      startDate:  getDate('startDate'),
+      endDate:    getDate('endDate'),
+      days:       getNum('days'),
+      reason:     get('reason'),
+      mgrNote:    get('mgrNote'),
+      submitted:  getDate('submitted'),
+      decided:    getDate('decided'),
+      override:   getBool('override'),
+    };
+  });
+  // Sort pending first by start date asc; decided rows go later.
+  _items.sort((a, b) => {
+    const aPending = a.status === 'Pending' ? 0 : 1;
+    const bPending = b.status === 'Pending' ? 0 : 1;
+    if (aPending !== bPending) return aPending - bPending;
+    return (a.startDate || '').localeCompare(b.startDate || '');
+  });
+}
+
+async function loadShifts() {
+  // Pull a generous window so future requests are covered (next 180 days).
+  const today = new Date(); today.setHours(0,0,0,0);
+  const horizon = new Date(today); horizon.setDate(horizon.getDate() + 180);
+  const todayISO = today.toISOString().split('T')[0];
+  const horizonISO = horizon.toISOString().split('T')[0];
+  const colIds = `["${SH_DATE}","${SH_ROLE}","${SH_STAFF}"]`;
+  let cursor = null, all = [];
+  do {
+    const q = cursor
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id column_values(ids:${colIds}){ id text value } } } }`
+      : `{ boards(ids:[${SHIFTS_BOARD}]){ items_page(limit:500){ cursor items{ id column_values(ids:${colIds}){ id text value } } } } }`;
+    const data = await mq(q);
+    const page = cursor ? data?.next_items_page : data?.boards?.[0]?.items_page;
+    if (!page) break;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+  } while (cursor);
+  _shiftRows = all.map(it => {
+    const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));
+    let date = '';
+    try { date = JSON.parse(cv[SH_DATE]?.value || 'null')?.date || ''; } catch (_) {}
+    return {
+      id: it.id,
+      date,
+      role: cv[SH_ROLE]?.text || '',
+      staffId: cv[SH_STAFF]?.text || '',
+    };
+  }).filter(r => r.date && r.date >= todayISO && r.date <= horizonISO);
+}
+
+async function loadStaff() {
+  try {
+    const data = await mq(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:300){ items{ id name } } } }`);
+    const items = data?.boards?.[0]?.items_page?.items || [];
+    _staffById = new Map();
+    _staffByName = new Map();
+    for (const i of items) {
+      _staffById.set(String(i.id), { name: i.name || '' });
+      _staffByName.set((i.name || '').trim().toLowerCase(), String(i.id));
+    }
+  } catch (e) { console.warn('loadStaff failed', e); }
+}
+
+function renderToolbar() {
+  const tb = document.getElementById('toolbar');
+  const pill = (val, label, cur) =>
+    `<span class="filter-pill ${cur===val?'on':''}" onclick="setFilter('${val}')">${label}</span>`;
+  const counts = {
+    pending: _items.filter(i => i.status === 'Pending').length,
+    approved: _items.filter(i => i.status === 'Approved').length,
+    declined: _items.filter(i => i.status === 'Declined').length,
+  };
+  tb.innerHTML =
+    pill('pending',  `Pending (${counts.pending})`, _filter) +
+    pill('all',      'All', _filter) +
+    pill('approved', `Approved (${counts.approved})`, _filter) +
+    pill('declined', `Declined (${counts.declined})`, _filter) +
+    `<span class="stats" id="stats"></span>`;
+}
+
+function setFilter(val) { _filter = val; render(); }
+
+function visibleItems() {
+  if (_filter === 'all') return _items;
+  if (_filter === 'pending')  return _items.filter(i => i.status === 'Pending');
+  if (_filter === 'approved') return _items.filter(i => i.status === 'Approved');
+  if (_filter === 'declined') return _items.filter(i => i.status === 'Declined');
+  return _items;
+}
+
+function render() {
+  const vis = visibleItems();
+  document.getElementById('stats').textContent = `${vis.length} of ${_items.length}`;
+  const c = document.getElementById('content');
+  if (!vis.length) {
+    c.innerHTML = `<div class="empty">No leave requests in this view.</div>`;
+    return;
+  }
+  c.innerHTML = vis.map(renderRow).join('');
+}
+
+function renderRow(i) {
+  const days = window.LeavesSchema.daysInRange(i.startDate, i.endDate);
+  const blockingByDay = window.LeavesSchema.countBlockingByDay(_shiftRows);
+  // For pending requests we EXCLUDE this person's already-approved rows
+  // from the count (they'd be writing their own row twice). Pending rows
+  // with overlapping dates from the same person are a separate problem
+  // we surface later.
+  const check = window.LeavesSchema.conflictCheck(days, blockingByDay);
+  const statusCls = i.status.toLowerCase();
+  const conflictCls = (i.status === 'Pending' && check.conflict) ? ' conflict' : '';
+  const typeCls = i.type === 'Annual leave' ? 'annual'
+                : i.type === 'Sick day'     ? 'sick'
+                :                              'personal';
+
+  const meta = [];
+  if (i.submitted) meta.push(`📥 Submitted ${i.submitted}`);
+  if (i.decided)   meta.push(`✅ Decided ${i.decided}`);
+  if (i.override)  meta.push(`⚠️ Override used`);
+  if (i.days)      meta.push(`📅 ${i.days} day${i.days===1?'':'s'}`);
+
+  // Day-by-day count of who else is off, only for pending rows where it
+  // matters. Approved/declined rows show a flat dates string.
+  let dayList = '';
+  if (i.status === 'Pending') {
+    dayList = '<div class="day-list">' + check.days.map(d => {
+      const label = fmtDate(d.date);
+      if (d.count >= 2) return `<span class="tight">⚠️ ${label} — ${d.count} already off</span>`;
+      if (d.count === 1) return `${label} — 1 already off`;
+      return `${label} — clear`;
+    }).join('<br>') + '</div>';
+  }
+
+  const reasonBlock = (i.reason || '').trim()
+    ? `<h4>Reason</h4><p>${escapeHtml(i.reason)}</p>`
+    : '';
+  const noteBlock = (i.mgrNote || '').trim()
+    ? `<h4>Manager note</h4><p>${escapeHtml(i.mgrNote)}</p>`
+    : '';
+
+  const actions = i.status === 'Pending'
+    ? renderActions(i, check.conflict)
+    : '';
+
+  return `<div class="row ${statusCls}${conflictCls}" data-id="${i.id}">
+    <div class="row-head">
+      <div style="flex:1 1 auto; min-width:0">
+        <div class="row-staff">${escapeHtml(i.staffName || '(unknown)')}</div>
+        <div class="row-meta">
+          <span class="badge ${typeCls}">${escapeHtml(i.type)}</span>
+          <span class="badge ${statusCls}">${escapeHtml(i.status)}</span>
+          ${(i.status === 'Pending' && check.conflict) ? '<span class="badge conflict">⚠ Conflict</span>' : ''}
+          <span>📆 ${fmtDateRange(i.startDate, i.endDate)}</span>
+          ${meta.map(m => `<span>${m}</span>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="row-detail">
+      ${reasonBlock}
+      ${noteBlock}
+      ${dayList}
+      ${actions}
+    </div>
+  </div>`;
+}
+
+function renderActions(i, conflict) {
+  const overrideId = `ovr_${i.id}`;
+  const noteId     = `note_${i.id}`;
+  const overrideBlock = conflict
+    ? `<label class="override-wrap">
+         <input type="checkbox" id="${overrideId}" onchange="onOverrideChange('${i.id}')">
+         I'm overriding the 2-person cap — a third person will be off.
+       </label>`
+    : '';
+  // Approve is disabled when there's a conflict and override isn't ticked.
+  const approveDisabled = conflict ? 'disabled' : '';
+  return `
+    <div class="row-actions">
+      ${overrideBlock}
+      <textarea id="${noteId}" placeholder="Manager note (optional, sent on approve/decline)"></textarea>
+      <button class="approve" id="approve_${i.id}" onclick="approveLeave('${i.id}')" ${approveDisabled}>✓ Approve</button>
+      <button class="decline" onclick="declineLeave('${i.id}')">✕ Decline</button>
+    </div>`;
+}
+
+function onOverrideChange(id) {
+  const ovr = document.getElementById(`ovr_${id}`);
+  const btn = document.getElementById(`approve_${id}`);
+  if (!ovr || !btn) return;
+  btn.disabled = !ovr.checked;
+}
+
+async function approveLeave(id) {
+  const item = _items.find(x => x.id === id);
+  if (!item) return;
+  const cols = _config.columns;
+  const ovrEl = document.getElementById(`ovr_${id}`);
+  const noteEl = document.getElementById(`note_${id}`);
+  const overrideUsed = !!(ovrEl && ovrEl.checked);
+  const note = (noteEl && noteEl.value.trim()) || '';
+  const today = new Date().toISOString().slice(0,10);
+
+  // Resolve staff Monday id (preferred from row, fallback to name lookup).
+  let staffId = item.staffId || _staffByName.get((item.staffName || '').trim().toLowerCase()) || '';
+
+  const days = window.LeavesSchema.daysInRange(item.startDate, item.endDate);
+  if (!days.length) { toast('No dates on this request — cannot approve.'); return; }
+
+  // 1. Update Leave Requests row → Approved.
+  const cv = {};
+  if (cols.status)   cv[cols.status]   = { label: 'Approved' };
+  if (cols.decided)  cv[cols.decided]  = { date: today };
+  if (cols.override) cv[cols.override] = { checked: overrideUsed ? 'true' : 'false' };
+  if (note && cols.mgrNote) cv[cols.mgrNote] = note;
+
+  const row = document.querySelector(`.row[data-id="${id}"]`);
+  if (row) row.style.opacity = '0.5';
+
+  try {
+    await mq(
+      `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`,
+      { b: _config.boardId, i: id, v: JSON.stringify(cv) }
+    );
+
+    // 2. Write Staff Shifts rows — one per day. Role is mapped from leave type.
+    if (staffId) {
+      const role = window.LeavesSchema.TYPE_TO_SHIFT_ROLE[item.type] || 'Leave';
+      const mutations = days.map((date, i) => {
+        const shCv = JSON.stringify({
+          [SH_DATE]:  { date },
+          [SH_ROLE]:  { label: role },
+          [SH_STAFF]: staffId,
+          [SH_HOURS]: 0,
+        }).replace(/"/g, '\\"');
+        const itemName = `${item.staffName} — ${role} — ${date}`.replace(/"/g, '\\"');
+        return `m${i}: create_item(board_id:${SHIFTS_BOARD}, item_name:"${itemName}", column_values:"${shCv}", create_labels_if_missing:true){ id }`;
+      }).join('\n');
+      await mq(`mutation { ${mutations} }`);
+    } else {
+      toast('Approved — but no staff Monday id found, please add the shift rows manually.');
+    }
+
+    // Update local cache + re-render.
+    item.status = 'Approved';
+    item.decided = today;
+    item.override = overrideUsed;
+    if (note) item.mgrNote = note;
+    renderToolbar();
+    render();
+    toast(`✓ Approved · ${days.length} day${days.length===1?'':'s'} added to rota`);
+  } catch (e) {
+    if (row) row.style.opacity = '';
+    console.error(e);
+    toast('Approve failed: ' + e.message);
+  }
+}
+
+async function declineLeave(id) {
+  const item = _items.find(x => x.id === id);
+  if (!item) return;
+  const cols = _config.columns;
+  const noteEl = document.getElementById(`note_${id}`);
+  const note = (noteEl && noteEl.value.trim()) || '';
+  if (!note && !confirm('Decline without a note? It helps if you say why.')) return;
+  const today = new Date().toISOString().slice(0,10);
+
+  const cv = {};
+  if (cols.status)  cv[cols.status]  = { label: 'Declined' };
+  if (cols.decided) cv[cols.decided] = { date: today };
+  if (note && cols.mgrNote) cv[cols.mgrNote] = note;
+
+  const row = document.querySelector(`.row[data-id="${id}"]`);
+  if (row) row.style.opacity = '0.5';
+  try {
+    await mq(
+      `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`,
+      { b: _config.boardId, i: id, v: JSON.stringify(cv) }
+    );
+    item.status = 'Declined';
+    item.decided = today;
+    if (note) item.mgrNote = note;
+    renderToolbar();
+    render();
+    toast('Declined');
+  } catch (e) {
+    if (row) row.style.opacity = '';
+    toast('Decline failed: ' + e.message);
+  }
+}
+</script>
+</body>
+</html>

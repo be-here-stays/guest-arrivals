@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#272F2E">
+<title>Request leave — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 96px); }
+
+  header { background:var(--dark); color:#fff; padding:18px 20px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; }
+  header h1 { font-size:17px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.65; margin-top:2px; }
+  .hdr-back { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; }
+
+  .container { max-width:580px; margin:0 auto; padding:18px 16px; }
+  .card { background:var(--surface); border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:0 1px 4px rgba(39,47,46,0.08); }
+  .card-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--sage); margin-bottom:14px; }
+
+  .field { margin-bottom:14px; }
+  .field:last-child { margin-bottom:0; }
+  label.lbl { display:block; font-size:12px; font-weight:700; color:var(--sage); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+  label.lbl .req { color:var(--red); margin-left:2px; }
+  .hint { font-size:11px; color:var(--sage-mid); font-weight:400; text-transform:none; letter-spacing:0; margin-top:3px; }
+
+  input[type=text], input[type=date], select, textarea {
+    width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:9px;
+    font-family:inherit; font-size:15px; color:var(--dark); background:#fff; outline:none;
+    transition:border-color 0.15s;
+    -webkit-appearance:none; appearance:none;
+  }
+  input:focus, select:focus, textarea:focus { border-color:var(--dark); }
+  textarea { min-height:90px; resize:vertical; font-size:14px; }
+  .missing { border-color:var(--red) !important; background:var(--red-bg) !important; }
+
+  /* Two-up date row */
+  .date-row { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+
+  /* Type chips */
+  .chip-row { display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; }
+  .chip {
+    padding:14px 8px; border:2px solid var(--border); border-radius:11px; background:#fff;
+    font-family:inherit; font-size:13px; font-weight:700; color:var(--sage-mid); cursor:pointer;
+    text-align:center; transition:all 0.15s; line-height:1.3;
+  }
+  .chip span { display:block; font-size:18px; margin-bottom:3px; }
+  .chip:hover { border-color:var(--sage); color:var(--sage); }
+  .chip.active.annual   { border-color:var(--green); background:var(--green-bg); color:var(--green); }
+  .chip.active.sick     { border-color:var(--red); background:var(--red-bg); color:var(--red); }
+  .chip.active.personal { border-color:var(--blue); background:var(--blue-bg); color:var(--blue); }
+
+  /* Submit */
+  .submit-btn {
+    width:100%; padding:15px; background:var(--dark); color:var(--cream); border:0; border-radius:12px;
+    font-family:inherit; font-size:15px; font-weight:700; cursor:pointer;
+  }
+  .submit-btn:hover { background:var(--sage); }
+  .submit-btn:disabled { background:var(--sage-mid); cursor:not-allowed; }
+
+  /* Status messages */
+  .msg { padding:12px 14px; border-radius:10px; font-size:13px; font-weight:600; margin-bottom:14px; display:none; }
+  .msg.show { display:block; }
+  .msg.success { background:var(--green-bg); color:var(--green); }
+  .msg.error   { background:var(--red-bg); color:var(--red); }
+  .msg.info    { background:var(--blue-bg); color:var(--blue); }
+
+  /* Conflict warning */
+  .conflict { background:var(--amber-bg); border:1.5px solid var(--amber); border-radius:11px; padding:12px 14px; margin-bottom:14px; display:none; }
+  .conflict.show { display:block; }
+  .conflict h4 { font-size:13px; color:var(--amber); margin-bottom:4px; }
+  .conflict p { font-size:13px; color:var(--dark); margin-bottom:6px; line-height:1.4; }
+  .conflict ul { margin:6px 0 0 20px; font-size:12px; color:var(--dark); }
+
+  /* Setup card (only shown if board doesn't exist yet) */
+  .setup-card { background:var(--amber-bg); border:1.5px solid var(--amber); border-radius:14px; padding:16px 18px; margin-bottom:14px; }
+  .setup-card.hide { display:none; }
+  .setup-card h3 { font-size:14px; color:var(--amber); margin-bottom:6px; }
+  .setup-card p { font-size:13px; color:var(--dark); margin-bottom:10px; }
+  .setup-btn { padding:9px 14px; background:var(--amber); color:#fff; border:0; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+
+  /* Done state */
+  .done-actions { display:flex; gap:8px; margin-top:14px; }
+  .done-actions a, .done-actions button {
+    flex:1; padding:12px; border-radius:10px; font-family:inherit; font-size:14px; font-weight:700;
+    text-decoration:none; text-align:center; cursor:pointer; border:0;
+  }
+  .done-actions .primary { background:var(--dark); color:var(--cream); }
+  .done-actions .secondary { background:#fff; color:var(--dark); border:1.5px solid var(--border); }
+
+  .hide { display:none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🌿 Request leave</h1>
+    <div class="sub">Goes to a manager for approval</div>
+  </div>
+  <a id="backLink" class="hdr-back" href="hub.html">‹ Back</a>
+</header>
+
+<script src="secrets.js"></script>
+<script src="leaves-schema.js"></script>
+
+<div class="container">
+  <div id="msgBox" class="msg"></div>
+
+  <!-- Setup banner — only shows if the Leave Requests board hasn't been created yet -->
+  <div id="setupCard" class="setup-card hide">
+    <h3>Leave Requests board not set up yet</h3>
+    <p>The Leave Requests board doesn't exist on Monday yet. Press once to create it (board name: <strong>Be Here — Leave Requests</strong>).</p>
+    <button class="setup-btn" id="setupBtn" onclick="bootstrapBoard()">Create the leave board</button>
+  </div>
+
+  <div class="card" id="formCard">
+    <div class="card-title">New leave request</div>
+
+    <div class="field">
+      <label class="lbl">Type <span class="req">*</span></label>
+      <div class="chip-row">
+        <button class="chip annual"   id="chipAnnual"   onclick="setType('Annual leave', this)" type="button"><span>🌴</span>Annual</button>
+        <button class="chip sick"     id="chipSick"     onclick="setType('Sick day', this)" type="button"><span>🤒</span>Sick</button>
+        <button class="chip personal" id="chipPersonal" onclick="setType('Personal / unpaid', this)" type="button"><span>📅</span>Personal</button>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="lbl">Dates <span class="req">*</span></label>
+      <div class="date-row">
+        <div>
+          <input type="date" id="fStart" onchange="onDatesChange()">
+          <div class="hint">Start</div>
+        </div>
+        <div>
+          <input type="date" id="fEnd" onchange="onDatesChange()">
+          <div class="hint">End (same day if blank)</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Conflict warning — populated by onDatesChange when 2+ already off on any day in range -->
+    <div class="conflict" id="conflictBox">
+      <h4>⚠️ Cover may be tight</h4>
+      <p id="conflictMsg"></p>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="fReason">Reason</label>
+      <textarea id="fReason" placeholder="Optional — anything the manager should know."></textarea>
+      <div class="hint">Helpful for last-minute or unusual requests.</div>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="fStaff">Your name <span class="req">*</span></label>
+      <input type="text" id="fStaff" placeholder="Your name">
+      <div class="hint">Pre-filled when you launch this from the staff app.</div>
+    </div>
+
+    <button class="submit-btn" id="submitBtn" onclick="submitLeave()">Submit request</button>
+  </div>
+
+  <!-- Success state -->
+  <div class="card hide" id="doneCard">
+    <h2>✓ Request submitted</h2>
+    <p id="doneSub">A manager will review and let you know. You'll see it on the rota once approved.</p>
+    <div class="done-actions">
+      <button class="primary" onclick="logAnother()">+ Submit another</button>
+      <a class="secondary" id="doneBack" href="hub.html">‹ Back</a>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOKEN   = window.MONDAY_API_TOKEN;
+const URL_API = 'https://api.monday.com/v2';
+
+// Staff Shifts board — used to count how many staff are already off on
+// each day in the requested range. Same constants as staff-shifts.html /
+// rota-planner.html.
+const SHIFTS_BOARD = '5095155773';
+const SH_DATE      = 'date_mm2phk9q';
+const SH_ROLE      = 'color_mm2pcrmp';
+const SH_STAFF     = 'text_mm2p1gqx';
+
+// Staff board — used to look up the requesting person's Monday item id
+// so the inbox can write to Shifts on their behalf when the request is
+// approved.
+const STAFF_BOARD  = '5095127554';
+
+let _config = null;          // { boardId, columns:{...} } once Leave Requests resolved
+let _selectedType = null;    // 'Annual leave' | 'Sick day' | 'Personal / unpaid'
+let _staffName = '';
+let _staffId   = '';
+let _shiftRows = [];         // cached Staff Shifts rows for next 90 days
+let _shiftsLoadedAt = 0;
+
+async function mq(query, variables) {
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization: TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+function showMsg(text, type) {
+  const box = document.getElementById('msgBox');
+  box.textContent = text;
+  box.className = 'msg show ' + type;
+  if (type === 'success') setTimeout(() => box.classList.remove('show'), 6000);
+}
+
+function setType(t, btnEl) {
+  _selectedType = t;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  btnEl.classList.add('active');
+}
+
+function onDatesChange() {
+  const startEl = document.getElementById('fStart');
+  const endEl   = document.getElementById('fEnd');
+  // If end < start, snap end to start. If end is blank, leave it (we
+  // treat blank end as "same as start" in submit).
+  if (endEl.value && startEl.value && endEl.value < startEl.value) {
+    endEl.value = startEl.value;
+  }
+  recomputeConflict();
+}
+
+function recomputeConflict() {
+  const start = document.getElementById('fStart').value;
+  const end   = document.getElementById('fEnd').value || start;
+  const box   = document.getElementById('conflictBox');
+  const msg   = document.getElementById('conflictMsg');
+  if (!start) { box.classList.remove('show'); return; }
+  const days = window.LeavesSchema.daysInRange(start, end);
+  const blockingByDay = window.LeavesSchema.countBlockingByDay(_shiftRows);
+  const check = window.LeavesSchema.conflictCheck(days, blockingByDay);
+  if (!check.conflict) { box.classList.remove('show'); return; }
+  // Build a friendly description of which days are tight.
+  const tight = check.days.filter(d => d.count >= 2)
+    .map(d => `${new Date(d.date+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})} (${d.count} already off)`);
+  msg.innerHTML = 'A manager will need to approve over the normal cap of 2 people off. Affected days: <br>'
+    + '<ul><li>' + tight.join('</li><li>') + '</li></ul>'
+    + 'You can still submit — the manager will see this warning when they review.';
+  box.classList.add('show');
+}
+
+/* Pull the Staff Shifts board for the next 90 days so we can count how
+   many staff are already off on the dates the user picks. We cache for
+   the page lifetime — it's a one-shot read. */
+async function loadShifts() {
+  const today = new Date(); today.setHours(0,0,0,0);
+  const horizon = new Date(today); horizon.setDate(horizon.getDate() + 90);
+  const todayISO = today.toISOString().split('T')[0];
+  const horizonISO = horizon.toISOString().split('T')[0];
+  const colIds = `["${SH_DATE}","${SH_ROLE}","${SH_STAFF}"]`;
+  let cursor = null, all = [];
+  do {
+    const q = cursor
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id column_values(ids:${colIds}){ id text value } } } }`
+      : `{ boards(ids:[${SHIFTS_BOARD}]){ items_page(limit:500){ cursor items{ id column_values(ids:${colIds}){ id text value } } } } }`;
+    const data = await mq(q);
+    const page = cursor ? data?.next_items_page : data?.boards?.[0]?.items_page;
+    if (!page) break;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+  } while (cursor);
+  _shiftRows = all.map(it => {
+    const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));
+    let date = '';
+    try { date = JSON.parse(cv[SH_DATE]?.value || 'null')?.date || ''; } catch (_) {}
+    return {
+      id: it.id,
+      date,
+      role: cv[SH_ROLE]?.text || '',
+      staffId: cv[SH_STAFF]?.text || '',
+    };
+  }).filter(r => r.date && r.date >= todayISO && r.date <= horizonISO);
+  _shiftsLoadedAt = Date.now();
+}
+
+/* Look up the requester's Monday Staff board id by name. We don't fail
+   the form if the lookup misses — the inbox has its own joining logic.
+   But it's nice to capture the id at submission time so the audit trail
+   is clean. */
+async function lookupStaffId(name) {
+  if (!name) return '';
+  try {
+    const data = await mq(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:200){ items{ id name } } } }`);
+    const items = data?.boards?.[0]?.items_page?.items || [];
+    const hit = items.find(i => (i.name || '').trim().toLowerCase() === name.trim().toLowerCase());
+    return hit ? hit.id : '';
+  } catch (_) { return ''; }
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  // Pre-fill name from URL when launched from staff.html.
+  const params = new URLSearchParams(location.search);
+  const nameParam = params.get('name');
+  if (nameParam) document.getElementById('fStaff').value = nameParam;
+  _staffName = nameParam || '';
+
+  // Default start = tomorrow; end blank (treated as same-as-start).
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById('fStart').value = tomorrow.toISOString().split('T')[0];
+
+  // Route the back link.
+  if (params.get('from') === 'staff') {
+    document.getElementById('backLink').href = 'staff.html';
+    document.getElementById('backLink').textContent = '‹ My Day';
+    document.getElementById('doneBack').href = 'staff.html';
+    document.getElementById('doneBack').textContent = '‹ My Day';
+  }
+
+  // Resolve the Leave Requests board. If it doesn't exist yet, show
+  // the setup banner (anyone can press it; it only succeeds once).
+  try {
+    _config = await window.LeavesSchema.getLeavesConfig(mq);
+    if (!_config) document.getElementById('setupCard').classList.remove('hide');
+  } catch (e) {
+    showMsg('Could not load leave board: ' + e.message, 'error');
+  }
+
+  // Background: pull shifts and the staff id (don't block the form).
+  Promise.all([
+    loadShifts().catch(e => console.warn('shifts load failed', e)),
+    lookupStaffId(_staffName).then(id => { _staffId = id; }).catch(()=>{}),
+  ]).then(() => {
+    recomputeConflict();
+  });
+});
+
+// Restore form state after iOS bfcache.
+window.addEventListener('pageshow', (e) => {
+  if (!e.persisted) return;
+  const btn = document.getElementById('submitBtn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Submit request'; }
+  document.getElementById('formCard').classList.remove('hide');
+  document.getElementById('doneCard').classList.add('hide');
+  const box = document.getElementById('msgBox');
+  if (box) { box.className = 'msg'; box.textContent = ''; }
+});
+
+async function bootstrapBoard() {
+  const btn = document.getElementById('setupBtn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    let cfg = await window.LeavesSchema.findLeavesBoard(mq);
+    if (!cfg) cfg = await window.LeavesSchema.createLeavesBoard(mq);
+    _config = cfg;
+    document.getElementById('setupCard').classList.add('hide');
+    showMsg('✓ Leave board ready.', 'success');
+  } catch (e) {
+    showMsg('Setup failed: ' + e.message, 'error');
+    btn.disabled = false; btn.textContent = 'Create the leave board';
+  }
+}
+
+async function submitLeave() {
+  document.querySelectorAll('.missing').forEach(el => el.classList.remove('missing'));
+
+  const errs = [];
+  let firstMissing = null;
+  if (!_selectedType) {
+    errs.push('Pick a leave type');
+    document.querySelectorAll('.chip').forEach(c => c.classList.add('missing'));
+    firstMissing = document.getElementById('chipAnnual');
+  }
+  const startEl = document.getElementById('fStart');
+  if (!startEl.value) {
+    errs.push('Start date');
+    startEl.classList.add('missing');
+    if (!firstMissing) firstMissing = startEl;
+  }
+  const staffEl = document.getElementById('fStaff');
+  if (!staffEl.value.trim()) {
+    errs.push('Your name');
+    staffEl.classList.add('missing');
+    if (!firstMissing) firstMissing = staffEl;
+  }
+  if (errs.length) {
+    showMsg('Missing: ' + errs.join(' · '), 'error');
+    document.getElementById('msgBox').scrollIntoView({ behavior:'smooth', block:'start' });
+    if (firstMissing && firstMissing.focus) setTimeout(() => firstMissing.focus({ preventScroll:true }), 300);
+    return;
+  }
+
+  if (!_config) {
+    showMsg('Leave board not set up yet — press the Create button at the top of the page.', 'error');
+    return;
+  }
+  const cols = _config.columns;
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+
+  const start  = startEl.value;
+  const end    = document.getElementById('fEnd').value || start;
+  const reason = document.getElementById('fReason').value.trim();
+  const staff  = staffEl.value.trim();
+  const today  = new Date().toISOString().slice(0,10);
+  const days   = window.LeavesSchema.daysInRange(start, end).length;
+
+  // If we hadn't resolved a staff id at page load (slow shifts query, or
+  // network blip), try once more here so the row is well-formed.
+  if (!_staffId && staff !== _staffName) _staffId = await lookupStaffId(staff);
+
+  const cv = {};
+  if (cols.type)       cv[cols.type]       = { label: _selectedType };
+  if (cols.status)     cv[cols.status]     = { label: 'Pending' };
+  if (cols.staffName)  cv[cols.staffName]  = staff;
+  if (cols.staffId)    cv[cols.staffId]    = _staffId || '';
+  if (cols.startDate)  cv[cols.startDate]  = { date: start };
+  if (cols.endDate)    cv[cols.endDate]    = { date: end };
+  if (cols.days)       cv[cols.days]       = days;
+  if (cols.reason)     cv[cols.reason]     = reason;
+  if (cols.submitted)  cv[cols.submitted]  = { date: today };
+
+  // Item name is human-readable for the Monday board view.
+  const typeShort = _selectedType === 'Annual leave' ? 'Annual'
+                  : _selectedType === 'Sick day'     ? 'Sick'
+                  :                                    'Personal';
+  const dateLabel = (start === end)
+    ? new Date(start+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'})
+    : `${new Date(start+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'})} – ${new Date(end+'T12:00:00').toLocaleDateString('en-GB',{day:'numeric',month:'short'})}`;
+  const itemName = `${staff} · ${typeShort} · ${dateLabel}`.slice(0, 250);
+
+  try {
+    await mq(
+      `mutation($b:ID!,$n:String!,$v:JSON!){ create_item(board_id:$b, item_name:$n, column_values:$v, create_labels_if_missing:true){ id } }`,
+      { b: _config.boardId, n: itemName, v: JSON.stringify(cv) }
+    );
+    enterDoneState();
+  } catch (e) {
+    showMsg('Submission error: ' + e.message, 'error');
+    btn.disabled = false; btn.textContent = 'Submit request';
+  }
+}
+
+function enterDoneState() {
+  document.getElementById('formCard').classList.add('hide');
+  document.getElementById('doneCard').classList.remove('hide');
+  document.getElementById('doneCard').scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+function logAnother() {
+  document.getElementById('doneCard').classList.add('hide');
+  document.getElementById('formCard').classList.remove('hide');
+  document.getElementById('fEnd').value = '';
+  document.getElementById('fReason').value = '';
+  // Reset chip selection
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  _selectedType = null;
+  // Default start back to tomorrow
+  const tomorrow = new Date(); tomorrow.setDate(tomorrow.getDate() + 1);
+  document.getElementById('fStart').value = tomorrow.toISOString().split('T')[0];
+  recomputeConflict();
+  document.getElementById('formCard').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+</script>
+</body>
+</html>

@@ -1356,6 +1356,15 @@ function renderDay() {
     </a>
   </div>`);
 
+  // Request leave — submits to the Leave Requests board for manager review.
+  // Sits below feedback so it's not the first thing staff see; still always
+  // available without hunting for it.
+  parts.push(`<div style="margin-top:8px">
+    <a href="request-leave.html?from=staff&name=${encodeURIComponent(me.name)}" class="cc-btn secondary" style="display:block; text-align:center; padding:11px; font-weight:700; text-decoration:none; border-radius:10px; background:#fff; color:#272F2E; border:1.5px solid #989782">
+      🌿 Request leave
+    </a>
+  </div>`);
+
   // Empty state: nothing for me today
   const nothing = !dayShifts.length && !dayHotTubs.length && !dayMaint.length
     && (maint || (!cleansMine.length && !dayLinenDrops.length && !dirtiesMine.length));

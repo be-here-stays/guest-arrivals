@@ -97,7 +97,7 @@
   async function createFeedbackBoard(mq) {
     // 1. Create the board.
     const created = await mq(`mutation {
-      create_board(board_name: "${BOARD_NAME.replace(/"/g,'\\"')}", board_kind: shareable) { id }
+      create_board(board_name: "${BOARD_NAME.replace(/"/g,'\\"')}", board_kind: share) { id }
     }`);
     const boardId = created?.create_board?.id;
     if (!boardId) throw new Error('Could not create board');

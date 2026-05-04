@@ -627,6 +627,7 @@ const SHIFTS_BOARD       = '5095155773';  // Staff Shifts (rostered hours per pe
 
 // Arrivals columns
 const AR_DATE     = 'date_mm2adtwg';   // arrival date (check-in)
+const AR_CHECKOUT = 'date_mm31c5jt';   // departure date (check-out) — added 2026-05-04
 const AR_PROP     = 'text_mm2ahbrx';   // property name (text snapshot)
 const AR_BOOKREF  = 'text_mm2ah8s';    // booking reference / Guesty confirmationCode
 const AR_FORM_ST  = 'color_mm2aw8fx';  // form status (Pending/Sent/Received) — surfaced in card chip
@@ -871,7 +872,7 @@ let _arrivalsCache = [];
 async function fetchBookings() {
   // 1. Pull the entire Arrivals board, paginated. Same shape as fetchCleans
   //    so the page load cost is one extra paginated fetch, not a flood.
-  const cols = `["${AR_DATE}","${AR_PROP}","${AR_BOOKREF}","${AR_FORM_ST}","${AR_REVIEW}","${AR_REVIEW_NT}"]`;
+  const cols = `["${AR_DATE}","${AR_CHECKOUT}","${AR_PROP}","${AR_BOOKREF}","${AR_FORM_ST}","${AR_REVIEW}","${AR_REVIEW_NT}"]`;
   let cursor = null;
   let raw = [];
   do {
@@ -884,20 +885,20 @@ async function fetchBookings() {
     cursor = page.cursor;
   } while (cursor);
 
-  // 2. Parse each Arrivals row into a flat per-booking object.
-  //    Arrivals rows hold check-in only; check-out is *not* on this board.
-  //    We rely on the existing Cleans rows' CL_CHECKOUT for that — and for
-  //    bookings that don't yet have a Cleans row, we infer the check-out
-  //    from the next booking's check-in for the same property (i.e. the
-  //    booking ends when the next guest arrives). This is the same
-  //    accommodation Lodge Status used to make implicitly.
+  // 2. Parse each Arrivals row into a flat per-booking object. The check-out
+  //    column was added 2026-05-04 so historical rows may have a blank
+  //    AR_CHECKOUT until the historical backfill page is run; for any with
+  //    a blank checkout, we still fall back to the next booking's check-in
+  //    on the same property in aggregateBookings(), so the rota stays
+  //    populated during the backfill window.
   const arrivals = raw.map(it => {
     const cv = {};
     for (const c of it.column_values) cv[c.id] = { value: c.value, text: c.text };
     return {
       arrivalId:   it.id,
       property:    pj(cv[AR_PROP]?.value)    || cv[AR_PROP]?.text    || it.name,
-      checkin:     pj(cv[AR_DATE]?.value)?.date || cv[AR_DATE]?.text || '',
+      checkin:     pj(cv[AR_DATE]?.value)?.date     || cv[AR_DATE]?.text     || '',
+      checkout:    pj(cv[AR_CHECKOUT]?.value)?.date || cv[AR_CHECKOUT]?.text || '',
       bookingRef:  pj(cv[AR_BOOKREF]?.value) || cv[AR_BOOKREF]?.text || '',
       formStatus:  cv[AR_FORM_ST]?.text || '',
       reviewFlag:  cv[AR_REVIEW]?.text || '',
@@ -944,21 +945,6 @@ function reAggregateBookings() {
 function aggregateBookings(arrivals) {
   const today = localStr(new Date());
 
-  // Build a quick lookup of Cleans rows by arrivalId so we can read the
-  // already-stored CL_CHECKOUT value for each booking. This avoids a Guesty
-  // round-trip — Make's daily/watcher scenarios populate CL_CHECKOUT every
-  // time they create a Cleans row, so the data's already there.
-  const checkoutByArrivalId = new Map();
-  for (const c of cleans) {
-    if (!c.deleted && c.arrivalId && c.checkoutDate) {
-      // Only set the first time we see an arrival id — multiple cleans
-      // tied to the same arrival is rare but happens (orphan-night links).
-      if (!checkoutByArrivalId.has(c.arrivalId)) {
-        checkoutByArrivalId.set(c.arrivalId, c.checkoutDate);
-      }
-    }
-  }
-
   // Group Arrivals by property, sort each group by check-in.
   const byProp = new Map();
   for (const a of arrivals) {
@@ -969,15 +955,39 @@ function aggregateBookings(arrivals) {
     list.sort((x, y) => (x.checkin || '').localeCompare(y.checkin || ''));
   }
 
+  // Fallback look-up of Cleans rows' CL_CHECKOUT by arrivalId — used only
+  // for historical Arrivals rows that pre-date the AR_CHECKOUT column
+  // (created 2026-05-04). Once the historical backfill page has been run,
+  // every Arrivals row will carry its own checkout and this fallback
+  // becomes redundant. Cheap to keep until then.
+  const checkoutByArrivalId = new Map();
+  for (const c of cleans) {
+    if (!c.deleted && c.arrivalId && c.checkoutDate && !checkoutByArrivalId.has(c.arrivalId)) {
+      checkoutByArrivalId.set(c.arrivalId, c.checkoutDate);
+    }
+  }
+
   const out = [];
   for (const [property, list] of byProp) {
     for (let i = 0; i < list.length; i++) {
       const cur  = list[i];
       const nxt  = list[i + 1] || null;
-      const currOut = checkoutByArrivalId.get(cur.arrivalId)
-                   || (nxt ? nxt.checkin : null);  // best-guess fallback
+      // Check-out source priority:
+      //   1. Arrivals row's AR_CHECKOUT (the canonical value, populated by
+      //      Make scenarios from Guesty's checkOut field)
+      //   2. Linked Cleans row's CL_CHECKOUT (legacy — covers historical
+      //      rows until the AR_CHECKOUT backfill is complete)
+      //   3. Next booking's check-in on the same property (last-resort,
+      //      assumes "stay ends when next guest arrives")
+      const currOut = cur.checkout
+                   || checkoutByArrivalId.get(cur.arrivalId)
+                   || (nxt ? nxt.checkin : null);
       const nextIn  = nxt ? nxt.checkin : null;
-      const nextOut = nxt ? (checkoutByArrivalId.get(nxt.arrivalId) || null) : null;
+      const nextOut = nxt
+                    ? (nxt.checkout
+                       || checkoutByArrivalId.get(nxt.arrivalId)
+                       || null)
+                    : null;
 
       // Synthesise todayStatus to match what Lodge Status used to emit, so
       // the chip on each property card stays right.

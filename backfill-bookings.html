@@ -151,6 +151,7 @@ const CL_REVIEW_NT = 'text_mm2qbgrt';
 
 // ── Arrivals-board column ids — same as arrivals-hub.html.
 const AR_DATE     = 'date_mm2adtwg';
+const AR_CHECKOUT = 'date_mm31c5jt';   // added 2026-05-04 — landed Guesty's checkOut on Arrivals
 const AR_FORM_ST  = 'color_mm2aw8fx';
 const AR_PROP     = 'text_mm2ahbrx';
 const AR_BEDCFG   = 'text_mm2ab56m';
@@ -411,6 +412,7 @@ async function createBooking() {
       const itemName = `${guest || prop} — ${checkin}`;
       const cv = {
         [AR_DATE]:      { date: checkin },
+        [AR_CHECKOUT]:  { date: checkout },
         [AR_PROP]:      prop,
         [AR_BOOKREF]:   bookRef || '',
         [AR_FORM_ST]:   { label: 'Pending' },

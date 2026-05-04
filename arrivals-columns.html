@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Arrivals board column inventory — Be Here</title>
+<style>
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; background:#D5D0C4; color:#272F2E; margin:0; padding:24px; line-height:1.45; max-width:1100px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 6px; }
+  .sub { color:#646955; font-size:13px; margin-bottom:18px; }
+  section { background:#fff; border-radius:12px; padding:18px 20px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+  section h2 { font-size:15px; margin:0 0 10px; color:#272F2E; }
+  button { padding:10px 18px; background:#272F2E; color:#F3E3C3; border:none; border-radius:8px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+  input[type=password] { padding:9px 12px; border:1.5px solid #c9c4b3; border-radius:8px; font-family:inherit; font-size:14px; background:#fff; flex:1; min-width:300px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:7px 10px; border-bottom:1px solid #ece9df; vertical-align:top; }
+  th { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#646955; font-weight:700; background:#f7f5ee; }
+  code { background:#f1eee5; padding:1px 6px; border-radius:4px; font-size:12px; }
+  .pill { display:inline-block; padding:2px 8px; border-radius:11px; font-size:11px; font-weight:700; }
+  .pill.date { background:#eaf4fb; color:#1a5276; }
+  .pill.text { background:#f1eee5; color:#646955; }
+  .pill.numbers,.pill.numeric { background:#fdf5e8; color:#a86c00; }
+  .pill.color,.pill.status { background:#edf7f2; color:#2d6a4f; }
+  .pill.email,.pill.link,.pill.phone { background:#fdf0ec; color:#8B2020; }
+  .pill.board_relation { background:#f5ebff; color:#5a2ca0; }
+  .highlight { background:#fff8e1; }
+  .highlight td { font-weight:600; }
+  .muted { color:#989782; font-size:12px; }
+  .ok { color:#2d6a4f; font-weight:600; }
+  .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+</style>
+</head>
+<body>
+
+<h1>Arrivals board column inventory</h1>
+<div class="sub">Lists every column on the Arrivals board (<code>5094453064</code>) so we can see exactly what's there. Highlights any column whose title looks like a check-out / departure date, so if one already exists we just need to know its id, not add a new one.</div>
+
+<script src="secrets.js"></script>
+
+<section>
+  <h2>Run</h2>
+  <div class="controls">
+    <input type="password" id="tokenInp" placeholder="Monday API token (optional if proxy reachable)">
+    <button onclick="run()" id="goBtn">List columns</button>
+    <span class="muted" id="status"></span>
+  </div>
+</section>
+
+<div id="out"></div>
+
+<script>
+const URL_API = 'https://api.monday.com/v2';
+const ARRIVALS_BOARD = '5094453064';
+
+document.addEventListener('DOMContentLoaded', () => {
+  const status = document.getElementById('status');
+  if (typeof window.LINEN_API_BASE === 'string' && window.LINEN_API_BASE) {
+    status.innerHTML = '<span class="ok">✓ Proxy detected — token paste optional</span>';
+  } else {
+    status.innerHTML = '<span style="color:#a86c00">⚠ Proxy not detected — paste a token</span>';
+  }
+});
+
+async function mq(query) {
+  const tok = (document.getElementById('tokenInp').value || '').trim();
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization: tok, 'API-Version':'2024-01' },
+    body: JSON.stringify({ query }),
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+async function run() {
+  const out = document.getElementById('out');
+  const btn = document.getElementById('goBtn');
+  btn.disabled = true; btn.textContent = 'Loading…';
+  out.innerHTML = '<section>Loading…</section>';
+
+  try {
+    const data = await mq(`{
+      boards(ids:[${ARRIVALS_BOARD}]) {
+        id
+        name
+        columns {
+          id
+          title
+          type
+          settings_str
+        }
+      }
+    }`);
+    const board = data.boards[0];
+    const cols = board.columns || [];
+
+    // Highlight anything that looks like check-out / departure / leave
+    const checkoutRegex = /(check[-_ ]?out|checkout|depart|leave|leaving)/i;
+
+    const rows = cols.map(c => {
+      const isCheckout = checkoutRegex.test(c.title);
+      return `<tr ${isCheckout ? 'class="highlight"' : ''}>
+        <td><code>${c.id}</code></td>
+        <td>${escapeHtml(c.title)}${isCheckout ? ' <span class="pill date">⭐ matches check-out / departure</span>' : ''}</td>
+        <td><span class="pill ${c.type}">${c.type}</span></td>
+        <td><details><summary class="muted" style="cursor:pointer">settings</summary><pre style="font-size:11px;background:#f7f5ee;padding:8px;border-radius:6px;margin-top:6px;white-space:pre-wrap">${escapeHtml(c.settings_str || '(empty)')}</pre></details></td>
+      </tr>`;
+    }).join('');
+
+    const candidates = cols.filter(c => checkoutRegex.test(c.title));
+
+    out.innerHTML = `
+      <section>
+        <h2>Board: ${escapeHtml(board.name)} <span class="muted">(id ${board.id})</span></h2>
+        <p class="muted">${cols.length} columns total.</p>
+        ${candidates.length === 0
+          ? '<p class="ok" style="background:#fdf0ec;color:#8B2020;padding:10px;border-radius:8px;border:1px solid #c0392b">✗ <strong>No column with check-out / departure in its title.</strong> A new column needs to be added.</p>'
+          : `<p class="ok" style="background:#edf7f2;padding:10px;border-radius:8px;border:1px solid #2d6a4f">✓ <strong>Found ${candidates.length} candidate column(s)</strong>:` +
+              '<ul style="margin:6px 0 0 18px">' +
+              candidates.map(c => `<li><code>${c.id}</code> — <strong>${escapeHtml(c.title)}</strong> (${c.type})</li>`).join('') +
+              '</ul>Tell me which one is the check-out and I will wire everything up to use it.</p>'
+        }
+        <table>
+          <thead><tr><th>Column id</th><th>Title</th><th>Type</th><th>Settings</th></tr></thead>
+          <tbody>${rows}</tbody>
+        </table>
+      </section>
+    `;
+  } catch (e) {
+    out.innerHTML = `<section><h2 style="color:#8B2020">Error</h2><pre style="background:#fdf0ec;padding:10px;border-radius:8px">${escapeHtml(e.message)}</pre></section>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'List columns';
+  }
+}
+
+function escapeHtml(s) { return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+</script>
+</body>
+</html>

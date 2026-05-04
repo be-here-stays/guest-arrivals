@@ -1,0 +1,389 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Cleanup duplicate Arrivals — Be Here</title>
+<style>
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; background:#D5D0C4; color:#272F2E; margin:0; padding:24px; line-height:1.45; max-width:1200px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 6px; }
+  .sub { color:#646955; font-size:13px; margin-bottom:18px; }
+  section { background:#fff; border-radius:12px; padding:18px 20px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+  section h2 { font-size:15px; margin:0 0 10px; color:#272F2E; display:flex; align-items:center; gap:8px; }
+  section h2 .pill { font-size:11px; padding:2px 9px; border-radius:13px; font-weight:700; background:#272F2E; color:#fff; }
+  .group { background:#fff; border-radius:12px; padding:14px 18px; margin-bottom:10px; box-shadow:0 1px 3px rgba(0,0,0,0.06); border-left:4px solid #8B2020; }
+  .group.byref     { border-left-color:#8B2020; }
+  .group.bypropdate{ border-left-color:#a86c00; }
+  .group.gone      { border-left-color:#2d6a4f; opacity:0.55; }
+  .group h3 { font-size:14px; margin:0 0 4px; color:#272F2E; display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .group .pill { font-size:11px; padding:2px 8px; border-radius:11px; font-weight:700; }
+  .pill.byref     { background:#fdf0ec; color:#8B2020; }
+  .pill.bypropdate{ background:#fdf5e8; color:#a86c00; }
+  .pill.gone      { background:#edf7f2; color:#2d6a4f; }
+  .pill.keeper    { background:#edf7f2; color:#2d6a4f; }
+  .pill.delete    { background:#fdf0ec; color:#8B2020; }
+  button { padding:9px 16px; background:#272F2E; color:#F3E3C3; border:none; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  button.danger { background:#8B2020; }
+  button.secondary { background:#646955; }
+  button.small { padding:4px 10px; font-size:11px; }
+  button:disabled { opacity:0.45; cursor:not-allowed; }
+  input[type=password], input[type=date] { padding:8px 10px; border:1.5px solid #c9c4b3; border-radius:8px; font-family:inherit; font-size:14px; background:#fff; }
+  table { width:100%; border-collapse:collapse; font-size:12px; }
+  th, td { text-align:left; padding:5px 8px; border-bottom:1px solid #ece9df; vertical-align:top; }
+  th { font-size:10px; text-transform:uppercase; letter-spacing:0.5px; color:#646955; font-weight:700; background:#f7f5ee; }
+  td.row-keeper { background:#edf7f2; }
+  td.row-delete { background:#fdf0ec; }
+  code { background:#f1eee5; padding:1px 5px; border-radius:4px; font-size:11px; }
+  .ok    { color:#2d6a4f; font-weight:600; }
+  .warn  { color:#a86c00; font-weight:600; }
+  .bad   { color:#8B2020; font-weight:600; }
+  .muted { color:#989782; font-size:12px; }
+  .stats { display:flex; gap:12px; flex-wrap:wrap; margin-bottom:14px; }
+  .stat { background:#fff; border-radius:10px; padding:10px 14px; min-width:120px; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+  .stat .num { font-size:22px; font-weight:700; line-height:1; }
+  .stat .lbl { font-size:11px; color:#646955; text-transform:uppercase; letter-spacing:0.4px; margin-top:3px; }
+  .stat.bad  .num { color:#8B2020; }
+  .stat.warn .num { color:#a86c00; }
+  .stat.ok   .num { color:#2d6a4f; }
+  .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:#272F2E; color:#fff; padding:10px 18px; border-radius:24px; font-size:13px; font-weight:600; opacity:0; transition:opacity .15s; pointer-events:none; z-index:200; }
+  .toast.show { opacity:1; }
+  .warning-box { background:#fdf5e8; border:1px solid #e2c06a; border-radius:8px; padding:10px 14px; margin:10px 0; font-size:12px; color:#7a5c35; }
+</style>
+</head>
+<body>
+
+<h1>Cleanup duplicate Arrivals</h1>
+<div class="sub">Finds Arrivals rows that share either the same booking reference (<code>text_mm2ah8s</code>) or the same property + arrival date, scores each candidate, suggests a keeper, and lets you delete the rest in one click per group. Re-runnable; no destructive changes happen until you click a Delete button.</div>
+
+<script src="secrets.js"></script>
+
+<section>
+  <h2>Setup</h2>
+  <div class="controls">
+    <input type="password" id="tokenInp" placeholder="Monday API token (optional if proxy reachable)" style="flex:1; min-width:280px">
+    <label style="display:flex;gap:6px;align-items:center;font-size:13px"><span class="muted">From</span> <input type="date" id="fromInp"></label>
+    <label style="display:flex;gap:6px;align-items:center;font-size:13px"><span class="muted">To</span> <input type="date" id="toInp"></label>
+    <button onclick="run()" id="goBtn">Find duplicates</button>
+    <span class="muted" id="setupStatus"></span>
+  </div>
+</section>
+
+<div id="out"></div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const URL_API         = 'https://api.monday.com/v2';
+const ARRIVALS_BOARD  = '5094453064';
+const CLEANS_BOARD    = '5095134636';
+const HT_CLEANS_BOARD = '5095259581';
+
+const AR_DATE     = 'date_mm2adtwg';
+const AR_CHECKOUT = 'date_mm31c5jt';
+const AR_PROP     = 'text_mm2ahbrx';
+const AR_BOOKREF  = 'text_mm2ah8s';
+const AR_FORM_ST  = 'color_mm2aw8fx';
+const AR_REVIEW   = 'color_mm2qfrrz';
+const AR_EMAIL    = 'email_mm2aaem6';
+const AR_PHONE    = 'phone_mm2dgbc3';
+const AR_ADULTS   = 'numeric_mm2a5s8r';
+const AR_CHILDREN = 'numeric_mm2add81';
+const AR_PETS     = 'numeric_mm2ahz0x';
+
+const CL_ARRIVAL  = 'board_relation_mm31mkyp';
+const HC_ARRIVAL  = 'board_relation_mm31mzvh';
+
+function p(v) { try { return v ? JSON.parse(v) : null; } catch { return null; } }
+function norm(s) { return (s || '').toLowerCase().replace(/[\s'’.,/-]+/g, ' ').trim(); }
+function escapeHtml(s) { return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2400); }
+
+async function mq(query) {
+  const tok = (document.getElementById('tokenInp').value || '').trim();
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization: tok, 'API-Version':'2024-01' },
+    body: JSON.stringify({ query }),
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const today = new Date();
+  const end   = new Date(today); end.setDate(end.getDate() + 90);
+  const fmt = d => d.toISOString().slice(0,10);
+  document.getElementById('fromInp').value = fmt(today);
+  document.getElementById('toInp').value   = fmt(end);
+
+  const status = document.getElementById('setupStatus');
+  if (typeof window.LINEN_API_BASE === 'string' && window.LINEN_API_BASE) {
+    status.innerHTML = '<span class="ok">✓ Proxy detected</span>';
+  } else {
+    status.innerHTML = '<span class="warn">⚠ No proxy — paste token</span>';
+  }
+});
+
+async function fetchAll(boardId, columnIds) {
+  const cols = columnIds.map(c => `"${c}"`).join(',');
+  let items = [], cursor = null;
+  do {
+    const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+    const data = await mq(`{ boards(ids:[${boardId}]) { items_page(limit:500${cursorPart}) { cursor items { id name created_at column_values(ids:[${cols}]) { id text value type ... on BoardRelationValue { linked_item_ids } } } } } }`);
+    const page = data.boards[0].items_page;
+    items = items.concat(page.items);
+    cursor = page.cursor;
+  } while (cursor);
+  return items;
+}
+
+let _state = null;  // { groups, dirty }
+
+async function run() {
+  const out  = document.getElementById('out');
+  const btn  = document.getElementById('goBtn');
+  const from = document.getElementById('fromInp').value;
+  const to   = document.getElementById('toInp').value;
+  if (!from || !to) { toast('Set both dates'); return; }
+  btn.disabled = true; btn.textContent = 'Loading…';
+  out.innerHTML = '<section><div>Loading three boards in parallel…</div></section>';
+
+  try {
+    const [arrivals, cleans, htCleans] = await Promise.all([
+      fetchAll(ARRIVALS_BOARD, [AR_DATE, AR_CHECKOUT, AR_PROP, AR_BOOKREF, AR_FORM_ST, AR_REVIEW, AR_EMAIL, AR_PHONE, AR_ADULTS, AR_CHILDREN, AR_PETS]),
+      fetchAll(CLEANS_BOARD, [CL_ARRIVAL]),
+      fetchAll(HT_CLEANS_BOARD, [HC_ARRIVAL]),
+    ]);
+
+    // Build "has linked X" lookups for each Arrivals id
+    const cleansByArrivalId = new Set();
+    for (const c of cleans) {
+      const cv = {}; for (const v of c.column_values) cv[v.id] = v;
+      const ids = cv[CL_ARRIVAL]?.linked_item_ids || [];
+      for (const aid of ids) cleansByArrivalId.add(String(aid));
+    }
+    const htByArrivalId = new Set();
+    for (const h of htCleans) {
+      const cv = {}; for (const v of h.column_values) cv[v.id] = v;
+      const ids = cv[HC_ARRIVAL]?.linked_item_ids || [];
+      for (const aid of ids) htByArrivalId.add(String(aid));
+    }
+
+    // Parse Arrivals + filter to window
+    const parsed = arrivals.map(it => {
+      const cv = {}; for (const v of it.column_values) cv[v.id] = v;
+      const checkin = p(cv[AR_DATE]?.value)?.date || cv[AR_DATE]?.text || '';
+      return {
+        id:           it.id,
+        name:         it.name,
+        created_at:   it.created_at,
+        checkin,
+        checkout:     p(cv[AR_CHECKOUT]?.value)?.date || cv[AR_CHECKOUT]?.text || '',
+        property:     p(cv[AR_PROP]?.value)    || cv[AR_PROP]?.text    || '',
+        bookingRef:   (p(cv[AR_BOOKREF]?.value) || cv[AR_BOOKREF]?.text || '').trim(),
+        formStatus:   cv[AR_FORM_ST]?.text || '',
+        reviewFlag:   cv[AR_REVIEW]?.text || '',
+        email:        cv[AR_EMAIL]?.text || '',
+        phone:        cv[AR_PHONE]?.text || '',
+        adults:       parseInt(p(cv[AR_ADULTS]?.value) || cv[AR_ADULTS]?.text) || 0,
+        children:     parseInt(p(cv[AR_CHILDREN]?.value) || cv[AR_CHILDREN]?.text) || 0,
+        pets:         parseInt(p(cv[AR_PETS]?.value) || cv[AR_PETS]?.text) || 0,
+        hasLinkedCleans: cleansByArrivalId.has(String(it.id)),
+        hasLinkedHT:     htByArrivalId.has(String(it.id)),
+      };
+    }).filter(a => a.checkin && a.checkin >= from && a.checkin <= to);
+
+    // Score each Arrivals row — used to suggest a keeper.
+    function scoreOf(a) {
+      let s = 0;
+      if (a.hasLinkedCleans) s += 20;
+      if (a.hasLinkedHT)     s += 10;
+      if (a.formStatus && a.formStatus !== 'Pending') s += 10;
+      if (a.checkout)        s += 5;
+      if (a.email)           s += 5;
+      if (a.phone)           s += 5;
+      if (a.bookingRef)      s += 5;
+      if (a.property)        s += 3;
+      if (a.adults > 0)      s += 3;
+      if (a.children > 0)    s += 2;
+      if (a.pets > 0)        s += 1;
+      // Cancelled rows: heavily deprioritise — almost certainly the wrong keeper
+      if (a.reviewFlag && /cancel/i.test(a.reviewFlag)) s -= 50;
+      return s;
+    }
+
+    // Build duplicate groups
+    const byRef = new Map();
+    for (const a of parsed) {
+      if (!a.bookingRef) continue;
+      if (!byRef.has(a.bookingRef)) byRef.set(a.bookingRef, []);
+      byRef.get(a.bookingRef).push(a);
+    }
+    const dupesByRef = Array.from(byRef.entries())
+      .filter(([_, rows]) => rows.length > 1)
+      .map(([ref, rows]) => ({ kind:'byref', key: ref, rows }));
+
+    const byPropDate = new Map();
+    for (const a of parsed) {
+      if (!a.property || !a.checkin) continue;
+      const k = norm(a.property) + '|' + a.checkin;
+      if (!byPropDate.has(k)) byPropDate.set(k, []);
+      byPropDate.get(k).push(a);
+    }
+    const dupesByPropDate = Array.from(byPropDate.entries())
+      .filter(([_, rows]) => rows.length > 1)
+      .filter(([_, rows]) => {
+        // Don't double-count groups that are already covered by the same-ref check
+        const refs = new Set(rows.map(r => r.bookingRef).filter(Boolean));
+        return refs.size > 1 || refs.size === 0;  // different refs OR all blank
+      })
+      .map(([key, rows]) => ({ kind:'bypropdate', key, rows }));
+
+    // Sort each group by score descending, mark suggested keeper
+    const groups = [...dupesByRef, ...dupesByPropDate];
+    for (const g of groups) {
+      g.rows = g.rows.map(r => ({ ...r, score: scoreOf(r) }));
+      g.rows.sort((a, b) => b.score - a.score || (a.created_at || '').localeCompare(b.created_at || ''));
+      g.suggestedKeeperId = g.rows[0].id;
+      g.selectedKeeperId  = g.rows[0].id;
+      g.deleted = false;
+    }
+    // Sort groups: byref first (more critical), then by check-in date
+    groups.sort((a, b) => {
+      if (a.kind !== b.kind) return a.kind === 'byref' ? -1 : 1;
+      const da = a.rows[0].checkin, db = b.rows[0].checkin;
+      return da.localeCompare(db);
+    });
+
+    _state = { groups, parsedCount: parsed.length };
+    render();
+  } catch (e) {
+    out.innerHTML = `<section><h2 class="bad">Error</h2><pre style="background:#fdf0ec;padding:10px;border-radius:8px">${escapeHtml(e.message)}</pre></section>`;
+  } finally {
+    btn.disabled = false; btn.textContent = 'Find duplicates';
+  }
+}
+
+function render() {
+  const f = _state; if (!f) return;
+  const out = document.getElementById('out');
+  const remaining = f.groups.filter(g => !g.deleted).length;
+  const cleaned   = f.groups.filter(g =>  g.deleted).length;
+  const totalRows = f.groups.reduce((n, g) => n + g.rows.length, 0);
+  const refGroups = f.groups.filter(g => g.kind === 'byref').length;
+  const pdGroups  = f.groups.filter(g => g.kind === 'bypropdate').length;
+
+  let body = `<div class="stats">
+    <div class="stat ${refGroups ? 'bad' : 'ok'}"><div class="num">${refGroups}</div><div class="lbl">Same-ref groups</div></div>
+    <div class="stat ${pdGroups ? 'warn' : 'ok'}"><div class="num">${pdGroups}</div><div class="lbl">Same prop+date groups</div></div>
+    <div class="stat"><div class="num">${totalRows}</div><div class="lbl">Total dup rows</div></div>
+    <div class="stat ${remaining ? 'warn' : 'ok'}"><div class="num">${remaining}</div><div class="lbl">Groups to clean</div></div>
+    <div class="stat ok"><div class="num">${cleaned}</div><div class="lbl">Cleaned</div></div>
+  </div>`;
+
+  if (f.groups.length === 0) {
+    body += `<section><h2 class="ok">✓ No duplicates</h2><p>Every Arrivals row in the window has a unique booking reference and unique property+date. Nothing to clean up.</p></section>`;
+    out.innerHTML = body;
+    return;
+  }
+
+  body += '<div>' + f.groups.map((g, gi) => renderGroup(g, gi)).join('') + '</div>';
+  out.innerHTML = body;
+}
+
+function renderGroup(g, gi) {
+  const headerLabel = g.kind === 'byref'
+    ? `Booking ref <code>${escapeHtml(g.key)}</code> · ×${g.rows.length}`
+    : `${escapeHtml(g.rows[0].property)} on <code>${g.rows[0].checkin}</code> · ×${g.rows.length} (different refs)`;
+
+  // Warn if multiple rows in the group have linked Cleans/HT — deleting will orphan them
+  const linkedCleansCount = g.rows.filter(r => r.hasLinkedCleans).length;
+  const linkedHTCount     = g.rows.filter(r => r.hasLinkedHT).length;
+  let warnings = '';
+  if (linkedCleansCount > 1) warnings += `<div class="warning-box">⚠ ${linkedCleansCount} of these rows have linked Cleans rows. Deleting non-keepers will orphan their Cleans rows (the relation will point at a deleted item). The keeper is the row with the Cleans relation kept; if multiple, the highest-scoring one wins.</div>`;
+  if (linkedHTCount > 1)     warnings += `<div class="warning-box">⚠ ${linkedHTCount} of these rows have linked Hot Tub Cleans rows. Same caveat as above.</div>`;
+
+  const rows = g.rows.map((r, ri) => {
+    const isKeeper = r.id === g.selectedKeeperId;
+    const cls = isKeeper ? 'row-keeper' : 'row-delete';
+    const tag = isKeeper ? '<span class="pill keeper">✓ KEEP</span>' : '<span class="pill delete">DELETE</span>';
+    return `<tr>
+      <td class="${cls}"><label style="display:flex;gap:5px;align-items:center;cursor:pointer"><input type="radio" name="keeper-${gi}" ${isKeeper?'checked':''} onchange="setKeeper(${gi}, '${r.id}')" ${g.deleted?'disabled':''}> ${tag}</label></td>
+      <td class="${cls}"><strong>${r.score}</strong></td>
+      <td class="${cls}"><code>${r.id}</code></td>
+      <td class="${cls}">${escapeHtml(r.name||'')}</td>
+      <td class="${cls}">${escapeHtml(r.bookingRef||'')}</td>
+      <td class="${cls}">${escapeHtml(r.property||'')}</td>
+      <td class="${cls}"><code>${r.checkin}</code></td>
+      <td class="${cls}">${r.checkout ? `<code>${r.checkout}</code>` : '<span class="muted">—</span>'}</td>
+      <td class="${cls}">${escapeHtml(r.formStatus||'')}${r.reviewFlag ? `<br><span class="bad">${escapeHtml(r.reviewFlag)}</span>` : ''}</td>
+      <td class="${cls}">${r.adults}/${r.children}/${r.pets}</td>
+      <td class="${cls}">${r.hasLinkedCleans?'<span class="ok">✓</span>':'<span class="muted">—</span>'}</td>
+      <td class="${cls}">${r.hasLinkedHT?'<span class="ok">✓</span>':'<span class="muted">—</span>'}</td>
+      <td class="${cls} muted">${(r.created_at||'').slice(0,10)}</td>
+    </tr>`;
+  }).join('');
+
+  const nonKeeperCount = g.rows.filter(r => r.id !== g.selectedKeeperId).length;
+  const action = g.deleted
+    ? `<span class="pill gone">✓ Cleaned (${g.rows.length - 1} deleted)</span>`
+    : `<button class="danger small" onclick="deleteOthers(${gi})">Delete ${nonKeeperCount} non-keeper row${nonKeeperCount===1?'':'s'}</button>`;
+
+  return `<div class="group ${g.kind} ${g.deleted ? 'gone' : ''}">
+    <h3>
+      <span class="pill ${g.kind}">${g.kind === 'byref' ? 'SAME REF' : 'SAME PROP+DATE'}</span>
+      ${headerLabel}
+      ${action}
+    </h3>
+    ${warnings}
+    <table>
+      <thead><tr><th></th><th>Score</th><th>Item id</th><th>Item name</th><th>Ref</th><th>Property</th><th>Check-in</th><th>Check-out</th><th>Status</th><th>A/C/P</th><th>Cleans</th><th>HT</th><th>Created</th></tr></thead>
+      <tbody>${rows}</tbody>
+    </table>
+  </div>`;
+}
+
+function setKeeper(groupIdx, rowId) {
+  if (!_state) return;
+  _state.groups[groupIdx].selectedKeeperId = rowId;
+  render();
+}
+
+async function deleteOthers(groupIdx) {
+  if (!_state) return;
+  const g = _state.groups[groupIdx];
+  const others = g.rows.filter(r => r.id !== g.selectedKeeperId);
+  if (!others.length) { toast('Nothing to delete'); return; }
+  const keeper = g.rows.find(r => r.id === g.selectedKeeperId);
+  const msg = `Delete ${others.length} duplicate Arrivals row${others.length===1?'':'s'}?\n\n` +
+              `Keeping: ${keeper.name} (id ${keeper.id})\n\n` +
+              `Deleting:\n${others.map(o => '• ' + o.name + ' (id ' + o.id + ')').join('\n')}`;
+  if (!confirm(msg)) return;
+
+  let ok = 0, fail = [];
+  for (const o of others) {
+    try {
+      await mq(`mutation { delete_item(item_id: ${o.id}) { id } }`);
+      ok++;
+    } catch (e) {
+      fail.push({ id: o.id, name: o.name, error: e.message });
+    }
+    await new Promise(r => setTimeout(r, 100));
+  }
+  if (fail.length === 0) {
+    g.deleted = true;
+    toast(`Deleted ${ok} row${ok===1?'':'s'}`);
+  } else {
+    toast(`Deleted ${ok}; ${fail.length} failed — see alert`);
+    alert('Deletes failed:\n\n' + fail.map(f => `• ${f.name} (${f.id}): ${f.error}`).join('\n'));
+    // Mark deleted only if at least one succeeded; user can re-run to retry the rest
+    if (ok > 0) g.deleted = true;
+  }
+  render();
+}
+</script>
+</body>
+</html>

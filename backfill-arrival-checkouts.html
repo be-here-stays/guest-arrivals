@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Backfill Arrivals check-out dates — Be Here</title>
+<style>
+  body { font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,Arial,sans-serif; background:#D5D0C4; color:#272F2E; margin:0; padding:24px; line-height:1.45; max-width:1000px; margin:0 auto; }
+  h1 { font-size:22px; margin:0 0 6px; }
+  .sub { color:#646955; font-size:13px; margin-bottom:18px; }
+  section { background:#fff; border-radius:12px; padding:18px 20px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+  section h2 { font-size:15px; margin:0 0 10px; color:#272F2E; }
+  button { padding:9px 16px; background:#272F2E; color:#F3E3C3; border:none; border-radius:8px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+  button.secondary { background:#646955; }
+  button:disabled { opacity:0.5; cursor:not-allowed; }
+  input[type=password] { padding:9px 12px; border:1.5px solid #c9c4b3; border-radius:8px; font-family:inherit; font-size:14px; background:#fff; flex:1; min-width:280px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:6px 9px; border-bottom:1px solid #ece9df; vertical-align:top; }
+  th { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:#646955; font-weight:700; background:#f7f5ee; }
+  code { background:#f1eee5; padding:1px 5px; border-radius:4px; font-size:12px; }
+  .ok { color:#2d6a4f; font-weight:600; }
+  .warn { color:#a86c00; font-weight:600; }
+  .bad { color:#8B2020; font-weight:600; }
+  .muted { color:#989782; font-size:12px; }
+  .stats { display:flex; gap:14px; flex-wrap:wrap; margin-top:10px; }
+  .stat { background:#f7f5ee; border-radius:10px; padding:9px 14px; min-width:110px; }
+  .stat .num { font-size:22px; font-weight:700; line-height:1; }
+  .stat .lbl { font-size:11px; color:#646955; text-transform:uppercase; letter-spacing:0.4px; margin-top:3px; }
+  .stat.ok .num { color:#2d6a4f; }
+  .stat.warn .num { color:#a86c00; }
+  .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .step { padding:8px 12px; border-radius:8px; font-size:13px; }
+  .step.todo { background:#f7f5ee; color:#646955; }
+  .step.doing { background:#fdf5e8; color:#7a5c35; }
+  .step.done { background:#edf7f2; color:#1e5c3a; }
+  .step.fail { background:#fdf0ec; color:#8B2020; }
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:#272F2E; color:#fff; padding:10px 18px; border-radius:24px; font-size:13px; font-weight:600; opacity:0; transition:opacity .15s; pointer-events:none; z-index:200; }
+  .toast.show { opacity:1; }
+</style>
+</head>
+<body>
+
+<h1>Backfill Arrivals check-out dates</h1>
+<div class="sub">Historical Arrivals rows pre-date the <code>date_mm31c5jt</code> Check-out column (added 2026-05-04). The Make scenarios populate it for new bookings going forward, but existing rows have it blank. This one-shot page sources the check-out from each row's linked Cleans row (the relation column we backfilled in Phase 2) and writes it to Arrivals. Idempotent.</div>
+
+<script src="secrets.js"></script>
+
+<section>
+  <h2>Setup</h2>
+  <div class="controls">
+    <input type="password" id="tokenInp" placeholder="Monday API token (optional if proxy reachable)">
+    <span class="muted" id="setupStatus"></span>
+  </div>
+</section>
+
+<section>
+  <h2>Backfill check-outs</h2>
+  <p class="muted" style="margin-bottom:10px">Walks every Arrivals row whose <code>date_mm31c5jt</code> is blank, finds the linked Cleans row(s) via <code>board_relation_mm31mkyp</code> on the Cleans side, reads the most recent non-empty <code>CL_CHECKOUT</code>, and writes it to the Arrivals row.</p>
+  <div class="controls">
+    <button onclick="run(false)" id="btnRun">Backfill check-outs</button>
+    <button onclick="run(true)" id="btnDry" class="secondary">Dry-run (preview only)</button>
+  </div>
+  <div id="out" style="margin-top:10px"></div>
+</section>
+
+<div class="toast" id="toast"></div>
+
+<script>
+const URL_API         = 'https://api.monday.com/v2';
+const ARRIVALS_BOARD  = '5094453064';
+const CLEANS_BOARD    = '5095134636';
+
+const AR_DATE     = 'date_mm2adtwg';
+const AR_CHECKOUT = 'date_mm31c5jt';
+const AR_PROP     = 'text_mm2ahbrx';
+const AR_BOOKREF  = 'text_mm2ah8s';
+
+const CL_CHECKOUT = 'date_mm2pb8rs';
+const CL_ARRIVAL  = 'board_relation_mm31mkyp';
+
+function p(v) { try { return v ? JSON.parse(v) : null; } catch { return null; } }
+function escapeHtml(s) { return String(s||'').replace(/[&<>"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'})[c]); }
+function toast(msg) { const t = document.getElementById('toast'); t.textContent = msg; t.classList.add('show'); setTimeout(() => t.classList.remove('show'), 2400); }
+
+async function mq(query) {
+  const tok = (document.getElementById('tokenInp').value || '').trim();
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization: tok, 'API-Version':'2024-01' },
+    body: JSON.stringify({ query }),
+  });
+  if (!r.ok) throw new Error('HTTP ' + r.status);
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  const status = document.getElementById('setupStatus');
+  if (typeof window.LINEN_API_BASE === 'string' && window.LINEN_API_BASE) {
+    status.innerHTML = '<span class="ok">✓ Proxy detected — token paste optional</span>';
+  } else {
+    status.innerHTML = '<span class="warn">⚠ Proxy not detected — paste a token</span>';
+  }
+});
+
+// Pull every row from a board, paginated. Uses the typed BoardRelationValue
+// fragment so board_relation columns return their linked_item_ids.
+async function fetchAll(boardId, columnIds) {
+  const cols = columnIds.map(c => `"${c}"`).join(',');
+  let items = [], cursor = null;
+  do {
+    const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+    const data = await mq(`{ boards(ids:[${boardId}]) { items_page(limit:500${cursorPart}) { cursor items { id name column_values(ids:[${cols}]) { id text value type ... on BoardRelationValue { linked_item_ids } } } } } }`);
+    const page = data.boards[0].items_page;
+    items = items.concat(page.items);
+    cursor = page.cursor;
+  } while (cursor);
+  return items;
+}
+
+async function run(dryOnly) {
+  const out  = document.getElementById('out');
+  const btn  = document.getElementById('btnRun');
+  const dbtn = document.getElementById('btnDry');
+  btn.disabled = true; dbtn.disabled = true;
+  out.innerHTML = '<div class="step doing">Loading Arrivals + Cleans…</div>';
+
+  try {
+    const [arrivals, cleans] = await Promise.all([
+      fetchAll(ARRIVALS_BOARD, [AR_DATE, AR_CHECKOUT, AR_PROP, AR_BOOKREF]),
+      fetchAll(CLEANS_BOARD,   [CL_CHECKOUT, CL_ARRIVAL]),
+    ]);
+
+    // Index Cleans rows by linked arrivalId — most recent CL_CHECKOUT wins
+    // if multiple cleans link to the same arrival (rare).
+    const checkoutByArrivalId = new Map();
+    for (const c of cleans) {
+      const cv = {}; for (const v of c.column_values) cv[v.id] = v;
+      const linked = cv[CL_ARRIVAL]?.linked_item_ids || [];
+      const checkout = p(cv[CL_CHECKOUT]?.value)?.date || cv[CL_CHECKOUT]?.text || '';
+      if (!linked.length || !checkout) continue;
+      for (const aid of linked) {
+        const k = String(aid);
+        // Keep the latest checkout if there's already one (defensive — shouldn't matter)
+        if (!checkoutByArrivalId.has(k) || checkoutByArrivalId.get(k) < checkout) {
+          checkoutByArrivalId.set(k, checkout);
+        }
+      }
+    }
+
+    // Walk Arrivals — find rows where AR_CHECKOUT is blank, pair with CL_CHECKOUT
+    const today = new Date().toISOString().slice(0,10);
+    const matched = [], alreadySet = [], unmatched = [];
+    for (const a of arrivals) {
+      const cv = {}; for (const v of a.column_values) cv[v.id] = v;
+      const arCheckout = p(cv[AR_CHECKOUT]?.value)?.date || cv[AR_CHECKOUT]?.text || '';
+      const arCheckin  = p(cv[AR_DATE]?.value)?.date     || cv[AR_DATE]?.text     || '';
+      const arProp     = p(cv[AR_PROP]?.value)           || cv[AR_PROP]?.text     || '';
+      if (arCheckout) { alreadySet.push({ id: a.id, name: a.name, checkout: arCheckout }); continue; }
+      const fromClean = checkoutByArrivalId.get(String(a.id));
+      if (!fromClean) {
+        unmatched.push({
+          id: a.id,
+          name: a.name,
+          checkin: arCheckin,
+          property: arProp,
+          isPast: arCheckin && arCheckin < today,
+          reason: 'no linked Cleans row with CL_CHECKOUT'
+        });
+        continue;
+      }
+      matched.push({ id: a.id, name: a.name, checkout: fromClean });
+    }
+    // Sort unmatched future-first (so rows that affect the rota appear at top)
+    unmatched.sort((a, b) => (b.checkin || '').localeCompare(a.checkin || ''));
+
+    // Write phase
+    let written = 0;
+    const writeFails = [];
+    if (!dryOnly && matched.length) {
+      out.innerHTML = `<div class="step doing">Writing ${matched.length} check-outs… <span class="progress" style="background:#272F2E;color:#fff;padding:1px 8px;border-radius:11px;font-weight:700;font-size:11px">0 / ${matched.length}</span></div>`;
+      const progressEl = out.querySelector('.progress');
+      for (let i = 0; i < matched.length; i++) {
+        const m = matched[i];
+        try {
+          const cv = JSON.stringify({ [AR_CHECKOUT]: { date: m.checkout } });
+          await mq(`mutation { change_multiple_column_values(board_id: ${ARRIVALS_BOARD}, item_id: ${m.id}, column_values: ${JSON.stringify(cv)}) { id } }`);
+          written++;
+        } catch (e) {
+          writeFails.push({ ...m, error: e.message });
+        }
+        if (progressEl) progressEl.textContent = (i+1) + ' / ' + matched.length;
+        await new Promise(r => setTimeout(r, 100));
+      }
+    }
+
+    // Render report
+    function statBlock(label, count, cls) {
+      return `<div class="stat ${cls||''}"><div class="num">${count}</div><div class="lbl">${label}</div></div>`;
+    }
+    out.innerHTML = `
+      <div class="stats">
+        ${statBlock('Total Arrivals', arrivals.length, '')}
+        ${statBlock('Already set', alreadySet.length, 'ok')}
+        ${statBlock(dryOnly ? 'Would write' : 'Written', dryOnly ? matched.length : written, 'ok')}
+        ${statBlock('Unmatched', unmatched.length, unmatched.length ? 'warn' : 'ok')}
+        ${writeFails.length ? statBlock('Failed', writeFails.length, 'bad') : ''}
+      </div>
+      <p class="muted" style="margin-top:10px">${dryOnly ? '<strong class="warn">Dry-run only — nothing written.</strong>' : 'Writes complete. Re-run is idempotent.'}</p>
+      ${unmatched.length ? (() => {
+        const futureCount = unmatched.filter(r => !r.isPast && r.checkin).length;
+        const pastCount   = unmatched.filter(r => r.isPast).length;
+        const undatedCount= unmatched.filter(r => !r.checkin).length;
+        return `<details style="margin-top:10px" open><summary><strong>Unmatched (${unmatched.length})</strong>
+          — <span class="${futureCount?'bad':'ok'}">${futureCount} future</span>
+          · <span class="muted">${pastCount} past</span>
+          ${undatedCount?`· <span class="muted">${undatedCount} undated</span>`:''}
+        </summary>
+        <p class="muted" style="margin-top:6px">${
+          futureCount === 0
+            ? '✓ No future-dated bookings are missing a check-out — all unmatched are historical and safe to leave. The rota won\\\'t be affected.'
+            : `⚠ ${futureCount} future booking(s) below have no check-out — these will be invisible on the rota until either their Cleans row gets a CL_CHECKOUT, or you set their AR_CHECKOUT manually in Monday.`
+        }</p>
+        <table style="margin-top:6px"><thead><tr><th>Check-in</th><th>Property</th><th>Item id</th><th>Item name</th></tr></thead><tbody>
+        ${unmatched.slice(0, 200).map(r => `<tr style="${!r.isPast && r.checkin ? 'background:#fdf0ec' : ''}">
+          <td><code>${r.checkin || '—'}</code>${!r.isPast && r.checkin ? ' <span class="bad">future</span>' : ''}</td>
+          <td>${escapeHtml(r.property || '')}</td>
+          <td><code>${r.id}</code></td>
+          <td>${escapeHtml(r.name)}</td>
+        </tr>`).join('')}
+        </tbody></table>${unmatched.length > 200 ? `<p class="muted">…and ${unmatched.length-200} more.</p>` : ''}
+      </details>`;
+      })() : ''}
+      ${writeFails.length ? `<details style="margin-top:10px"><summary class="bad">Write failures (${writeFails.length})</summary>
+        <table style="margin-top:6px"><thead><tr><th>Item id</th><th>Item name</th><th>Error</th></tr></thead><tbody>
+        ${writeFails.map(r => `<tr><td><code>${r.id}</code></td><td>${escapeHtml(r.name||'')}</td><td class="bad">${escapeHtml(r.error||'')}</td></tr>`).join('')}
+        </tbody></table>
+      </details>` : ''}
+    `;
+    toast(dryOnly ? `Dry-run: ${matched.length} would be written, ${alreadySet.length} already set` : `Backfill done: ${written} written, ${unmatched.length} unmatched`);
+  } catch (e) {
+    out.innerHTML = `<div class="step fail">Error: ${escapeHtml(e.message)}</div>`;
+  } finally {
+    btn.disabled = false; dbtn.disabled = false;
+  }
+}
+</script>
+</body>
+</html>

@@ -511,6 +511,29 @@ function renderPane(s) {
       </div>` : ''}
     </div>
 
+    ${section('Login & access', false, `
+      <div class="grid-3">
+        <div class="field">
+          <label>Full name</label>
+          <input type="text" data-key="name" value="${escapeHtml(s.name)}">
+          <div style="font-size:11px; color:var(--sage-mid); margin-top:4px">Renaming a staff member updates the Monday item name. Existing Cleans assignments still show the old name in dropdowns until reassigned.</div>
+        </div>
+        <div class="field">
+          <label>Access code (staff.html login)</label>
+          <input type="text" inputmode="numeric" maxlength="6" data-key="code" value="${escapeHtml(s.code)}" placeholder="4-digit code">
+          <div style="font-size:11px; color:var(--sage-mid); margin-top:4px">Each staff member uses this 4-digit code to log into the staff app on a tablet/phone.</div>
+        </div>
+        <div class="field">
+          <label>Status</label>
+          <select data-key="status">
+            <option value="">—</option>
+            ${['Active','On leave','Inactive','Leaver'].map(t => `<option ${s.status===t?'selected':''}>${t}</option>`).join('')}
+          </select>
+          <div style="font-size:11px; color:var(--sage-mid); margin-top:4px">Inactive/Leaver hides the staff member from rota dropdowns; their record is preserved.</div>
+        </div>
+      </div>
+    `, 'login')}
+
     ${section('Identity', false, `
       <div class="grid-3">
         <div class="field"><label>Date of birth</label><input type="date" data-key="dob" value="${s.dob}"></div>
@@ -624,8 +647,11 @@ function toggleChip(el, fieldKey) {
 }
 
 /* Map of section key → list of {key, type} fields it owns. type drives
-   how we read the input value back. */
+   how we read the input value back. The `login` section is special: `name`
+   updates the Monday item name itself (not a column) and `code` + `status`
+   live on existing legacy columns ST_CODE / ST_STATUS. */
 const SECTION_FIELDS = {
+  login:     [['name','itemName'],['code','text','existingCode'],['status','status','existingStatus']],
   identity:  [['dob','date'],['serviceStart','date'],['employmentType','status']],
   contact:   [['mobile','text'],['mobileAlt','text'],['addr1','text'],['addr2','text'],['town','text'],['postcode','text']],
   nok:       [['nokName','text'],['nokRelation','text'],['nokPhone','text']],
@@ -647,15 +673,31 @@ async function saveSection(key) {
   const cv = {};
   let updateLocal = {};
 
+  // Special handling for the Login section's `name` field — it's the
+  // Monday item name itself, not a column. We collect it here and apply
+  // it via change_item_name AFTER the column writes succeed (so a
+  // failed name change doesn't leave the columns half-written).
+  let pendingNameChange = null;
+
   for (const [fkey, ftype, fixedTo] of fields) {
-    // Resolve target column id. The two existing columns we surface
-    // (contractHrs, defaultRate) live on the legacy ST_CONTRACT/ST_DEFRATE,
-    // so we map those explicitly via the `fixedTo` flag.
+    // Resolve target column id. Existing legacy columns are mapped via
+    // `fixedTo` because they live on hardcoded ST_* ids rather than the
+    // auto-discovered new columns map.
     let colId;
-    if (fixedTo === 'existingContract') colId = ex.ST_CONTRACT;
+    if (fixedTo === 'existingContract')   colId = ex.ST_CONTRACT;
     else if (fixedTo === 'existingDefRate') colId = ex.ST_DEFRATE;
+    else if (fixedTo === 'existingCode')    colId = ex.ST_CODE;
+    else if (fixedTo === 'existingStatus')  colId = ex.ST_STATUS;
+    else if (ftype === 'itemName') colId = '__name__';   // sentinel, handled separately
     else colId = nc[fkey];
     if (!colId) continue;
+
+    if (ftype === 'itemName') {
+      const el = document.querySelector(`[data-key="${fkey}"]`);
+      const v = (el?.value || '').trim();
+      if (v && v !== s.name) pendingNameChange = v;
+      continue;  // don't add to cv map
+    }
 
     if (ftype === 'date') {
       const el = document.querySelector(`[data-key="${fkey}"]`);
@@ -703,13 +745,47 @@ async function saveSection(key) {
     if (cv[k] === null) cv[k] = '';
   }
 
+  // Confirm rename — destructive for Cleans dropdowns and any cached
+  // ?name= URL the staff member may have bookmarked.
+  if (pendingNameChange) {
+    const ok = confirm(
+      `Rename "${s.name}" to "${pendingNameChange}"?\n\n` +
+      `This updates the Monday item name. Side effects:\n` +
+      ` • Cleans dropdowns (Primary/Partner/Checker) keep the OLD label on past assignments until you reassign.\n` +
+      ` • The staff member should re-launch staff.html so their session picks up the new name.`
+    );
+    if (!ok) {
+      // Roll back the input to current value so the next save attempt is clean.
+      const nameEl = document.querySelector('[data-key="name"]');
+      if (nameEl) nameEl.value = s.name;
+      pendingNameChange = null;
+      status.textContent = 'Rename cancelled';
+      status.className = 'save-status';
+      return;
+    }
+  }
+
   status.textContent = 'Saving…';
   status.className = 'save-status';
   try {
-    await mq(
-      `mutation($i:ID!,$v:JSON!){ change_multiple_column_values(board_id:${_config.boardId}, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`,
-      { i: s.id, v: JSON.stringify(cv) }
-    );
+    // 1. Column writes (everything except name).
+    if (Object.keys(cv).length) {
+      await mq(
+        `mutation($i:ID!,$v:JSON!){ change_multiple_column_values(board_id:${_config.boardId}, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`,
+        { i: s.id, v: JSON.stringify(cv) }
+      );
+    }
+    // 2. Item rename — Monday's dedicated mutation.
+    if (pendingNameChange) {
+      await mq(
+        `mutation($i:ID!,$n:String!){ change_item_name(board_id:${_config.boardId}, item_id:$i, item_name:$n){ id name } }`,
+        { i: s.id, n: pendingNameChange }
+      );
+      s.name = pendingNameChange;
+      // Refresh the pane heading so the new name is reflected immediately.
+      const heading = document.querySelector('#pane h2');
+      if (heading) heading.textContent = pendingNameChange;
+    }
     Object.assign(s, updateLocal);
     status.textContent = '✓ Saved';
     status.className = 'save-status ok';

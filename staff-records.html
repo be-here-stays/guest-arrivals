@@ -163,13 +163,16 @@
 </div>
 
 <script src="secrets.js"></script>
+<script src="pins-schema.js"></script>
 <script src="staff-schema.js"></script>
 <script src="leaves-schema.js"></script>
 
 <script>
 const TOKEN   = window.MONDAY_API_TOKEN;
 const URL_API = 'https://api.monday.com/v2';
-const PIN_HASH = 'df8d602b7bcaf41725409b83af2a3df79722be244d9f33b5f128b81a269b955e';
+// Per-area PIN — managed via pin-admin.html. Falls back to legacy 652318
+// if the registry isn't seeded yet, so first-time use doesn't lock anyone out.
+const AREA_KEY = 'staff-records';
 
 let _config     = null;       // staff schema config (existing IDs + newColumns + missing[])
 let _leavesCfg  = null;       // leaves schema config (used for leave-usage display)
@@ -177,13 +180,8 @@ let _staff      = [];         // parsed staff array
 let _leaveRows  = [];         // parsed approved leave rows
 let _selectedId = null;       // currently-selected staff item id
 
-async function sha256(text) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
-}
-async function checkPin(v) {
-  if ((await sha256(v)) === PIN_HASH) {
-    sessionStorage.setItem('bh-mgmt', '1');
+async function tryPin(v) {
+  if (await window.PinsSchema.checkPin(mq, AREA_KEY, v)) {
     document.getElementById('pinGate').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     boot();
@@ -193,7 +191,7 @@ async function checkPin(v) {
   }
 }
 document.addEventListener('DOMContentLoaded', () => {
-  if (sessionStorage.getItem('bh-mgmt') === '1') {
+  if (window.PinsSchema.isUnlocked(AREA_KEY)) {
     document.getElementById('pinGate').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     boot();
@@ -201,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
   }
   const inp = document.getElementById('pinInp');
   inp.focus();
-  inp.addEventListener('input', () => { if (inp.value.length === 6) checkPin(inp.value); });
+  inp.addEventListener('input', () => { if (inp.value.length === 6) tryPin(inp.value); });
 });
 
 async function mq(query, variables) {
@@ -222,6 +220,16 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2400);
 }
 function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* Format an ISO date 'YYYY-MM-DD' as UK style 'dd-mm-yy' for display. The
+   underlying Monday API + HTML date inputs always speak ISO; this is a
+   pure display helper used by the leave card, day breakdowns, etc. */
+function fmtUK(iso) {
+  if (!iso || typeof iso !== 'string') return '';
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  return `${m[3]}-${m[2]}-${m[1].slice(2)}`;
+}
 
 async function boot() {
   try {
@@ -471,13 +479,20 @@ function renderPane(s) {
 
   // Live leave usage for this person.
   const window_ = window.StaffSchema.currentLeaveYearWindow(s.leaveYearStart);
-  const stdHpd = s.stdHoursDay || 8;
+  const workingDayCount = (s.prefDays && s.prefDays.length) ? s.prefDays.length : 5;
+  const hpdEffective = s.stdHoursDay
+    ? s.stdHoursDay
+    : (s.contractHrs ? (s.contractHrs / workingDayCount) : 8);
   const myLeaveRows = _leaveRows.filter(r => {
     if (!r.staffId && !r.staffName) return false;
     if (r.staffId && String(r.staffId) === String(s.id)) return true;
     return (r.staffName || '').trim().toLowerCase() === (s.name || '').trim().toLowerCase();
   });
-  const used = window.StaffSchema.computeLeaveUsage(myLeaveRows, stdHpd, window_);
+  const used = window.StaffSchema.computeLeaveUsage(myLeaveRows, {
+    prefDays:    s.prefDays,
+    stdHoursDay: s.stdHoursDay,
+    contractHrs: s.contractHrs,
+  }, window_);
   const total = (s.leaveEntitle || 0) + (s.leaveCarryOver || 0);
   const remaining = total - used;
   const recentApproved = myLeaveRows
@@ -501,13 +516,13 @@ function renderPane(s) {
     </div>
 
     <div class="leave-card">
-      <h4>🌿 Leave year ${window_.start} → ${window_.end}</h4>
+      <h4>🌿 Leave year ${fmtUK(window_.start)} → ${fmtUK(window_.end)}</h4>
       <div class="row"><span class="lbl">Entitlement (incl. carry-over)</span><span class="val">${total.toFixed(1)} h</span></div>
       <div class="row"><span class="lbl">Used (Annual leave only)</span><span class="val">${used.toFixed(1)} h</span></div>
       <div class="row"><span class="lbl">Remaining</span><span class="val" style="color:${remaining < 0 ? 'var(--red)' : 'var(--green)'}">${remaining.toFixed(1)} h</span></div>
-      <div class="row"><span class="lbl">Std hours/day used in calc</span><span class="val">${stdHpd} h</span></div>
+      <div class="row"><span class="lbl">Working pattern</span><span class="val">${(s.prefDays && s.prefDays.length) ? s.prefDays.join(', ') : 'Mon–Fri (default)'} · ${hpdEffective.toFixed(1)} h/day</span></div>
       ${recentApproved.length ? `<div class="breakdown">
-        ${recentApproved.map(r => `<div class="leave-line"><span>${r.startDate}${r.endDate && r.endDate !== r.startDate ? ' → ' + r.endDate : ''}</span><span>${escapeHtml(r.type)}</span></div>`).join('')}
+        ${recentApproved.map(r => `<div class="leave-line"><span>${fmtUK(r.startDate)}${r.endDate && r.endDate !== r.startDate ? ' → ' + fmtUK(r.endDate) : ''}</span><span>${escapeHtml(r.type)}</span></div>`).join('')}
       </div>` : ''}
     </div>
 
@@ -690,7 +705,17 @@ async function saveSection(key) {
     else if (fixedTo === 'existingStatus')  colId = ex.ST_STATUS;
     else if (ftype === 'itemName') colId = '__name__';   // sentinel, handled separately
     else colId = nc[fkey];
-    if (!colId) continue;
+    if (!colId) {
+      // Defensive logging: if the user typed a non-empty value and we're
+      // about to silently skip it because the column wasn't resolved
+      // (e.g. setup didn't create that column), shout about it. Without
+      // this you'd see a successful "Saved" toast for a field that never
+      // actually wrote anywhere.
+      const probe = document.querySelector(`[data-key="${fkey}"]`);
+      const v = probe?.type === 'checkbox' ? probe.checked : (probe?.value || '');
+      if (v) console.warn(`[staff-records] skipping "${fkey}" — column id not resolved on the Staff board. Re-run the setup banner to provision missing columns.`);
+      continue;
+    }
 
     if (ftype === 'itemName') {
       const el = document.querySelector(`[data-key="${fkey}"]`);
@@ -765,22 +790,22 @@ async function saveSection(key) {
     }
   }
 
+  // Include the rename in the same change_multiple_column_values call.
+  // Monday's API doesn't expose a separate change_item_name mutation in
+  // our API version; instead the item name is treated as a special "name"
+  // key inside column_values JSON.
+  if (pendingNameChange) cv['name'] = pendingNameChange;
+
   status.textContent = 'Saving…';
   status.className = 'save-status';
   try {
-    // 1. Column writes (everything except name).
     if (Object.keys(cv).length) {
       await mq(
-        `mutation($i:ID!,$v:JSON!){ change_multiple_column_values(board_id:${_config.boardId}, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`,
+        `mutation($i:ID!,$v:JSON!){ change_multiple_column_values(board_id:${_config.boardId}, item_id:$i, column_values:$v, create_labels_if_missing:true){ id name } }`,
         { i: s.id, v: JSON.stringify(cv) }
       );
     }
-    // 2. Item rename — Monday's dedicated mutation.
     if (pendingNameChange) {
-      await mq(
-        `mutation($i:ID!,$n:String!){ change_item_name(board_id:${_config.boardId}, item_id:$i, item_name:$n){ id name } }`,
-        { i: s.id, n: pendingNameChange }
-      );
       s.name = pendingNameChange;
       // Refresh the pane heading so the new name is reflected immediately.
       const heading = document.querySelector('#pane h2');

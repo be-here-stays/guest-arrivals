@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>PIN admin — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; }
+
+  /* PIN gate */
+  #pinGate { position:fixed; inset:0; background:var(--dark); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; padding:20px; }
+  #pinGate h2 { color:#fff; font-size:18px; font-weight:600; margin-bottom:18px; }
+  #pinGate input { width:240px; padding:12px; font-size:20px; text-align:center; border-radius:8px; border:none; background:rgba(255,255,255,0.12); color:#fff; font-family:inherit; letter-spacing:8px; }
+  #pinGate input::placeholder { color:rgba(255,255,255,0.5); letter-spacing:normal; }
+  #pinGate .pin-err { color:#ff8a80; font-size:13px; margin-top:10px; min-height:18px; }
+  #pinGate .pin-back { color:rgba(255,255,255,0.5); margin-top:18px; font-size:12px; text-decoration:none; }
+
+  header { background:var(--dark); color:#fff; padding:18px 24px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+  header h1 { font-size:18px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.6; margin-top:2px; }
+  .hdr-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .hdr-btn { color:rgba(255,255,255,0.85); text-decoration:none; font-size:13px; font-weight:600; padding:7px 12px; border:1px solid rgba(255,255,255,0.25); border-radius:8px; background:transparent; cursor:pointer; font-family:inherit; }
+  .hdr-btn:hover { background:rgba(255,255,255,0.08); }
+
+  .container { max-width:780px; margin:0 auto; padding:18px 22px 60px; }
+
+  .setup-card { background:var(--amber-bg); border:1.5px solid var(--amber); border-radius:14px; padding:16px 18px; margin-bottom:14px; }
+  .setup-card.hide { display:none; }
+  .setup-card h3 { font-size:14px; color:var(--amber); margin-bottom:6px; }
+  .setup-card p { font-size:13px; color:var(--dark); margin-bottom:10px; line-height:1.4; }
+  .setup-btn { padding:9px 14px; background:var(--amber); color:#fff; border:0; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+
+  .info-banner { background:var(--blue-bg); border-left:4px solid var(--blue); padding:14px 16px; border-radius:8px; margin-bottom:18px; font-size:13px; color:var(--dark); line-height:1.5; }
+  .info-banner strong { color:var(--blue); }
+
+  .area-row { background:var(--surface); border-radius:12px; padding:14px 18px; margin-bottom:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+  .area-row .head { display:flex; align-items:flex-start; gap:14px; flex-wrap:wrap; }
+  .area-row .meta { flex:1 1 240px; }
+  .area-row .name { font-size:15px; font-weight:700; color:var(--dark); }
+  .area-row .desc { font-size:12px; color:var(--sage); margin-top:3px; line-height:1.4; }
+  .area-row .badge { font-size:11px; font-weight:700; padding:3px 8px; border-radius:10px; display:inline-block; margin-top:5px; }
+  .area-row .badge.legacy { background:var(--amber-bg); color:var(--amber); }
+  .area-row .badge.custom { background:var(--green-bg); color:var(--green); }
+  .area-row .badge.unset  { background:var(--red-bg); color:var(--red); }
+
+  .area-form { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border); }
+  .area-form input[type=password], .area-form input[type=text] {
+    padding:9px 12px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px;
+    background:#fff; color:var(--dark); outline:none; min-width:140px; letter-spacing:4px; text-align:center;
+  }
+  .area-form input:focus { border-color:var(--dark); }
+  .area-form .save-btn {
+    padding:9px 14px; background:var(--dark); color:var(--cream); border:0; border-radius:8px;
+    font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;
+  }
+  .area-form .save-btn:hover { background:var(--sage); }
+  .area-form .save-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .area-form .status { font-size:12px; color:var(--sage-mid); }
+  .area-form .status.ok { color:var(--green); }
+  .area-form .status.err { color:var(--red); }
+  .area-form label { font-size:11px; color:var(--sage); font-weight:600; }
+
+  .footer-actions { margin-top:24px; padding-top:18px; border-top:1px solid var(--border); font-size:13px; color:var(--sage); }
+  .footer-actions a { color:var(--blue); text-decoration:none; font-weight:600; }
+  .footer-actions a:hover { text-decoration:underline; }
+
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--dark); color:#fff; padding:10px 18px; border-radius:24px; font-size:13px; font-weight:600; opacity:0; transition:opacity .15s; pointer-events:none; z-index:200; }
+  .toast.show { opacity:1; }
+  .loading { color:var(--sage-mid); font-size:13px; padding:30px; text-align:center; }
+  .hide { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="pinGate">
+  <h2>PIN admin</h2>
+  <input type="password" id="pinInp" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+  <div class="pin-err" id="pinErr"></div>
+  <a class="pin-back" href="hub.html">‹ Back to hub</a>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <div>
+      <h1>🔐 PIN admin</h1>
+      <div class="sub">Set a different PIN for each manager area</div>
+    </div>
+    <div class="hdr-actions">
+      <a href="staff-records.html" class="hdr-btn">👤 Staff</a>
+      <a href="rota-planner.html" class="hdr-btn">Rota planner</a>
+      <a href="hub.html" class="hdr-btn">‹ Hub</a>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="setupCard" class="setup-card hide">
+      <h3>Pins board not set up yet</h3>
+      <p>Press once to create the <strong>Be Here — Access PINs</strong> board on Monday and seed every area with the current legacy PIN. After that, change individual area PINs below.</p>
+      <button class="setup-btn" id="setupBtn" onclick="bootstrap()">Create the Pins board</button>
+    </div>
+
+    <div class="info-banner" id="infoBanner">
+      <strong>How this works:</strong> every manager-facing page checks its own area's PIN before unlocking. Areas marked <strong style="color:var(--amber)">Legacy</strong> are still using the original 652318 PIN — change them here so each area has its own. Once changed, the legacy PIN no longer works for that area.
+    </div>
+
+    <div id="content" class="loading">Loading…</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="secrets.js"></script>
+<script src="pins-schema.js"></script>
+
+<script>
+const TOKEN   = window.MONDAY_API_TOKEN;
+const URL_API = 'https://api.monday.com/v2';
+
+let _registry = null;     // { boardId, columns, pins:{areaKey:hash}, ts }
+
+async function mq(query, variables) {
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization: TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* ── PIN gate (use the registry's own checkPin) ───────────────────────── */
+async function checkAdminPin(v) {
+  const ok = await window.PinsSchema.checkPin(mq, 'pin-admin', v);
+  if (ok) {
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    boot();
+  } else {
+    document.getElementById('pinErr').textContent = 'Wrong PIN';
+    document.getElementById('pinInp').value = '';
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.PinsSchema.isUnlocked('pin-admin')) {
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    boot();
+    return;
+  }
+  const inp = document.getElementById('pinInp');
+  inp.focus();
+  inp.addEventListener('input', () => { if (inp.value.length === 6) checkAdminPin(inp.value); });
+});
+
+async function boot() {
+  try {
+    _registry = await window.PinsSchema.loadPins(mq);
+    if (!_registry) {
+      document.getElementById('setupCard').classList.remove('hide');
+      document.getElementById('content').innerHTML = '';
+      return;
+    }
+    render();
+  } catch (e) {
+    console.error(e);
+    document.getElementById('content').innerHTML = `<div class="loading">Error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function bootstrap() {
+  const btn = document.getElementById('setupBtn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    _registry = await window.PinsSchema.createPinsBoard(mq);
+    document.getElementById('setupCard').classList.add('hide');
+    toast('✓ Pins board ready — every area seeded with the legacy PIN');
+    render();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Create the Pins board';
+    toast('Setup failed: ' + e.message);
+  }
+}
+
+function render() {
+  const c = document.getElementById('content');
+  const legacy = window.PinsSchema.LEGACY_HASH;
+  const pins = _registry?.pins || {};
+  c.innerHTML = window.PinsSchema.AREAS.map(area => {
+    const stored = pins[area.key];
+    let badge;
+    if (!stored) {
+      badge = `<span class="badge unset">⚠️ No PIN registered</span>`;
+    } else if (stored === legacy) {
+      badge = `<span class="badge legacy">Legacy PIN (652318)</span>`;
+    } else {
+      badge = `<span class="badge custom">✓ Custom PIN set</span>`;
+    }
+    return `<div class="area-row" data-key="${area.key}">
+      <div class="head">
+        <div class="meta">
+          <div class="name">${escapeHtml(area.title)}</div>
+          <div class="desc">${escapeHtml(area.description)}</div>
+          ${badge}
+        </div>
+      </div>
+      <div class="area-form">
+        <label>New PIN</label>
+        <input type="password" inputmode="numeric" maxlength="6" placeholder="••••••" id="pin_${area.key}" autocomplete="off">
+        <input type="text" placeholder="Confirm" id="confirm_${area.key}" autocomplete="off">
+        <input type="text" id="by_${area.key}" placeholder="Your name (audit)" style="min-width:140px; letter-spacing:0; text-align:left">
+        <button class="save-btn" onclick="changePin('${area.key}')">Set PIN</button>
+        <span class="status" id="status_${area.key}"></span>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+async function changePin(areaKey) {
+  const newEl = document.getElementById('pin_' + areaKey);
+  const cnfEl = document.getElementById('confirm_' + areaKey);
+  const byEl  = document.getElementById('by_' + areaKey);
+  const status = document.getElementById('status_' + areaKey);
+  const newPin = (newEl?.value || '').trim();
+  const cnf    = (cnfEl?.value || '').trim();
+  const by     = (byEl?.value  || '').trim();
+
+  if (!newPin) { status.textContent = 'Pick a PIN first.'; status.className = 'status err'; return; }
+  if (newPin.length < 4 || newPin.length > 6) { status.textContent = 'PIN should be 4–6 digits.'; status.className = 'status err'; return; }
+  if (newPin !== cnf) { status.textContent = "Confirmation doesn't match."; status.className = 'status err'; return; }
+  if (newPin === '652318') {
+    if (!confirm('Setting this area\'s PIN to the legacy 652318 again — that\'s the same as having no per-area PIN. Continue?')) return;
+  }
+
+  status.textContent = 'Saving…';
+  status.className = 'status';
+  try {
+    await window.PinsSchema.setPin(mq, areaKey, newPin, by);
+    // Force a fresh load so the badge updates correctly.
+    _registry = await window.PinsSchema.loadPins(mq);
+    status.textContent = '✓ PIN updated';
+    status.className = 'status ok';
+    newEl.value = ''; cnfEl.value = '';
+    setTimeout(() => render(), 800);   // re-render the row badges
+  } catch (e) {
+    status.textContent = 'Error: ' + e.message;
+    status.className = 'status err';
+  }
+}
+</script>
+</body>
+</html>

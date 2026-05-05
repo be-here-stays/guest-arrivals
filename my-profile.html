@@ -139,6 +139,12 @@ function toast(msg) {
   setTimeout(() => t.classList.remove('show'), 2400);
 }
 function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtUK(iso) {
+  if (!iso || typeof iso !== 'string') return '';
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  return `${m[3]}-${m[2]}-${m[1].slice(2)}`;
+}
 
 document.addEventListener('DOMContentLoaded', async () => {
   const params = new URLSearchParams(location.search);
@@ -258,7 +264,7 @@ function parseStaff(it) {
 async function loadMyLeaveRows() {
   if (!_leavesCfg) return [];
   const cols = _leavesCfg.columns;
-  const want = ['type','status','staffName','staffId','startDate','endDate']
+  const want = ['type','status','staffName','staffId','startDate','endDate','submitted','decided','mgrNote']
     .map(k => cols[k]).filter(Boolean);
   const colsArg = want.map(c => `"${c}"`).join(',');
   let cursor = null, all = [];
@@ -291,6 +297,9 @@ async function loadMyLeaveRows() {
       staffId: get('staffId'),
       startDate: getDate('startDate'),
       endDate: getDate('endDate'),
+      submitted: getDate('submitted'),
+      decided: getDate('decided'),
+      mgrNote: get('mgrNote'),
     };
   }).filter(r => {
     // Match this person via id or name.
@@ -302,8 +311,15 @@ async function loadMyLeaveRows() {
 function render(myLeaveRows) {
   const s = _me;
   const window_ = window.StaffSchema.currentLeaveYearWindow(s.leaveYearStart);
-  const stdHpd = s.stdHoursDay || 8;
-  const used = window.StaffSchema.computeLeaveUsage(myLeaveRows, stdHpd, window_);
+  const workingDayCount = (s.prefDays && s.prefDays.length) ? s.prefDays.length : 5;
+  const hpdEffective = s.stdHoursDay
+    ? s.stdHoursDay
+    : (s.contractHrs ? (s.contractHrs / workingDayCount) : 8);
+  const used = window.StaffSchema.computeLeaveUsage(myLeaveRows, {
+    prefDays:    s.prefDays,
+    stdHoursDay: s.stdHoursDay,
+    contractHrs: s.contractHrs,
+  }, window_);
   const total = (s.leaveEntitle || 0) + (s.leaveCarryOver || 0);
   const remaining = total - used;
 
@@ -314,6 +330,32 @@ function render(myLeaveRows) {
   const roleChipsLocked = (s.roles.length ? s.roles : [s.primaryRole].filter(Boolean)).map(r =>
     `<span class="pick on locked">${escapeHtml(r)}</span>`
   ).join('') || '<span class="pick locked">—</span>';
+
+  // Build the leave-requests panel: most-recent first, all statuses.
+  const requestsSorted = (myLeaveRows || []).slice().sort((a, b) => (b.startDate || '').localeCompare(a.startDate || ''));
+  const STATUS_STYLE = {
+    'Pending':   { bg: 'var(--amber-bg)', fg: 'var(--amber)', icon: '⏳' },
+    'Approved':  { bg: 'var(--green-bg)', fg: 'var(--green)', icon: '✓' },
+    'Declined':  { bg: 'var(--red-bg)',   fg: 'var(--red)',   icon: '✕' },
+    'Cancelled': { bg: 'var(--cream)',    fg: 'var(--sage-mid)', icon: '—' },
+  };
+  const requestsHtml = requestsSorted.length
+    ? requestsSorted.slice(0, 12).map(r => {
+        const st = STATUS_STYLE[r.status] || STATUS_STYLE['Pending'];
+        const range = r.endDate && r.endDate !== r.startDate
+          ? `${fmtUK(r.startDate)} → ${fmtUK(r.endDate)}`
+          : fmtUK(r.startDate);
+        return `<div style="background:#fff; border-radius:9px; padding:10px 12px; margin-bottom:6px; border-left:3px solid ${st.fg};">
+          <div style="display:flex; gap:10px; align-items:flex-start; flex-wrap:wrap;">
+            <span style="background:${st.bg}; color:${st.fg}; font-size:11px; font-weight:700; padding:3px 8px; border-radius:8px;">${st.icon} ${escapeHtml(r.status)}</span>
+            <span style="font-size:13px; color:var(--dark); font-weight:600;">${escapeHtml(r.type)}</span>
+            <span style="font-size:13px; color:var(--sage);">${range}</span>
+            ${r.decided ? `<span style="font-size:11px; color:var(--sage-mid); margin-left:auto;">decided ${fmtUK(r.decided)}</span>` : ''}
+          </div>
+          ${r.mgrNote ? `<div style="font-size:12px; color:var(--sage); margin-top:6px; font-style:italic;">"${escapeHtml(r.mgrNote)}"</div>` : ''}
+        </div>`;
+      }).join('')
+    : `<div style="font-size:13px; color:var(--sage-mid); padding:10px 0;">You haven't submitted any leave requests yet.</div>`;
 
   const c = document.getElementById('content');
   c.innerHTML = `
@@ -326,10 +368,17 @@ function render(myLeaveRows) {
       </div>
 
       <div class="leave-card">
-        <h4>🌿 Your leave year — ${window_.start} to ${window_.end}</h4>
+        <h4>🌿 Your leave year — ${fmtUK(window_.start)} to ${fmtUK(window_.end)}</h4>
         <div class="row"><span class="lbl">Entitlement (incl. carry-over)</span><span class="val">${total.toFixed(1)} h</span></div>
         <div class="row"><span class="lbl">Used (Annual leave)</span><span class="val">${used.toFixed(1)} h</span></div>
         <div class="row"><span class="lbl">Remaining</span><span class="val" style="color:${remaining < 0 ? 'var(--red)' : 'var(--green)'}">${remaining.toFixed(1)} h</span></div>
+        <div class="row"><span class="lbl">Working pattern</span><span class="val">${(s.prefDays && s.prefDays.length) ? s.prefDays.join(', ') : 'Mon–Fri (default)'} · ${hpdEffective.toFixed(1)} h/day</span></div>
+      </div>
+
+      <div class="section">
+        <h3>My leave requests</h3>
+        ${requestsHtml}
+        <div style="margin-top:8px"><a href="request-leave.html?from=staff&name=${encodeURIComponent(s.name)}" style="display:inline-block; padding:9px 14px; background:var(--dark); color:var(--cream); text-decoration:none; border-radius:9px; font-size:13px; font-weight:700;">+ Submit a new request</a></div>
       </div>
 
       <div class="section">

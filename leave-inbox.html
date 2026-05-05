@@ -65,8 +65,27 @@
   .row-detail { margin-top:10px; padding-top:10px; border-top:1px dashed var(--border); }
   .row-detail h4 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--sage); margin-bottom:4px; }
   .row-detail p  { font-size:13px; color:var(--dark); line-height:1.45; white-space:pre-wrap; margin-bottom:10px; }
-  .day-list { font-size:12px; color:var(--sage); margin-top:6px; line-height:1.6; }
+  .day-list { font-size:12px; color:var(--sage); margin-top:6px; line-height:1.5; }
   .day-list .tight { color:var(--amber); font-weight:700; }
+  /* Per-day card: condensed day breakdown with optional inline expand. */
+  .day-card { background:#fff; border-radius:8px; padding:8px 10px; margin-bottom:4px; border-left:3px solid transparent; }
+  .day-card.has-blockers { border-left-color:var(--blue); }
+  .day-card.is-tight { border-left-color:var(--amber); background:#fffaf0; }
+  .day-card .day-head { display:flex; align-items:center; gap:8px; flex-wrap:wrap; cursor:pointer; user-select:none; }
+  .day-card .day-head .label { font-weight:700; color:var(--dark); font-size:13px; }
+  .day-card .day-head .total { font-weight:600; color:var(--sage); font-size:12px; }
+  .day-card.is-tight .day-head .total { color:var(--amber); }
+  .day-card .role-chip { display:inline-block; padding:1px 7px; background:var(--sage-light, #eaeae0); color:var(--sage); border-radius:8px; font-size:10px; font-weight:700; letter-spacing:0.2px; }
+  .day-card.is-tight .role-chip { background:var(--amber-bg); color:var(--amber); }
+  .day-card .who-toggle { margin-left:auto; font-size:11px; color:var(--blue); cursor:pointer; user-select:none; }
+  .day-card .who-list { margin-top:6px; padding-top:6px; border-top:1px dashed var(--border); display:none; }
+  .day-card.expanded .who-list { display:block; }
+  .day-card .who-list .person { font-size:12px; color:var(--dark); padding:2px 0; }
+  .day-card .who-list .person .roles { color:var(--sage-mid); font-size:11px; font-weight:500; }
+  .day-card .who-list .person .type { float:right; padding:1px 7px; border-radius:8px; font-size:10px; font-weight:700; }
+  .day-card .who-list .person .type.Leave { background:var(--green-bg); color:var(--green); }
+  .day-card .who-list .person .type.Sick  { background:var(--red-bg);   color:var(--red); }
+  .day-card .who-list .person .type.Off   { background:var(--cream);    color:var(--sage); }
 
   .row-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
   .row-actions button {
@@ -129,14 +148,17 @@
 </div>
 
 <script src="secrets.js"></script>
+<script src="pins-schema.js"></script>
 <script src="leaves-schema.js"></script>
+<script src="staff-schema.js"></script>
 
 <script>
 const TOKEN   = window.MONDAY_API_TOKEN;
 const URL_API = 'https://api.monday.com/v2';
 
-// Same PIN as rota-planner.html / staff-shifts.html (manager-only pages).
-const PIN_HASH = 'df8d602b7bcaf41725409b83af2a3df79722be244d9f33b5f128b81a269b955e';
+// Per-area PIN — managed via pin-admin.html. Falls back to legacy 652318
+// if the registry isn't seeded yet, so first-time use doesn't lock anyone out.
+const AREA_KEY = 'leave-inbox';
 
 // Staff Shifts board — needed for the conflict count + the approve write.
 const SHIFTS_BOARD = '5095155773';
@@ -157,13 +179,8 @@ let _staffByName= new Map();   // lc(name) → staffId
 let _filter     = 'pending';   // 'pending' | 'all' | 'approved' | 'declined'
 let _expanded   = new Set();
 
-async function sha256(text) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
-}
-async function checkPin(v) {
-  if ((await sha256(v)) === PIN_HASH) {
-    sessionStorage.setItem('bh-mgmt', '1');
+async function tryPin(v) {
+  if (await window.PinsSchema.checkPin(mq, AREA_KEY, v)) {
     document.getElementById('pinGate').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     boot();
@@ -173,7 +190,7 @@ async function checkPin(v) {
   }
 }
 document.addEventListener('DOMContentLoaded', () => {
-  if (sessionStorage.getItem('bh-mgmt') === '1') {
+  if (window.PinsSchema.isUnlocked(AREA_KEY)) {
     document.getElementById('pinGate').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     boot();
@@ -182,7 +199,7 @@ document.addEventListener('DOMContentLoaded', () => {
   const inp = document.getElementById('pinInp');
   inp.focus();
   inp.addEventListener('input', () => {
-    if (inp.value.length === 6) checkPin(inp.value);
+    if (inp.value.length === 6) tryPin(inp.value);
   });
 });
 
@@ -205,6 +222,12 @@ function toast(msg) {
 }
 
 function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtUK(iso) {
+  if (!iso || typeof iso !== 'string') return '';
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  return `${m[3]}-${m[2]}-${m[1].slice(2)}`;
+}
 function fmtDate(iso) {
   if (!iso) return '';
   return new Date(iso+'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
@@ -352,15 +375,67 @@ async function loadShifts() {
 
 async function loadStaff() {
   try {
-    const data = await mq(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:300){ items{ id name } } } }`);
+    // Resolve the Staff board's column IDs first (the new "Roles" multi-select
+    // is auto-discovered by title) so we can pull each staff member's role list.
+    let staffCfg = null;
+    try { staffCfg = await window.StaffSchema.getStaffConfig(mq); } catch (_) {}
+    const ex  = staffCfg?.existing  || {};
+    const nc  = staffCfg?.newColumns || {};
+    const roleColIds = [ex.ST_ROLE, nc.rolesAll].filter(Boolean);
+    const colsArg = roleColIds.length ? `column_values(ids:[${roleColIds.map(c => `"${c}"`).join(',')}]) { id text }` : '';
+    const data = await mq(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:300){ items{ id name ${colsArg} } } } }`);
     const items = data?.boards?.[0]?.items_page?.items || [];
     _staffById = new Map();
     _staffByName = new Map();
     for (const i of items) {
-      _staffById.set(String(i.id), { name: i.name || '' });
+      const cv = Object.fromEntries(((i.column_values) || []).map(c => [c.id, c]));
+      const primaryRole = (cv[ex.ST_ROLE]?.text || '').trim();
+      const rolesList = (cv[nc.rolesAll]?.text || '')
+        .split(',').map(s => s.trim()).filter(Boolean);
+      // Eligibility set: prefer the multi-select; fall back to primary if the
+      // multi-select hasn't been seeded yet for this person.
+      const roles = rolesList.length ? rolesList : (primaryRole ? [primaryRole] : []);
+      _staffById.set(String(i.id), { name: i.name || '', primaryRole, roles });
       _staffByName.set((i.name || '').trim().toLowerCase(), String(i.id));
     }
   } catch (e) { console.warn('loadStaff failed', e); }
+}
+
+/* For each calendar day in the request range, return an array of staff
+   who are blocked-off that day with the type of block. Used by the
+   per-role breakdown. shape:
+     [{ date, count, byRole: {roleName: count}, people: [{name, roles, type}] }]
+   `count` is unique people; per-role figures may overlap when one person
+   has multiple roles (which is the point — that one person counts toward
+   each cover pool). */
+function buildBreakdown(rangeDays, shiftRows, staffById) {
+  // Build a fast lookup: date → list of blocking shifts.
+  const byDate = new Map();
+  for (const r of (shiftRows || [])) {
+    if (!r || !r.date || !r.role) continue;
+    if (!window.LeavesSchema.BLOCKING_ROLES.has(r.role)) continue;
+    if (!byDate.has(r.date)) byDate.set(r.date, []);
+    byDate.get(r.date).push(r);
+  }
+  return rangeDays.map(d => {
+    const blocking = byDate.get(d) || [];
+    // Dedupe by staffId — one person on multiple shift rows for the same day
+    // shouldn't get counted twice.
+    const seen = new Set();
+    const people = [];
+    const byRole = {};
+    for (const sh of blocking) {
+      const key = sh.staffId || ('_unk_' + people.length);
+      if (seen.has(key)) continue;
+      seen.add(key);
+      const meta = sh.staffId ? staffById.get(String(sh.staffId)) : null;
+      const roles = meta?.roles && meta.roles.length ? meta.roles : ['(no role)'];
+      const name = meta?.name || `Staff #${sh.staffId || '?'}`;
+      people.push({ name, roles, type: sh.role });
+      for (const role of roles) byRole[role] = (byRole[role] || 0) + 1;
+    }
+    return { date: d, count: people.length, people, byRole };
+  });
 }
 
 function renderToolbar() {
@@ -416,21 +491,41 @@ function renderRow(i) {
                 :                              'personal';
 
   const meta = [];
-  if (i.submitted) meta.push(`📥 Submitted ${i.submitted}`);
-  if (i.decided)   meta.push(`✅ Decided ${i.decided}`);
+  if (i.submitted) meta.push(`📥 Submitted ${fmtUK(i.submitted)}`);
+  if (i.decided)   meta.push(`✅ Decided ${fmtUK(i.decided)}`);
   if (i.override)  meta.push(`⚠️ Override used`);
   if (i.days)      meta.push(`📅 ${i.days} day${i.days===1?'':'s'}`);
 
-  // Day-by-day count of who else is off, only for pending rows where it
-  // matters. Approved/declined rows show a flat dates string.
+  // Day-by-day breakdown — only for pending rows. Each day shows a card
+  // with total count + per-role breakdown, click-expand for the who.
   let dayList = '';
   if (i.status === 'Pending') {
-    dayList = '<div class="day-list">' + check.days.map(d => {
+    const breakdown = buildBreakdown(days, _shiftRows, _staffById);
+    dayList = '<div class="day-list">' + breakdown.map(d => {
       const label = fmtDate(d.date);
-      if (d.count >= 2) return `<span class="tight">⚠️ ${label} — ${d.count} already off</span>`;
-      if (d.count === 1) return `${label} — 1 already off`;
-      return `${label} — clear`;
-    }).join('<br>') + '</div>';
+      if (d.count === 0) {
+        return `<div class="day-card"><div class="day-head"><span class="label">${label}</span><span class="total">clear</span></div></div>`;
+      }
+      const tightCls = d.count >= 2 ? ' is-tight' : ' has-blockers';
+      const warnIcon = d.count >= 2 ? '⚠️ ' : '';
+      const roleChips = Object.entries(d.byRole)
+        .sort((a,b) => b[1] - a[1])
+        .map(([role, n]) => `<span class="role-chip">${escapeHtml(role)} ×${n}</span>`)
+        .join(' ');
+      const peopleRows = d.people.map(p => {
+        const typeCls = p.type === 'Leave' || p.type === 'Sick' || p.type === 'Off' ? p.type : 'Off';
+        return `<div class="person"><span class="type ${typeCls}">${escapeHtml(p.type)}</span>${escapeHtml(p.name)}<div class="roles">${escapeHtml(p.roles.join(', '))}</div></div>`;
+      }).join('');
+      return `<div class="day-card${tightCls}" id="day_${i.id}_${d.date}">
+        <div class="day-head" onclick="toggleDay('${i.id}_${d.date}')">
+          <span class="label">${warnIcon}${label}</span>
+          <span class="total">${d.count} already off</span>
+          ${roleChips}
+          <span class="who-toggle">▾ Who?</span>
+        </div>
+        <div class="who-list">${peopleRows}</div>
+      </div>`;
+    }).join('') + '</div>';
   }
 
   const reasonBlock = (i.reason || '').trim()
@@ -484,6 +579,16 @@ function renderActions(i, conflict) {
       <button class="approve" id="approve_${i.id}" onclick="approveLeave('${i.id}')" ${approveDisabled}>✓ Approve</button>
       <button class="decline" onclick="declineLeave('${i.id}')">✕ Decline</button>
     </div>`;
+}
+
+// Toggle the inline "who is off" panel on a given day card.
+function toggleDay(key) {
+  const el = document.getElementById('day_' + key);
+  if (!el) return;
+  el.classList.toggle('expanded');
+  // Flip the chevron caption.
+  const tog = el.querySelector('.who-toggle');
+  if (tog) tog.textContent = el.classList.contains('expanded') ? '▴ Hide' : '▾ Who?';
 }
 
 function onOverrideChange(id) {

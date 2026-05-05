@@ -254,33 +254,62 @@
   }
 
   /* Sum the hours used by a staff member in the active leave year, given
-     the approved Annual leave rows from the Leave Requests board. Each
-     row's days are multiplied by the staff member's stdHoursPerDay
-     (default 8h if not set). Sick days and Personal/unpaid don't deduct.
+     the approved Annual leave rows from the Leave Requests board.
 
-     leaveRows: array of { type, status, startDate, endDate, days } from
-       leave-inbox / leaves-schema parsing.
-     stdHoursPerDay: number (8 if not set on the staff record).
+     Smart per-staff calculation:
+       1. workingDays — set of weekdays (1=Mon..7=Sun) the staff actually
+          works. Comes from the staff member's `prefDays` multi-select.
+          Falls back to Mon–Fri (1..5) when the staff hasn't set their
+          preferences yet.
+       2. hoursPerDay — taken from the staff member's `stdHoursDay` field
+          when set. Otherwise derived from contractHrs ÷ workingDays.length
+          (e.g. 35h/wk over Mon-Fri = 7h/day). Final fallback is 8h.
+
+     For each approved Annual leave request, we walk every day in the
+     range, count only the ones whose weekday is in workingDays, and
+     multiply that count by hoursPerDay. Sick days and Personal/unpaid
+     don't deduct from the entitlement.
+
+     staffCfg: { prefDays:[], stdHoursDay, contractHrs }
+     leaveRows: array of { type, status, startDate, endDate } from leave-inbox parsing.
      window: { start, end } from currentLeaveYearWindow(). */
-  function computeLeaveUsage(leaveRows, stdHoursPerDay, window) {
-    const hpd = parseFloat(stdHoursPerDay) || 8;
+  function computeLeaveUsage(leaveRows, staffCfg, window) {
+    // Map prefDays labels (Mon..Sun) → JS weekday number (1..7, where Sun=7).
+    const dayLabelToNum = { Mon:1, Tue:2, Wed:3, Thu:4, Fri:5, Sat:6, Sun:7 };
+    let workingDays;
+    if (staffCfg && Array.isArray(staffCfg.prefDays) && staffCfg.prefDays.length) {
+      workingDays = new Set(staffCfg.prefDays.map(d => dayLabelToNum[d]).filter(Boolean));
+    } else {
+      workingDays = new Set([1,2,3,4,5]);   // default Mon–Fri
+    }
+    let hpd;
+    if (staffCfg && parseFloat(staffCfg.stdHoursDay) > 0) {
+      hpd = parseFloat(staffCfg.stdHoursDay);
+    } else if (staffCfg && parseFloat(staffCfg.contractHrs) > 0 && workingDays.size > 0) {
+      hpd = parseFloat(staffCfg.contractHrs) / workingDays.size;
+    } else {
+      hpd = 8;
+    }
+
     let used = 0;
     for (const r of (leaveRows || [])) {
       if (r.status !== 'Approved') continue;
       if (r.type !== 'Annual leave') continue;          // only annual deducts
       if (!r.startDate) continue;
-      // Only count days that fall inside the active leave year.
       const start = r.startDate;
       const end = r.endDate || r.startDate;
-      // Rough overlap test — if the request straddles year boundaries
-      // we count only the days inside the window.
       if (end < window.start || start > window.end) continue;
       const effStart = start < window.start ? window.start : start;
       const effEnd   = end   > window.end   ? window.end   : end;
-      // Inclusive day count.
-      const ms = (new Date(effEnd+'T12:00:00') - new Date(effStart+'T12:00:00'));
-      const days = Math.round(ms / 86400000) + 1;
-      used += days * hpd;
+      // Iterate inclusively, counting only working weekdays.
+      const cur = new Date(effStart + 'T12:00:00');
+      const stop = new Date(effEnd   + 'T12:00:00');
+      while (cur <= stop) {
+        const dow = cur.getDay();              // 0=Sun..6=Sat
+        const dowMonFirst = dow === 0 ? 7 : dow; // 1=Mon..7=Sun
+        if (workingDays.has(dowMonFirst)) used += hpd;
+        cur.setDate(cur.getDate() + 1);
+      }
     }
     return used;
   }

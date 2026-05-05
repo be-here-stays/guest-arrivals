@@ -345,6 +345,7 @@
 
 <!-- Runtime-decoded API tokens -->
 <script src="secrets.js"></script>
+<script src="pins-schema.js"></script>
 
 <script>
 /* ========== Config ========== */
@@ -372,8 +373,9 @@ const SH_HOURS      = 'numeric_mm2pawya';
 const SH_RATE       = 'numeric_mm2pqva0';
 const SH_NOTES      = 'long_text_mm2pped0';
 
-// PIN (6-digit). Hash of 652318.
-const PIN_HASH = 'df8d602b7bcaf41725409b83af2a3df79722be244d9f33b5f128b81a269b955e';
+// Per-area PIN — managed via pin-admin.html. Falls back to legacy 652318
+// if the registry isn't seeded yet, so first-time use doesn't lock anyone out.
+const AREA_KEY = 'staff-shifts';
 
 const ROLE_ORDER = ['Housekeeper','A Team','Checker','Van driver','Maintenance','Manager','Owner'];
 const BLOCK_ROLES = ['Off','Leave','Sick'];   // lines that block out a day
@@ -1218,18 +1220,10 @@ document.querySelectorAll('.quick-block button').forEach(b => b.addEventListener
   recomputeHours();
 }));
 
-/* ========== PIN ========== */
-async function sha256(s){
-  const buf = new TextEncoder().encode(s);
-  const h = await crypto.subtle.digest('SHA-256', buf);
-  return Array.from(new Uint8Array(h)).map(b => b.toString(16).padStart(2,'0')).join('');
-}
-
+/* ========== PIN — uses the per-area PIN registry (pins-schema.js) ========== */
 async function tryPin(val){
   const err = document.getElementById('pinErr');
-  const h = await sha256(val);
-  if(h === PIN_HASH){
-    sessionStorage.setItem('bh-mgmt','1');
+  if(await window.PinsSchema.checkPin(mondayQuery, AREA_KEY, val)){
     document.getElementById('pinOverlay').classList.add('hide');
     document.getElementById('app').classList.remove('hide');
     refresh();
@@ -1250,8 +1244,8 @@ document.getElementById('pinInput').addEventListener('keydown', e => {
 restorePrefs();
 document.getElementById('hideZeroToggle').checked = hideZero;
 
-// Auto-unlock if already authed this session
-if(sessionStorage.getItem('bh-mgmt') === '1'){
+// Auto-unlock if already authed this session for this area
+if(window.PinsSchema.isUnlocked(AREA_KEY)){
   document.getElementById('pinOverlay').classList.add('hide');
   document.getElementById('app').classList.remove('hide');
   refresh();

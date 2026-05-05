@@ -605,6 +605,7 @@
 <div id="toast"></div>
 
 <script src="work-dispatch.js"></script>
+<script src="pins-schema.js"></script>
 <!-- Runtime-decoded API tokens -->
 <script src="secrets.js"></script>
 
@@ -696,7 +697,9 @@ const HK_CAPACITY_ROLES = new Set(['Housekeeper','A Team','A-Team','Housekeeping
 
 const LAUNDRY_OPTIONS = ['Laundry van','Maintenance team','Staff car'];
 
-const PIN_HASH = 'df8d602b7bcaf41725409b83af2a3df79722be244d9f33b5f128b81a269b955e';
+// Per-area PIN — managed via pin-admin.html. Falls back to legacy 652318
+// if the registry isn't seeded yet, so first-time use doesn't lock anyone out.
+const AREA_KEY = 'rota-planner';
 const STORE_KEY = 'rotaPlanner_v1';
 const EXT_KEY = 'rotaPlanner_extBookings_v1';
 
@@ -743,15 +746,10 @@ function isStaffAvailable(s) {
 }
 
 /* ═══════════════════════════════════════════════════════════════════
-   PIN GATE
+   PIN GATE — uses the per-area PIN registry (pins-schema.js)
    ═══════════════════════════════════════════════════════════════════ */
-async function sha256(text) {
-  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
-  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
-}
-async function checkPin(v) {
-  if ((await sha256(v)) === PIN_HASH) {
-    sessionStorage.setItem('bh-mgmt', '1');
+async function tryPin(v) {
+  if (await window.PinsSchema.checkPin(mondayFetch, AREA_KEY, v)) {
     document.getElementById('pinGate').style.display = 'none';
     document.getElementById('app').style.display = 'block';
     boot();
@@ -763,15 +761,15 @@ async function checkPin(v) {
 }
 document.getElementById('pinInput').addEventListener('input', e => {
   const v = e.target.value.trim();
-  if (v.length === 6) checkPin(v);
+  if (v.length === 6) tryPin(v);
 });
 document.getElementById('pinInput').addEventListener('keydown', e => {
   if (e.key === 'Enter') {
     const v = e.target.value.trim();
-    if (v.length >= 4) checkPin(v);
+    if (v.length >= 4) tryPin(v);
   }
 });
-if (sessionStorage.getItem('bh-mgmt') === '1') {
+if (window.PinsSchema.isUnlocked(AREA_KEY)) {
   document.getElementById('pinGate').style.display = 'none';
   document.getElementById('app').style.display = 'block';
   window.addEventListener('DOMContentLoaded', boot);

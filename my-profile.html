@@ -1,0 +1,459 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#272F2E">
+<title>My profile — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 60px); }
+
+  header { background:var(--dark); color:#fff; padding:18px 20px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; }
+  header h1 { font-size:17px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.65; margin-top:2px; }
+  .hdr-back { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; }
+
+  .container { max-width:620px; margin:0 auto; padding:18px 16px; }
+
+  .pane { background:var(--surface); border-radius:14px; padding:18px 20px; margin-bottom:14px; box-shadow:0 1px 4px rgba(39,47,46,0.08); }
+  .pane h2 { font-size:18px; color:var(--dark); margin-bottom:6px; }
+  .pane .person-meta { font-size:13px; color:var(--sage); margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+
+  .section { margin-bottom:20px; }
+  .section h3 { font-size:11px; font-weight:700; color:var(--sage); text-transform:uppercase; letter-spacing:0.6px; margin-bottom:10px; padding-bottom:6px; border-bottom:1px dashed var(--border); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  .section h3 .lock { font-size:9px; color:var(--sage-mid); padding:2px 6px; background:var(--cream); border-radius:8px; letter-spacing:0.4px; }
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width: 500px) { .grid-2 { grid-template-columns:1fr; } }
+
+  .field { display:flex; flex-direction:column; }
+  .field label { font-size:11px; font-weight:700; color:var(--sage); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.4px; }
+  .field input, .field select, .field textarea {
+    padding:10px 12px; border:1.5px solid var(--border); border-radius:9px; font-family:inherit; font-size:15px;
+    background:#fff; color:var(--dark); outline:none; transition:border-color 0.15s;
+    -webkit-appearance:none; appearance:none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color:var(--dark); }
+  .field input[readonly], .field input:disabled, .field select:disabled {
+    background:var(--cream); color:var(--sage); cursor:not-allowed;
+  }
+  .field textarea { min-height:60px; resize:vertical; font-size:14px; }
+  .field .check-row { display:flex; align-items:center; gap:8px; padding:8px 0; }
+  .field .check-row input { width:20px; height:20px; cursor:pointer; }
+  .field .check-row label { margin:0; text-transform:none; letter-spacing:0; font-weight:600; color:var(--dark); font-size:14px; }
+
+  .chip-pick { display:flex; flex-wrap:wrap; gap:6px; padding:6px 0; }
+  .chip-pick .pick {
+    padding:8px 14px; border:1.5px solid var(--border); border-radius:18px; background:#fff;
+    font-size:13px; font-weight:600; cursor:pointer; user-select:none; color:var(--sage); font-family:inherit;
+  }
+  .chip-pick .pick.on { background:var(--dark); color:#fff; border-color:var(--dark); }
+  .chip-pick .pick.locked { cursor:default; opacity:0.7; }
+
+  .leave-card { background:var(--green-bg); border-radius:10px; padding:12px 14px; margin-bottom:14px; }
+  .leave-card h4 { font-size:11px; font-weight:700; color:var(--green); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:8px; }
+  .leave-card .row { display:flex; justify-content:space-between; font-size:14px; padding:3px 0; }
+  .leave-card .row .lbl { color:var(--sage); }
+  .leave-card .row .val { font-weight:700; color:var(--dark); }
+
+  .save-btn { width:100%; padding:13px; background:var(--dark); color:var(--cream); border:0; border-radius:11px; font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; }
+  .save-btn:hover { background:var(--sage); }
+  .save-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+  .msg { padding:12px 14px; border-radius:10px; font-size:13px; font-weight:600; margin-bottom:14px; display:none; }
+  .msg.show { display:block; }
+  .msg.success { background:var(--green-bg); color:var(--green); }
+  .msg.error   { background:var(--red-bg); color:var(--red); }
+  .msg.info    { background:var(--blue-bg); color:var(--blue); }
+
+  .empty { text-align:center; padding:40px 20px; color:var(--sage-mid); font-size:14px; }
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--dark); color:#fff; padding:10px 18px; border-radius:24px; font-size:13px; font-weight:600; opacity:0; transition:opacity .15s; pointer-events:none; z-index:200; }
+  .toast.show { opacity:1; }
+  .loading { color:var(--sage-mid); font-size:13px; padding:30px; text-align:center; }
+  .hide { display:none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>👤 My profile</h1>
+    <div class="sub">Update your contact details, next-of-kin and shift preferences</div>
+  </div>
+  <a id="backLink" class="hdr-back" href="staff.html">‹ My Day</a>
+</header>
+
+<div class="container">
+  <div id="msgBox" class="msg"></div>
+  <div id="content" class="loading">Loading…</div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="secrets.js"></script>
+<script src="staff-schema.js"></script>
+<script src="leaves-schema.js"></script>
+
+<script>
+const TOKEN   = window.MONDAY_API_TOKEN;
+const URL_API = 'https://api.monday.com/v2';
+
+let _config    = null;
+let _leavesCfg = null;
+let _me        = null;       // parsed staff object
+let _meName    = '';
+
+async function mq(query, variables) {
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization: TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+function showMsg(text, type) {
+  const box = document.getElementById('msgBox');
+  box.textContent = text;
+  box.className = 'msg show ' + type;
+  if (type === 'success') setTimeout(() => box.classList.remove('show'), 5000);
+}
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const params = new URLSearchParams(location.search);
+  _meName = (params.get('name') || '').trim();
+  if (!_meName) {
+    document.getElementById('content').innerHTML = `<div class="empty">No profile to show — open this page from the staff app menu so we know who you are.</div>`;
+    return;
+  }
+  if (params.get('from') === 'staff') {
+    document.getElementById('backLink').href = 'staff.html';
+    document.getElementById('backLink').textContent = '‹ My Day';
+  }
+  try {
+    _config = await window.StaffSchema.getStaffConfig(mq);
+    if (_config.missing && _config.missing.length) {
+      // We don't bootstrap from here — staff don't have permission anyway.
+      document.getElementById('content').innerHTML = `<div class="empty">Profile not set up yet — ask a manager to open Staff Records once to provision the missing columns.</div>`;
+      return;
+    }
+    _leavesCfg = await window.LeavesSchema.getLeavesConfig(mq);
+    await loadMe();
+    if (!_me) {
+      document.getElementById('content').innerHTML = `<div class="empty">Couldn't find a staff record for "${escapeHtml(_meName)}". Ask a manager to add you to the Staff board.</div>`;
+      return;
+    }
+    let leaveRows = [];
+    if (_leavesCfg) leaveRows = await loadMyLeaveRows();
+    render(leaveRows);
+  } catch (e) {
+    console.error(e);
+    document.getElementById('content').innerHTML = `<div class="empty">Couldn't load your profile: ${escapeHtml(e.message)}</div>`;
+  }
+});
+
+async function loadMe() {
+  const ex = _config.existing;
+  const nc = _config.newColumns;
+  const wantIds = [
+    ex.ST_ROLE, ex.ST_STATUS, ex.ST_CONTRACT, ex.ST_DEFRATE, ex.ST_CODE, ex.ST_EMAIL,
+    ...Object.values(nc),
+  ].filter(Boolean);
+  const colsArg = wantIds.map(c => `"${c}"`).join(',');
+  const data = await mq(`{
+    boards(ids:[${_config.boardId}]) {
+      items_page(limit: 200) {
+        items { id name column_values(ids:[${colsArg}]) { id text value } }
+      }
+    }
+  }`);
+  const items = data?.boards?.[0]?.items_page?.items || [];
+  const hit = items.find(i => (i.name || '').trim().toLowerCase() === _meName.toLowerCase());
+  if (!hit) { _me = null; return; }
+  _me = parseStaff(hit);
+}
+
+function parseStaff(it) {
+  const cv = {};
+  for (const c of (it.column_values || [])) cv[c.id] = c;
+  const ex = _config.existing;
+  const nc = _config.newColumns;
+  const text = (id) => id ? (cv[id]?.text || '') : '';
+  const dateOf = (id) => {
+    if (!id) return '';
+    try { return JSON.parse(cv[id]?.value || 'null')?.date || ''; } catch (_) { return ''; }
+  };
+  const numOf = (id) => {
+    if (!id) return 0;
+    try { return parseFloat(JSON.parse(cv[id]?.value || 'null')) || 0; } catch (_) { return 0; }
+  };
+  const boolOf = (id) => {
+    if (!id) return false;
+    try { return !!JSON.parse(cv[id]?.value || 'null')?.checked; } catch (_) { return false; }
+  };
+  const labelsOf = (id) => {
+    if (!id) return [];
+    return (cv[id]?.text || '').split(',').map(s => s.trim()).filter(Boolean);
+  };
+  return {
+    id: it.id,
+    name: it.name,
+    primaryRole: text(ex.ST_ROLE),
+    status:      text(ex.ST_STATUS),
+    contractHrs: numOf(ex.ST_CONTRACT),
+    defaultRate: numOf(ex.ST_DEFRATE),
+    code:        text(ex.ST_CODE),
+    email:       text(ex.ST_EMAIL),
+    dob:             dateOf(nc.dob),
+    serviceStart:    dateOf(nc.serviceStart),
+    employmentType:  text(nc.employmentType),
+    mobile:    text(nc.mobile),
+    mobileAlt: text(nc.mobileAlt),
+    addr1:     text(nc.addr1),
+    addr2:     text(nc.addr2),
+    town:      text(nc.town),
+    postcode:  text(nc.postcode),
+    nokName:     text(nc.nokName),
+    nokRelation: text(nc.nokRelation),
+    nokPhone:    text(nc.nokPhone),
+    medical:   text(nc.medical),
+    gpDetails: text(nc.gpDetails),
+    roles:        labelsOf(nc.rolesAll),
+    stdHoursDay:  numOf(nc.stdHoursDay),
+    leaveEntitle:   numOf(nc.leaveEntitle),
+    leaveYearStart: dateOf(nc.leaveYearStart),
+    leaveCarryOver: numOf(nc.leaveCarryOver),
+    prefDays:      labelsOf(nc.prefDays),
+    earliestStart: text(nc.earliestStart),
+    latestFinish:  text(nc.latestFinish),
+    maxHoursWeek:  numOf(nc.maxHoursWeek),
+    unavailable:   text(nc.unavailable),
+    prefNotes:     text(nc.prefNotes),
+    drivingLicence: boolOf(nc.drivingLicence),
+    ownVehicle:     boolOf(nc.ownVehicle),
+  };
+}
+
+async function loadMyLeaveRows() {
+  if (!_leavesCfg) return [];
+  const cols = _leavesCfg.columns;
+  const want = ['type','status','staffName','staffId','startDate','endDate']
+    .map(k => cols[k]).filter(Boolean);
+  const colsArg = want.map(c => `"${c}"`).join(',');
+  let cursor = null, all = [];
+  do {
+    const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+    const data = await mq(`{
+      boards(ids:[${_leavesCfg.boardId}]) {
+        items_page(limit: 200${cursorPart}) {
+          cursor
+          items { id column_values(ids:[${colsArg}]) { id text value } }
+        }
+      }
+    }`);
+    const page = data.boards[0].items_page;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+  } while (cursor);
+  return all.map(it => {
+    const cv = {}; for (const c of it.column_values) cv[c.id] = c;
+    const get = (k) => cols[k] ? (cv[cols[k]]?.text || '') : '';
+    const getDate = (k) => {
+      if (!cols[k]) return '';
+      try { return JSON.parse(cv[cols[k]]?.value || 'null')?.date || ''; } catch (_) { return ''; }
+    };
+    return {
+      id: it.id,
+      type: get('type'),
+      status: get('status'),
+      staffName: get('staffName'),
+      staffId: get('staffId'),
+      startDate: getDate('startDate'),
+      endDate: getDate('endDate'),
+    };
+  }).filter(r => {
+    // Match this person via id or name.
+    if (r.staffId && String(r.staffId) === String(_me.id)) return true;
+    return (r.staffName || '').trim().toLowerCase() === (_me.name || '').trim().toLowerCase();
+  });
+}
+
+function render(myLeaveRows) {
+  const s = _me;
+  const window_ = window.StaffSchema.currentLeaveYearWindow(s.leaveYearStart);
+  const stdHpd = s.stdHoursDay || 8;
+  const used = window.StaffSchema.computeLeaveUsage(myLeaveRows, stdHpd, window_);
+  const total = (s.leaveEntitle || 0) + (s.leaveCarryOver || 0);
+  const remaining = total - used;
+
+  const dayChips = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d =>
+    `<span class="pick ${s.prefDays.includes(d)?'on':''}" onclick="toggleChip(this)" data-key="prefDays" data-val="${d}">${d}</span>`
+  ).join('');
+
+  const roleChipsLocked = (s.roles.length ? s.roles : [s.primaryRole].filter(Boolean)).map(r =>
+    `<span class="pick on locked">${escapeHtml(r)}</span>`
+  ).join('') || '<span class="pick locked">—</span>';
+
+  const c = document.getElementById('content');
+  c.innerHTML = `
+    <div class="pane">
+      <h2>${escapeHtml(s.name)}</h2>
+      <div class="person-meta">
+        <strong>${escapeHtml(s.primaryRole || '—')}</strong>
+        ${s.code ? ' · Code ' + escapeHtml(s.code) : ''}
+        ${s.email ? ' · <a href="mailto:' + escapeHtml(s.email) + '" style="color:var(--sage)">' + escapeHtml(s.email) + '</a>' : ''}
+      </div>
+
+      <div class="leave-card">
+        <h4>🌿 Your leave year — ${window_.start} to ${window_.end}</h4>
+        <div class="row"><span class="lbl">Entitlement (incl. carry-over)</span><span class="val">${total.toFixed(1)} h</span></div>
+        <div class="row"><span class="lbl">Used (Annual leave)</span><span class="val">${used.toFixed(1)} h</span></div>
+        <div class="row"><span class="lbl">Remaining</span><span class="val" style="color:${remaining < 0 ? 'var(--red)' : 'var(--green)'}">${remaining.toFixed(1)} h</span></div>
+      </div>
+
+      <div class="section">
+        <h3>Your roles <span class="lock">Set by manager</span></h3>
+        <div class="chip-pick">${roleChipsLocked}</div>
+        <div style="font-size:12px; color:var(--sage-mid); margin-top:6px">If this list is wrong, message a manager — only they can update it.</div>
+      </div>
+
+      <div class="section">
+        <h3>Identity & employment <span class="lock">Set by manager</span></h3>
+        <div class="grid-2">
+          <div class="field"><label>Date of birth</label><input type="date" value="${s.dob}" disabled></div>
+          <div class="field"><label>Service start</label><input type="date" value="${s.serviceStart}" disabled></div>
+          <div class="field"><label>Employment type</label><input type="text" value="${escapeHtml(s.employmentType)}" disabled></div>
+          <div class="field"><label>Contract hours/wk</label><input type="text" value="${s.contractHrs || '—'}" disabled></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Contact details</h3>
+        <div class="grid-2">
+          <div class="field"><label>Mobile</label><input type="text" data-key="mobile" value="${escapeHtml(s.mobile)}" placeholder="07…"></div>
+          <div class="field"><label>Mobile (alt)</label><input type="text" data-key="mobileAlt" value="${escapeHtml(s.mobileAlt)}"></div>
+          <div class="field"><label>Address line 1</label><input type="text" data-key="addr1" value="${escapeHtml(s.addr1)}"></div>
+          <div class="field"><label>Address line 2</label><input type="text" data-key="addr2" value="${escapeHtml(s.addr2)}"></div>
+          <div class="field"><label>Town</label><input type="text" data-key="town" value="${escapeHtml(s.town)}"></div>
+          <div class="field"><label>Postcode</label><input type="text" data-key="postcode" value="${escapeHtml(s.postcode)}"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Next of kin</h3>
+        <div class="grid-2">
+          <div class="field"><label>Name</label><input type="text" data-key="nokName" value="${escapeHtml(s.nokName)}"></div>
+          <div class="field"><label>Relationship</label><input type="text" data-key="nokRelation" value="${escapeHtml(s.nokRelation)}" placeholder="Partner, parent, friend…"></div>
+          <div class="field" style="grid-column:1/-1"><label>Phone</label><input type="text" data-key="nokPhone" value="${escapeHtml(s.nokPhone)}"></div>
+        </div>
+      </div>
+
+      <div class="section">
+        <h3>Health & safety</h3>
+        <div class="field"><label>Allergies / medical notes</label><textarea data-key="medical">${escapeHtml(s.medical)}</textarea></div>
+        <div class="field" style="margin-top:8px"><label>GP details</label><textarea data-key="gpDetails" placeholder="Surgery name & contact (optional)">${escapeHtml(s.gpDetails)}</textarea></div>
+      </div>
+
+      <div class="section">
+        <h3>Shift preferences</h3>
+        <div class="field"><label>Preferred days</label><div class="chip-pick">${dayChips}</div></div>
+        <div class="grid-2" style="margin-top:8px">
+          <div class="field"><label>Earliest start (HH:MM)</label><input type="text" data-key="earliestStart" value="${escapeHtml(s.earliestStart)}" placeholder="08:00"></div>
+          <div class="field"><label>Latest finish (HH:MM)</label><input type="text" data-key="latestFinish" value="${escapeHtml(s.latestFinish)}" placeholder="17:00"></div>
+        </div>
+        <div class="field" style="margin-top:8px"><label>Max hours per week</label><input type="number" step="0.5" min="0" data-key="maxHoursWeek" value="${s.maxHoursWeek || ''}"></div>
+        <div class="field" style="margin-top:8px"><label>Recurring unavailability</label><textarea data-key="unavailable" placeholder="e.g. School run Wednesdays 14:30–15:30">${escapeHtml(s.unavailable)}</textarea></div>
+        <div class="field" style="margin-top:8px"><label>Anything else we should know</label><textarea data-key="prefNotes">${escapeHtml(s.prefNotes)}</textarea></div>
+      </div>
+
+      <div class="section">
+        <h3>Practical</h3>
+        <div class="grid-2">
+          <div class="field"><div class="check-row"><input type="checkbox" data-key="drivingLicence" ${s.drivingLicence?'checked':''}><label>I have a UK driving licence</label></div></div>
+          <div class="field"><div class="check-row"><input type="checkbox" data-key="ownVehicle" ${s.ownVehicle?'checked':''}><label>I have my own vehicle</label></div></div>
+        </div>
+      </div>
+
+      <button class="save-btn" id="saveBtn" onclick="saveAll()">Save changes</button>
+    </div>
+  `;
+}
+
+function toggleChip(el) {
+  el.classList.toggle('on');
+}
+
+const FIELD_TYPES = {
+  mobile:'text', mobileAlt:'text', addr1:'text', addr2:'text', town:'text', postcode:'text',
+  nokName:'text', nokRelation:'text', nokPhone:'text',
+  medical:'text', gpDetails:'text',
+  prefDays:'dropdown',
+  earliestStart:'text', latestFinish:'text', maxHoursWeek:'number',
+  unavailable:'text', prefNotes:'text',
+  drivingLicence:'check', ownVehicle:'check',
+};
+
+async function saveAll() {
+  const btn = document.getElementById('saveBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  const nc = _config.newColumns;
+  const cv = {};
+
+  for (const [fkey, ftype] of Object.entries(FIELD_TYPES)) {
+    const colId = nc[fkey];
+    if (!colId) continue;
+    if (ftype === 'text') {
+      const el = document.querySelector(`[data-key="${fkey}"]`);
+      cv[colId] = (el?.value || '').trim();
+    } else if (ftype === 'number') {
+      const el = document.querySelector(`[data-key="${fkey}"]`);
+      const v = el?.value === '' ? null : parseFloat(el.value);
+      cv[colId] = (v === null || isNaN(v)) ? '' : v;
+    } else if (ftype === 'check') {
+      const el = document.querySelector(`[data-key="${fkey}"]`);
+      cv[colId] = { checked: el?.checked ? 'true' : 'false' };
+    } else if (ftype === 'dropdown') {
+      // Read selected chips for this dropdown's data-key.
+      const chips = document.querySelectorAll(`.chip-pick .pick[data-key="${fkey}"].on`);
+      const labels = Array.from(chips).map(c => c.getAttribute('data-val') || c.textContent.trim());
+      cv[colId] = { labels };
+    }
+  }
+
+  try {
+    await mq(
+      `mutation($i:ID!,$v:JSON!){ change_multiple_column_values(board_id:${_config.boardId}, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`,
+      { i: _me.id, v: JSON.stringify(cv) }
+    );
+    showMsg('✓ Saved — thanks for keeping your profile up to date.', 'success');
+    btn.disabled = false; btn.textContent = 'Save changes';
+    document.getElementById('msgBox').scrollIntoView({ behavior:'smooth', block:'start' });
+  } catch (e) {
+    showMsg('Couldn\'t save: ' + e.message, 'error');
+    btn.disabled = false; btn.textContent = 'Save changes';
+  }
+}
+</script>
+</body>
+</html>

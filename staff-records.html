@@ -1,0 +1,725 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Staff records — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; }
+
+  /* PIN gate */
+  #pinGate { position:fixed; inset:0; background:var(--dark); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; padding:20px; }
+  #pinGate h2 { color:#fff; font-size:18px; font-weight:600; margin-bottom:18px; }
+  #pinGate input { width:240px; padding:12px; font-size:20px; text-align:center; border-radius:8px; border:none; background:rgba(255,255,255,0.12); color:#fff; font-family:inherit; letter-spacing:8px; }
+  #pinGate input::placeholder { color:rgba(255,255,255,0.5); letter-spacing:normal; }
+  #pinGate .pin-err { color:#ff8a80; font-size:13px; margin-top:10px; min-height:18px; }
+  #pinGate .pin-back { color:rgba(255,255,255,0.5); margin-top:18px; font-size:12px; text-decoration:none; }
+
+  header { background:var(--dark); color:#fff; padding:18px 24px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+  header h1 { font-size:18px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.6; margin-top:2px; }
+  .hdr-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .hdr-btn { color:rgba(255,255,255,0.85); text-decoration:none; font-size:13px; font-weight:600; padding:7px 12px; border:1px solid rgba(255,255,255,0.25); border-radius:8px; background:transparent; cursor:pointer; font-family:inherit; }
+  .hdr-btn:hover { background:rgba(255,255,255,0.08); }
+
+  .container { max-width:1300px; margin:0 auto; padding:18px 22px 60px; }
+
+  /* Setup banner */
+  .setup-card { background:var(--amber-bg); border:1.5px solid var(--amber); border-radius:14px; padding:16px 18px; margin-bottom:14px; }
+  .setup-card.hide { display:none; }
+  .setup-card h3 { font-size:14px; color:var(--amber); margin-bottom:6px; }
+  .setup-card p { font-size:13px; color:var(--dark); margin-bottom:10px; line-height:1.4; }
+  .setup-card ul { font-size:12px; color:var(--sage); margin:0 0 10px 18px; }
+  .setup-btn { padding:9px 14px; background:var(--amber); color:#fff; border:0; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; margin-right:8px; }
+  .setup-btn.secondary { background:#fff; color:var(--amber); border:1.5px solid var(--amber); }
+
+  /* Two-column layout */
+  .layout { display:grid; grid-template-columns:300px 1fr; gap:18px; }
+  @media (max-width: 800px) { .layout { grid-template-columns:1fr; } }
+
+  /* Left rail — staff list */
+  .rail { background:var(--surface); border-radius:12px; padding:14px; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+  .rail .search { width:100%; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; margin-bottom:10px; outline:none; }
+  .rail .search:focus { border-color:var(--dark); }
+  .rail-list { max-height:70vh; overflow-y:auto; }
+  .staff-pill { padding:9px 11px; border-radius:8px; cursor:pointer; margin-bottom:4px; font-size:14px; display:flex; justify-content:space-between; align-items:center; border-left:3px solid transparent; }
+  .staff-pill:hover { background:var(--cream); }
+  .staff-pill.selected { background:var(--cream); border-left-color:var(--gold); font-weight:700; }
+  .staff-pill .name { font-weight:600; color:var(--dark); }
+  .staff-pill.selected .name { font-weight:700; }
+  .staff-pill .role { font-size:11px; color:var(--sage-mid); }
+  .staff-pill.inactive .name { color:var(--sage-mid); font-style:italic; }
+
+  /* Right pane — editor */
+  .pane { background:var(--surface); border-radius:12px; padding:18px 22px; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+  .pane h2 { font-size:18px; color:var(--dark); margin-bottom:6px; }
+  .pane .person-meta { font-size:13px; color:var(--sage); margin-bottom:18px; padding-bottom:12px; border-bottom:1px solid var(--border); }
+  .pane .person-meta span + span::before { content:" · "; color:var(--sage-mid); margin:0 4px; }
+
+  .section { margin-bottom:24px; }
+  .section h3 { font-size:12px; font-weight:700; color:var(--sage); text-transform:uppercase; letter-spacing:0.6px; margin-bottom:10px; padding-bottom:6px; border-bottom:1px dashed var(--border); display:flex; align-items:center; gap:6px; }
+  .section h3 .lock { font-size:10px; opacity:0.6; font-weight:600; }
+  .section h3 .self { background:var(--blue-bg); color:var(--blue); padding:1px 6px; border-radius:8px; font-size:9px; font-weight:700; letter-spacing:0.4px; }
+  .grid-2 { display:grid; grid-template-columns:1fr 1fr; gap:12px; }
+  .grid-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:12px; }
+  @media (max-width: 600px) { .grid-2, .grid-3 { grid-template-columns:1fr; } }
+
+  .field { display:flex; flex-direction:column; }
+  .field label { font-size:11px; font-weight:700; color:var(--sage); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.4px; }
+  .field input[type=text], .field input[type=date], .field input[type=number], .field select, .field textarea {
+    padding:9px 11px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px;
+    background:#fff; color:var(--dark); outline:none; transition:border-color 0.15s;
+    -webkit-appearance:none; appearance:none;
+  }
+  .field input:focus, .field select:focus, .field textarea:focus { border-color:var(--dark); }
+  .field textarea { min-height:60px; resize:vertical; font-size:13px; }
+  .field .check-row { display:flex; align-items:center; gap:8px; padding:9px 0; }
+  .field .check-row input { width:18px; height:18px; cursor:pointer; }
+  .field .check-row label { margin:0; text-transform:none; letter-spacing:0; font-weight:600; color:var(--dark); font-size:14px; }
+
+  /* Multi-select chips for Roles + Preferred days */
+  .chip-pick { display:flex; flex-wrap:wrap; gap:6px; padding:6px 0; }
+  .chip-pick .pick {
+    padding:6px 12px; border:1.5px solid var(--border); border-radius:16px; background:#fff;
+    font-size:12px; font-weight:600; cursor:pointer; user-select:none; color:var(--sage);
+    font-family:inherit;
+  }
+  .chip-pick .pick.on { background:var(--dark); color:#fff; border-color:var(--dark); }
+  .chip-pick .pick.add { color:var(--sage-mid); font-style:italic; }
+
+  /* Section save button */
+  .section-actions { margin-top:10px; display:flex; gap:8px; align-items:center; }
+  .save-btn { padding:8px 14px; background:var(--dark); color:var(--cream); border:0; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  .save-btn:hover { background:var(--sage); }
+  .save-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .save-status { font-size:12px; color:var(--sage-mid); }
+  .save-status.ok { color:var(--green); }
+  .save-status.err { color:var(--red); }
+
+  /* Leave usage card */
+  .leave-card { background:var(--green-bg); border-radius:10px; padding:12px 14px; margin-bottom:14px; }
+  .leave-card h4 { font-size:11px; font-weight:700; color:var(--green); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:6px; }
+  .leave-card .row { display:flex; justify-content:space-between; font-size:13px; padding:3px 0; }
+  .leave-card .row .lbl { color:var(--sage); }
+  .leave-card .row .val { font-weight:700; color:var(--dark); }
+  .leave-card .breakdown { margin-top:8px; padding-top:8px; border-top:1px dashed rgba(45,106,79,0.3); font-size:12px; color:var(--sage); }
+  .leave-card .breakdown .leave-line { display:flex; justify-content:space-between; padding:2px 0; }
+
+  .empty-pane { text-align:center; padding:50px 20px; color:var(--sage-mid); font-size:14px; }
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--dark); color:#fff; padding:10px 18px; border-radius:24px; font-size:13px; font-weight:600; opacity:0; transition:opacity .15s; pointer-events:none; z-index:200; }
+  .toast.show { opacity:1; }
+  .loading { color:var(--sage-mid); font-size:13px; padding:30px; text-align:center; }
+  .hide { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="pinGate">
+  <h2>Manager PIN</h2>
+  <input type="password" id="pinInp" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+  <div class="pin-err" id="pinErr"></div>
+  <a class="pin-back" href="hub.html">‹ Back to hub</a>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <div>
+      <h1>Staff records</h1>
+      <div class="sub">Profile, contact, leave entitlement, preferences</div>
+    </div>
+    <div class="hdr-actions">
+      <a href="staff-shifts.html" class="hdr-btn">Shifts</a>
+      <a href="leave-inbox.html" class="hdr-btn">🌿 Leave inbox</a>
+      <a href="rota-planner.html" class="hdr-btn">Rota planner</a>
+      <a href="hub.html" class="hdr-btn">‹ Hub</a>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="setupCard" class="setup-card hide">
+      <h3>Some staff record columns aren't on the Staff board yet</h3>
+      <p>Press once to create the missing columns. Existing columns won't be touched.</p>
+      <ul id="missingList"></ul>
+      <button class="setup-btn" id="setupBtn" onclick="bootstrap()">Add the missing columns</button>
+      <button class="setup-btn secondary" id="seedBtn" onclick="seedRoles()" title="Copy each staff member's primary Role into the new multi-select Roles column. One-shot — safe to re-run.">Seed Roles from primary</button>
+    </div>
+
+    <div id="content" class="loading">Loading…</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="secrets.js"></script>
+<script src="staff-schema.js"></script>
+<script src="leaves-schema.js"></script>
+
+<script>
+const TOKEN   = window.MONDAY_API_TOKEN;
+const URL_API = 'https://api.monday.com/v2';
+const PIN_HASH = 'df8d602b7bcaf41725409b83af2a3df79722be244d9f33b5f128b81a269b955e';
+
+let _config     = null;       // staff schema config (existing IDs + newColumns + missing[])
+let _leavesCfg  = null;       // leaves schema config (used for leave-usage display)
+let _staff      = [];         // parsed staff array
+let _leaveRows  = [];         // parsed approved leave rows
+let _selectedId = null;       // currently-selected staff item id
+
+async function sha256(text) {
+  const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));
+  return Array.from(new Uint8Array(buf)).map(b => b.toString(16).padStart(2,'0')).join('');
+}
+async function checkPin(v) {
+  if ((await sha256(v)) === PIN_HASH) {
+    sessionStorage.setItem('bh-mgmt', '1');
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    boot();
+  } else {
+    document.getElementById('pinErr').textContent = 'Wrong PIN';
+    document.getElementById('pinInp').value = '';
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  if (sessionStorage.getItem('bh-mgmt') === '1') {
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    boot();
+    return;
+  }
+  const inp = document.getElementById('pinInp');
+  inp.focus();
+  inp.addEventListener('input', () => { if (inp.value.length === 6) checkPin(inp.value); });
+});
+
+async function mq(query, variables) {
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization: TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function boot() {
+  try {
+    _config = await window.StaffSchema.getStaffConfig(mq);
+    if (_config.missing && _config.missing.length) {
+      const ml = document.getElementById('missingList');
+      ml.innerHTML = _config.missing.map(m => `<li>${escapeHtml(m)}</li>`).join('');
+      document.getElementById('setupCard').classList.remove('hide');
+    }
+    _leavesCfg = await window.LeavesSchema.getLeavesConfig(mq);
+    await loadStaff();
+    if (_leavesCfg) await loadLeaveRows();
+    render();
+  } catch (e) {
+    console.error(e);
+    document.getElementById('content').innerHTML = `<div class="empty-pane">Error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function bootstrap() {
+  const btn = document.getElementById('setupBtn');
+  btn.disabled = true; btn.textContent = 'Adding columns…';
+  try {
+    const result = await window.StaffSchema.setupStaffColumns(mq);
+    _config = result;
+    document.getElementById('setupCard').classList.add('hide');
+    toast(result.created.length ? `✓ Added ${result.created.length} column${result.created.length===1?'':'s'}` : '✓ Already up to date');
+    await loadStaff();
+    render();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Add the missing columns';
+    toast('Setup failed: ' + e.message);
+  }
+}
+
+async function seedRoles() {
+  if (!confirm('Copy each staff member\'s primary Role into the new Roles multi-select?\n\nOnly seeds rows where Roles is currently empty. Safe to re-run.')) return;
+  const btn = document.getElementById('seedBtn');
+  btn.disabled = true; btn.textContent = 'Seeding…';
+  try {
+    const r = await window.StaffSchema.seedRolesFromPrimary(mq, _config);
+    toast(`✓ Seeded ${r.seeded}, skipped ${r.skipped}`);
+    btn.disabled = false; btn.textContent = 'Seed Roles from primary';
+    await loadStaff();
+    render();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Seed Roles from primary';
+    toast('Seed failed: ' + e.message);
+  }
+}
+
+async function loadStaff() {
+  const ex = _config.existing;
+  const nc = _config.newColumns || {};
+  const wantIds = [
+    ex.ST_ROLE, ex.ST_STATUS, ex.ST_CONTRACT, ex.ST_DEFRATE, ex.ST_CODE, ex.ST_EMAIL,
+    ...Object.values(nc),
+  ].filter(Boolean);
+  const colsArg = wantIds.map(c => `"${c}"`).join(',');
+  const data = await mq(`{
+    boards(ids:[${_config.boardId}]) {
+      items_page(limit: 200) {
+        items {
+          id name created_at
+          column_values(ids:[${colsArg}]) { id text value }
+        }
+      }
+    }
+  }`);
+  const items = data?.boards?.[0]?.items_page?.items || [];
+  _staff = items.map(it => parseStaff(it));
+  _staff.sort((a, b) => (a.name||'').localeCompare(b.name||''));
+}
+
+/* Parse one Staff board row into a flat object. We expose a nested .raw
+   map of column id → text/value for any place that needs the original
+   value (e.g. dropdown chips that list the labels). */
+function parseStaff(it) {
+  const cv = {};
+  for (const c of (it.column_values || [])) cv[c.id] = c;
+  const ex = _config.existing;
+  const nc = _config.newColumns || {};
+  const text = (id) => id ? (cv[id]?.text || '') : '';
+  const dateOf = (id) => {
+    if (!id) return '';
+    try { return JSON.parse(cv[id]?.value || 'null')?.date || ''; } catch (_) { return ''; }
+  };
+  const numOf = (id) => {
+    if (!id) return 0;
+    try { return parseFloat(JSON.parse(cv[id]?.value || 'null')) || 0; } catch (_) { return 0; }
+  };
+  const boolOf = (id) => {
+    if (!id) return false;
+    try { return !!JSON.parse(cv[id]?.value || 'null')?.checked; } catch (_) { return false; }
+  };
+  const labelsOf = (id) => {
+    // Multi-select dropdown returns its labels comma-joined in .text.
+    if (!id) return [];
+    return (cv[id]?.text || '').split(',').map(s => s.trim()).filter(Boolean);
+  };
+
+  return {
+    id: it.id,
+    name: it.name,
+    raw: cv,
+    // Existing columns
+    primaryRole: text(ex.ST_ROLE),
+    status:      text(ex.ST_STATUS),
+    contractHrs: numOf(ex.ST_CONTRACT),
+    defaultRate: numOf(ex.ST_DEFRATE),
+    code:        text(ex.ST_CODE),
+    email:       text(ex.ST_EMAIL),
+    // Identity
+    dob:             dateOf(nc.dob),
+    serviceStart:    dateOf(nc.serviceStart),
+    employmentType:  text(nc.employmentType),
+    // Contact
+    mobile:    text(nc.mobile),
+    mobileAlt: text(nc.mobileAlt),
+    addr1:     text(nc.addr1),
+    addr2:     text(nc.addr2),
+    town:      text(nc.town),
+    postcode:  text(nc.postcode),
+    // NoK
+    nokName:     text(nc.nokName),
+    nokRelation: text(nc.nokRelation),
+    nokPhone:    text(nc.nokPhone),
+    // Health
+    medical:   text(nc.medical),
+    gpDetails: text(nc.gpDetails),
+    // Role & rota
+    roles:        labelsOf(nc.rolesAll),
+    stdHoursDay:  numOf(nc.stdHoursDay),
+    // Leave entitlement
+    leaveEntitle:   numOf(nc.leaveEntitle),
+    leaveYearStart: dateOf(nc.leaveYearStart),
+    leaveCarryOver: numOf(nc.leaveCarryOver),
+    // Preferences
+    prefDays:      labelsOf(nc.prefDays),
+    earliestStart: text(nc.earliestStart),
+    latestFinish:  text(nc.latestFinish),
+    maxHoursWeek:  numOf(nc.maxHoursWeek),
+    unavailable:   text(nc.unavailable),
+    prefNotes:     text(nc.prefNotes),
+    // Practical
+    drivingLicence: boolOf(nc.drivingLicence),
+    ownVehicle:     boolOf(nc.ownVehicle),
+    // Manager
+    mgrNotes:      text(nc.mgrNotes),
+    lastReview:    dateOf(nc.lastReview),
+    dbsStatus:     text(nc.dbsStatus),
+    dbsDate:       dateOf(nc.dbsDate),
+    trainingCerts: text(nc.trainingCerts),
+  };
+}
+
+async function loadLeaveRows() {
+  if (!_leavesCfg) return;
+  const cols = _leavesCfg.columns;
+  const want = ['type','status','staffName','staffId','startDate','endDate','days']
+    .map(k => cols[k]).filter(Boolean);
+  const colsArg = want.map(c => `"${c}"`).join(',');
+  let cursor = null, all = [];
+  do {
+    const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+    const data = await mq(`{
+      boards(ids:[${_leavesCfg.boardId}]) {
+        items_page(limit: 200${cursorPart}) {
+          cursor
+          items { id column_values(ids:[${colsArg}]) { id text value } }
+        }
+      }
+    }`);
+    const page = data.boards[0].items_page;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+  } while (cursor);
+  _leaveRows = all.map(it => {
+    const cv = {}; for (const c of it.column_values) cv[c.id] = c;
+    const get = (k) => cols[k] ? (cv[cols[k]]?.text || '') : '';
+    const getDate = (k) => {
+      if (!cols[k]) return '';
+      try { return JSON.parse(cv[cols[k]]?.value || 'null')?.date || ''; } catch (_) { return ''; }
+    };
+    return {
+      id: it.id,
+      type: get('type'),
+      status: get('status'),
+      staffName: get('staffName'),
+      staffId: get('staffId'),
+      startDate: getDate('startDate'),
+      endDate: getDate('endDate'),
+    };
+  });
+}
+
+function render() {
+  const c = document.getElementById('content');
+  c.innerHTML = `<div class="layout">
+    <div class="rail">
+      <input class="search" id="searchInp" placeholder="Search staff…" oninput="renderRail()">
+      <div class="rail-list" id="railList"></div>
+    </div>
+    <div class="pane" id="pane">${renderPane(null)}</div>
+  </div>`;
+  renderRail();
+  if (_selectedId) renderPaneFor(_selectedId);
+}
+
+function renderRail() {
+  const list = document.getElementById('railList');
+  if (!list) return;
+  const q = (document.getElementById('searchInp')?.value || '').trim().toLowerCase();
+  const filtered = _staff.filter(s => {
+    if (!q) return true;
+    return (s.name || '').toLowerCase().includes(q)
+        || (s.primaryRole || '').toLowerCase().includes(q)
+        || s.roles.some(r => r.toLowerCase().includes(q));
+  });
+  list.innerHTML = filtered.map(s => {
+    const inactive = /inactive|leaver|deactivated/i.test(s.status);
+    const role = s.roles.length ? s.roles.join(', ') : (s.primaryRole || '');
+    return `<div class="staff-pill ${_selectedId===s.id?'selected':''} ${inactive?'inactive':''}" onclick="selectStaff('${s.id}')">
+      <div>
+        <div class="name">${escapeHtml(s.name)}</div>
+        <div class="role">${escapeHtml(role || '—')}</div>
+      </div>
+    </div>`;
+  }).join('') || '<div style="font-size:13px; color:var(--sage-mid); padding:10px">No matches.</div>';
+}
+
+function selectStaff(id) {
+  _selectedId = id;
+  renderRail();
+  renderPaneFor(id);
+}
+
+function renderPaneFor(id) {
+  const pane = document.getElementById('pane');
+  if (!pane) return;
+  const s = _staff.find(x => x.id === id);
+  pane.innerHTML = renderPane(s);
+}
+
+function renderPane(s) {
+  if (!s) return '<div class="empty-pane">Select a staff member from the list to view or edit their record.</div>';
+
+  // Live leave usage for this person.
+  const window_ = window.StaffSchema.currentLeaveYearWindow(s.leaveYearStart);
+  const stdHpd = s.stdHoursDay || 8;
+  const myLeaveRows = _leaveRows.filter(r => {
+    if (!r.staffId && !r.staffName) return false;
+    if (r.staffId && String(r.staffId) === String(s.id)) return true;
+    return (r.staffName || '').trim().toLowerCase() === (s.name || '').trim().toLowerCase();
+  });
+  const used = window.StaffSchema.computeLeaveUsage(myLeaveRows, stdHpd, window_);
+  const total = (s.leaveEntitle || 0) + (s.leaveCarryOver || 0);
+  const remaining = total - used;
+  const recentApproved = myLeaveRows
+    .filter(r => r.status === 'Approved' && r.type === 'Annual leave' && r.startDate >= window_.start && r.startDate <= window_.end)
+    .sort((a,b) => (a.startDate||'').localeCompare(b.startDate||''))
+    .slice(0, 6);
+
+  const dayChips = ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'].map(d =>
+    `<span class="pick ${s.prefDays.includes(d)?'on':''}" onclick="toggleChip(this,'prefDays')">${d}</span>`
+  ).join('');
+  const roleChips = window.StaffSchema.PRIMARY_ROLE_LABELS.concat(s.roles.filter(r => !window.StaffSchema.PRIMARY_ROLE_LABELS.includes(r))).map(r =>
+    `<span class="pick ${s.roles.includes(r)?'on':''}" onclick="toggleChip(this,'rolesAll')">${escapeHtml(r)}</span>`
+  ).join('');
+
+  return `
+    <h2>${escapeHtml(s.name)}</h2>
+    <div class="person-meta">
+      <span>${escapeHtml(s.primaryRole || '—')}</span>
+      <span>${escapeHtml(s.status || 'Active')}</span>
+      ${s.code ? `<span>Code ${escapeHtml(s.code)}</span>` : ''}
+    </div>
+
+    <div class="leave-card">
+      <h4>🌿 Leave year ${window_.start} → ${window_.end}</h4>
+      <div class="row"><span class="lbl">Entitlement (incl. carry-over)</span><span class="val">${total.toFixed(1)} h</span></div>
+      <div class="row"><span class="lbl">Used (Annual leave only)</span><span class="val">${used.toFixed(1)} h</span></div>
+      <div class="row"><span class="lbl">Remaining</span><span class="val" style="color:${remaining < 0 ? 'var(--red)' : 'var(--green)'}">${remaining.toFixed(1)} h</span></div>
+      <div class="row"><span class="lbl">Std hours/day used in calc</span><span class="val">${stdHpd} h</span></div>
+      ${recentApproved.length ? `<div class="breakdown">
+        ${recentApproved.map(r => `<div class="leave-line"><span>${r.startDate}${r.endDate && r.endDate !== r.startDate ? ' → ' + r.endDate : ''}</span><span>${escapeHtml(r.type)}</span></div>`).join('')}
+      </div>` : ''}
+    </div>
+
+    ${section('Identity', false, `
+      <div class="grid-3">
+        <div class="field"><label>Date of birth</label><input type="date" data-key="dob" value="${s.dob}"></div>
+        <div class="field"><label>Service start</label><input type="date" data-key="serviceStart" value="${s.serviceStart}"></div>
+        <div class="field"><label>Employment type</label><select data-key="employmentType">
+          <option value="">—</option>
+          ${['Employed','Self-employed','Casual'].map(t => `<option ${s.employmentType===t?'selected':''}>${t}</option>`).join('')}
+        </select></div>
+      </div>
+    `, 'identity')}
+
+    ${section('Contact', true, `
+      <div class="grid-2">
+        <div class="field"><label>Mobile</label><input type="text" data-key="mobile" value="${escapeHtml(s.mobile)}"></div>
+        <div class="field"><label>Mobile (alt)</label><input type="text" data-key="mobileAlt" value="${escapeHtml(s.mobileAlt)}"></div>
+        <div class="field"><label>Address line 1</label><input type="text" data-key="addr1" value="${escapeHtml(s.addr1)}"></div>
+        <div class="field"><label>Address line 2</label><input type="text" data-key="addr2" value="${escapeHtml(s.addr2)}"></div>
+        <div class="field"><label>Town</label><input type="text" data-key="town" value="${escapeHtml(s.town)}"></div>
+        <div class="field"><label>Postcode</label><input type="text" data-key="postcode" value="${escapeHtml(s.postcode)}"></div>
+      </div>
+    `, 'contact')}
+
+    ${section('Next of kin', true, `
+      <div class="grid-3">
+        <div class="field"><label>Name</label><input type="text" data-key="nokName" value="${escapeHtml(s.nokName)}"></div>
+        <div class="field"><label>Relationship</label><input type="text" data-key="nokRelation" value="${escapeHtml(s.nokRelation)}"></div>
+        <div class="field"><label>Phone</label><input type="text" data-key="nokPhone" value="${escapeHtml(s.nokPhone)}"></div>
+      </div>
+    `, 'nok')}
+
+    ${section('Health & safety', true, `
+      <div class="grid-2">
+        <div class="field"><label>Allergies / medical</label><textarea data-key="medical">${escapeHtml(s.medical)}</textarea></div>
+        <div class="field"><label>GP details</label><textarea data-key="gpDetails">${escapeHtml(s.gpDetails)}</textarea></div>
+      </div>
+    `, 'health')}
+
+    ${section('Role & rota', false, `
+      <div class="field"><label>Roles (multi-select — eligibility for assignments)</label>
+        <div class="chip-pick">${roleChips}</div>
+      </div>
+      <div class="grid-3" style="margin-top:8px">
+        <div class="field"><label>Std hours/day</label><input type="number" step="0.5" min="0" data-key="stdHoursDay" value="${s.stdHoursDay || ''}"></div>
+        <div class="field"><label>Contract hours/wk</label><input type="number" step="0.5" min="0" data-key="contractHrs" value="${s.contractHrs || ''}"></div>
+        <div class="field"><label>Default rate (£/h)</label><input type="number" step="0.01" min="0" data-key="defaultRate" value="${s.defaultRate || ''}"></div>
+      </div>
+    `, 'role')}
+
+    ${section('Leave entitlement', false, `
+      <div class="grid-3">
+        <div class="field"><label>Entitlement (h/year)</label><input type="number" step="1" min="0" data-key="leaveEntitle" value="${s.leaveEntitle || ''}"></div>
+        <div class="field"><label>Leave year start</label><input type="date" data-key="leaveYearStart" value="${s.leaveYearStart}"></div>
+        <div class="field"><label>Carry-over (h)</label><input type="number" step="0.5" data-key="leaveCarryOver" value="${s.leaveCarryOver || ''}"></div>
+      </div>
+    `, 'leave')}
+
+    ${section('Preferences', true, `
+      <div class="field"><label>Preferred days</label><div class="chip-pick">${dayChips}</div></div>
+      <div class="grid-3" style="margin-top:8px">
+        <div class="field"><label>Earliest start (HH:MM)</label><input type="text" data-key="earliestStart" value="${escapeHtml(s.earliestStart)}" placeholder="08:00"></div>
+        <div class="field"><label>Latest finish (HH:MM)</label><input type="text" data-key="latestFinish" value="${escapeHtml(s.latestFinish)}" placeholder="17:00"></div>
+        <div class="field"><label>Max hours/week</label><input type="number" step="0.5" min="0" data-key="maxHoursWeek" value="${s.maxHoursWeek || ''}"></div>
+      </div>
+      <div class="grid-2" style="margin-top:8px">
+        <div class="field"><label>Recurring unavailability</label><textarea data-key="unavailable" placeholder="e.g. School run Wednesdays 14:30–15:30">${escapeHtml(s.unavailable)}</textarea></div>
+        <div class="field"><label>Notes / preferences</label><textarea data-key="prefNotes">${escapeHtml(s.prefNotes)}</textarea></div>
+      </div>
+    `, 'pref')}
+
+    ${section('Practical', true, `
+      <div class="grid-2">
+        <div class="field"><div class="check-row"><input type="checkbox" data-key="drivingLicence" ${s.drivingLicence?'checked':''}><label>Driving licence</label></div></div>
+        <div class="field"><div class="check-row"><input type="checkbox" data-key="ownVehicle" ${s.ownVehicle?'checked':''}><label>Own vehicle</label></div></div>
+      </div>
+    `, 'practical')}
+
+    ${section('Manager notes', false, `
+      <div class="field"><label>Manager notes</label><textarea data-key="mgrNotes">${escapeHtml(s.mgrNotes)}</textarea></div>
+      <div class="grid-3" style="margin-top:8px">
+        <div class="field"><label>Last review</label><input type="date" data-key="lastReview" value="${s.lastReview}"></div>
+        <div class="field"><label>DBS status</label><select data-key="dbsStatus">
+          <option value="">—</option>
+          ${['Pending','Cleared','Expired','N/A'].map(t => `<option ${s.dbsStatus===t?'selected':''}>${t}</option>`).join('')}
+        </select></div>
+        <div class="field"><label>DBS date</label><input type="date" data-key="dbsDate" value="${s.dbsDate}"></div>
+      </div>
+      <div class="field" style="margin-top:8px"><label>Training certs (free text — list certs + expiry)</label><textarea data-key="trainingCerts">${escapeHtml(s.trainingCerts)}</textarea></div>
+    `, 'mgr')}
+  `;
+}
+
+function section(title, selfEditable, body, key) {
+  const tag = selfEditable
+    ? '<span class="self">Staff self-edit</span>'
+    : '<span class="lock">🔒 Manager-only</span>';
+  return `<div class="section" data-section="${key}">
+    <h3>${title} ${tag}</h3>
+    ${body}
+    <div class="section-actions">
+      <button class="save-btn" onclick="saveSection('${key}')">Save</button>
+      <span class="save-status" id="status_${key}"></span>
+    </div>
+  </div>`;
+}
+
+function toggleChip(el, fieldKey) {
+  el.classList.toggle('on');
+  // Mark the section dirty by updating a data attribute on the section
+  const section = el.closest('.section');
+  if (section) section.dataset.dirty = '1';
+}
+
+/* Map of section key → list of {key, type} fields it owns. type drives
+   how we read the input value back. */
+const SECTION_FIELDS = {
+  identity:  [['dob','date'],['serviceStart','date'],['employmentType','status']],
+  contact:   [['mobile','text'],['mobileAlt','text'],['addr1','text'],['addr2','text'],['town','text'],['postcode','text']],
+  nok:       [['nokName','text'],['nokRelation','text'],['nokPhone','text']],
+  health:    [['medical','text'],['gpDetails','text']],
+  role:      [['rolesAll','dropdown'],['stdHoursDay','number'],['contractHrs','number','existingContract'],['defaultRate','number','existingDefRate']],
+  leave:     [['leaveEntitle','number'],['leaveYearStart','date'],['leaveCarryOver','number']],
+  pref:      [['prefDays','dropdown'],['earliestStart','text'],['latestFinish','text'],['maxHoursWeek','number'],['unavailable','text'],['prefNotes','text']],
+  practical: [['drivingLicence','check'],['ownVehicle','check']],
+  mgr:       [['mgrNotes','text'],['lastReview','date'],['dbsStatus','status'],['dbsDate','date'],['trainingCerts','text']],
+};
+
+async function saveSection(key) {
+  const s = _staff.find(x => x.id === _selectedId);
+  if (!s) return;
+  const status = document.getElementById('status_' + key);
+  const ex = _config.existing;
+  const nc = _config.newColumns || {};
+  const fields = SECTION_FIELDS[key] || [];
+  const cv = {};
+  let updateLocal = {};
+
+  for (const [fkey, ftype, fixedTo] of fields) {
+    // Resolve target column id. The two existing columns we surface
+    // (contractHrs, defaultRate) live on the legacy ST_CONTRACT/ST_DEFRATE,
+    // so we map those explicitly via the `fixedTo` flag.
+    let colId;
+    if (fixedTo === 'existingContract') colId = ex.ST_CONTRACT;
+    else if (fixedTo === 'existingDefRate') colId = ex.ST_DEFRATE;
+    else colId = nc[fkey];
+    if (!colId) continue;
+
+    if (ftype === 'date') {
+      const el = document.querySelector(`[data-key="${fkey}"]`);
+      const v = el?.value || '';
+      cv[colId] = v ? { date: v } : null;
+      updateLocal[fkey] = v;
+    } else if (ftype === 'text') {
+      const el = document.querySelector(`[data-key="${fkey}"]`);
+      const v = (el?.value || '').trim();
+      cv[colId] = v;
+      updateLocal[fkey] = v;
+    } else if (ftype === 'number') {
+      const el = document.querySelector(`[data-key="${fkey}"]`);
+      const v = el?.value === '' ? null : parseFloat(el.value);
+      cv[colId] = (v === null || isNaN(v)) ? null : v;
+      updateLocal[fkey] = (v === null || isNaN(v)) ? 0 : v;
+    } else if (ftype === 'check') {
+      const el = document.querySelector(`[data-key="${fkey}"]`);
+      const v = !!el?.checked;
+      cv[colId] = { checked: v ? 'true' : 'false' };
+      updateLocal[fkey] = v;
+    } else if (ftype === 'status') {
+      const el = document.querySelector(`[data-key="${fkey}"]`);
+      const v = (el?.value || '').trim();
+      cv[colId] = v ? { label: v } : null;
+      updateLocal[fkey] = v;
+    } else if (ftype === 'dropdown') {
+      // Read selected chips for this fieldKey.
+      const section = document.querySelector(`.section[data-section="${key}"]`);
+      const labels = Array.from(section?.querySelectorAll(`.chip-pick .pick.on`) || [])
+        .filter(el => {
+          // fkey may not be the immediate parent's data attr — find via
+          // the field labelled with this key. Scope by the field's onclick
+          // which carries the fkey string.
+          return (el.getAttribute('onclick') || '').includes(`'${fkey}'`);
+        })
+        .map(el => el.textContent.trim());
+      cv[colId] = { labels };
+      updateLocal[fkey] = labels;
+    }
+  }
+
+  // Drop nulls (Monday's API doesn't accept null directly — use empty value).
+  for (const k of Object.keys(cv)) {
+    if (cv[k] === null) cv[k] = '';
+  }
+
+  status.textContent = 'Saving…';
+  status.className = 'save-status';
+  try {
+    await mq(
+      `mutation($i:ID!,$v:JSON!){ change_multiple_column_values(board_id:${_config.boardId}, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`,
+      { i: s.id, v: JSON.stringify(cv) }
+    );
+    Object.assign(s, updateLocal);
+    status.textContent = '✓ Saved';
+    status.className = 'save-status ok';
+    setTimeout(() => { status.textContent = ''; status.className = 'save-status'; }, 1800);
+    renderRail(); // role/name/status changes affect the rail
+  } catch (e) {
+    status.textContent = 'Error: ' + e.message;
+    status.className = 'save-status err';
+  }
+}
+</script>
+</body>
+</html>

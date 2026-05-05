@@ -186,6 +186,18 @@
         <div class="card-desc">Weekly matrix of start/finish times by staff (leave/sick/feeds payroll).</div>
         <span class="card-badge b-both">📱💻 Any</span>
       </a>
+      <a href="staff-records.html" class="tool-card">
+        <div class="card-icon">👤</div>
+        <div class="card-name">Staff Records</div>
+        <div class="card-desc">Profile, contact, next-of-kin, leave entitlement, preferences. Plus the multi-role list that drives rota eligibility.</div>
+        <span class="card-badge b-desktop">💻 Desktop</span>
+      </a>
+      <a href="leave-inbox.html" class="tool-card">
+        <div class="card-icon">🌿</div>
+        <div class="card-name">Leave Inbox</div>
+        <div class="card-desc">Pending leave requests from staff. Approve/decline; warns when a 3rd person would be off on the same day.</div>
+        <span class="card-badge b-both">📱💻 Any</span>
+      </a>
       <a href="payroll.html" class="tool-card">
         <div class="card-icon">💷</div>
         <div class="card-name">Payroll</div>
@@ -418,6 +430,31 @@
         <div class="card-icon">📬</div>
         <div class="card-name">Feedback Inbox</div>
         <div class="card-desc">Triage open bugs and enhancement requests — change status, add notes, mark as done. Export the open list as Markdown to share with Claude.</div>
+        <span class="card-badge b-desktop">💻 Desktop</span>
+      </a>
+    </div>
+  </div>
+
+  <!-- Booking reconciliation + diagnostics — admin tools to catch Make / sync gaps -->
+  <div style="grid-column:1/-1">
+    <div class="section-label">🔍 Sync & data tools</div>
+    <div class="cards cards-3">
+      <a href="booking-recon.html" class="tool-card featured">
+        <div class="card-icon">🔄</div>
+        <div class="card-name">Booking Reconciliation</div>
+        <div class="card-desc">Run each morning to catch bookings the weekly Guesty Make scenario or booking watcher missed. Cross-references Lodge Status, Cleans and Arrivals boards. Reports gaps with one-click backfill.</div>
+        <span class="card-badge b-desktop">💻 Desktop</span>
+      </a>
+      <a href="backfill-bookings.html" class="tool-card">
+        <div class="card-icon">➕</div>
+        <div class="card-name">Backfill Booking</div>
+        <div class="card-desc">Manually add a missing booking to both the Cleans and Arrivals boards — e.g. a phoned-in last-minute direct booking that Guesty hasn't picked up. Tags as Last minute.</div>
+        <span class="card-badge b-desktop">💻 Desktop</span>
+      </a>
+      <a href="arrivals-diagnose.html" class="tool-card">
+        <div class="card-icon">🩺</div>
+        <div class="card-name">Arrivals Diagnostic</div>
+        <div class="card-desc">Hunt a specific missing-arrival booking. Pinpoints whether the Arrivals row exists, has the wrong date, or never got synced.</div>
         <span class="card-badge b-desktop">💻 Desktop</span>
       </a>
     </div>

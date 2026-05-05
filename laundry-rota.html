@@ -428,6 +428,8 @@
   <a href="linen-transport.html" class="header-btn">🚚 Transport</a>
   <button class="header-btn" onclick="refreshArrivals()">↻ Refresh</button>
   <button class="header-btn" onclick="showExtManager()">⚙ External</button>
+  <a class="header-btn" href="leave-inbox.html" title="Review and approve staff leave requests" style="text-decoration:none;">🌿 Leave</a>
+  <a class="header-btn" href="staff-records.html" title="Manage staff records" style="text-decoration:none;">👤 Staff</a>
 </div>
 <div id="loadingBar"></div>
 
@@ -634,7 +636,7 @@
 <script>
   const MONDAY_API_TOKEN = window.MONDAY_API_TOKEN;
   const STAFF_NAME_KEY = 'linenStaffName';
-  const BOARD_ID = '5094453064';
+  const ARRIVALS_BOARD = '5094453064';
   const ROTA_KEY = 'laundryRota_v2';
   const EXT_KEY  = 'laundryExternalProps';
   const VIEW_KEY = 'laundryRota_viewMode';
@@ -719,7 +721,7 @@
     let items = [], cursor = null;
     do {
       const cp = cursor ? `, cursor: "${cursor}"` : '';
-      const d = await mondayFetch(`{ boards(ids:[${BOARD_ID}]){ items_page(limit:500${cp}){ cursor items{
+      const d = await mondayFetch(`{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500${cp}){ cursor items{
         id name column_values(ids:[
           "date_mm2adtwg","text_mm2ahbrx","text_mm2ab56m",
           "numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x"
@@ -1398,7 +1400,7 @@
     const tasks = [];
     // 1) Update arrival item bedConfig column + post note (only for arrival entries with numeric Monday id)
     if (e.source === 'arrival' && /^\d+$/.test(e.id)) {
-      tasks.push({ label: 'arrival col',    fn: () => mondayUpdateText(BOARD_ID, e.id, 'text_mm2ab56m', newBeds) });
+      tasks.push({ label: 'arrival col',    fn: () => mondayUpdateText(ARRIVALS_BOARD, e.id, 'text_mm2ab56m', newBeds) });
       tasks.push({ label: 'arrival update', fn: () => mondayPostUpdate(e.id, noteBody) });
     }
     // 2) Post update on matching property item (if found by name)

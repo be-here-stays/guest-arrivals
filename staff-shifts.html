@@ -168,6 +168,8 @@
     <h1>Staff Shifts <small id="wkTitle"></small></h1>
     <button class="btn" id="addStaffBtn" title="Add a new staff member to the Staff board">+ Add staff</button>
     <button class="btn gold" id="refreshBtn">↻ Refresh</button>
+    <a class="btn" href="leave-inbox.html" title="Review and approve staff leave requests" style="text-decoration:none">🌿 Leave</a>
+    <a class="btn" href="staff-records.html" title="Manage staff records" style="text-decoration:none">👤 Records</a>
   </div>
 
   <div class="sub">
@@ -341,9 +343,12 @@
   </div>
 </div>
 
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
+
 <script>
 /* ========== Config ========== */
-const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const TOKEN = window.MONDAY_API_TOKEN;
 const MONDAY_URL = 'https://api.monday.com/v2';
 
 const STAFF_BOARD  = '5095127554';

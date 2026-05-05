@@ -13,9 +13,11 @@
   section { background:#fff; border-radius:12px; padding:18px 20px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
   section h2 { font-size:15px; margin:0 0 10px; color:#272F2E; display:flex; align-items:center; gap:8px; }
   section h2 .count { background:#272F2E; color:#fff; font-size:11px; padding:2px 8px; border-radius:11px; font-weight:700; }
-  section h2.bad .count   { background:#8B2020; }
-  section h2.warn .count  { background:#a86c00; }
-  section h2.ok   .count  { background:#2d6a4f; }
+  section h2.bad  .count { background:#8B2020; }
+  section h2.warn .count { background:#a86c00; }
+  section h2.ok   .count { background:#2d6a4f; }
+  section h2.info .count { background:#1a5276; }
+  section h2.info        { color:#1a5276; }
   .controls { display:flex; gap:10px; align-items:center; flex-wrap:wrap; margin-bottom:14px; }
   input[type=date], input[type=text], input[type=password], select { padding:8px 10px; border:1.5px solid #c9c4b3; border-radius:8px; font-family:inherit; font-size:14px; background:#fff; }
   button { padding:9px 16px; background:#272F2E; color:#F3E3C3; border:none; border-radius:8px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }
@@ -41,6 +43,7 @@
   .stat.bad   .num { color:#8B2020; }
   .stat.warn  .num { color:#a86c00; }
   .stat.ok    .num { color:#2d6a4f; }
+  .stat.info  .num { color:#1a5276; }
   .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:#272F2E; color:#fff; padding:10px 18px; border-radius:24px; font-size:13px; font-weight:600; opacity:0; transition:opacity .15s; pointer-events:none; z-index:200; }
   .toast.show { opacity:1; }
   .loading { color:#646955; font-size:13px; padding:30px; text-align:center; }
@@ -55,8 +58,8 @@
 <div class="sub">Treats the <strong>Arrivals board</strong> (<code>5094453064</code>) as the source of truth, then checks downstream boards (Cleans, Hot Tub Cleans) for matching rows. Anything missing means a downstream consumer didn't sync. Flags orphan rows on those boards too — rows that exist without a matching Arrivals entry, suggesting a cancelled or moved booking the watcher missed.</div>
 
 <div class="architecture">
-  <strong>Architecture:</strong> Guesty → Arrivals (authoritative) → Cleans / Hot Tub Cleans / Laundry (derived).
-  This tool covers the Arrivals → downstream half. The Guesty → Arrivals half needs Guesty Open API access in the Cloudflare worker — currently not wired (<code>GUESTY_CLIENT_ID: false</code> in the proxy health check). Once those secrets are added, the tool can also verify Arrivals against Guesty.
+  <strong>Architecture (post-2026-05-04 refactor):</strong> Guesty → <strong>Arrivals</strong> (authoritative, written by Make) → Cleans / Hot Tub Cleans (derived <em>on demand</em> by rota-planner and hot-tub-rota when a manager opens them and saves).<br>
+  Make scenarios <strong>no longer create Cleans rows</strong>, so an Arrivals row without a matching Cleans entry is normal — it just means nobody's opened the rota planner since that booking landed. The "Arrivals not yet planned" section below is informational, not an error. Real problems live in the duplicates and orphan-rows sections lower down.
 </div>
 
 <script src="secrets.js"></script>
@@ -380,9 +383,9 @@ function render() {
 
   const stats = `<div class="stats">
     <div class="stat ok"><div class="num">${f.synced.length}</div><div class="lbl">Fully synced</div></div>
-    <div class="stat ${f.missingBoth.length    ? 'bad'  : 'ok'}"><div class="num">${f.missingBoth.length}</div><div class="lbl">Missing both downstream</div></div>
-    <div class="stat ${f.missingCleans.length  ? 'warn' : 'ok'}"><div class="num">${f.missingCleans.length}</div><div class="lbl">Missing Cleans</div></div>
-    <div class="stat ${f.missingHT.length      ? 'warn' : 'ok'}"><div class="num">${f.missingHT.length}</div><div class="lbl">Missing Hot Tub</div></div>
+    <div class="stat ${f.missingBoth.length    ? 'info' : 'ok'}"><div class="num">${f.missingBoth.length}</div><div class="lbl">Awaiting rota planning</div></div>
+    <div class="stat ${f.missingCleans.length  ? 'info' : 'ok'}"><div class="num">${f.missingCleans.length}</div><div class="lbl">Cleans not yet generated</div></div>
+    <div class="stat ${f.missingHT.length      ? 'info' : 'ok'}"><div class="num">${f.missingHT.length}</div><div class="lbl">HT not yet generated</div></div>
     <div class="stat ${f.orphanCleans.length   ? 'warn' : 'ok'}"><div class="num">${f.orphanCleans.length}</div><div class="lbl">Orphan Cleans</div></div>
     <div class="stat ${f.orphanHT.length       ? 'warn' : 'ok'}"><div class="num">${f.orphanHT.length}</div><div class="lbl">Orphan Hot Tub</div></div>
     <div class="stat ${f.dupesByRef.length     ? 'bad'  : 'ok'}"><div class="num">${f.dupesByRef.length}</div><div class="lbl">Duplicate refs</div></div>
@@ -395,8 +398,8 @@ function render() {
   }
 
   const sectionMissingBoth = f.missingBoth.length ? `<section>
-    <h2 class="bad">✗ Arrivals row exists but NO downstream rows <span class="count">${f.missingBoth.length}</span></h2>
-    <p class="muted">An Arrivals booking is on Monday but neither Cleans nor Hot Tub Cleans has a matching row. Most likely the Make scenario that creates downstream rows didn't fire (or fired but failed property mapping).</p>
+    <h2 class="info">📅 Arrivals not yet planned in rota <span class="count">${f.missingBoth.length}</span></h2>
+    <p class="muted">These bookings exist on Arrivals but don't have Cleans or Hot Tub Cleans rows yet. <strong>That's expected after the Arrivals refactor</strong> — Make only writes Arrivals; the housekeeping rota and hot-tub rota generate their own rows when a manager opens them and saves. Open <a href="rota-planner.html">rota-planner</a> (and/or <a href="hot-tub-rota.html">hot-tub-rota</a>) and save to materialise these.</p>
     <table><thead><tr><th>Property</th><th>Check-in</th><th>Booking ref</th><th>Form Status</th><th>Arrivals row</th><th></th></tr></thead><tbody>
     ${f.missingBoth.map(r => `<tr>
       <td><strong>${escapeHtml(r.property)}</strong></td>
@@ -410,8 +413,8 @@ function render() {
   </section>` : '';
 
   const sectionMissingCleans = f.missingCleans.length ? `<section>
-    <h2 class="warn">⚠ Missing on Cleans board <span class="count">${f.missingCleans.length}</span></h2>
-    <p class="muted">Hot Tub Cleans has a row, but the housekeeping Cleans board doesn't. Won't appear on rota-planner.</p>
+    <h2 class="info">📅 Hot Tub planned but Cleans not yet created <span class="count">${f.missingCleans.length}</span></h2>
+    <p class="muted">A Hot Tub Cleans row exists for this booking but the housekeeping Cleans board doesn't. Open <a href="rota-planner.html">rota-planner</a> and save to generate the Cleans row from the Arrivals booking.</p>
     <table><thead><tr><th>Property</th><th>Check-in</th><th>Booking ref</th><th>HT Cleans row</th><th></th></tr></thead><tbody>
     ${f.missingCleans.map(r => `<tr>
       <td><strong>${escapeHtml(r.property)}</strong></td>
@@ -424,8 +427,8 @@ function render() {
   </section>` : '';
 
   const sectionMissingHT = f.missingHT.length ? `<section>
-    <h2 class="warn">⚠ Missing on Hot Tub Cleans board <span class="count">${f.missingHT.length}</span></h2>
-    <p class="muted">Cleans has a row, but the Hot Tub Cleans schedule doesn't. The hot-tub rota auto-derives most rows from bookings + 48h cadence, so this is usually only a problem if the property genuinely has a tub and the HT scheduler hasn't run yet.</p>
+    <h2 class="info">📅 Cleans planned but Hot Tub schedule not generated <span class="count">${f.missingHT.length}</span></h2>
+    <p class="muted">A housekeeping Cleans row exists but no matching Hot Tub Cleans entry. The hot-tub rota auto-derives rows from Arrivals + 48h cadence when a manager opens it. Most missing entries here are bookings outside the visible HT scheduling window. Open <a href="hot-tub-rota.html">hot-tub-rota</a> and save to materialise any in-window rows.</p>
     <table><thead><tr><th>Property</th><th>Check-in</th><th>Cleans row</th><th></th></tr></thead><tbody>
     ${f.missingHT.map(r => `<tr>
       <td><strong>${escapeHtml(r.property)}</strong></td>

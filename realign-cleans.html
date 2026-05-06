@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Re-align early cleans — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; }
+
+  /* PIN gate */
+  #pinGate { position:fixed; inset:0; background:var(--dark); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; padding:20px; }
+  #pinGate h2 { color:#fff; font-size:18px; font-weight:600; margin-bottom:18px; }
+  #pinGate input { width:240px; padding:12px; font-size:20px; text-align:center; border-radius:8px; border:none; background:rgba(255,255,255,0.12); color:#fff; font-family:inherit; letter-spacing:8px; }
+  #pinGate input::placeholder { color:rgba(255,255,255,0.5); letter-spacing:normal; }
+  #pinGate .pin-err { color:#ff8a80; font-size:13px; margin-top:10px; min-height:18px; }
+  #pinGate .pin-back { color:rgba(255,255,255,0.5); margin-top:18px; font-size:12px; text-decoration:none; }
+
+  header { background:var(--dark); color:#fff; padding:18px 24px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+  header h1 { font-size:18px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.6; margin-top:2px; }
+  .hdr-btn { color:rgba(255,255,255,0.85); text-decoration:none; font-size:13px; font-weight:600; padding:7px 12px; border:1px solid rgba(255,255,255,0.25); border-radius:8px; }
+  .hdr-btn:hover { background:rgba(255,255,255,0.08); }
+
+  .container { max-width:1100px; margin:0 auto; padding:18px 22px 60px; }
+
+  .info { background:var(--blue-bg); border-left:3px solid var(--blue); padding:12px 14px; border-radius:0 8px 8px 0; margin-bottom:18px; font-size:13px; line-height:1.5; }
+  .info strong { color:#0c3a5a; }
+
+  .controls { background:#fff; border-radius:12px; padding:14px 16px; margin-bottom:14px; display:flex; flex-wrap:wrap; gap:10px; align-items:center; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+  .controls .stat { font-size:13px; color:var(--sage); }
+  .controls .stat strong { color:var(--dark); font-size:16px; }
+  .controls .actions { margin-left:auto; display:flex; gap:8px; flex-wrap:wrap; }
+  button {
+    padding:9px 14px; background:var(--dark); color:var(--cream); border:0; border-radius:8px;
+    font-family:inherit; font-size:13px; font-weight:700; cursor:pointer;
+  }
+  button:hover { background:var(--sage); }
+  button:disabled { opacity:0.5; cursor:not-allowed; }
+  button.secondary { background:#fff; color:var(--dark); border:1.5px solid var(--border); }
+  button.danger    { background:var(--red); color:#fff; }
+
+  table { width:100%; background:#fff; border-radius:12px; border-collapse:collapse; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+  thead th { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--sage); text-align:left; padding:10px 12px; border-bottom:1px solid var(--border); background:#f7f5ee; }
+  tbody td { padding:9px 12px; border-bottom:1px solid #ece9df; font-size:13px; vertical-align:middle; }
+  tbody tr:last-child td { border-bottom:0; }
+  tbody tr.processing { opacity:0.5; }
+  tbody tr.done       { background:var(--green-bg); }
+  tbody tr.failed     { background:var(--red-bg); }
+
+  .pill { display:inline-block; padding:1px 7px; border-radius:9px; font-size:11px; font-weight:700; }
+  .pill.early   { background:var(--amber-bg); color:var(--amber); }
+  .pill.target  { background:var(--green-bg); color:var(--green); }
+  .pill.shift   { background:var(--cream); color:var(--sage); }
+  code { background:#f1eee5; padding:1px 5px; border-radius:4px; font-size:12px; }
+
+  .empty { text-align:center; color:var(--sage-mid); padding:50px 20px; }
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--dark); color:#fff; padding:10px 18px; border-radius:24px; font-size:13px; font-weight:600; opacity:0; transition:opacity .15s; pointer-events:none; z-index:200; }
+  .toast.show { opacity:1; }
+  .loading { color:var(--sage-mid); font-size:13px; padding:30px; text-align:center; }
+  .progress-bar { height:4px; background:#ece9df; border-radius:2px; overflow:hidden; margin:6px 0 0; }
+  .progress-bar .fill { height:100%; background:var(--green); transition:width 0.2s; }
+  .hide { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="pinGate">
+  <h2>Manager PIN</h2>
+  <input type="password" id="pinInp" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+  <div class="pin-err" id="pinErr"></div>
+  <a class="pin-back" href="hub.html">‹ Back to hub</a>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <div>
+      <h1>📐 Re-align early cleans</h1>
+      <div class="sub">Move auto-placed early cleans back to their booking's check-in day</div>
+    </div>
+    <div>
+      <a href="rota-planner.html" class="hdr-btn">Rota planner</a>
+      <a href="hub.html" class="hdr-btn">‹ Hub</a>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="info">
+      <strong>What this does:</strong> finds every Cleans-board row where the scheduled day is <em>before</em> the booking's check-in date (i.e. flagged "early"), and rewrites the day to the check-in date. Same-day turnovers are left alone. Completed cleans are skipped — we don't rewrite history.<br><br>
+      Use this once after the materialise-on-windowStart bug landed cleans on the wrong day. After it's run, the rota will be fully aligned and rota-planner's new default will keep it that way.
+    </div>
+
+    <div class="controls" id="controls" style="display:none">
+      <div class="stat"><strong id="affectedCount">0</strong> cleans to move</div>
+      <div class="stat"><strong id="checkedCount">0</strong> selected</div>
+      <div class="actions">
+        <button class="secondary" onclick="toggleAll(true)">Select all</button>
+        <button class="secondary" onclick="toggleAll(false)">Select none</button>
+        <button id="runBtn" onclick="runRealign()">Move selected to check-in day</button>
+      </div>
+      <div class="progress-bar" id="progressBar" style="flex:1 1 100%; display:none"><div class="fill" id="progressFill" style="width:0%"></div></div>
+    </div>
+
+    <div id="content" class="loading">Loading Cleans board…</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="secrets.js"></script>
+<script src="pins-schema.js"></script>
+
+<script>
+const TOKEN   = window.MONDAY_API_TOKEN;
+const URL_API = 'https://api.monday.com/v2';
+const AREA_KEY = 'rota-planner';
+
+// Cleans board column ids — same as rota-planner.html
+const CLEANS_BOARD   = '5095134636';
+const CL_DATE        = 'date_mm2pphc';
+const CL_CHECKIN     = 'date_mm2p6tck';
+const CL_PROP        = 'board_relation_mm2psy0b';
+const CL_SAMEDAY     = 'boolean_mm2p2v4n';
+const CL_PRIMARY     = 'dropdown_mm2pntvm';
+const CL_PARTNER     = 'dropdown_mm2pbcnq';
+const CL_COMPLETED   = 'date_mm2qxh4a';
+
+let _affected = [];   // { id, property, day, checkinDate, primary, partner }
+
+async function tryPin(v) {
+  if (await window.PinsSchema.checkPin(mq, AREA_KEY, v)) {
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    boot();
+  } else {
+    document.getElementById('pinErr').textContent = 'Wrong PIN';
+    document.getElementById('pinInp').value = '';
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.PinsSchema.isUnlocked(AREA_KEY)) {
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    boot();
+    return;
+  }
+  const inp = document.getElementById('pinInp');
+  inp.focus();
+  inp.addEventListener('input', () => { if (inp.value.length === 6) tryPin(inp.value); });
+});
+
+async function mq(query, variables) {
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization: TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtUK(iso) {
+  if (!iso) return '';
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  return `${m[3]}-${m[2]}-${m[1].slice(2)}`;
+}
+function pj(v) { try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; } }
+
+async function boot() {
+  try {
+    await loadAffected();
+    render();
+  } catch (e) {
+    document.getElementById('content').innerHTML = `<div class="empty">Error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+/* Load every Cleans row, filter to ones where day < checkinDate AND not
+   sameDay AND not completed. We treat empty checkinDate as "no anchor" —
+   skip those (couldn't realign anyway). */
+async function loadAffected() {
+  const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_PROP}","${CL_SAMEDAY}","${CL_PRIMARY}","${CL_PARTNER}","${CL_COMPLETED}"]`;
+  let cursor = null, all = [];
+  do {
+    const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+    const data = await mq(`{
+      boards(ids:[${CLEANS_BOARD}]) {
+        items_page(limit: 500${cursorPart}) {
+          cursor
+          items { id name column_values(ids:${colIds}) { id text value } }
+        }
+      }
+    }`);
+    const page = data.boards[0].items_page;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+  } while (cursor);
+
+  _affected = [];
+  for (const it of all) {
+    const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+    const day      = pj(cv[CL_DATE]?.value)?.date     || '';
+    const checkin  = pj(cv[CL_CHECKIN]?.value)?.date  || '';
+    const sameDay  = !!(pj(cv[CL_SAMEDAY]?.value)?.checked);
+    const completedAt = pj(cv[CL_COMPLETED]?.value)?.date || '';
+    if (!day || !checkin) continue;
+    if (sameDay) continue;
+    if (completedAt) continue;
+    if (day >= checkin) continue;        // already on or after check-in — fine
+
+    const propText = (cv[CL_PROP]?.text || it.name || '').trim();
+    _affected.push({
+      id: it.id,
+      name: it.name,
+      property: propText,
+      day,
+      checkinDate: checkin,
+      primary: cv[CL_PRIMARY]?.text || '',
+      partner: cv[CL_PARTNER]?.text || '',
+      shift: dayShift(day, checkin),
+    });
+  }
+  // Newest target date first so the imminent ones surface.
+  _affected.sort((a, b) => (a.checkinDate || '').localeCompare(b.checkinDate || ''));
+}
+
+function dayShift(from, to) {
+  if (!from || !to) return '';
+  const ms = (new Date(to+'T12:00:00') - new Date(from+'T12:00:00'));
+  const days = Math.round(ms / 86400000);
+  if (days === 0) return 'same';
+  if (days === 1) return '+1 day';
+  return `+${days} days`;
+}
+
+function render() {
+  document.getElementById('controls').style.display = 'flex';
+  document.getElementById('affectedCount').textContent = _affected.length;
+  const c = document.getElementById('content');
+  if (!_affected.length) {
+    c.innerHTML = `<div class="empty">✓ Nothing to realign — every clean is already on its check-in day.</div>`;
+    document.getElementById('runBtn').disabled = true;
+    updateCheckedCount();
+    return;
+  }
+  c.innerHTML = `<table>
+    <thead>
+      <tr>
+        <th><input type="checkbox" id="cbAll" checked onchange="toggleAll(this.checked)"></th>
+        <th>Property</th>
+        <th>Currently scheduled</th>
+        <th>Will move to</th>
+        <th>Shift</th>
+        <th>Cleaner</th>
+        <th>Item id</th>
+      </tr>
+    </thead>
+    <tbody>
+      ${_affected.map(r => `<tr id="row_${r.id}">
+        <td><input type="checkbox" class="cb" data-id="${r.id}" checked onchange="updateCheckedCount()"></td>
+        <td><strong>${escapeHtml(r.property || '—')}</strong></td>
+        <td><span class="pill early">${fmtUK(r.day)}</span></td>
+        <td><span class="pill target">${fmtUK(r.checkinDate)}</span></td>
+        <td><span class="pill shift">${r.shift}</span></td>
+        <td>${escapeHtml(r.primary || r.partner || '—')}</td>
+        <td><code>${r.id}</code></td>
+      </tr>`).join('')}
+    </tbody>
+  </table>`;
+  updateCheckedCount();
+}
+
+function updateCheckedCount() {
+  const cbs = document.querySelectorAll('.cb');
+  let n = 0;
+  cbs.forEach(cb => { if (cb.checked) n++; });
+  document.getElementById('checkedCount').textContent = n;
+  document.getElementById('runBtn').disabled = n === 0;
+}
+
+function toggleAll(on) {
+  document.querySelectorAll('.cb').forEach(cb => { cb.checked = !!on; });
+  const all = document.getElementById('cbAll');
+  if (all) all.checked = !!on;
+  updateCheckedCount();
+}
+
+async function runRealign() {
+  const cbs = Array.from(document.querySelectorAll('.cb')).filter(cb => cb.checked);
+  if (!cbs.length) return;
+  if (!confirm(`Move ${cbs.length} clean${cbs.length===1?'':'s'} to their check-in day?\n\nThis writes to Monday and can be undone manually if needed (the planner shows current dates).`)) return;
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true; btn.textContent = 'Realigning…';
+  document.getElementById('progressBar').style.display = 'block';
+
+  const ids = cbs.map(cb => cb.dataset.id);
+  const total = ids.length;
+  let done = 0, failed = 0;
+  const GAP_MS = 150;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  for (const id of ids) {
+    const row = document.getElementById('row_' + id);
+    if (row) row.classList.add('processing');
+    const item = _affected.find(x => x.id === id);
+    if (!item) { done++; continue; }
+    try {
+      // change_simple_column_value for date column accepts the bare ISO string.
+      const q = `mutation { change_simple_column_value(board_id:${CLEANS_BOARD}, item_id:${id}, column_id:"${CL_DATE}", value:${JSON.stringify(item.checkinDate)}){ id } }`;
+      await mq(q);
+      done++;
+      if (row) { row.classList.remove('processing'); row.classList.add('done'); }
+      // Update local state so a follow-up render is accurate.
+      item.day = item.checkinDate;
+    } catch (e) {
+      failed++;
+      console.error('realign failed', id, e);
+      if (row) { row.classList.remove('processing'); row.classList.add('failed'); }
+    }
+    document.getElementById('progressFill').style.width = `${Math.round(((done+failed)/total)*100)}%`;
+    await sleep(GAP_MS);
+  }
+
+  btn.disabled = false; btn.textContent = 'Move selected to check-in day';
+  toast(`✓ Moved ${done} · ${failed ? failed + ' failed' : 'no errors'}`);
+  if (failed === 0) {
+    setTimeout(async () => {
+      // Re-load so the page shows nothing remaining (or what's left).
+      await loadAffected();
+      render();
+    }, 800);
+  }
+}
+</script>
+</body>
+</html>

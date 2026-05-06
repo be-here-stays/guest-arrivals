@@ -1228,13 +1228,11 @@ async function refreshAll() {
    ═══════════════════════════════════════════════════════════════════ */
 function derivedCleans() {
   const out = [];
+  // PASS 1 — between-bookings cleans. For each booking, emit a derived
+  // clean for the gap AFTER its checkout (= before the next booking's
+  // check-in). This covers bookings 2..N on each property.
   for (const b of bookings) {
-    // The "turn" we care about is between currOut and nextIn
     if (!b.currOut) continue;
-    // Ignore nextIn if it's not strictly after currOut — the Lodge Status board
-    // mirrors the current booking into the next-booking fields when there's no
-    // future booking loaded yet, which would produce an inverted window and
-    // break the planned-clean match below (duplicating property rows).
     const nextIn = (b.nextIn && b.nextIn > b.currOut) ? b.nextIn
                  : (b.nextIn && b.nextIn === b.currOut) ? b.nextIn
                  : null;
@@ -1250,12 +1248,50 @@ function derivedCleans() {
       windowEnd: windowEndDate ? localStr(windowEndDate) : b.currOut,
       source: b.source,
       todayStatus: b.todayStatus,
-      // NEW — pass the Arrivals board_relation through so findPlannedClean
-      // can do a strict id-based join. The "next" booking is the one whose
-      // check-in we're cleaning *for*, so the next booking's arrivalId is
-      // what a freshly-created clean should link to.
+      // The "next" booking is the one whose check-in we're cleaning for,
+      // so the next booking's arrivalId is what a freshly-created clean
+      // should link to.
       arrivalId: b.nextArrivalId || null,
       bookingRef: b.bookingRef || '',
+    });
+  }
+
+  // PASS 2 — first-arrival cleans. The pass above misses the FIRST
+  // booking on each property (no prior to drive a between-bookings
+  // clean). Here we emit one clean per first arrival so newly-tracked
+  // properties (with no Arrivals history) still get a clean generated
+  // for them on Save. We dedupe by arrivalId — if a between-bookings
+  // clean already targets this arrival, we skip.
+  const byProp = new Map();
+  for (const b of bookings) {
+    if (b.source !== 'monday') continue;
+    if (!b.currIn || !b.arrivalId) continue;
+    if (!byProp.has(b.property)) byProp.set(b.property, []);
+    byProp.get(b.property).push(b);
+  }
+  for (const list of byProp.values()) {
+    list.sort((x, y) => (x.currIn || '').localeCompare(y.currIn || ''));
+  }
+  const alreadyCovered = new Set(out.map(d => d.arrivalId).filter(Boolean));
+  for (const [property, list] of byProp) {
+    const first = list[0];
+    if (!first || !first.arrivalId) continue;
+    if (alreadyCovered.has(first.arrivalId)) continue;
+    out.push({
+      key: `${property}|first|${first.arrivalId}`,
+      property,
+      // No prior on Arrivals — model the clean as a same-day-as-arrival
+      // clean (no slack). windowStart=windowEnd=currIn so any
+      // window-based logic still works.
+      checkout: first.currIn,
+      nextIn: first.currIn,
+      sameDay: false,
+      windowStart: first.currIn,
+      windowEnd: first.currIn,
+      source: first.source,
+      todayStatus: first.todayStatus,
+      arrivalId: first.arrivalId,
+      bookingRef: first.bookingRef || '',
     });
   }
   return out;
@@ -2826,28 +2862,52 @@ function saveButtonClick() {
   saveToMonday();
 }
 
-/* Returns derived cleans whose checkout day falls inside the visible 7-day
+/* Decide which day a freshly-materialised derived clean should land on.
+   Default policy: land on the new guest's CHECK-IN day, not the prior
+   guest's checkout. Reasons:
+     - A Monday check-in with a Friday checkout shouldn't auto-schedule
+       on Friday — the property is empty over the weekend, sure, but
+       cleans default to "the day the new guest arrives" so we don't
+       accidentally force weekend work or unbalance the rota.
+     - Same-day turnovers must clean on the shared day.
+     - "Early" cleans (between checkout and check-in) are a manual
+       optimisation the manager makes by dragging — we don't bake them
+       in at materialisation time. */
+function derivedLandingDay(d) {
+  if (d.sameDay)  return d.checkout;             // shared day; checkout === nextIn
+  if (d.nextIn)   return d.nextIn;               // standard "clean on arrival day"
+  return d.checkout || d.windowStart || null;    // last booking, no follow-on
+}
+
+/* Returns derived cleans whose landing day falls inside the visible 7-day
    window AND don't have a matching Cleans-board row yet. These are the
    "Arrivals not yet planned" rows the recon page complains about. */
 function unmaterialisedDerivedInWindow() {
   const days = visibleDays().map(localStr);
   const winStart = days[0], winEnd = days[6];
-  return derivedCleans().filter(d => {
-    if (!d.windowStart) return false;
-    if (d.windowStart < winStart || d.windowStart > winEnd) return false;
-    return !findPlannedClean(d);
-  });
+  const out = [];
+  for (const d of derivedCleans()) {
+    if (findPlannedClean(d)) continue;
+    const dayStr = derivedLandingDay(d);
+    if (!dayStr) continue;
+    if (dayStr < winStart || dayStr > winEnd) continue;
+    // Stash the resolved day on the derived object so materialiseDerived
+    // doesn't have to recompute it.
+    out.push({ ...d, _dayStr: dayStr });
+  }
+  return out;
 }
 
 /* Push a "new" Cleans entry into the cleans[] array for each derived
-   clean. Lands on the checkout day (windowStart) by default; the manager
-   can drag/edit later. Mirrors planNewClean's row shape so saveToMonday's
-   buildColumnValues writes the same payload it would for a click-planned
-   clean. Doesn't persistLocal — saveToMonday handles that on the way out. */
+   clean. Lands on the check-in day (or shared day for same-day turns).
+   Mirrors planNewClean's row shape so saveToMonday's buildColumnValues
+   writes the same payload it would for a click-planned clean. Doesn't
+   persistLocal — saveToMonday handles that on the way out. */
 function materialiseDerived(derivedList) {
   for (const d of derivedList) {
     const prop = properties[d.property] || {};
-    const dayStr = d.windowStart;
+    const dayStr = d._dayStr || derivedLandingDay(d);
+    if (!dayStr) continue;
     const c = {
       id: uid(),
       mondayId: null,
@@ -2862,7 +2922,9 @@ function materialiseDerived(derivedList) {
       checkoutDate: d.checkout || '',
       checkinDate: d.nextIn || '',
       sameDay: !!d.sameDay,
-      early: dayStr !== d.windowStart && !d.sameDay,
+      // early = true only when we deliberately schedule before check-in.
+      // For default landing on nextIn this is always false.
+      early: !!(!d.sameDay && d.nextIn && dayStr < d.nextIn),
       localOverride: !!prop.local,
       notes: '',
       status: 'Planned',

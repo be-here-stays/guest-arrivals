@@ -85,6 +85,10 @@ const URL_API           = 'https://api.monday.com/v2';
 const ARRIVALS_BOARD    = '5094453064';   // canonical: every booking
 const CLEANS_BOARD      = '5095134636';   // housekeeping rota — derived from Arrivals
 const HT_CLEANS_BOARD   = '5095259581';   // hot tub schedule — derived from Arrivals
+const PROP_CONFIG_BOARD = '5094466278';   // property metadata — has-tub flag etc.
+
+// Property Config columns
+const PC_HAS_TUB = 'boolean_mm2rpzzh';    // true when the property has a hot tub
 
 // Arrivals board
 const AR_DATE     = 'date_mm2adtwg';
@@ -232,6 +236,24 @@ async function loadHTCleans(from, to) {
   });
 }
 
+/* Load every Property Config row → Map<normalised name, { hasTub }>.
+   Used to filter the missing-HT lists so non-tub properties (Aintree,
+   Tranquility, Serenity, etc.) don't get flagged for missing HT rows
+   they shouldn't have. */
+async function loadPropertyConfigs() {
+  const cols = `["${PC_HAS_TUB}"]`;
+  const data = await mq(`{ boards(ids:[${PROP_CONFIG_BOARD}]) { items_page(limit:200) { items { id name column_values(ids:${cols}) { id text value } } } } }`);
+  const items = data?.boards?.[0]?.items_page?.items || [];
+  const map = new Map();
+  for (const it of items) {
+    const cv = (it.column_values || []).find(c => c.id === PC_HAS_TUB);
+    let hasTub = false;
+    try { hasTub = !!JSON.parse(cv?.value || 'null')?.checked; } catch (_) {}
+    map.set(norm(it.name || ''), { name: it.name, hasTub });
+  }
+  return map;
+}
+
 function parsePropertyFromItemName(name) {
   if (!name) return '';
   let n = name.trim();
@@ -253,11 +275,19 @@ async function runRecon() {
   out.innerHTML = '<div class="loading">Loading three boards in parallel…</div>';
 
   try {
-    const [arrivals, cleans, htCleans] = await Promise.all([
+    const [arrivals, cleans, htCleans, propConfigs] = await Promise.all([
       loadArrivals(from, to),
       loadCleans(from, to),
       loadHTCleans(from, to),
+      loadPropertyConfigs(),
     ]);
+    // Helper: does this property have a hot tub? Default true when the
+    // property isn't on Property Config (better to over-flag than under).
+    const hasTub = (property) => {
+      const cfg = propConfigs.get(norm(property));
+      if (!cfg) return true;
+      return !!cfg.hasTub;
+    };
 
     // Index Cleans + HT Cleans by (normalised property, check-in date).
     // For Cleans the check-in column wins; fall back to the clean date.
@@ -289,18 +319,33 @@ async function runRecon() {
       bookingRef: a.bookingRef,
     }));
 
-    const missingBoth     = [];   // expected, no Cleans + no HT Cleans
-    const missingCleans   = [];   // expected, has HT, no Cleans
-    const missingHT       = [];   // expected, has Cleans, no HT
-    const synced          = [];   // expected, both present
+    const missingBoth     = [];   // expected, no Cleans + no HT Cleans (only counts as both if the property has a tub; otherwise just missingCleans)
+    const missingCleans   = [];   // expected, no Cleans (with or without tub)
+    const missingHT       = [];   // expected, has Cleans, no HT (only flagged for hot-tub properties)
+    const synced          = [];   // expected, both present (or only Cleans for non-tub)
     for (const e of expected) {
       const key = norm(e.property) + '|' + e.checkin;
       const c = cleansByKey.get(key);
       const h = htByKey.get(key);
-      if (!c && !h)   missingBoth.push({ ...e });
-      else if (!c)    missingCleans.push({ ...e, ht: h });
-      else if (!h)    missingHT.push({ ...e, clean: c });
-      else            synced.push({ ...e, clean: c, ht: h });
+      const tub = hasTub(e.property);
+      if (!c && !h) {
+        // No Cleans and no HT.
+        // Tub property → really missing both.
+        // Non-tub property → only Cleans matters; classify as missingCleans.
+        if (tub) missingBoth.push({ ...e });
+        else     missingCleans.push({ ...e, ht: null });
+      }
+      else if (!c) {
+        missingCleans.push({ ...e, ht: h });
+      }
+      else if (!h) {
+        // Cleans exists, HT doesn't — only flag if the property has a tub.
+        if (tub) missingHT.push({ ...e, clean: c });
+        else     synced.push({ ...e, clean: c, ht: null });
+      }
+      else {
+        synced.push({ ...e, clean: c, ht: h });
+      }
     }
 
     // Inverse lookup: every Cleans / HT Cleans row should have a matching

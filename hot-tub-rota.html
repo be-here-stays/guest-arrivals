@@ -2507,18 +2507,23 @@ function overlayClose(e, id) { if (e.target.id === id) closeModal(id); }
 /* ═══════════════════════════════════════════════════════════════════
    SAVE TO MONDAY
    ═══════════════════════════════════════════════════════════════════ */
-/* User-explicit Save button click. Auto-materialises any visible-window
-   virtual (auto-suggested) HT cleans before saving — so opening the rota
-   and clicking Save commits today's pending bookings without the manager
-   having to click each card individually. Autosave (which calls saveAll
-   directly) deliberately does NOT trigger materialisation, so background
-   ticks don't accidentally commit suggestions the manager hasn't reviewed. */
+/* User-explicit Save button click.
+   ── Auto-materialise temporarily DISABLED (2026-05-06) ──────────────────
+   Same reason as rota-planner.html: bulk-committing virtual cleans on Save
+   was creating duplicates of pre-refactor HT Cleans rows when the matching
+   couldn't recognise the older row. Save reverts to legacy behaviour —
+   only persists cleans the user explicitly clicked. Virtual suggestions
+   still render on the rota; manager taps "Tap to plan" on each.
+   Flip MATERIALISE_ON_SAVE to true to re-enable once matching is proven. */
 function saveButtonClick() {
-  const virts = unmaterialisedVirtualsInWindow();
-  if (virts.length) {
-    for (const v of virts) commitVirtual(v);
-    render();
-    toast(`Generated ${virts.length} HT clean${virts.length===1?'':'s'} from arrivals — saving…`, 1800);
+  const MATERIALISE_ON_SAVE = false;
+  if (MATERIALISE_ON_SAVE) {
+    const virts = unmaterialisedVirtualsInWindow();
+    if (virts.length) {
+      for (const v of virts) commitVirtual(v);
+      render();
+      toast(`Generated ${virts.length} HT clean${virts.length===1?'':'s'} from arrivals — saving…`, 1800);
+    }
   }
   saveAll();
 }

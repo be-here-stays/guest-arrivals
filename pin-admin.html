@@ -112,7 +112,8 @@
     </div>
 
     <div class="info-banner" id="infoBanner">
-      <strong>How this works:</strong> every manager-facing page checks its own area's PIN before unlocking. Areas marked <strong style="color:var(--amber)">Legacy</strong> are still using the original 652318 PIN — change them here so each area has its own. Once changed, the legacy PIN no longer works for that area.
+      <strong>How this works:</strong> every manager-facing page checks its own area's PIN before unlocking. Areas marked <strong style="color:var(--amber)">Legacy</strong> are still using the original 652318 PIN — change them here so each area has its own. Once changed, the legacy PIN no longer works for that area.<br><br>
+      <strong>Note on the Monday board:</strong> the long string in the <em>Hash</em> column is a one-way fingerprint of the PIN — not the PIN itself. We store hashes (not PINs) so anyone with access to the board can't see your codes. The legacy badge shows "652318" only because that's the original default I'm telling you in this UI. Custom PINs you set here cannot be displayed back later — use <strong>Test current PIN</strong> below to verify a value, or <strong>Reset to legacy 652318</strong> if you've forgotten one.
     </div>
 
     <div id="content" class="loading">Loading…</div>
@@ -216,6 +217,7 @@ function render() {
     } else {
       badge = `<span class="badge custom">✓ Custom PIN set</span>`;
     }
+    const isCustom = stored && stored !== legacy;
     return `<div class="area-row" data-key="${area.key}">
       <div class="head">
         <div class="meta">
@@ -224,6 +226,17 @@ function render() {
           ${badge}
         </div>
       </div>
+
+      <!-- Verify a known PIN against the stored hash without changing it.
+           Useful for "did I really set 4321 for this last week?" -->
+      <div class="area-form" style="border-top:1px dashed var(--border); margin-top:10px; padding-top:10px;">
+        <label>Test current PIN</label>
+        <input type="password" inputmode="numeric" maxlength="6" placeholder="••••••" id="test_${area.key}" autocomplete="off">
+        <button class="save-btn" style="background:var(--blue); border-color:var(--blue);" onclick="testPin('${area.key}')">Check</button>
+        <span class="status" id="testStatus_${area.key}"></span>
+        ${isCustom ? `<button class="save-btn" style="background:#fff; color:var(--amber); border:1.5px solid var(--amber); margin-left:auto;" onclick="resetToLegacy('${area.key}')" title="Wipe this area's PIN back to 652318 — useful if you've forgotten the custom PIN.">Reset to legacy 652318</button>` : ''}
+      </div>
+
       <div class="area-form">
         <label>New PIN</label>
         <input type="password" inputmode="numeric" maxlength="6" placeholder="••••••" id="pin_${area.key}" autocomplete="off">
@@ -234,6 +247,57 @@ function render() {
       </div>
     </div>`;
   }).join('');
+}
+
+/* Test a typed PIN against the stored hash for an area. Doesn't change
+   anything — purely a "does this match what I set?" check. */
+async function testPin(areaKey) {
+  const el = document.getElementById('test_' + areaKey);
+  const status = document.getElementById('testStatus_' + areaKey);
+  const v = (el?.value || '').trim();
+  if (!v) { status.textContent = 'Type a PIN first.'; status.className = 'status err'; return; }
+  status.textContent = 'Checking…';
+  status.className = 'status';
+  try {
+    const hash = await window.PinsSchema.sha256(v);
+    const stored = (_registry?.pins || {})[areaKey];
+    if (!stored) {
+      status.textContent = '⚠ No PIN registered for this area';
+      status.className = 'status err';
+      return;
+    }
+    if (hash === stored) {
+      status.textContent = '✓ Match';
+      status.className = 'status ok';
+    } else {
+      status.textContent = '✕ Doesn\'t match the stored PIN';
+      status.className = 'status err';
+    }
+    el.value = '';
+  } catch (e) {
+    status.textContent = 'Error: ' + e.message;
+    status.className = 'status err';
+  }
+}
+
+/* Reset an area's stored hash back to the legacy 652318 hash. Recovery
+   path when a custom PIN has been forgotten — operator can then log in
+   with 652318 and set a fresh custom PIN. */
+async function resetToLegacy(areaKey) {
+  if (!confirm('Reset this area\'s PIN back to the legacy 652318?\n\nUse this when a custom PIN has been forgotten. After reset, anyone with the legacy PIN can unlock the area until you set a new custom PIN.')) return;
+  const status = document.getElementById('status_' + areaKey);
+  status.textContent = 'Resetting…';
+  status.className = 'status';
+  try {
+    await window.PinsSchema.setPin(mq, areaKey, '652318', 'Reset to legacy');
+    _registry = await window.PinsSchema.loadPins(mq);
+    status.textContent = '✓ Reset to 652318';
+    status.className = 'status ok';
+    setTimeout(() => render(), 800);
+  } catch (e) {
+    status.textContent = 'Error: ' + e.message;
+    status.className = 'status err';
+  }
 }
 
 async function changePin(areaKey) {

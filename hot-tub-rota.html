@@ -364,7 +364,7 @@
     <div class="header-title">Hot Tub Rota</div>
     <button class="header-btn" onclick="refreshAll()" title="Reload from Monday">↻</button>
     <button class="header-btn" id="discardBtn" onclick="discardChanges()" title="Discard your pending changes and reload from Monday" style="display:none; background:#a9434a">↶ Discard</button>
-    <button class="header-btn" id="saveBtn" onclick="saveAll()" title="Save changes to Monday">☁ Saved</button>
+    <button class="header-btn" id="saveBtn" onclick="saveButtonClick()" title="Save changes to Monday">☁ Saved</button>
     <a class="header-btn" href="leave-inbox.html" title="Review and approve staff leave requests" style="text-decoration:none; display:inline-flex; align-items:center;">🌿 Leave</a>
     <a class="header-btn" href="staff-records.html" title="Manage staff records" style="text-decoration:none; display:inline-flex; align-items:center;">👤 Staff</a>
   </div>
@@ -2507,6 +2507,32 @@ function overlayClose(e, id) { if (e.target.id === id) closeModal(id); }
 /* ═══════════════════════════════════════════════════════════════════
    SAVE TO MONDAY
    ═══════════════════════════════════════════════════════════════════ */
+/* User-explicit Save button click. Auto-materialises any visible-window
+   virtual (auto-suggested) HT cleans before saving — so opening the rota
+   and clicking Save commits today's pending bookings without the manager
+   having to click each card individually. Autosave (which calls saveAll
+   directly) deliberately does NOT trigger materialisation, so background
+   ticks don't accidentally commit suggestions the manager hasn't reviewed. */
+function saveButtonClick() {
+  const virts = unmaterialisedVirtualsInWindow();
+  if (virts.length) {
+    for (const v of virts) commitVirtual(v);
+    render();
+    toast(`Generated ${virts.length} HT clean${virts.length===1?'':'s'} from arrivals — saving…`, 1800);
+  }
+  saveAll();
+}
+
+/* Auto-derived virtuals whose day falls inside the visible window AND
+   that don't yet have a real Cleans-board counterpart (autoDeriveCleans
+   already filters those out, so we just window-filter here). Used to
+   bulk-commit on Save click. */
+function unmaterialisedVirtualsInWindow() {
+  const startStr = localStr(viewStart);
+  const endStr   = localStr(addDays(viewStart, viewMode === 'day' ? 0 : 6));
+  return autoDeriveCleans().filter(c => c.day >= startStr && c.day <= endStr);
+}
+
 async function saveAll() {
   if (_saveInFlight) return;          // Don't pile up concurrent saves
   _saveInFlight = true;

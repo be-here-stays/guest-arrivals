@@ -2812,7 +2812,67 @@ function saveButtonClick() {
       '\n\nClicking OK will retry.'
     );
   }
+  // Auto-materialise any visible-week derived cleans that don't yet have a
+  // Cleans-board row. After the Arrivals refactor this is the explicit
+  // "commit pending bookings to the rota" action — without this, clicking
+  // Save with no manual edits would say "Nothing to save" and leave the
+  // booking-recon page reporting them as missing.
+  const pending = unmaterialisedDerivedInWindow();
+  if (pending.length) {
+    materialiseDerived(pending);
+    render();
+    toast(`Generated ${pending.length} clean${pending.length===1?'':'s'} from arrivals — saving…`, 1800);
+  }
   saveToMonday();
+}
+
+/* Returns derived cleans whose checkout day falls inside the visible 7-day
+   window AND don't have a matching Cleans-board row yet. These are the
+   "Arrivals not yet planned" rows the recon page complains about. */
+function unmaterialisedDerivedInWindow() {
+  const days = visibleDays().map(localStr);
+  const winStart = days[0], winEnd = days[6];
+  return derivedCleans().filter(d => {
+    if (!d.windowStart) return false;
+    if (d.windowStart < winStart || d.windowStart > winEnd) return false;
+    return !findPlannedClean(d);
+  });
+}
+
+/* Push a "new" Cleans entry into the cleans[] array for each derived
+   clean. Lands on the checkout day (windowStart) by default; the manager
+   can drag/edit later. Mirrors planNewClean's row shape so saveToMonday's
+   buildColumnValues writes the same payload it would for a click-planned
+   clean. Doesn't persistLocal — saveToMonday handles that on the way out. */
+function materialiseDerived(derivedList) {
+  for (const d of derivedList) {
+    const prop = properties[d.property] || {};
+    const dayStr = d.windowStart;
+    const c = {
+      id: uid(),
+      mondayId: null,
+      property: d.property,
+      arrivalId: d.arrivalId || null,
+      day: dayStr,
+      hoursTotal: prop.stdHrs || 1.5,
+      primary: '',
+      partner: '',
+      partnerHours: null,
+      partnerStart: null,
+      checkoutDate: d.checkout || '',
+      checkinDate: d.nextIn || '',
+      sameDay: !!d.sameDay,
+      early: dayStr !== d.windowStart && !d.sameDay,
+      localOverride: !!prop.local,
+      notes: '',
+      status: 'Planned',
+      checkType: '',
+      dirty: true,
+      new: true,
+    };
+    c.start = defaultStartFor(c);
+    cleans.push(c);
+  }
 }
 
 function isDirty() {

@@ -1338,14 +1338,19 @@ function renderDay() {
     </div>`);
   }
 
-  // "Report an issue" + "Stock shortage" — visible to ALL staff, not just
-  // maintenance. Anyone on site can flag a defect or low stock in seconds.
-  parts.push(`<div style="display:grid; grid-template-columns:1fr 1fr; gap:8px; margin-top:10px">
+  // "Report an issue" + "Stock shortage" + "Linen issue" — visible to ALL
+  // staff. Anyone on site can flag a defect, low stock, or a bedding
+  // mismatch in seconds. Three columns on tablet, wraps to two then one
+  // on narrow phones.
+  parts.push(`<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:8px; margin-top:10px">
     <a href="report-issue.html?from=staff&reporter=${encodeURIComponent(me.name)}" class="cc-btn secondary" style="text-align:center; padding:12px; font-weight:700; text-decoration:none; border-radius:10px; background:#a9434a; color:#fff">
       🚨 Report issue
     </a>
     <a href="report-stock.html?from=staff&reporter=${encodeURIComponent(me.name)}" class="cc-btn secondary" style="text-align:center; padding:12px; font-weight:700; text-decoration:none; border-radius:10px; background:#646955; color:#fff">
       📦 Stock shortage
+    </a>
+    <a href="report-linen.html?from=staff&name=${encodeURIComponent(me.name)}" class="cc-btn secondary" style="text-align:center; padding:12px; font-weight:700; text-decoration:none; border-radius:10px; background:#AF926A; color:#fff">
+      🛏 Linen issue
     </a>
   </div>`);
 
@@ -1417,8 +1422,20 @@ function renderCleanCard(c) {
   // Small "🚨" button — quick way to log a defect found while on this clean.
   // Pre-fills property + reporter so it's one tap from a logged issue.
   const issueUrl = `report-issue.html?from=staff&property=${encodeURIComponent(c.property)}&reporter=${encodeURIComponent(me.name)}`;
+  // "🛏" linen issue — pre-fills the linked Arrivals row id and booking ref
+  // so the linen team gets the booking shape (incl. expected bed config)
+  // without the cleaner having to re-type anything.
+  const linenParts = [
+    'from=staff',
+    `property=${encodeURIComponent(c.property)}`,
+    `name=${encodeURIComponent(me.name)}`,
+  ];
+  if (c.arrivalId)  linenParts.push(`arrival_id=${encodeURIComponent(c.arrivalId)}`);
+  if (c.bookingRef) linenParts.push(`booking_ref=${encodeURIComponent(c.bookingRef)}`);
+  const linenUrl = `report-linen.html?${linenParts.join('&')}`;
   if (!completed && !absorbed) {
     actionsBtns.push(`<a class="cc-btn secondary" href="${issueUrl}" title="Found something broken? Log it" style="background:#a9434a; color:#fff; flex:0 0 auto; min-width:0; padding-left:12px; padding-right:12px">🚨</a>`);
+    actionsBtns.push(`<a class="cc-btn secondary" href="${linenUrl}" title="Wrong bedding, missing or damaged linen — log it" style="background:#AF926A; color:#fff; flex:0 0 auto; min-width:0; padding-left:12px; padding-right:12px">🛏</a>`);
   }
 
   return `<div class="clean-card${c.sameDay?' same-day':''}${c.early && !c.sameDay?' early':''}${completed?' completed':''}${absorbed?' absorbed':''}">

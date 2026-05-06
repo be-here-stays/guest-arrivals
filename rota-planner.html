@@ -2881,12 +2881,21 @@ function derivedLandingDay(d) {
 
 /* Returns derived cleans whose landing day falls inside the visible 7-day
    window AND don't have a matching Cleans-board row yet. These are the
-   "Arrivals not yet planned" rows the recon page complains about. */
+   "Arrivals not yet planned" rows the recon page complains about.
+
+   IMPORTANT: only materialise when an arrivalId is present — i.e. there
+   IS a future booking driving the clean. derivedCleans() also emits an
+   entry for "last booking on a property with no follow-on guest" (arrivalId
+   null, landing day = checkout day). Auto-creating Cleans rows for those
+   produces phantom rows for properties that aren't actually changing over;
+   they should remain UI suggestions only and a manager creates them
+   manually if needed. */
 function unmaterialisedDerivedInWindow() {
   const days = visibleDays().map(localStr);
   const winStart = days[0], winEnd = days[6];
   const out = [];
   for (const d of derivedCleans()) {
+    if (!d.arrivalId) continue;          // skip "last booking, no follow-on" — see header
     if (findPlannedClean(d)) continue;
     const dayStr = derivedLandingDay(d);
     if (!dayStr) continue;

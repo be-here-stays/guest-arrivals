@@ -1,0 +1,518 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Clean up Cleans rows — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; }
+
+  /* PIN gate */
+  #pinGate { position:fixed; inset:0; background:var(--dark); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; padding:20px; }
+  #pinGate h2 { color:#fff; font-size:18px; font-weight:600; margin-bottom:18px; }
+  #pinGate input { width:240px; padding:12px; font-size:20px; text-align:center; border-radius:8px; border:none; background:rgba(255,255,255,0.12); color:#fff; font-family:inherit; letter-spacing:8px; }
+  #pinGate input::placeholder { color:rgba(255,255,255,0.5); letter-spacing:normal; }
+  #pinGate .pin-err { color:#ff8a80; font-size:13px; margin-top:10px; min-height:18px; }
+  #pinGate .pin-back { color:rgba(255,255,255,0.5); margin-top:18px; font-size:12px; text-decoration:none; }
+
+  header { background:var(--dark); color:#fff; padding:18px 24px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+  header h1 { font-size:18px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.6; margin-top:2px; }
+  .hdr-btn { color:rgba(255,255,255,0.85); text-decoration:none; font-size:13px; font-weight:600; padding:7px 12px; border:1px solid rgba(255,255,255,0.25); border-radius:8px; background:transparent; }
+  .hdr-btn:hover { background:rgba(255,255,255,0.08); }
+
+  .container { max-width:1200px; margin:0 auto; padding:18px 22px 60px; }
+
+  .info { background:var(--blue-bg); border-left:3px solid var(--blue); padding:12px 14px; border-radius:0 8px 8px 0; margin-bottom:18px; font-size:13px; line-height:1.5; }
+  .info strong { color:#0c3a5a; }
+
+  .stats { display:flex; gap:14px; flex-wrap:wrap; margin-bottom:14px; }
+  .stat { background:#fff; border-radius:10px; padding:11px 16px; box-shadow:0 1px 3px rgba(0,0,0,0.05); min-width:140px; }
+  .stat .num { font-size:24px; font-weight:700; line-height:1; }
+  .stat .lbl { font-size:11px; color:var(--sage); text-transform:uppercase; letter-spacing:0.5px; margin-top:4px; }
+  .stat.bad   .num { color:var(--red); }
+  .stat.warn  .num { color:var(--amber); }
+  .stat.info  .num { color:var(--blue); }
+  .stat.ok    .num { color:var(--green); }
+
+  section { background:#fff; border-radius:12px; padding:16px 18px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.06); }
+  section h2 { font-size:15px; margin:0 0 8px; color:var(--dark); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  section h2 .count { background:var(--sage); color:#fff; font-size:11px; padding:2px 8px; border-radius:11px; font-weight:700; }
+  section h2.bad .count   { background:var(--red); }
+  section h2.warn .count  { background:var(--amber); }
+  section .desc { font-size:13px; color:var(--sage); line-height:1.5; margin-bottom:10px; }
+
+  .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+  button {
+    padding:8px 13px; background:var(--dark); color:var(--cream); border:0; border-radius:8px;
+    font-family:inherit; font-size:12px; font-weight:700; cursor:pointer;
+  }
+  button:hover { background:var(--sage); }
+  button:disabled { opacity:0.5; cursor:not-allowed; }
+  button.secondary { background:#fff; color:var(--dark); border:1.5px solid var(--border); }
+  button.danger    { background:var(--red); color:#fff; }
+
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:7px 9px; border-bottom:1px solid #ece9df; vertical-align:middle; }
+  th { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--sage); background:#f7f5ee; }
+  tr.processing { opacity:0.5; }
+  tr.done       { background:var(--green-bg); }
+  tr.failed     { background:var(--red-bg); }
+  tr.keeper     { background:#faf3e8; }
+  code { background:#f1eee5; padding:1px 5px; border-radius:4px; font-size:12px; }
+  .muted { color:var(--sage-mid); font-size:12px; }
+
+  .pill { display:inline-block; padding:1px 7px; border-radius:9px; font-size:11px; font-weight:700; }
+  .pill.linked   { background:var(--green-bg); color:var(--green); }
+  .pill.unlinked { background:var(--amber-bg); color:var(--amber); }
+  .pill.completed{ background:var(--green-bg); color:var(--green); }
+  .pill.assigned { background:var(--blue-bg); color:var(--blue); }
+  .pill.notes    { background:var(--cream); color:var(--sage); }
+  .pill.score    { background:#f7f5ee; color:var(--dark); font-weight:600; }
+  .pill.keeper   { background:var(--gold); color:#fff; }
+
+  .empty { text-align:center; color:var(--sage-mid); padding:50px 20px; }
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--dark); color:#fff; padding:10px 18px; border-radius:24px; font-size:13px; font-weight:600; opacity:0; transition:opacity .15s; pointer-events:none; z-index:200; }
+  .toast.show { opacity:1; }
+  .loading { color:var(--sage-mid); font-size:13px; padding:30px; text-align:center; }
+  .progress-bar { height:4px; background:#ece9df; border-radius:2px; overflow:hidden; margin:6px 0 0; }
+  .progress-bar .fill { height:100%; background:var(--green); transition:width 0.2s; }
+  .hide { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="pinGate">
+  <h2>Manager PIN</h2>
+  <input type="password" id="pinInp" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+  <div class="pin-err" id="pinErr"></div>
+  <a class="pin-back" href="hub.html">‹ Back to hub</a>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <div>
+      <h1>🧹 Clean up Cleans rows</h1>
+      <div class="sub">Find and delete phantom, duplicate and orphan rows on the Cleans board</div>
+    </div>
+    <div>
+      <a href="rota-planner.html" class="hdr-btn">Rota planner</a>
+      <a href="hub.html" class="hdr-btn">‹ Hub</a>
+    </div>
+  </header>
+
+  <div class="container">
+    <div class="info">
+      <strong>Three buckets:</strong><br>
+      • <strong>Phantoms</strong> — Cleans rows with no Arrivals link, no cleaner assigned, no notes, no completed date. Almost certainly auto-created and unwanted.<br>
+      • <strong>Duplicates</strong> — multiple rows for the same booking (same arrivalId) OR same property+day. Keep one, delete the rest.<br>
+      • <strong>Orphans</strong> — arrivalId set but the linked Arrivals row no longer exists (cancelled bookings the watcher didn't tidy up).<br><br>
+      Completed cleans are <em>never</em> touched — we don't rewrite history. Safe to re-run after deletes; the page will reload and show what's left.
+    </div>
+
+    <div class="stats" id="stats" style="display:none"></div>
+
+    <div id="content" class="loading">Loading Cleans + Arrivals boards…</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="secrets.js"></script>
+<script src="pins-schema.js"></script>
+
+<script>
+const TOKEN   = window.MONDAY_API_TOKEN;
+const URL_API = 'https://api.monday.com/v2';
+const AREA_KEY = 'rota-planner';
+
+const CLEANS_BOARD   = '5095134636';
+const ARRIVALS_BOARD = '5094453064';
+const CL_DATE        = 'date_mm2pphc';
+const CL_CHECKIN     = 'date_mm2p6tck';
+const CL_PROP        = 'board_relation_mm2psy0b';
+const CL_PRIMARY     = 'dropdown_mm2pntvm';
+const CL_PARTNER     = 'dropdown_mm2pbcnq';
+const CL_CHECKER     = 'dropdown_mm2p9qd3';
+const CL_NOTES       = 'long_text_mm2pedn3';
+const CL_COMPLETED   = 'date_mm2qxh4a';
+const CL_ARRIVAL     = 'board_relation_mm31mkyp';
+
+let _phantoms  = [];
+let _dupes     = [];   // [{ key, rows:[...], scored:[{...row, score, keeper:bool}] }]
+let _orphans   = [];
+
+async function tryPin(v) {
+  if (await window.PinsSchema.checkPin(mq, AREA_KEY, v)) {
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    boot();
+  } else {
+    document.getElementById('pinErr').textContent = 'Wrong PIN';
+    document.getElementById('pinInp').value = '';
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.PinsSchema.isUnlocked(AREA_KEY)) {
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    boot();
+    return;
+  }
+  const inp = document.getElementById('pinInp');
+  inp.focus();
+  inp.addEventListener('input', () => { if (inp.value.length === 6) tryPin(inp.value); });
+});
+
+async function mq(query, variables) {
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization: TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtUK(iso) {
+  if (!iso) return '';
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  return `${m[3]}-${m[2]}-${m[1].slice(2)}`;
+}
+function pj(v) { try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; } }
+
+async function boot() {
+  try {
+    await Promise.all([loadCleans(), loadArrivalIds()]);
+    classify();
+    render();
+  } catch (e) {
+    document.getElementById('content').innerHTML = `<div class="empty">Error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+let _cleansRaw = [];
+let _arrivalsIds = new Set();   // ids of every Arrivals row that exists today
+
+async function loadCleans() {
+  const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_PROP}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_NOTES}","${CL_COMPLETED}","${CL_ARRIVAL}"]`;
+  let cursor = null, all = [];
+  do {
+    const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+    // Typed BoardRelationValue fragment so we get linked_item_ids reliably.
+    const data = await mq(`{
+      boards(ids:[${CLEANS_BOARD}]) {
+        items_page(limit: 500${cursorPart}) {
+          cursor
+          items { id name created_at column_values(ids:${colIds}) { id text value ... on BoardRelationValue { linked_item_ids } } }
+        }
+      }
+    }`);
+    const page = data.boards[0].items_page;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+  } while (cursor);
+
+  _cleansRaw = all.map(it => {
+    const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));
+    const arrivalLinkedIds = cv[CL_ARRIVAL]?.linked_item_ids || [];
+    const arrivalId = arrivalLinkedIds.length ? String(arrivalLinkedIds[0]) : null;
+    return {
+      id: it.id,
+      name: it.name,
+      created_at: it.created_at,
+      day:         pj(cv[CL_DATE]?.value)?.date     || '',
+      checkin:     pj(cv[CL_CHECKIN]?.value)?.date  || '',
+      property:    cv[CL_PROP]?.text || '',
+      primary:     cv[CL_PRIMARY]?.text || '',
+      partner:     cv[CL_PARTNER]?.text || '',
+      checker:     cv[CL_CHECKER]?.text || '',
+      notes:       (pj(cv[CL_NOTES]?.value)?.text || cv[CL_NOTES]?.text || '').trim(),
+      completedAt: pj(cv[CL_COMPLETED]?.value)?.date || '',
+      arrivalId,
+    };
+  });
+}
+
+async function loadArrivalIds() {
+  // Only the IDs — we just need to know which Arrivals rows still exist
+  // so we can flag orphan Cleans rows whose arrivalId points to nothing.
+  let cursor = null, ids = new Set();
+  do {
+    const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+    const data = await mq(`{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500${cursorPart}){ cursor items{ id } } } }`);
+    const page = data.boards[0].items_page;
+    for (const it of (page.items || [])) ids.add(String(it.id));
+    cursor = page.cursor;
+  } while (cursor);
+  _arrivalsIds = ids;
+}
+
+function isAssigned(c) {
+  return !!(c.primary || c.partner || c.checker);
+}
+
+function classify() {
+  _phantoms = [];
+  _dupes = [];
+  _orphans = [];
+
+  // Phantoms: no arrivalId, no cleaner, no notes, no completed date,
+  // and day is today or future (we don't disturb anything in the past).
+  const todayISO = new Date().toISOString().slice(0,10);
+  for (const c of _cleansRaw) {
+    if (c.arrivalId) continue;
+    if (isAssigned(c)) continue;
+    if (c.notes) continue;
+    if (c.completedAt) continue;
+    if (c.day && c.day < todayISO) continue;
+    _phantoms.push(c);
+  }
+  _phantoms.sort((a,b) => (a.day || '').localeCompare(b.day || '') || a.property.localeCompare(b.property));
+
+  // Orphans: arrivalId set but Arrivals row doesn't exist any more.
+  for (const c of _cleansRaw) {
+    if (!c.arrivalId) continue;
+    if (_arrivalsIds.has(c.arrivalId)) continue;
+    _orphans.push(c);
+  }
+  _orphans.sort((a,b) => (a.day || '').localeCompare(b.day || '') || a.property.localeCompare(b.property));
+
+  // Duplicates: group by arrivalId (when set) and by property+day. Each
+  // group with >1 row gets a scored keeper suggestion.
+  const byArrival = new Map();
+  const byPropDay = new Map();
+  for (const c of _cleansRaw) {
+    if (c.arrivalId) {
+      if (!byArrival.has(c.arrivalId)) byArrival.set(c.arrivalId, []);
+      byArrival.get(c.arrivalId).push(c);
+    }
+    if (c.property && c.day) {
+      const key = c.property + '|' + c.day;
+      if (!byPropDay.has(key)) byPropDay.set(key, []);
+      byPropDay.get(key).push(c);
+    }
+  }
+  const seenIds = new Set();
+  for (const [arrivalId, rows] of byArrival) {
+    if (rows.length < 2) continue;
+    addDupeGroup({ kind: 'arrivalId', label: 'Same arrivalId · ' + arrivalId, rows });
+    for (const r of rows) seenIds.add(r.id);
+  }
+  for (const [key, rows] of byPropDay) {
+    if (rows.length < 2) continue;
+    // Skip groups whose rows are already covered by an arrivalId dupe.
+    if (rows.every(r => seenIds.has(r.id))) continue;
+    addDupeGroup({ kind: 'propDay', label: 'Same property+day · ' + key, rows });
+  }
+  _dupes.sort((a,b) => (a.rows[0].day || '').localeCompare(b.rows[0].day || ''));
+
+  function addDupeGroup({ kind, label, rows }) {
+    const scored = rows.map(r => ({ ...r, score: scoreRow(r) }))
+                       .sort((a,b) => b.score - a.score);
+    scored[0].keeper = true;
+    _dupes.push({ kind, label, rows: scored });
+  }
+}
+
+/* Higher = better keeper. */
+function scoreRow(c) {
+  let s = 0;
+  if (c.completedAt) s += 100;
+  if (isAssigned(c))  s += 30;
+  if (c.notes)        s += 10;
+  if (c.arrivalId)    s += 20;
+  if (c.checkin)      s += 5;
+  // Older rows usually win — they're the "real" one a duplicate was created against.
+  s += (c.created_at ? -new Date(c.created_at).getTime() / 1e9 : 0);
+  return s;
+}
+
+function render() {
+  document.getElementById('stats').style.display = 'flex';
+  document.getElementById('stats').innerHTML = `
+    <div class="stat ${_phantoms.length ? 'bad' : 'ok'}"><div class="num">${_phantoms.length}</div><div class="lbl">Phantoms</div></div>
+    <div class="stat ${_dupes.length    ? 'warn' : 'ok'}"><div class="num">${_dupes.length}</div><div class="lbl">Duplicate groups</div></div>
+    <div class="stat ${_orphans.length  ? 'info' : 'ok'}"><div class="num">${_orphans.length}</div><div class="lbl">Orphans</div></div>
+    <div class="stat ok"><div class="num">${_cleansRaw.length}</div><div class="lbl">Cleans rows total</div></div>
+  `;
+
+  const c = document.getElementById('content');
+  if (!_phantoms.length && !_dupes.length && !_orphans.length) {
+    c.innerHTML = `<div class="empty">✓ Nothing to clean up — no phantoms, no duplicates, no orphans.</div>`;
+    return;
+  }
+
+  let html = '';
+
+  if (_phantoms.length) {
+    html += `<section>
+      <h2 class="bad">👻 Phantom rows <span class="count">${_phantoms.length}</span></h2>
+      <p class="desc">No Arrivals link, no cleaner assigned, no notes, no completed date — almost certainly auto-created and unwanted. Selected rows will be deleted.</p>
+      <div class="controls">
+        <button class="secondary" onclick="toggleAll('phantom', true)">Select all</button>
+        <button class="secondary" onclick="toggleAll('phantom', false)">Select none</button>
+        <button class="danger" onclick="runDelete('phantom')">Delete selected</button>
+        <span class="muted" id="phantomStatus"></span>
+      </div>
+      <div class="progress-bar hide" id="phantom_pb"><div class="fill" id="phantom_fill" style="width:0%"></div></div>
+      <table>
+        <thead><tr><th><input type="checkbox" onchange="toggleAll('phantom', this.checked)" checked></th><th>Property</th><th>Day</th><th>Item id</th><th>Created</th></tr></thead>
+        <tbody>
+        ${_phantoms.map(r => `<tr id="ph_${r.id}">
+          <td><input type="checkbox" class="cb-phantom" data-id="${r.id}" checked></td>
+          <td><strong>${escapeHtml(r.property || r.name || '—')}</strong></td>
+          <td>${fmtUK(r.day) || '<span class="muted">—</span>'}</td>
+          <td><code>${r.id}</code></td>
+          <td class="muted">${r.created_at ? r.created_at.slice(0,10) : ''}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table>
+    </section>`;
+  }
+
+  if (_dupes.length) {
+    html += `<section>
+      <h2 class="warn">📑 Duplicate groups <span class="count">${_dupes.length}</span></h2>
+      <p class="desc">Multiple Cleans rows for the same booking. The highest-scoring row in each group is suggested as the keeper (gold row); the rest are pre-checked for delete. Score: completed (+100), has cleaner (+30), arrivalId set (+20), notes (+10), older row wins ties.</p>
+      <div class="controls">
+        <button class="secondary" onclick="toggleAll('dupe', true)">Select all (non-keepers)</button>
+        <button class="secondary" onclick="toggleAll('dupe', false)">Select none</button>
+        <button class="danger" onclick="runDelete('dupe')">Delete selected</button>
+        <span class="muted" id="dupeStatus"></span>
+      </div>
+      <div class="progress-bar hide" id="dupe_pb"><div class="fill" id="dupe_fill" style="width:0%"></div></div>
+      ${_dupes.map(g => `<div style="margin-top:12px">
+        <div style="font-size:12px; color:var(--sage); margin-bottom:4px;"><strong>${escapeHtml(g.label)}</strong></div>
+        <table>
+          <thead><tr><th></th><th>Property</th><th>Day</th><th>Cleaner</th><th>Tags</th><th>Score</th><th>Item id</th><th>Created</th></tr></thead>
+          <tbody>
+          ${g.rows.map(r => `<tr id="dp_${r.id}" class="${r.keeper ? 'keeper' : ''}">
+            <td>${r.keeper ? '<span class="pill keeper">KEEP</span>' : `<input type="checkbox" class="cb-dupe" data-id="${r.id}" checked>`}</td>
+            <td><strong>${escapeHtml(r.property || r.name || '—')}</strong></td>
+            <td>${fmtUK(r.day) || '<span class="muted">—</span>'}</td>
+            <td>${escapeHtml(r.primary || r.partner || '<span class="muted">—</span>')}</td>
+            <td>
+              ${r.completedAt ? '<span class="pill completed">✓ done</span> ' : ''}
+              ${isAssigned(r) ? '<span class="pill assigned">assigned</span> ' : ''}
+              ${r.arrivalId ? '<span class="pill linked">linked</span> ' : '<span class="pill unlinked">no link</span> '}
+              ${r.notes ? '<span class="pill notes">notes</span>' : ''}
+            </td>
+            <td><span class="pill score">${Math.round(r.score)}</span></td>
+            <td><code>${r.id}</code></td>
+            <td class="muted">${r.created_at ? r.created_at.slice(0,10) : ''}</td>
+          </tr>`).join('')}
+          </tbody>
+        </table>
+      </div>`).join('')}
+    </section>`;
+  }
+
+  if (_orphans.length) {
+    html += `<section>
+      <h2 class="warn">👤 Orphans <span class="count">${_orphans.length}</span></h2>
+      <p class="desc">Cleans rows whose arrivalId points to an Arrivals row that no longer exists (cancelled booking the watcher didn't tidy). Selected rows will be deleted.</p>
+      <div class="controls">
+        <button class="secondary" onclick="toggleAll('orphan', true)">Select all</button>
+        <button class="secondary" onclick="toggleAll('orphan', false)">Select none</button>
+        <button class="danger" onclick="runDelete('orphan')">Delete selected</button>
+        <span class="muted" id="orphanStatus"></span>
+      </div>
+      <div class="progress-bar hide" id="orphan_pb"><div class="fill" id="orphan_fill" style="width:0%"></div></div>
+      <table>
+        <thead><tr><th><input type="checkbox" onchange="toggleAll('orphan', this.checked)" checked></th><th>Property</th><th>Day</th><th>Stale arrivalId</th><th>Cleaner</th><th>Item id</th></tr></thead>
+        <tbody>
+        ${_orphans.map(r => `<tr id="or_${r.id}">
+          <td><input type="checkbox" class="cb-orphan" data-id="${r.id}" checked></td>
+          <td><strong>${escapeHtml(r.property || r.name || '—')}</strong></td>
+          <td>${fmtUK(r.day) || '<span class="muted">—</span>'}</td>
+          <td><code>${escapeHtml(r.arrivalId)}</code></td>
+          <td>${escapeHtml(r.primary || r.partner || '<span class="muted">—</span>')}</td>
+          <td><code>${r.id}</code></td>
+        </tr>`).join('')}
+        </tbody>
+      </table>
+    </section>`;
+  }
+
+  c.innerHTML = html;
+}
+
+function toggleAll(kind, on) {
+  const cls = '.cb-' + kind;
+  document.querySelectorAll(cls).forEach(cb => { cb.checked = !!on; });
+}
+
+async function runDelete(kind) {
+  const cls = '.cb-' + kind;
+  const cbs = Array.from(document.querySelectorAll(cls)).filter(cb => cb.checked);
+  if (!cbs.length) { toast('Nothing selected'); return; }
+  const noun = kind === 'phantom' ? 'phantom row' : kind === 'orphan' ? 'orphan row' : 'duplicate row';
+  if (!confirm(`Delete ${cbs.length} ${noun}${cbs.length===1?'':'s'} from Monday?\n\nThis cannot be undone (Monday's trash holds them for 30 days but you'd have to restore manually).`)) return;
+
+  const status = document.getElementById(kind + 'Status');
+  const pb     = document.getElementById(kind + '_pb');
+  const fill   = document.getElementById(kind + '_fill');
+  const ids = cbs.map(cb => cb.dataset.id);
+  const total = ids.length;
+  let done = 0, failed = 0;
+  const GAP_MS = 150;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  pb.classList.remove('hide');
+  status.textContent = `Deleting 0/${total}…`;
+
+  for (const id of ids) {
+    const prefix = kind === 'phantom' ? 'ph_' : kind === 'orphan' ? 'or_' : 'dp_';
+    const row = document.getElementById(prefix + id);
+    if (row) row.classList.add('processing');
+    try {
+      await mq(`mutation { delete_item(item_id:${id}){ id } }`);
+      done++;
+      if (row) { row.classList.remove('processing'); row.classList.add('done'); }
+    } catch (e) {
+      failed++;
+      console.error('delete failed', id, e);
+      if (row) { row.classList.remove('processing'); row.classList.add('failed'); }
+    }
+    fill.style.width = `${Math.round(((done+failed)/total)*100)}%`;
+    status.textContent = `Deleting ${done+failed}/${total}…`;
+    await sleep(GAP_MS);
+  }
+
+  status.textContent = `✓ Deleted ${done}${failed ? ` · ${failed} failed` : ''}`;
+  toast(`✓ Deleted ${done}${failed ? ` · ${failed} failed` : ''}`);
+  if (failed === 0) {
+    setTimeout(async () => {
+      // Reload + reclassify so the page shows what's left.
+      await loadCleans();
+      await loadArrivalIds();
+      classify();
+      render();
+    }, 1000);
+  }
+}
+</script>
+</body>
+</html>

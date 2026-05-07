@@ -99,6 +99,7 @@
     .cc-badge.qc { background:#9d50dd; color:#fff; }
     .cc-badge.rf { background:#fdab3d; color:#fff; }
     .cc-badge.comp { background:var(--green); color:#fff; }
+    .cc-badge.ip { background:var(--gold); color:#fff; }   /* in-progress */
     .cc-meta { font-size:13px; color:var(--sage); margin-bottom:8px; }
     .cc-meta .role-pill { display:inline-block; padding:1px 7px; background:#eeeae0; color:var(--dark); border-radius:4px; margin-left:4px; font-size:11px; font-weight:700; }
     .cc-with { font-size:12px; color:var(--sage); margin-bottom:4px; font-style:italic; }
@@ -489,6 +490,11 @@ const CL_LINKED_NT  = 'long_text_mm2qp4ay';
 const CL_COMPLETED  = 'date_mm2qxh4a';
 const CL_ARRIVAL    = 'board_relation_mm31mkyp';   // → Arrivals (added 2026-05-04)
 
+// "Started at" column — auto-bootstrapped on first run by ensureStartedAtColumn().
+// Stays empty until the bootstrap discovers or creates the column on the
+// Cleans board. Pages that read it must guard with `if (CL_STARTED)`.
+let CL_STARTED      = localStorage.getItem('cache_cl_started_col') || '';
+
 // Staff Shifts
 const SH_STAFF = 'text_mm2p1gqx';
 const SH_DATE  = 'date_mm2phk9q';
@@ -692,6 +698,12 @@ async function boot() {
     }
   } catch(e) {}
 
+  // Discover (or, on first run only, create) the "Started at" column on the
+  // Cleans board. Cheap once cached. Runs before loadCleans so the column
+  // is in scope when the loader builds its column-id list.
+  try { await ensureStartedAtColumn(); }
+  catch (e) { console.warn('ensureStartedAtColumn failed:', e); }
+
   // Load Arrivals first so loadCleans / loadHotTubCleans can join against it.
   // Cheap (one paginated fetch) and runs in parallel with localStorage cache
   // rendering above. If it fails (e.g. transient network blip) loadCleans
@@ -729,6 +741,36 @@ async function boot() {
    guestName, bookingRef). Cleans / HT Cleans rows look up their linked
    booking here via CL_ARRIVAL / HC_ARRIVAL board_relation columns. */
 let arrivalsById = new Map();
+
+/* ─── Lifecycle column bootstrap ─────────────────────────────
+   Discovers (or, on first run, creates) the "Started at" column on the
+   Cleans board so Start-clean taps can be persisted to Monday. Result is
+   cached in localStorage so this only hits Monday once per device.
+   Failure mode: silent — Start clean still works, but the timestamp
+   doesn't survive a reload. */
+async function ensureStartedAtColumn() {
+  if (CL_STARTED) return;
+  try {
+    const data = await mondayFetch(`{ boards(ids:[${CLEANS_BOARD}]){ columns{ id title type } } }`);
+    const cols = data?.boards?.[0]?.columns || [];
+    const found = cols.find(c => (c.title||'').toLowerCase().trim() === 'started at' && c.type === 'date');
+    if (found) {
+      CL_STARTED = found.id;
+      localStorage.setItem('cache_cl_started_col', CL_STARTED);
+      return;
+    }
+    const created = await mondayFetch(
+      `mutation{ create_column(board_id:${CLEANS_BOARD}, title:"Started at", description:"Stamped by staff app when the housekeeper taps Start clean.", column_type:date){ id } }`
+    );
+    const newId = created?.create_column?.id;
+    if (newId) {
+      CL_STARTED = newId;
+      localStorage.setItem('cache_cl_started_col', CL_STARTED);
+    }
+  } catch (e) {
+    console.warn('ensureStartedAtColumn failed; Start-clean will not persist:', e);
+  }
+}
 
 async function loadArrivals() {
   const startISO = todayISO();
@@ -798,7 +840,16 @@ function arrivalIdFromCol(col) {
 async function loadCleans() {
   const startISO = todayISO();
   const endISO   = addDaysISO(startISO, 6);
-  const colIds = `["${CL_DATE}","${CL_CHECKIN}","${CL_CHECKOUT}","${CL_PROP}","${CL_START}","${CL_HRS}","${CL_PRIMARY}","${CL_PARTNER}","${CL_CHECKER}","${CL_SAMEDAY}","${CL_LINEN_MTHD}","${CL_LINEN_DRV}","${CL_LINEN_DATE}","${CL_DIRT_MTHD}","${CL_DIRT_DRV}","${CL_LINEN_SRC}","${CL_NOTES}","${CL_CHECKTYPE}","${CL_REVIEW}","${CL_REVIEW_NT}","${CL_LINKED_REF}","${CL_LINKED_NT}","${CL_COMPLETED}","${CL_ARRIVAL}"]`;
+  // Build column-id list; append CL_STARTED only when it's been bootstrapped
+  // so a missing column doesn't fail the whole query for older devices.
+  const colIdArr = [CL_DATE, CL_CHECKIN, CL_CHECKOUT, CL_PROP, CL_START, CL_HRS,
+                    CL_PRIMARY, CL_PARTNER, CL_CHECKER, CL_SAMEDAY,
+                    CL_LINEN_MTHD, CL_LINEN_DRV, CL_LINEN_DATE,
+                    CL_DIRT_MTHD, CL_DIRT_DRV, CL_LINEN_SRC, CL_NOTES,
+                    CL_CHECKTYPE, CL_REVIEW, CL_REVIEW_NT,
+                    CL_LINKED_REF, CL_LINKED_NT, CL_COMPLETED, CL_ARRIVAL];
+  if (CL_STARTED) colIdArr.push(CL_STARTED);
+  const colIds = '[' + colIdArr.map(id => `"${id}"`).join(',') + ']';
   let cursor = null, all = [];
   do {
     // Note typed BoardRelationValue fragment so CL_ARRIVAL exposes
@@ -846,6 +897,11 @@ async function loadCleans() {
 
     const linenDate = pj(cv[CL_LINEN_DATE]?.value)?.date || '';
     const completedAt = pj(cv[CL_COMPLETED]?.value)?.date || '';
+    // started_at: Monday's date column with a time component. We surface the
+    // date for the truthy check ("has started?") and the time for display.
+    const startedObj = CL_STARTED ? pj(cv[CL_STARTED]?.value) : null;
+    const startedAt  = startedObj?.date || '';
+    const startedAtTime = (startedObj?.time || '').slice(0, 5);  // "HH:MM"
     const sameDay = !!(pj(cv[CL_SAMEDAY]?.value)?.checked);
 
     // My role on this clean (for display)
@@ -880,6 +936,8 @@ async function loadCleans() {
       linkedRef: cv[CL_LINKED_REF]?.text || '',
       linkedNote: pj(cv[CL_LINKED_NT]?.value)?.text || cv[CL_LINKED_NT]?.text || '',
       completedAt,
+      startedAt,
+      startedAtTime,
       sameDay,
       early: !sameDay && !!checkinDate && dateObj.date < checkinDate,
       roles,
@@ -1387,9 +1445,11 @@ function renderDay() {
 
 function renderCleanCard(c) {
   const completed = !!c.completedAt;
+  const started   = !!c.startedAt && !completed;     // in-progress state
   const absorbed  = !!c.linkedRef && cleanIsAbsorbed(c);
   const badges = [];
   if (completed) badges.push('<span class="cc-badge comp">✓ Done</span>');
+  else if (started) badges.push('<span class="cc-badge ip" title="In progress">▶ In progress</span>');
   if (c.sameDay) badges.push('<span class="cc-badge t">T</span>');
   if (c.early && !c.sameDay) badges.push('<span class="cc-badge e">Early</span>');
   if (c.checkType === 'Guest Ready') badges.push('<span class="cc-badge gr" title="No quality check needed">GR</span>');
@@ -1408,13 +1468,31 @@ function renderCleanCard(c) {
 
   // Action: Mark complete → open changeover-form prefilled
   const formUrl = `changeover-form.html?clean_id=${encodeURIComponent(c.id)}&property=${encodeURIComponent(c.property)}&date=${encodeURIComponent(c.day)}&name=${encodeURIComponent(me.name)}&act=cleaned`;
-  const canComplete = !completed && !absorbed && c.roles.some(r => /cleaner/i.test(r));
+  const isCleaner = c.roles.some(r => /cleaner/i.test(r));
+  // Three card states:
+  //   1. Not started, not complete  → primary action is Start clean.
+  //   2. Started, not complete      → primary action is Mark complete (existing).
+  //   3. Complete                   → no primary action; existing "Done" state.
+  // canStart only when CL_STARTED column has been bootstrapped — without it,
+  // Start taps can't be persisted, so we fall back to the original Mark-complete
+  // flow rather than mislead the user with a button that doesn't survive reload.
+  const canStart    = !completed && !absorbed && !c.startedAt && isCleaner && !!CL_STARTED;
+  const canComplete = !completed && !absorbed &&  c.startedAt && isCleaner;
+  // Legacy fallback: when CL_STARTED isn't available we still let cleaners
+  // hit Mark complete directly (the old flow).
+  const canCompleteLegacy = !completed && !absorbed && !CL_STARTED && isCleaner;
 
   let completedLine = '';
-  if (completed) completedLine = `<div class="cc-completed-line">✓ Completed ${escapeHtml(c.completedAt)}</div>`;
+  if (completed) {
+    completedLine = `<div class="cc-completed-line">✓ Completed ${escapeHtml(c.completedAt)}</div>`;
+  } else if (started) {
+    completedLine = `<div class="cc-completed-line" style="color:var(--gold)">⏱ Started ${escapeHtml(c.startedAtTime || c.startedAt)}</div>`;
+  }
 
   const actionsBtns = [];
-  if (canComplete) {
+  if (canStart) {
+    actionsBtns.push(`<button type="button" class="cc-btn primary" onclick="startClean('${c.id}')">▶ Start clean</button>`);
+  } else if (canComplete || canCompleteLegacy) {
     actionsBtns.push(`<a class="cc-btn primary" href="${formUrl}">✓ Mark complete</a>`);
   } else if (c.roles.some(r => /checker/i.test(r))) {
     actionsBtns.push(`<a class="cc-btn secondary" href="checker.html">Open checker</a>`);
@@ -1448,6 +1526,56 @@ function renderCleanCard(c) {
     ${completedLine}
     ${actionsBtns.length ? `<div class="cc-actions">${actionsBtns.join('')}</div>` : ''}
   </div>`;
+}
+
+/* ─── Start clean — stamp Started at on the Cleans row ──────────
+   Optimistic UI: the card flips to "in progress" the instant the housekeeper
+   taps. The Monday write happens in the background and is queued via the
+   existing offline outbox if the device is offline. On API failure we revert
+   the local state and toast the error so they know to try again. */
+async function startClean(cleanId) {
+  const c = cleans.find(x => x.id === cleanId);
+  if (!c) return;
+  if (c.startedAt || c.completedAt) return;
+  if (!CL_STARTED) {
+    toast('Start time column not provisioned yet — refresh the page', 'error');
+    return;
+  }
+
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const timeStr = now.toTimeString().slice(0, 8);    // "HH:MM:SS"
+
+  // Optimistic local update first — instant feedback.
+  const prevStartedAt     = c.startedAt;
+  const prevStartedAtTime = c.startedAtTime;
+  c.startedAt     = dateStr;
+  c.startedAtTime = timeStr.slice(0, 5);
+  try { localStorage.setItem('cache_cleans', JSON.stringify(cleans)); } catch (_) {}
+  renderDay();
+
+  try {
+    await mondayFetch(
+      `mutation($b:ID!,$i:ID!,$c:String!,$v:JSON!){
+         change_column_value(board_id:$b, item_id:$i, column_id:$c, value:$v){ id }
+       }`,
+      { b: String(CLEANS_BOARD), i: String(cleanId), c: CL_STARTED,
+        v: JSON.stringify({ date: dateStr, time: timeStr }) },
+      true   // useOutbox — survives offline
+    );
+    toast('Started — finish time will be captured on Mark complete', 'success');
+  } catch (e) {
+    if (e.message === 'OFFLINE_QUEUED') {
+      toast('Started (queued for sync)', 'success');
+      return;
+    }
+    // Revert local optimistic update on a real failure.
+    c.startedAt     = prevStartedAt;
+    c.startedAtTime = prevStartedAtTime;
+    try { localStorage.setItem('cache_cleans', JSON.stringify(cleans)); } catch (_) {}
+    renderDay();
+    toast('Could not save start time: ' + (e.message || e), 'error');
+  }
 }
 
 function renderLinenDropCard(c) {

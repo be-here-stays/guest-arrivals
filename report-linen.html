@@ -94,6 +94,45 @@
   .done-actions .secondary { background:#fff; color:var(--dark); border:1.5px solid var(--border); }
 
   .hide { display:none !important; }
+
+  /* Packed-items list — shown when launched from a clean card with bags
+     linked to the Arrivals row. Lets the housekeeper tap each item to flag
+     missing/damaged without typing. */
+  .packed-list { border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .packed-row { display:flex; align-items:center; justify-content:space-between;
+                padding:10px 12px; background:#fff; border-bottom:1px solid var(--border);
+                gap:8px; }
+  .packed-row:last-child { border-bottom:0; }
+  .packed-row.flagged { background:var(--amber-bg); }
+  .packed-row.flagged-dmg { background:var(--red-bg); }
+  .packed-name { font-size:13px; font-weight:600; color:var(--dark); flex:1; min-width:0; }
+  .packed-name .pk-cnt { font-weight:500; color:var(--sage-mid); margin-left:6px; font-size:12px; }
+  .packed-ctrl { display:flex; align-items:center; gap:6px; }
+
+  /* Missing items: -/+ counter for "missing N" */
+  .pk-step {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:30px; height:30px; border:1.5px solid var(--border); border-radius:8px;
+    background:#fff; color:var(--dark); font-size:18px; font-weight:700;
+    cursor:pointer; user-select:none; -webkit-tap-highlight-color:rgba(0,0,0,0.1);
+  }
+  .pk-step:disabled { opacity:0.3; cursor:not-allowed; }
+  .pk-val { min-width:22px; text-align:center; font-weight:700; font-size:14px; color:var(--amber); }
+  .pk-val.zero { color:var(--sage-mid); font-weight:500; }
+
+  /* Damaged: tap-to-toggle damaged + optional note */
+  .pk-toggle {
+    display:inline-flex; align-items:center; gap:6px;
+    padding:6px 10px; border:1.5px solid var(--border); border-radius:8px;
+    background:#fff; color:var(--sage-mid); font-size:12px; font-weight:600;
+    cursor:pointer; user-select:none;
+  }
+  .pk-toggle.on { border-color:var(--red); background:var(--red-bg); color:var(--red); }
+  .pk-note {
+    width:100%; margin-top:6px; padding:6px 8px; border:1.5px solid var(--border);
+    border-radius:7px; font-family:inherit; font-size:12px; color:var(--dark); background:#fff;
+  }
+  .pk-empty { padding:14px; text-align:center; font-size:12px; color:var(--sage-mid); font-style:italic; }
 </style>
 </head>
 <body>
@@ -107,6 +146,7 @@
 </header>
 
 <script src="secrets.js"></script>
+<script src="linen-schema.js"></script>
 <script src="linens-schema.js"></script>
 
 <div class="container">
@@ -153,6 +193,17 @@
       <div class="hint">Helps the linen team find the right stay; pre-filled when launched from a clean.</div>
     </div>
 
+    <!-- Packed items panel — shown for Missing/Damaged categories when we
+         have a linked Arrivals row AND found bags packed for that arrival.
+         Lets the housekeeper tap rather than type. -->
+    <div class="hide" id="packedFields">
+      <div class="field">
+        <label class="lbl" id="packedLbl">What was packed for this clean</label>
+        <div class="hint" id="packedHint">Tap a row to flag what's wrong.</div>
+        <div class="packed-list" id="packedList"></div>
+      </div>
+    </div>
+
     <!-- Bed config: Expected vs Found — only shown for Wrong bed / Wrong size -->
     <div class="hide" id="bedFields">
       <div class="field">
@@ -166,12 +217,13 @@
       </div>
     </div>
 
-    <!-- Items list — only shown for Missing / Damaged -->
+    <!-- Items list — only shown for Missing / Damaged. When we have packed
+         items above, this becomes "anything else not on the list". -->
     <div class="hide" id="itemFields">
       <div class="field">
-        <label class="lbl" for="fItems">Items affected <span class="req">*</span></label>
+        <label class="lbl" for="fItems"><span id="fItemsLbl">Items affected</span> <span class="req" id="fItemsReq">*</span></label>
         <textarea id="fItems" placeholder="e.g. 2 hand towels short, 1 duvet cover stained on master bed"></textarea>
-        <div class="hint">List the items + counts so the linen team can swap stock.</div>
+        <div class="hint" id="fItemsHint">List the items + counts so the linen team can swap stock.</div>
       </div>
     </div>
 
@@ -207,6 +259,36 @@ let _selectedCat = null;     // chosen category label
 let _arrivalId = '';         // pre-filled Arrivals item id (board_relation target)
 let _arrivalBedConfig = '';  // pre-filled bed config snapshot from the Arrivals row
 
+// Packed-items state. Populated by loadPackedItems() when we know the
+// Arrivals row and find Linen Bags linked to it. _packedTotals maps an
+// item key (e.g. 'bathTowels') to the number that was packed. _itemReports
+// maps the same key to { missing, damaged, damageNote } per the housekeeper's
+// taps. Keys are taken from LINEN.bagsColumns.items so they survive a schema
+// rename in one place.
+let _packedTotals = {};
+let _itemReports  = {};
+let _packedReady  = false;   // true once loadPackedItems completed (success or empty)
+
+// Human-readable names for each item key on the Linen Bags board. Order here
+// determines display order in the packed-items list.
+const ITEM_LABELS = {
+  skDuvets:     'SK duvets',
+  kingDuvets:   'King duvets',
+  doubleDuvets: 'Double duvets',
+  singleDuvets: 'Single duvets',
+  kingSheets:   'King sheets',
+  doubleSheets: 'Double sheets',
+  singleSheets: 'Single sheets',
+  oxford:       'Oxford pillowcases',
+  standard:     'Standard pillowcases',
+  bathTowels:   'Bath towels',
+  handTowels:   'Hand towels',
+  hotTubTowels: 'Hot tub towels',
+  bathrobes:    'Bathrobes',
+  teaTowels:    'Tea towels',
+  bathMats:     'Bath mats',
+};
+
 async function mq(query, variables) {
   const r = await fetch(URL_API, {
     method: 'POST',
@@ -235,6 +317,185 @@ function setCat(label, btn) {
   const wantsItems = (label === 'Missing items'   || label === 'Damaged / stained');
   document.getElementById('bedFields').classList.toggle('hide', !wantsBed);
   document.getElementById('itemFields').classList.toggle('hide', !wantsItems);
+
+  // Packed-items panel — only meaningful for Missing/Damaged AND only when
+  // we actually have packed-items data for this clean. If we have it, the
+  // panel becomes the primary input and the free-text textarea drops back to
+  // "anything else" / non-required.
+  const hasPacked = wantsItems && Object.keys(_packedTotals).length > 0;
+  document.getElementById('packedFields').classList.toggle('hide', !hasPacked);
+  if (hasPacked) {
+    renderPackedItems(label);
+    // Free-text becomes a fallback for items not on the packed list.
+    document.getElementById('fItemsLbl').textContent = 'Anything else not in the list above';
+    document.getElementById('fItemsReq').classList.add('hide');
+    document.getElementById('fItems').placeholder = 'Optional — only if something missing/damaged isn\'t in the list above';
+    document.getElementById('fItemsHint').textContent = 'Tap rows above first; use this only for items not in the packed list.';
+  } else {
+    document.getElementById('fItemsLbl').textContent = 'Items affected';
+    document.getElementById('fItemsReq').classList.remove('hide');
+    document.getElementById('fItems').placeholder = 'e.g. 2 hand towels short, 1 duvet cover stained on master bed';
+    document.getElementById('fItemsHint').textContent = 'List the items + counts so the linen team can swap stock.';
+  }
+}
+
+/* ───────────────────────────────────────────────────────────────────────
+   Packed items — query Linen Bags board for bags linked to this Arrivals
+   row, sum per-item counts across bags, and stash in _packedTotals. Best-
+   effort: failure (no schema, no bags, network) leaves the form working
+   the way it always did.
+   ─────────────────────────────────────────────────────────────────────── */
+async function loadPackedItems(arrivalId) {
+  if (!arrivalId) return;
+  if (typeof LINEN === 'undefined' || !LINEN.boards || !LINEN.boards.bags) return;
+  const items = LINEN.bagsColumns && LINEN.bagsColumns.items;
+  const arrivalCol = LINEN.bagsColumns && LINEN.bagsColumns.arrival;
+  if (!items || !arrivalCol) return;
+
+  const itemColIds = Object.values(items);
+  const colIds = [arrivalCol, ...itemColIds];
+  const colsArg = colIds.map(id => `"${id}"`).join(',');
+
+  let bags = [];
+  try {
+    const data = await mq(`{
+      boards(ids:[${LINEN.boards.bags}]) {
+        items_page(limit:200) {
+          items {
+            id name
+            column_values(ids:[${colsArg}]) {
+              id text value
+              ... on BoardRelationValue { linked_item_ids }
+            }
+          }
+        }
+      }
+    }`);
+    bags = data?.boards?.[0]?.items_page?.items || [];
+  } catch (_) {
+    return;   // silent — form still works without packed-items
+  }
+
+  // Filter to bags linked to our Arrivals row. linked_item_ids is an array
+  // of strings; arrival_id from the URL param is also a string.
+  const myArrival = String(arrivalId);
+  const myBags = bags.filter(it => {
+    const cv = it.column_values.find(c => c.id === arrivalCol);
+    if (!cv) return false;
+    const ids = (cv.linked_item_ids || []).map(String);
+    return ids.includes(myArrival);
+  });
+  if (!myBags.length) return;
+
+  // Sum item counts across all matching bags.
+  const totals = {};
+  for (const [itemKey, colId] of Object.entries(items)) {
+    let total = 0;
+    for (const bag of myBags) {
+      const cv = bag.column_values.find(c => c.id === colId);
+      const n  = parseFloat(cv?.text || cv?.value || '0') || 0;
+      total += n;
+    }
+    if (total > 0) totals[itemKey] = total;
+    _itemReports[itemKey] = { missing: 0, damaged: false, damageNote: '' };
+  }
+  _packedTotals = totals;
+  _packedReady  = true;
+}
+
+/* Render the packed-items list for the chosen category. Missing → step
+   counter per item; Damaged → tap-to-toggle + optional note. Re-rendered
+   each time the category flips. */
+function renderPackedItems(category) {
+  const list = document.getElementById('packedList');
+  const lbl  = document.getElementById('packedLbl');
+  const hint = document.getElementById('packedHint');
+  const items = Object.keys(ITEM_LABELS).filter(k => _packedTotals[k] > 0);
+  if (!items.length) {
+    list.innerHTML = '<div class="pk-empty">No bags found for this clean.</div>';
+    return;
+  }
+
+  const isMissing = (category === 'Missing items');
+  if (isMissing) {
+    lbl.textContent  = 'Tap − / + for each item that\'s short';
+    hint.textContent = 'Shows what was packed for this clean. Tap + on any row that\'s short.';
+  } else {
+    lbl.textContent  = 'Tap any item that\'s damaged or stained';
+    hint.textContent = 'Add a note for each damaged item so the linen team can swap stock.';
+  }
+
+  list.innerHTML = items.map(key => {
+    const label  = ITEM_LABELS[key];
+    const packed = _packedTotals[key];
+    const r = _itemReports[key] || { missing:0, damaged:false, damageNote:'' };
+    if (isMissing) {
+      const v = r.missing || 0;
+      const flagged = v > 0 ? ' flagged' : '';
+      return `<div class="packed-row${flagged}" id="pkRow_${key}">
+        <div class="packed-name">${label}<span class="pk-cnt">packed ${packed}</span></div>
+        <div class="packed-ctrl">
+          <button type="button" class="pk-step" onclick="bumpMissing('${key}', -1)" ${v<=0?'disabled':''}>−</button>
+          <span class="pk-val ${v===0?'zero':''}" id="pkVal_${key}">${v}</span>
+          <button type="button" class="pk-step" onclick="bumpMissing('${key}', 1)" ${v>=packed?'disabled':''}>+</button>
+        </div>
+      </div>`;
+    } else {
+      const onClass = r.damaged ? ' on' : '';
+      const flagged = r.damaged ? ' flagged-dmg' : '';
+      const noteVisible = r.damaged ? '' : ' style="display:none"';
+      return `<div class="packed-row${flagged}" id="pkRow_${key}" style="flex-wrap:wrap">
+        <div class="packed-name">${label}<span class="pk-cnt">packed ${packed}</span></div>
+        <div class="packed-ctrl">
+          <button type="button" class="pk-toggle${onClass}" id="pkTgl_${key}" onclick="toggleDamaged('${key}')">${r.damaged?'✓ Damaged':'Damaged?'}</button>
+        </div>
+        <input type="text" class="pk-note" id="pkNote_${key}" placeholder="e.g. stained on master bed" value="${escapeAttr(r.damageNote||'')}" oninput="setDamageNote('${key}', this.value)"${noteVisible}>
+      </div>`;
+    }
+  }).join('');
+}
+
+function escapeAttr(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function bumpMissing(key, delta) {
+  const r = _itemReports[key]; if (!r) return;
+  const max = _packedTotals[key] || 0;
+  r.missing = Math.max(0, Math.min(max, (r.missing||0) + delta));
+  renderPackedItems('Missing items');
+}
+function toggleDamaged(key) {
+  const r = _itemReports[key]; if (!r) return;
+  r.damaged = !r.damaged;
+  if (!r.damaged) r.damageNote = '';
+  renderPackedItems('Damaged / stained');
+}
+function setDamageNote(key, val) {
+  const r = _itemReports[key]; if (!r) return;
+  r.damageNote = val;
+  // Don't re-render on every keystroke — just store.
+}
+
+/* Build a human-readable summary line from _itemReports for the current
+   category. Returned string goes into the Linen Issues 'items' column so
+   the manager triage view doesn't need to know about the structured input. */
+function summariseItemReports(category) {
+  const lines = [];
+  if (category === 'Missing items') {
+    for (const [key, r] of Object.entries(_itemReports)) {
+      if ((r.missing||0) > 0) {
+        const packed = _packedTotals[key] || 0;
+        lines.push(`${r.missing}× ${ITEM_LABELS[key]} short (packed ${packed})`);
+      }
+    }
+  } else if (category === 'Damaged / stained') {
+    for (const [key, r] of Object.entries(_itemReports)) {
+      if (r.damaged) {
+        const note = (r.damageNote||'').trim();
+        lines.push(`${ITEM_LABELS[key]} damaged${note ? ' — ' + note : ''}`);
+      }
+    }
+  }
+  return lines.join('; ');
 }
 
 document.addEventListener('DOMContentLoaded', async () => {
@@ -278,7 +539,9 @@ document.addEventListener('DOMContentLoaded', async () => {
   }
 
   // If we know the Arrivals row, pull its bed config text snapshot to
-  // prefill Expected. Best-effort — we don't block submission on this.
+  // prefill Expected, AND pull the Linen Bags packed for this clean to
+  // power the structured Missing/Damaged input. Both are best-effort —
+  // we don't block submission on either.
   if (_arrivalId) {
     try {
       const data = await mq(`{ items(ids:[${_arrivalId}]){ id name column_values(ids:["${AR_BED_CONFIG}"]){ id text value } } }`);
@@ -295,6 +558,10 @@ document.addEventListener('DOMContentLoaded', async () => {
         document.getElementById('ctxBed').textContent = bed;
       }
     } catch (e) { /* non-fatal — leave Expected blank for manual entry */ }
+
+    // Packed-items lookup runs in parallel-ish — uses LINEN constants from
+    // linen-schema.js (different file from linens-schema.js, naming legacy).
+    try { await loadPackedItems(_arrivalId); } catch (_) {}
   }
 });
 
@@ -359,9 +626,14 @@ async function submitLinen() {
     }
   }
   if (wantsItems) {
+    // Two valid input paths: the structured packed-items list (when we
+    // have packed data and the user has tapped at least one row) OR the
+    // free-text textarea. Either alone is enough to submit.
+    const structured = summariseItemReports(_selectedCat);
     const itemsEl = document.getElementById('fItems');
-    if (!itemsEl.value.trim()) {
-      errs.push('Items affected');
+    if (!structured && !itemsEl.value.trim()) {
+      const hasPanel = !document.getElementById('packedFields').classList.contains('hide');
+      errs.push(hasPanel ? 'Tap at least one item above (or describe it below)' : 'Items affected');
       itemsEl.classList.add('missing');
       if (!firstMissing) firstMissing = itemsEl;
     }
@@ -387,7 +659,12 @@ async function submitLinen() {
   const booking  = document.getElementById('fBook').value.trim();
   const expected = document.getElementById('fExpected').value.trim();
   const found    = document.getElementById('fFound').value.trim();
-  const items    = document.getElementById('fItems').value.trim();
+  const freeText = document.getElementById('fItems').value.trim();
+  // Combine structured packed-items selections with any free-text the user
+  // added. Structured lines come first; free-text appended after a divider
+  // so the manager view shows tapped items prominently.
+  const structured = summariseItemReports(_selectedCat);
+  const items    = [structured, freeText].filter(Boolean).join(structured && freeText ? ' · ' : '');
   const reporter = reporterEl.value.trim();
   const today    = new Date().toISOString().slice(0,10);
 
@@ -441,6 +718,12 @@ function logAnother() {
   _selectedCat = null;
   document.getElementById('bedFields').classList.add('hide');
   document.getElementById('itemFields').classList.add('hide');
+  document.getElementById('packedFields').classList.add('hide');
+  // Reset the per-item flags so the next submission starts from zero. Keep
+  // _packedTotals — same clean, same packed bags.
+  for (const k of Object.keys(_itemReports)) {
+    _itemReports[k] = { missing:0, damaged:false, damageNote:'' };
+  }
   document.getElementById('formCard').scrollIntoView({ behavior:'smooth', block:'start' });
 }
 </script>

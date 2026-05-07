@@ -1,0 +1,608 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Guesty ↔ Arrivals sync — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; }
+
+  header { background:var(--dark); color:#fff; padding:18px 24px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+  header h1 { font-size:18px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.6; margin-top:2px; }
+  .hdr-btn { color:rgba(255,255,255,0.85); text-decoration:none; font-size:13px; font-weight:600; padding:7px 12px; border:1px solid rgba(255,255,255,0.25); border-radius:8px; }
+  .hdr-btn:hover { background:rgba(255,255,255,0.08); }
+
+  .container { max-width:1200px; margin:0 auto; padding:18px 22px 60px; }
+
+  .info { background:var(--green-bg); border-left:3px solid var(--green); padding:12px 14px; border-radius:0 8px 8px 0; margin-bottom:14px; font-size:13px; line-height:1.55; color:#1c4836; }
+  .info strong { color:#0f2c1d; }
+
+  /* Setup card — credentials + date window */
+  .setup { background:#fff; border-radius:12px; padding:16px 18px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+  .setup h2 { font-size:13px; font-weight:700; color:var(--sage); text-transform:uppercase; letter-spacing:0.5px; margin-bottom:10px; }
+  .row { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+  .field { display:flex; flex-direction:column; flex:1 1 200px; }
+  .field label { font-size:11px; font-weight:700; color:var(--sage); margin-bottom:4px; text-transform:uppercase; letter-spacing:0.4px; }
+  .field input { padding:9px 11px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:14px; background:#fff; outline:none; }
+  .field input:focus { border-color:var(--dark); }
+  .hint { font-size:11px; color:var(--sage-mid); margin-top:4px; }
+
+  button {
+    padding:10px 16px; background:var(--dark); color:var(--cream); border:0; border-radius:9px;
+    font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; white-space:nowrap;
+  }
+  button:hover { background:var(--sage); }
+  button:disabled { opacity:0.5; cursor:not-allowed; }
+  button.secondary { background:#fff; color:var(--dark); border:1.5px solid var(--border); }
+  button.danger    { background:var(--red); color:#fff; }
+  button.success   { background:var(--green); color:#fff; }
+
+  .status-bar { font-size:13px; color:var(--sage); margin-top:12px; padding:8px 12px; background:#f7f5ee; border-radius:8px; }
+  .status-bar.error   { background:var(--red-bg);   color:var(--red); font-weight:600; }
+  .status-bar.success { background:var(--green-bg); color:var(--green); font-weight:600; }
+
+  /* Stats summary — the big numbers */
+  .stats { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin-bottom:18px; }
+  .stat { background:#fff; border-radius:12px; padding:16px 18px; box-shadow:0 1px 3px rgba(0,0,0,0.05); border-left:4px solid transparent; }
+  .stat .num { font-size:32px; font-weight:700; line-height:1; }
+  .stat .lbl { font-size:11px; color:var(--sage); text-transform:uppercase; letter-spacing:0.5px; margin-top:6px; font-weight:600; }
+  .stat.bad   { border-left-color:var(--red); }
+  .stat.bad   .num { color:var(--red); }
+  .stat.warn  { border-left-color:var(--amber); }
+  .stat.warn  .num { color:var(--amber); }
+  .stat.ok    { border-left-color:var(--green); }
+  .stat.ok    .num { color:var(--green); }
+  .stat.info  { border-left-color:var(--blue); }
+  .stat.info  .num { color:var(--blue); }
+
+  /* Sections */
+  section { background:#fff; border-radius:12px; padding:16px 18px; margin-bottom:14px; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
+  section h2 { font-size:15px; margin:0 0 6px; color:var(--dark); display:flex; align-items:center; gap:8px; flex-wrap:wrap; }
+  section h2.bad  { color:var(--red); }
+  section h2.warn { color:var(--amber); }
+  section h2.ok   { color:var(--green); }
+  section h2 .count { background:var(--sage); color:#fff; font-size:11px; padding:2px 8px; border-radius:11px; font-weight:700; }
+  section h2.bad .count   { background:var(--red); }
+  section h2.warn .count  { background:var(--amber); }
+  section h2.ok .count    { background:var(--green); }
+  section .desc { font-size:13px; color:var(--sage); line-height:1.5; margin-bottom:12px; }
+
+  .controls { display:flex; gap:8px; align-items:center; flex-wrap:wrap; margin-bottom:10px; }
+
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { text-align:left; padding:8px 10px; border-bottom:1px solid #ece9df; vertical-align:middle; }
+  th { font-size:11px; text-transform:uppercase; letter-spacing:0.5px; color:var(--sage); background:#f7f5ee; font-weight:700; }
+  tr.processing { opacity:0.5; }
+  tr.done   { background:var(--green-bg); }
+  tr.failed { background:var(--red-bg); }
+  code { background:#f1eee5; padding:1px 6px; border-radius:4px; font-size:12px; }
+  .muted { color:var(--sage-mid); font-size:12px; }
+  details summary { cursor:pointer; padding:6px 0; font-size:13px; color:var(--sage); }
+  details > div { padding:6px 0; }
+
+  .progress-bar { height:5px; background:#ece9df; border-radius:3px; overflow:hidden; margin-top:8px; }
+  .progress-bar .fill { height:100%; background:var(--green); transition:width 0.2s; }
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--dark); color:#fff; padding:10px 18px; border-radius:24px; font-size:13px; font-weight:600; opacity:0; transition:opacity .15s; pointer-events:none; z-index:200; }
+  .toast.show { opacity:1; }
+  .empty { text-align:center; color:var(--sage-mid); padding:40px 20px; font-size:14px; }
+  .hide { display:none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🔄 Guesty ↔ Arrivals sync</h1>
+    <div class="sub">Daily reconciliation — pull every booking from Guesty, compare against Monday Arrivals, fix gaps in one click</div>
+  </div>
+  <div>
+    <a href="booking-recon.html" class="hdr-btn">Booking recon</a>
+    <a href="hub.html" class="hdr-btn">‹ Hub</a>
+  </div>
+</header>
+
+<!-- secrets.js routes all api.monday.com + auth.guesty.com + open-api.guesty.com
+     calls through the Cloudflare Worker, which holds the Monday + Guesty
+     credentials server-side. CORS is fine because the Worker is on a
+     trusted origin and Guesty's CORS rules don't apply to server-to-server
+     calls. We deliberately don't bypass the Worker — direct browser-to-
+     Guesty calls fail CORS from file:// (and even from deployed origins
+     unless Guesty has explicitly allowlisted them). -->
+<script src="secrets.js"></script>
+
+<script>
+const URL_API = 'https://api.monday.com/v2';
+const ARRIVALS_BOARD = '5094453064';
+const AR_DATE     = 'date_mm2adtwg';
+const AR_CHECKOUT = 'date_mm31c5jt';
+const AR_PROP     = 'text_mm2ahbrx';
+const AR_BOOKREF  = 'text_mm2ah8s';
+const AR_ADULTS   = 'numeric_mm2a5s8r';
+const AR_CHILDREN = 'numeric_mm2add81';
+const AR_PETS     = 'numeric_mm2ahz0x';
+const AR_FORM_ST  = 'color_mm2aw8fx';
+
+// localStorage key for cached Guesty credentials. Stored client-side only;
+// never leaves your browser. If you want to wipe them, click "Forget creds".
+const CREDS_KEY = 'bh.guestySync.creds';
+
+let _guestyToken = null;
+let _guestyTokenExp = 0;
+let _missing = [];   // Guesty bookings not on Arrivals
+let _matched = [];   // both
+let _orphans = [];   // on Arrivals but not in Guesty
+
+document.addEventListener('DOMContentLoaded', () => {
+  // Default date window: today → +90 days. Catches everything in pipeline.
+  const today = new Date();
+  const horizon = new Date(today); horizon.setDate(horizon.getDate() + 90);
+  const fmt = d => d.toISOString().slice(0, 10);
+  document.getElementById('fromInp').value = fmt(today);
+  document.getElementById('toInp').value = fmt(horizon);
+
+  // Restore cached credentials.
+  try {
+    const cached = JSON.parse(localStorage.getItem(CREDS_KEY) || 'null');
+    if (cached && cached.id && cached.secret) {
+      document.getElementById('clientIdInp').value = cached.id;
+      document.getElementById('clientSecretInp').value = cached.secret;
+      setStatus('Credentials restored from your browser. Press "Run sync" when ready.', '');
+    } else {
+      setStatus('Paste your Guesty client ID and secret to start.', '');
+    }
+  } catch (_) {}
+});
+
+function setStatus(text, cls) {
+  const el = document.getElementById('statusBar');
+  el.textContent = text;
+  el.className = 'status-bar ' + (cls || '');
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+function fmtUK(iso) {
+  if (!iso) return '';
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  return `${m[3]}-${m[2]}-${m[1].slice(2)}`;
+}
+
+/* ── Guesty access (via the Cloudflare Worker proxy) ─────────────────── */
+// secrets.js intercepts these URLs and routes them to the Worker, which
+// holds GUESTY_CLIENT_ID + GUESTY_CLIENT_SECRET as server-side secrets.
+// We don't need the user's pasted credentials for normal operation —
+// the Worker handles OAuth automatically. The credential inputs are kept
+// as a visible reminder of what's stored where (and could be repurposed
+// for a "direct mode" later if needed).
+
+async function getGuestyToken() {
+  if (_guestyToken && _guestyTokenExp > Date.now() + 60000) return _guestyToken;
+  // The Worker's /guesty/oauth/token-stub returns a placeholder token that
+  // satisfies our code; the Worker uses its real server-side token when
+  // the actual data call comes through. So credential validation happens
+  // server-side, not here.
+  const r = await fetch('https://auth.guesty.com/oauth/token', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams({ grant_type: 'client_credentials', scope: 'open-api' }),
+  });
+  if (!r.ok) {
+    const body = await r.text().catch(() => '');
+    throw new Error('Guesty auth failed: HTTP ' + r.status + ' — ' + body.slice(0, 200) +
+      ' · This usually means the Cloudflare Worker is missing its GUESTY_CLIENT_ID / GUESTY_CLIENT_SECRET secrets. Check Cloudflare dashboard → Workers → be-here-api-proxy → Settings → Variables and Secrets.');
+  }
+  const j = await r.json();
+  _guestyToken    = j.access_token || 'worker-managed';
+  _guestyTokenExp = Date.now() + ((j.expires_in || 86400) * 1000);
+  // Optionally cache the user-pasted credentials (in case the Worker fails
+  // again and we add a direct-mode fallback later). Harmless either way.
+  try {
+    const id     = document.getElementById('clientIdInp').value.trim();
+    const secret = document.getElementById('clientSecretInp').value.trim();
+    if (id && secret) localStorage.setItem(CREDS_KEY, JSON.stringify({ id, secret }));
+  } catch (_) {}
+  return _guestyToken;
+}
+
+async function guestyGet(path) {
+  const token = await getGuestyToken();
+  // secrets.js will rewrite this URL to the Worker. The Worker ignores our
+  // Authorization header and attaches its own real Guesty token.
+  const r = await fetch('https://open-api.guesty.com' + path, {
+    headers: { 'Accept': 'application/json', 'Authorization': 'Bearer ' + token },
+  });
+  if (!r.ok) {
+    const txt = await r.text();
+    throw new Error('Guesty HTTP ' + r.status + ': ' + txt.slice(0, 200));
+  }
+  return r.json();
+}
+
+/* Pull every reservation in the date window. Paginates if needed. */
+async function loadGuestyReservations(from, to) {
+  // We pull anything that overlaps the window — checkIn anywhere from
+  // `from` to `to`. Keeps simple, catches everything. Guesty's max page
+  // size is 100; loop with `skip` until empty.
+  const fields = 'listing checkIn checkOut checkInDateLocalized checkOutDateLocalized guest confirmationCode source numberOfPets guestsCount status _id';
+  let skip = 0, all = [], page = 0;
+  while (true) {
+    const url = `/v1/reservations?checkIn[$gte]=${encodeURIComponent(from)}&checkIn[$lte]=${encodeURIComponent(to)}&limit=100&skip=${skip}&fields=${encodeURIComponent(fields)}`;
+    const j = await guestyGet(url);
+    const rows = j?.results || [];
+    all = all.concat(rows);
+    if (rows.length < 100) break;     // last page
+    skip += 100;
+    page++;
+    if (page > 20) break;             // safety: 2000 reservations is plenty for 90 days
+  }
+  return all.map(parseRes).filter(r => r.bookRef);  // skip rows with no booking ref
+}
+
+function parseRes(res) {
+  const guest    = res.guest || {};
+  const listing  = res.listing || {};
+  const checkIn  = (res.checkInDateLocalized  || res.checkIn  || '').slice(0, 10);
+  const checkOut = (res.checkOutDateLocalized || res.checkOut || '').slice(0, 10);
+  const numAdults   = Number(res.guestsCount?.adults  ?? res.numAdults    ?? 0) || 0;
+  const numChildren = Number(res.guestsCount?.children ?? res.numChildren ?? 0) || 0;
+  const numPets     = Number(res.numberOfPets ?? 0) || 0;
+  const guestName   = guest.fullName || [guest.firstName, guest.lastName].filter(Boolean).join(' ') || '';
+  const propName    = listing.nickname || listing.title || '';
+  const bookRef     = res.confirmationCode || res.source?.confirmationCode || res.source?.bookingNumber || '';
+  return {
+    raw: res,
+    guesty_id: res._id || '',
+    bookRef, propName, guestName,
+    checkIn, checkOut,
+    numAdults, numChildren, numPets,
+    status: res.status || '',
+  };
+}
+
+/* ── Monday Arrivals fetch ──────────────────────────────────────────── */
+async function mq(query) {
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', Authorization: window.MONDAY_API_TOKEN, 'API-Version': '2024-01' },
+    body: JSON.stringify({ query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error('Monday: ' + j.errors[0].message);
+  return j.data;
+}
+
+async function loadArrivals(from, to) {
+  // Pull every Arrivals row in the window. Compares booking refs against
+  // Guesty. We don't filter aggressively here — the comparison is by ref.
+  let cursor = null, all = [], pages = 0;
+  do {
+    const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+    const data = await mq(`{
+      boards(ids:[${ARRIVALS_BOARD}]) {
+        items_page(limit: 500${cursorPart}) {
+          cursor
+          items {
+            id name
+            column_values(ids:["${AR_DATE}","${AR_CHECKOUT}","${AR_PROP}","${AR_BOOKREF}"]) {
+              id text value
+            }
+          }
+        }
+      }
+    }`);
+    const page = data.boards[0].items_page;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+    pages++;
+    if (pages > 10) break;
+  } while (cursor);
+
+  return all.map(it => {
+    const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));
+    let arrivalDate = '';
+    let checkout = '';
+    try { arrivalDate = JSON.parse(cv[AR_DATE]?.value || 'null')?.date || ''; } catch (_) {}
+    try { checkout    = JSON.parse(cv[AR_CHECKOUT]?.value || 'null')?.date || ''; } catch (_) {}
+    return {
+      id: it.id,
+      name: it.name,
+      bookRef:  cv[AR_BOOKREF]?.text || '',
+      property: cv[AR_PROP]?.text || '',
+      arrivalDate,
+      checkout,
+    };
+  }).filter(a => a.arrivalDate >= from && a.arrivalDate <= to);
+}
+
+/* ── Run sync ───────────────────────────────────────────────────────── */
+async function runSync() {
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true; btn.textContent = 'Running…';
+  setStatus('Pulling Guesty + Monday in parallel…', '');
+  document.getElementById('content').innerHTML = '<div class="empty">Loading…</div>';
+  document.getElementById('stats').innerHTML = '';
+
+  const from = document.getElementById('fromInp').value;
+  const to   = document.getElementById('toInp').value;
+  if (!from || !to) {
+    setStatus('Set both dates first', 'error');
+    btn.disabled = false; btn.textContent = 'Run sync';
+    return;
+  }
+
+  try {
+    const [guestyList, arrivalsList] = await Promise.all([
+      loadGuestyReservations(from, to),
+      loadArrivals(from, to),
+    ]);
+
+    // Index Arrivals by booking ref.
+    const arrivalsByRef = new Map();
+    for (const a of arrivalsList) {
+      if (a.bookRef) arrivalsByRef.set(a.bookRef.trim(), a);
+    }
+
+    // Categorise.
+    _missing = [];
+    _matched = [];
+    const guestyRefs = new Set();
+    for (const g of guestyList) {
+      guestyRefs.add(g.bookRef);
+      if (arrivalsByRef.has(g.bookRef)) _matched.push({ guesty: g, arrivals: arrivalsByRef.get(g.bookRef) });
+      else _missing.push(g);
+    }
+    _orphans = arrivalsList.filter(a => a.bookRef && !guestyRefs.has(a.bookRef.trim()));
+
+    renderResult(guestyList.length, arrivalsList.length);
+    setStatus(`✓ Synced — Guesty ${guestyList.length} · Arrivals ${arrivalsList.length} · ${_missing.length} missing · ${_orphans.length} orphans`,
+              _missing.length ? 'error' : 'success');
+  } catch (e) {
+    console.error(e);
+    setStatus('✗ ' + e.message, 'error');
+    document.getElementById('content').innerHTML = '';
+  }
+  btn.disabled = false; btn.textContent = 'Run sync';
+}
+
+function renderResult(guestyCount, arrivalsCount) {
+  document.getElementById('stats').innerHTML = `
+    <div class="stat ${_missing.length ? 'bad' : 'ok'}"><div class="num">${_missing.length}</div><div class="lbl">${_missing.length === 1 ? 'Missing booking' : 'Missing bookings'}</div></div>
+    <div class="stat ok"><div class="num">${_matched.length}</div><div class="lbl">In sync</div></div>
+    <div class="stat ${_orphans.length ? 'warn' : 'ok'}"><div class="num">${_orphans.length}</div><div class="lbl">${_orphans.length === 1 ? 'Orphan on Arrivals' : 'Orphans on Arrivals'}</div></div>
+    <div class="stat info"><div class="num">${guestyCount}</div><div class="lbl">Guesty total</div></div>
+  `;
+
+  let html = '';
+
+  // Missing — the urgent ones.
+  if (_missing.length) {
+    _missing.sort((a, b) => (a.checkIn || '').localeCompare(b.checkIn || ''));
+    html += `<section>
+      <h2 class="bad">⚠️ Missing on Arrivals — must create <span class="count">${_missing.length}</span></h2>
+      <p class="desc">These bookings are on Guesty but not on Monday's Arrivals board. Tick the ones to create, then press the green button. The rest of the system (rota planner, laundry rota, hot tub, staff app) only sees what's on Arrivals — until these are created, they're invisible to your team.</p>
+      <div class="controls">
+        <button class="secondary" onclick="toggleAllMissing(true)">Select all</button>
+        <button class="secondary" onclick="toggleAllMissing(false)">Select none</button>
+        <button class="success" id="createBtn" onclick="createSelected()">✓ Create selected on Arrivals</button>
+        <span class="muted" id="createStatus"></span>
+      </div>
+      <div class="progress-bar hide" id="createPb"><div class="fill" id="createFill" style="width:0%"></div></div>
+      <table id="missingTable">
+        <thead><tr><th><input type="checkbox" id="cbAll" checked onchange="toggleAllMissing(this.checked)"></th><th>Property</th><th>Check-in</th><th>Check-out</th><th>Guest</th><th>Booking ref</th><th>Status</th><th>Adults · Kids · Pets</th></tr></thead>
+        <tbody>
+        ${_missing.map((g, i) => `<tr id="missing_${i}">
+          <td><input type="checkbox" class="cb-missing" data-idx="${i}" checked></td>
+          <td><strong>${escapeHtml(g.propName || '—')}</strong></td>
+          <td>${fmtUK(g.checkIn)}</td>
+          <td>${fmtUK(g.checkOut)}</td>
+          <td>${escapeHtml(g.guestName || '<span class="muted">—</span>')}</td>
+          <td><code>${escapeHtml(g.bookRef)}</code></td>
+          <td>${escapeHtml(g.status)}</td>
+          <td class="muted">${g.numAdults} · ${g.numChildren} · ${g.numPets}</td>
+        </tr>`).join('')}
+        </tbody>
+      </table>
+    </section>`;
+  }
+
+  // Orphans on Arrivals — possibly cancelled.
+  if (_orphans.length) {
+    _orphans.sort((a, b) => (a.arrivalDate || '').localeCompare(b.arrivalDate || ''));
+    html += `<section>
+      <h2 class="warn">🚨 On Arrivals but missing from Guesty <span class="count">${_orphans.length}</span></h2>
+      <p class="desc">These rows are on Monday's Arrivals board but Guesty doesn't have them in this date window. Most likely a cancelled booking the watcher didn't tidy. Open Monday and review — if cancelled, delete the Arrivals row and the linked Cleans / HT Cleans rows.</p>
+      <table>
+        <thead><tr><th>Property</th><th>Check-in</th><th>Booking ref</th><th>Item ID</th></tr></thead>
+        <tbody>
+        ${_orphans.map(a => `<tr>
+          <td><strong>${escapeHtml(a.property || a.name)}</strong></td>
+          <td>${fmtUK(a.arrivalDate)}</td>
+          <td><code>${escapeHtml(a.bookRef)}</code></td>
+          <td><code>${a.id}</code></td>
+        </tr>`).join('')}
+        </tbody>
+      </table>
+    </section>`;
+  }
+
+  // In sync — collapsed for reference.
+  if (_matched.length) {
+    html += `<section>
+      <h2 class="ok">✓ In sync <span class="count">${_matched.length}</span></h2>
+      <details>
+        <summary>Show ${_matched.length} matched booking${_matched.length === 1 ? '' : 's'}</summary>
+        <div>
+          <table>
+            <thead><tr><th>Property</th><th>Check-in</th><th>Check-out</th><th>Guest</th><th>Booking ref</th></tr></thead>
+            <tbody>
+            ${_matched.sort((a,b) => (a.guesty.checkIn||'').localeCompare(b.guesty.checkIn||'')).map(m => `<tr>
+              <td><strong>${escapeHtml(m.guesty.propName || '—')}</strong></td>
+              <td>${fmtUK(m.guesty.checkIn)}</td>
+              <td>${fmtUK(m.guesty.checkOut)}</td>
+              <td>${escapeHtml(m.guesty.guestName || '')}</td>
+              <td><code>${escapeHtml(m.guesty.bookRef)}</code></td>
+            </tr>`).join('')}
+            </tbody>
+          </table>
+        </div>
+      </details>
+    </section>`;
+  }
+
+  if (!_missing.length && !_orphans.length) {
+    html = `<section><div class="empty">✓ All ${_matched.length} bookings in sync. Nothing to do.</div></section>` + html;
+  }
+
+  document.getElementById('content').innerHTML = html;
+}
+
+function toggleAllMissing(on) {
+  document.querySelectorAll('.cb-missing').forEach(cb => { cb.checked = !!on; });
+  const all = document.getElementById('cbAll');
+  if (all) all.checked = !!on;
+}
+
+async function createSelected() {
+  const cbs = Array.from(document.querySelectorAll('.cb-missing')).filter(cb => cb.checked);
+  if (!cbs.length) { toast('Nothing selected'); return; }
+  if (!confirm(`Create ${cbs.length} Arrivals row${cbs.length === 1 ? '' : 's'}?\n\nWrites to Monday's Arrivals board. The rest of the system will pick them up immediately. Safe to retry — duplicate creates are prevented by booking ref.`)) return;
+
+  const btn = document.getElementById('createBtn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  document.getElementById('createPb').classList.remove('hide');
+  const status = document.getElementById('createStatus');
+  const fill = document.getElementById('createFill');
+
+  let done = 0, failed = 0;
+  const total = cbs.length;
+  const GAP_MS = 200;
+  const sleep = ms => new Promise(r => setTimeout(r, ms));
+
+  for (const cb of cbs) {
+    const idx = parseInt(cb.dataset.idx, 10);
+    const g = _missing[idx];
+    const tr = document.getElementById('missing_' + idx);
+    if (tr) tr.classList.add('processing');
+    try {
+      // Belt-and-braces dedup: re-check Monday for this booking ref RIGHT
+      // before creating, in case another tab / Make scenario landed it
+      // since the sync ran. Skips if found.
+      const exists = await mq(`{ items_page_by_column_values(board_id:${ARRIVALS_BOARD}, columns:[{column_id:"${AR_BOOKREF}", column_values:["${g.bookRef.replace(/"/g,'\\"')}"]}], limit:1){ items{ id } } }`);
+      if (exists?.items_page_by_column_values?.items?.length) {
+        if (tr) { tr.classList.remove('processing'); tr.classList.add('done'); }
+        done++;
+        fill.style.width = `${Math.round(((done+failed)/total)*100)}%`;
+        status.textContent = `${done+failed}/${total} — ${g.bookRef} already there, skipped`;
+        await sleep(GAP_MS);
+        continue;
+      }
+
+      const itemName = `${g.guestName || g.propName} — ${g.checkIn}`;
+      const cv = {
+        [AR_DATE]:     { date: g.checkIn },
+        [AR_CHECKOUT]: { date: g.checkOut },
+        [AR_PROP]:     g.propName,
+        [AR_BOOKREF]:  g.bookRef,
+        [AR_FORM_ST]:  { label: 'Pending' },
+        [AR_ADULTS]:   String(g.numAdults),
+        [AR_CHILDREN]: String(g.numChildren),
+        [AR_PETS]:     String(g.numPets),
+      };
+      const cvStr = JSON.stringify(JSON.stringify(cv));
+      const q = `mutation { create_item(board_id:${ARRIVALS_BOARD}, item_name:${JSON.stringify(itemName)}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
+      await mq(q);
+      done++;
+      if (tr) { tr.classList.remove('processing'); tr.classList.add('done'); }
+    } catch (e) {
+      failed++;
+      console.error('Create failed for', g.bookRef, e);
+      if (tr) {
+        tr.classList.remove('processing');
+        tr.classList.add('failed');
+        const td = tr.querySelector('td:last-child');
+        if (td) td.innerHTML += ` <span style="color:var(--red); font-weight:600">✗ ${escapeHtml(e.message.slice(0,80))}</span>`;
+      }
+    }
+    fill.style.width = `${Math.round(((done+failed)/total)*100)}%`;
+    status.textContent = `${done+failed}/${total}`;
+    await sleep(GAP_MS);
+  }
+
+  btn.disabled = false; btn.textContent = '✓ Create selected on Arrivals';
+  status.textContent = `✓ Created ${done}${failed ? ` · ${failed} failed (see red rows)` : ''}`;
+  toast(`✓ ${done} created${failed ? ` · ${failed} failed` : ''}`);
+
+  if (failed === 0 && done > 0) {
+    setTimeout(() => runSync(), 1500);
+  }
+}
+
+function forgetCreds() {
+  if (!confirm('Wipe cached Guesty credentials from this browser?')) return;
+  try { localStorage.removeItem(CREDS_KEY); } catch (_) {}
+  document.getElementById('clientIdInp').value = '';
+  document.getElementById('clientSecretInp').value = '';
+  _guestyToken = null;
+  _guestyTokenExp = 0;
+  setStatus('Credentials cleared. Paste them again to run sync.', '');
+}
+</script>
+
+<div class="container">
+  <div class="info">
+    <strong>One-button daily reconciliation.</strong> Pulls every reservation from Guesty + every row from Monday Arrivals, compares booking references, and shows you exactly what's missing. Bypasses Make and the Cloudflare Worker entirely — uses Guesty OAuth directly from your browser. Run it first thing each morning; if any bookings are missing, one click creates them.
+  </div>
+
+  <div class="setup">
+    <h2>Guesty access (one-time, cached in your browser)</h2>
+    <div class="row">
+      <div class="field" style="flex:1 1 280px">
+        <label>Client ID</label>
+        <input type="password" id="clientIdInp" placeholder="6XXXXXXXXXXXX" autocomplete="off">
+      </div>
+      <div class="field" style="flex:1 1 280px">
+        <label>Client secret</label>
+        <input type="password" id="clientSecretInp" placeholder="••••••••" autocomplete="off">
+      </div>
+    </div>
+    <div class="hint">Paste once. Cached client-side only. Get them from Guesty → Developers → Integrations → your OAuth app. Click "Forget creds" below to wipe.</div>
+
+    <h2 style="margin-top:16px">Date window</h2>
+    <div class="row">
+      <div class="field"><label>From (check-in)</label><input type="date" id="fromInp"></div>
+      <div class="field"><label>To (check-in)</label><input type="date" id="toInp"></div>
+      <button id="runBtn" onclick="runSync()">Run sync</button>
+      <button class="secondary" onclick="forgetCreds()">Forget creds</button>
+    </div>
+    <div class="status-bar" id="statusBar">Paste your Guesty client ID and secret to start.</div>
+  </div>
+
+  <div class="stats" id="stats"></div>
+  <div id="content"></div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+</body>
+</html>

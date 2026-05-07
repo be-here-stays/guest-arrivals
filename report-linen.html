@@ -1,0 +1,448 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#272F2E">
+<title>Report a linen issue — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 96px); }
+
+  header { background:var(--dark); color:#fff; padding:18px 20px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; }
+  header h1 { font-size:17px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.65; margin-top:2px; }
+  .hdr-back { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; }
+
+  .container { max-width:580px; margin:0 auto; padding:18px 16px; }
+  .card { background:var(--surface); border-radius:14px; padding:18px; margin-bottom:14px; box-shadow:0 1px 4px rgba(39,47,46,0.08); }
+  .card-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--sage); margin-bottom:14px; }
+
+  .field { margin-bottom:14px; }
+  .field:last-child { margin-bottom:0; }
+  label.lbl { display:block; font-size:12px; font-weight:700; color:var(--sage); margin-bottom:6px; text-transform:uppercase; letter-spacing:0.5px; }
+  label.lbl .req { color:var(--red); margin-left:2px; }
+  .hint { font-size:11px; color:var(--sage-mid); font-weight:400; text-transform:none; letter-spacing:0; margin-top:3px; }
+
+  input[type=text], select, textarea {
+    width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:9px;
+    font-family:inherit; font-size:15px; color:var(--dark); background:#fff; outline:none;
+    transition:border-color 0.15s;
+    -webkit-appearance:none; appearance:none;
+  }
+  input:focus, select:focus, textarea:focus { border-color:var(--dark); }
+  textarea { min-height:70px; resize:vertical; font-size:14px; }
+  .missing { border-color:var(--red) !important; background:var(--red-bg) !important; }
+
+  /* Category chips — 2×2 grid */
+  .chip-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .chip {
+    padding:14px 10px; border:2px solid var(--border); border-radius:11px; background:#fff;
+    font-family:inherit; font-size:13px; font-weight:700; color:var(--sage-mid); cursor:pointer;
+    text-align:center; transition:all 0.15s; line-height:1.3;
+  }
+  .chip span.icon { display:block; font-size:22px; margin-bottom:4px; }
+  .chip span.desc { display:block; font-size:11px; font-weight:500; opacity:0.75; margin-top:3px; line-height:1.3; }
+  .chip:hover { border-color:var(--sage); color:var(--sage); }
+  .chip.active.bed     { border-color:var(--gold);  background:#faf3e8; color:#7a5c35; }
+  .chip.active.miss    { border-color:var(--amber); background:var(--amber-bg); color:var(--amber); }
+  .chip.active.damaged { border-color:var(--red);   background:var(--red-bg); color:var(--red); }
+  .chip.active.size    { border-color:var(--blue);  background:var(--blue-bg); color:var(--blue); }
+
+  /* Booking context card */
+  .ctx { background:var(--blue-bg); border-radius:9px; padding:10px 12px; margin-bottom:14px; font-size:13px; color:var(--blue); }
+  .ctx strong { color:#0c3a5a; }
+  .ctx .ctx-row { padding:2px 0; }
+
+  .submit-btn {
+    width:100%; padding:15px; background:var(--dark); color:var(--cream); border:0; border-radius:12px;
+    font-family:inherit; font-size:15px; font-weight:700; cursor:pointer;
+  }
+  .submit-btn:hover { background:var(--sage); }
+  .submit-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+  .msg { padding:12px 14px; border-radius:10px; font-size:13px; font-weight:600; margin-bottom:14px; display:none; }
+  .msg.show { display:block; }
+  .msg.success { background:var(--green-bg); color:var(--green); }
+  .msg.error   { background:var(--red-bg); color:var(--red); }
+  .msg.info    { background:var(--blue-bg); color:var(--blue); }
+
+  .setup-card { background:var(--amber-bg); border:1.5px solid var(--amber); border-radius:14px; padding:16px 18px; margin-bottom:14px; }
+  .setup-card.hide { display:none; }
+  .setup-card h3 { font-size:14px; color:var(--amber); margin-bottom:6px; }
+  .setup-card p { font-size:13px; color:var(--dark); margin-bottom:10px; }
+  .setup-btn { padding:9px 14px; background:var(--amber); color:#fff; border:0; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+
+  .done-actions { display:flex; gap:8px; margin-top:14px; }
+  .done-actions a, .done-actions button {
+    flex:1; padding:12px; border-radius:10px; font-family:inherit; font-size:14px; font-weight:700;
+    text-decoration:none; text-align:center; cursor:pointer; border:0;
+  }
+  .done-actions .primary { background:var(--dark); color:var(--cream); }
+  .done-actions .secondary { background:#fff; color:var(--dark); border:1.5px solid var(--border); }
+
+  .hide { display:none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🛏 Report a linen issue</h1>
+    <div class="sub">Wrong bedding, missing items, damage</div>
+  </div>
+  <a id="backLink" class="hdr-back" href="hub.html">‹ Back</a>
+</header>
+
+<script src="secrets.js"></script>
+<script src="linens-schema.js"></script>
+
+<div class="container">
+  <div id="msgBox" class="msg"></div>
+
+  <!-- Setup banner — only on first run before bootstrap -->
+  <div id="setupCard" class="setup-card hide">
+    <h3>Linen Issues board not set up yet</h3>
+    <p>The Linen Issues board doesn't exist on Monday yet. Press once to create it (board name: <strong>Be Here — Linen Issues</strong>).</p>
+    <button class="setup-btn" id="setupBtn" onclick="bootstrap()">Create the linen board</button>
+  </div>
+
+  <div class="card" id="formCard">
+    <div class="card-title">New linen issue</div>
+
+    <!-- Booking context — shown when launched from a clean card with details -->
+    <div class="ctx hide" id="ctxBox">
+      <div class="ctx-row"><strong>Property:</strong> <span id="ctxProp"></span></div>
+      <div class="ctx-row" id="ctxBookRow" style="display:none"><strong>Booking:</strong> <span id="ctxBook"></span></div>
+      <div class="ctx-row" id="ctxBedRow" style="display:none"><strong>Booking bed config:</strong> <span id="ctxBed"></span></div>
+    </div>
+
+    <div class="field">
+      <label class="lbl">Category <span class="req">*</span></label>
+      <div class="chip-row">
+        <button class="chip bed"     id="chipBed"     onclick="setCat('Wrong bed config', this)" type="button"><span class="icon">🛏</span>Wrong bed config<span class="desc">Lodge made up differently to booking</span></button>
+        <button class="chip miss"    id="chipMiss"    onclick="setCat('Missing items', this)" type="button"><span class="icon">⚠️</span>Missing items<span class="desc">Towels short, no duvet cover, etc.</span></button>
+        <button class="chip damaged" id="chipDamaged" onclick="setCat('Damaged / stained', this)" type="button"><span class="icon">🩹</span>Damaged / stained<span class="desc">Stains, tears, breakages</span></button>
+        <button class="chip size"    id="chipSize"    onclick="setCat('Wrong size or set', this)" type="button"><span class="icon">📐</span>Wrong size or set<span class="desc">Wrong duvet size, mismatched set</span></button>
+      </div>
+    </div>
+
+    <!-- Property — manual when not pre-filled -->
+    <div class="field" id="propField">
+      <label class="lbl" for="fProp">Property <span class="req">*</span></label>
+      <input type="text" id="fProp" placeholder="e.g. Mallard">
+      <div class="hint">Pre-filled when launched from a clean card.</div>
+    </div>
+
+    <!-- Booking ref — manual when not pre-filled -->
+    <div class="field" id="bookField">
+      <label class="lbl" for="fBook">Booking reference (optional)</label>
+      <input type="text" id="fBook" placeholder="e.g. HMK3YKMFDB">
+      <div class="hint">Helps the linen team find the right stay; pre-filled when launched from a clean.</div>
+    </div>
+
+    <!-- Bed config: Expected vs Found — only shown for Wrong bed / Wrong size -->
+    <div class="hide" id="bedFields">
+      <div class="field">
+        <label class="lbl" for="fExpected">Expected (what the booking asked for)</label>
+        <textarea id="fExpected" placeholder="e.g. 1 SK + 4 S, or 2 doubles + 1 twin"></textarea>
+        <div class="hint">Auto-filled from the booking's bed config when known. Edit if needed.</div>
+      </div>
+      <div class="field">
+        <label class="lbl" for="fFound">Found (what was actually set up) <span class="req">*</span></label>
+        <textarea id="fFound" placeholder="e.g. 3 SK"></textarea>
+      </div>
+    </div>
+
+    <!-- Items list — only shown for Missing / Damaged -->
+    <div class="hide" id="itemFields">
+      <div class="field">
+        <label class="lbl" for="fItems">Items affected <span class="req">*</span></label>
+        <textarea id="fItems" placeholder="e.g. 2 hand towels short, 1 duvet cover stained on master bed"></textarea>
+        <div class="hint">List the items + counts so the linen team can swap stock.</div>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="lbl" for="fReporter">Your name <span class="req">*</span></label>
+      <input type="text" id="fReporter" placeholder="Your name">
+      <div class="hint">Pre-filled when you launch from the staff app.</div>
+    </div>
+
+    <button class="submit-btn" id="submitBtn" onclick="submitLinen()">Submit linen issue</button>
+  </div>
+
+  <!-- Success state -->
+  <div class="card hide" id="doneCard">
+    <h2>✓ Linen issue logged</h2>
+    <p id="doneSub">It's on the linen team's board for triage. Check the inbox once they've actioned it.</p>
+    <div class="done-actions">
+      <button class="primary" onclick="logAnother()">+ Log another</button>
+      <a class="secondary" id="doneBack" href="hub.html">‹ Back</a>
+    </div>
+  </div>
+</div>
+
+<script>
+const TOKEN   = window.MONDAY_API_TOKEN;
+const URL_API = 'https://api.monday.com/v2';
+const ARRIVALS_BOARD = '5094453064';
+// Booking bed config column on Arrivals — used to pre-fill "Expected".
+const AR_BED_CONFIG = 'text_mm2ab56m';
+
+let _config = null;          // Linen Issues board config
+let _selectedCat = null;     // chosen category label
+let _arrivalId = '';         // pre-filled Arrivals item id (board_relation target)
+let _arrivalBedConfig = '';  // pre-filled bed config snapshot from the Arrivals row
+
+async function mq(query, variables) {
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization: TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+function showMsg(text, type) {
+  const box = document.getElementById('msgBox');
+  box.textContent = text;
+  box.className = 'msg show ' + type;
+  if (type === 'success') setTimeout(() => box.classList.remove('show'), 6000);
+}
+
+function setCat(label, btn) {
+  _selectedCat = label;
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  // Toggle field visibility based on category. Bed-config and Wrong-size
+  // both want Expected vs Found; Missing and Damaged want item lists.
+  const wantsBed   = (label === 'Wrong bed config' || label === 'Wrong size or set');
+  const wantsItems = (label === 'Missing items'   || label === 'Damaged / stained');
+  document.getElementById('bedFields').classList.toggle('hide', !wantsBed);
+  document.getElementById('itemFields').classList.toggle('hide', !wantsItems);
+}
+
+document.addEventListener('DOMContentLoaded', async () => {
+  const params = new URLSearchParams(location.search);
+
+  // Pre-fill from URL params (when launched from staff.html or a clean card).
+  const propParam     = params.get('property');
+  const bookParam     = params.get('booking_ref');
+  const arrivalParam  = params.get('arrival_id');
+  const reporterParam = params.get('name') || params.get('reporter');
+
+  if (propParam) document.getElementById('fProp').value = propParam;
+  if (bookParam) document.getElementById('fBook').value = bookParam;
+  if (reporterParam) document.getElementById('fReporter').value = reporterParam;
+  _arrivalId = arrivalParam || '';
+
+  // Show booking context card when there's anything to display.
+  if (propParam || bookParam || arrivalParam) {
+    document.getElementById('ctxBox').classList.remove('hide');
+    document.getElementById('ctxProp').textContent = propParam || '—';
+    if (bookParam) {
+      document.getElementById('ctxBookRow').style.display = '';
+      document.getElementById('ctxBook').textContent = bookParam;
+    }
+  }
+
+  // Route the back link.
+  if (params.get('from') === 'staff') {
+    document.getElementById('backLink').href = 'staff.html';
+    document.getElementById('backLink').textContent = '‹ My Day';
+    document.getElementById('doneBack').href = 'staff.html';
+    document.getElementById('doneBack').textContent = '‹ My Day';
+  }
+
+  // Resolve the Linen Issues board.
+  try {
+    _config = await window.LinensSchema.getLinensConfig(mq);
+    if (!_config) document.getElementById('setupCard').classList.remove('hide');
+  } catch (e) {
+    showMsg('Could not load linen board: ' + e.message, 'error');
+  }
+
+  // If we know the Arrivals row, pull its bed config text snapshot to
+  // prefill Expected. Best-effort — we don't block submission on this.
+  if (_arrivalId) {
+    try {
+      const data = await mq(`{ items(ids:[${_arrivalId}]){ id name column_values(ids:["${AR_BED_CONFIG}"]){ id text value } } }`);
+      const item = data?.items?.[0];
+      const cv = item?.column_values?.[0];
+      let bed = cv?.text || '';
+      if (!bed && cv?.value) {
+        try { bed = JSON.parse(cv.value) || ''; } catch (_) {}
+      }
+      if (bed) {
+        _arrivalBedConfig = bed;
+        document.getElementById('fExpected').value = bed;
+        document.getElementById('ctxBedRow').style.display = '';
+        document.getElementById('ctxBed').textContent = bed;
+      }
+    } catch (e) { /* non-fatal — leave Expected blank for manual entry */ }
+  }
+});
+
+// iOS bfcache restore — re-enable button + form.
+window.addEventListener('pageshow', (e) => {
+  if (!e.persisted) return;
+  const btn = document.getElementById('submitBtn');
+  if (btn) { btn.disabled = false; btn.textContent = 'Submit linen issue'; }
+  document.getElementById('formCard').classList.remove('hide');
+  document.getElementById('doneCard').classList.add('hide');
+  const box = document.getElementById('msgBox');
+  if (box) { box.className = 'msg'; box.textContent = ''; }
+});
+
+async function bootstrap() {
+  const btn = document.getElementById('setupBtn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    let cfg = await window.LinensSchema.findLinensBoard(mq);
+    if (!cfg) cfg = await window.LinensSchema.createLinensBoard(mq);
+    _config = cfg;
+    document.getElementById('setupCard').classList.add('hide');
+    showMsg('✓ Linen board ready.', 'success');
+  } catch (e) {
+    showMsg('Setup failed: ' + e.message, 'error');
+    btn.disabled = false; btn.textContent = 'Create the linen board';
+  }
+}
+
+async function submitLinen() {
+  document.querySelectorAll('.missing').forEach(el => el.classList.remove('missing'));
+  const errs = [];
+  let firstMissing = null;
+
+  if (!_selectedCat) {
+    errs.push('Pick a category');
+    document.querySelectorAll('.chip').forEach(c => c.classList.add('missing'));
+    firstMissing = document.getElementById('chipBed');
+  }
+  const propEl = document.getElementById('fProp');
+  if (!propEl.value.trim()) {
+    errs.push('Property');
+    propEl.classList.add('missing');
+    if (!firstMissing) firstMissing = propEl;
+  }
+  const reporterEl = document.getElementById('fReporter');
+  if (!reporterEl.value.trim()) {
+    errs.push('Your name');
+    reporterEl.classList.add('missing');
+    if (!firstMissing) firstMissing = reporterEl;
+  }
+
+  // Category-specific required fields.
+  const wantsBed   = (_selectedCat === 'Wrong bed config' || _selectedCat === 'Wrong size or set');
+  const wantsItems = (_selectedCat === 'Missing items'   || _selectedCat === 'Damaged / stained');
+  if (wantsBed) {
+    const foundEl = document.getElementById('fFound');
+    if (!foundEl.value.trim()) {
+      errs.push('Found (what was set up)');
+      foundEl.classList.add('missing');
+      if (!firstMissing) firstMissing = foundEl;
+    }
+  }
+  if (wantsItems) {
+    const itemsEl = document.getElementById('fItems');
+    if (!itemsEl.value.trim()) {
+      errs.push('Items affected');
+      itemsEl.classList.add('missing');
+      if (!firstMissing) firstMissing = itemsEl;
+    }
+  }
+
+  if (errs.length) {
+    showMsg('Missing: ' + errs.join(' · '), 'error');
+    document.getElementById('msgBox').scrollIntoView({ behavior:'smooth', block:'start' });
+    if (firstMissing && firstMissing.focus) setTimeout(() => firstMissing.focus({ preventScroll:true }), 300);
+    return;
+  }
+
+  if (!_config) {
+    showMsg('Linen board not set up yet — press the Create button above.', 'error');
+    return;
+  }
+  const cols = _config.columns;
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = 'Submitting…';
+
+  const property = propEl.value.trim();
+  const booking  = document.getElementById('fBook').value.trim();
+  const expected = document.getElementById('fExpected').value.trim();
+  const found    = document.getElementById('fFound').value.trim();
+  const items    = document.getElementById('fItems').value.trim();
+  const reporter = reporterEl.value.trim();
+  const today    = new Date().toISOString().slice(0,10);
+
+  const cv = {};
+  if (cols.category)   cv[cols.category]   = { label: _selectedCat };
+  if (cols.status)     cv[cols.status]     = { label: 'New' };
+  if (cols.property)   cv[cols.property]   = property;
+  if (cols.bookingRef) cv[cols.bookingRef] = booking;
+  if (cols.expected)   cv[cols.expected]   = expected;
+  if (cols.found)      cv[cols.found]      = found;
+  if (cols.items)      cv[cols.items]      = items;
+  if (cols.reporter)   cv[cols.reporter]   = reporter;
+  if (cols.submitted)  cv[cols.submitted]  = { date: today };
+  if (cols.arrivalLink && _arrivalId) {
+    cv[cols.arrivalLink] = { item_ids: [parseInt(_arrivalId, 10)] };
+  }
+
+  // Item name is human-readable on the Monday board view.
+  const catShort = _selectedCat === 'Wrong bed config'  ? 'Bed'
+                 : _selectedCat === 'Missing items'      ? 'Missing'
+                 : _selectedCat === 'Damaged / stained'  ? 'Damaged'
+                 :                                          'Wrong size';
+  const itemName = `${property} · ${catShort} · ${today}`.slice(0, 250);
+
+  try {
+    await mq(
+      `mutation($b:ID!,$n:String!,$v:JSON!){ create_item(board_id:$b, item_name:$n, column_values:$v, create_labels_if_missing:true){ id } }`,
+      { b: _config.boardId, n: itemName, v: JSON.stringify(cv) }
+    );
+    enterDoneState();
+  } catch (e) {
+    showMsg('Submission error: ' + e.message, 'error');
+    btn.disabled = false; btn.textContent = 'Submit linen issue';
+  }
+}
+
+function enterDoneState() {
+  document.getElementById('formCard').classList.add('hide');
+  document.getElementById('doneCard').classList.remove('hide');
+  document.getElementById('doneCard').scrollIntoView({ behavior:'smooth', block:'center' });
+}
+
+function logAnother() {
+  document.getElementById('doneCard').classList.add('hide');
+  document.getElementById('formCard').classList.remove('hide');
+  // Clear category-specific fields; keep property/reporter/booking for chained submissions.
+  document.getElementById('fExpected').value = _arrivalBedConfig || '';
+  document.getElementById('fFound').value = '';
+  document.getElementById('fItems').value = '';
+  document.querySelectorAll('.chip').forEach(c => c.classList.remove('active'));
+  _selectedCat = null;
+  document.getElementById('bedFields').classList.add('hide');
+  document.getElementById('itemFields').classList.add('hide');
+  document.getElementById('formCard').scrollIntoView({ behavior:'smooth', block:'start' });
+}
+</script>
+</body>
+</html>

@@ -45,6 +45,7 @@
     { key: 'staff-shifts',   title: 'Staff shifts',  description: 'Weekly hours matrix; payroll inputs.' },
     { key: 'staff-records',  title: 'Staff records', description: 'Personal data (DOB, NoK, address) and leave entitlement.' },
     { key: 'leave-inbox',    title: 'Leave inbox',   description: 'Approve / decline staff leave requests.' },
+    { key: 'linen-inbox',    title: 'Linen inbox',   description: 'Triage bedding / missing-item / damage reports from the team.' },
     { key: 'pin-admin',      title: 'PIN admin',     description: 'Super-admin only — manage area PINs from this page.' },
   ];
 

@@ -238,13 +238,20 @@ async function loadCleans() {
     const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));
     const arrivalLinkedIds = cv[CL_ARRIVAL]?.linked_item_ids || [];
     const arrivalId = arrivalLinkedIds.length ? String(arrivalLinkedIds[0]) : null;
+    // Fallback property: when CL_PROP.text is empty (board_relation can be
+    // unset or return empty .text on Monday's API), parse from the item
+    // name. Pre-refactor names: "Wed 06 · Boathouse" / "06 May · Boathouse".
+    // Post-refactor names: "Boathouse — 2026-05-06". Both formats covered.
+    const propTextRaw = cv[CL_PROP]?.text || '';
+    const property = propTextRaw || parsePropertyFromName(it.name || '');
     return {
       id: it.id,
       name: it.name,
       created_at: it.created_at,
       day:         pj(cv[CL_DATE]?.value)?.date     || '',
       checkin:     pj(cv[CL_CHECKIN]?.value)?.date  || '',
-      property:    cv[CL_PROP]?.text || '',
+      property,
+      propertySource: propTextRaw ? 'CL_PROP' : (property ? 'name-parse' : 'unknown'),
       primary:     cv[CL_PRIMARY]?.text || '',
       partner:     cv[CL_PARTNER]?.text || '',
       checker:     cv[CL_CHECKER]?.text || '',
@@ -253,6 +260,24 @@ async function loadCleans() {
       arrivalId,
     };
   });
+}
+
+/* Parse a property name out of a Cleans-board item name. Handles both
+   pre-refactor formats ("Wed 06 · Boathouse", "06 May · Boathouse")
+   and the post-refactor format ("Boathouse — 2026-05-06"). */
+function parsePropertyFromName(name) {
+  if (!name) return '';
+  let n = name.trim();
+  // Strip trailing " — YYYY-MM-DD" or " — Day Mon"
+  const emIdx = n.lastIndexOf(' — ');
+  if (emIdx > 0) n = n.slice(0, emIdx).trim();
+  // Strip "Day DD · " prefix (legacy Make scenario format)
+  const bulletMatch = n.match(/^[A-Za-z]{3}\s+\d{1,2}\s+·\s+(.+)$/);
+  if (bulletMatch) n = bulletMatch[1].trim();
+  // Strip "DD Mon · " prefix
+  const dayMonMatch = n.match(/^\d{1,2}\s+[A-Za-z]{3}\s+·\s+(.+)$/);
+  if (dayMonMatch) n = dayMonMatch[1].trim();
+  return n.replace(/^CL\s+/i, '').trim();
 }
 
 async function loadArrivalIds() {
@@ -300,7 +325,11 @@ function classify() {
   _orphans.sort((a,b) => (a.day || '').localeCompare(b.day || '') || a.property.localeCompare(b.property));
 
   // Duplicates: group by arrivalId (when set) and by property+day. Each
-  // group with >1 row gets a scored keeper suggestion.
+  // group with >1 row gets a scored keeper suggestion. Property is
+  // normalised (lowercase, trimmed, whitespace collapsed) so "Mayflower"
+  // matches "  Mayflower " matches "MAYFLOWER" — defensive against
+  // pre-refactor naming differences.
+  const normProp = (s) => (s || '').toString().trim().toLowerCase().replace(/\s+/g, ' ');
   const byArrival = new Map();
   const byPropDay = new Map();
   for (const c of _cleansRaw) {
@@ -309,7 +338,7 @@ function classify() {
       byArrival.get(c.arrivalId).push(c);
     }
     if (c.property && c.day) {
-      const key = c.property + '|' + c.day;
+      const key = normProp(c.property) + '|' + c.day;
       if (!byPropDay.has(key)) byPropDay.set(key, []);
       byPropDay.get(key).push(c);
     }
@@ -360,7 +389,7 @@ function render() {
 
   const c = document.getElementById('content');
   if (!_phantoms.length && !_dupes.length && !_orphans.length) {
-    c.innerHTML = `<div class="empty">✓ Nothing to clean up — no phantoms, no duplicates, no orphans.</div>`;
+    c.innerHTML = `<div class="empty">✓ Nothing in the three buckets.</div>` + renderRawTable();
     return;
   }
 
@@ -456,7 +485,80 @@ function render() {
     </section>`;
   }
 
+  // Also append a debug table of every Cleans row so you can spot-check
+  // if classification missed anything. Filterable by date and property.
+  html += renderRawTable();
+
   c.innerHTML = html;
+}
+
+/* Show every Cleans-board row in the loaded set, sorted by day. Useful
+   when the bucket classification can't see something (e.g. a row with
+   weird property data). Includes a search filter and a manual delete
+   button per row so you can nuke individual rows that the buckets miss. */
+function renderRawTable() {
+  const sorted = _cleansRaw.slice().sort((a, b) => {
+    const ad = a.day || '9999-99-99';
+    const bd = b.day || '9999-99-99';
+    if (ad !== bd) return ad.localeCompare(bd);
+    return (a.property || '').localeCompare(b.property || '');
+  });
+  return `<section style="margin-top:14px">
+    <h2>🔎 All Cleans rows (debug) <span class="count">${sorted.length}</span></h2>
+    <p class="desc">Every Cleans-board row in the loaded data, regardless of bucket. Filter by typing in the box; the table updates as you type. Click 🗑 to delete an individual row directly. <strong>Use this if you can see a duplicate on the rota planner that the buckets above miss.</strong></p>
+    <div class="controls">
+      <input type="text" id="rawFilter" placeholder="Filter — type a property name, day (2026-05-08), 'no link', etc." style="flex:1; padding:8px 10px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:13px;" oninput="filterRawTable()">
+    </div>
+    <table id="rawTable">
+      <thead><tr><th>Day</th><th>Property</th><th>Item name</th><th>Source</th><th>arrivalId</th><th>Cleaner</th><th>Notes</th><th>Item id</th><th>Created</th><th></th></tr></thead>
+      <tbody>
+      ${sorted.map(r => {
+        const propSrc = r.propertySource === 'CL_PROP' ? '<span class="pill linked">CL_PROP</span>'
+                      : r.propertySource === 'name-parse' ? '<span class="pill notes">name</span>'
+                      : '<span class="pill unlinked">none</span>';
+        const linkPill = r.arrivalId ? `<code>${escapeHtml(r.arrivalId)}</code>` : '<span class="pill unlinked">no link</span>';
+        const cleaner = r.primary || r.partner || '<span class="muted">—</span>';
+        const notesShort = r.notes ? '<span class="pill notes">notes</span>' : '<span class="muted">—</span>';
+        const filterText = `${r.day} ${r.property} ${r.name} ${r.arrivalId || ''} ${r.primary} ${r.partner} ${r.notes} ${r.id}`.toLowerCase();
+        return `<tr id="raw_${r.id}" data-filter="${escapeHtml(filterText)}">
+          <td>${fmtUK(r.day) || '<span class="muted">—</span>'}</td>
+          <td><strong>${escapeHtml(r.property || '(empty)')}</strong></td>
+          <td>${escapeHtml(r.name || '')}</td>
+          <td>${propSrc}</td>
+          <td>${linkPill}</td>
+          <td>${escapeHtml(cleaner)}</td>
+          <td>${notesShort}</td>
+          <td><code>${r.id}</code></td>
+          <td class="muted">${r.created_at ? r.created_at.slice(0,10) : ''}</td>
+          <td><button class="danger" style="padding:4px 8px; font-size:11px;" onclick="deleteOne('${r.id}')">🗑</button></td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>
+  </section>`;
+}
+
+function filterRawTable() {
+  const q = (document.getElementById('rawFilter')?.value || '').trim().toLowerCase();
+  const rows = document.querySelectorAll('#rawTable tbody tr');
+  rows.forEach(tr => {
+    const t = tr.dataset.filter || '';
+    tr.style.display = (!q || t.includes(q)) ? '' : 'none';
+  });
+}
+
+async function deleteOne(id) {
+  if (!confirm(`Delete Cleans row ${id}?\n\nDirect deletion — no scoring, no keeper logic. Use only when you're sure.`)) return;
+  const row = document.getElementById('raw_' + id);
+  if (row) row.style.opacity = '0.5';
+  try {
+    await mq(`mutation { delete_item(item_id:${id}){ id } }`);
+    if (row) { row.style.background = 'var(--green-bg)'; row.style.opacity = '0.5'; }
+    toast('✓ Deleted ' + id);
+  } catch (e) {
+    if (row) row.style.opacity = '';
+    toast('Delete failed: ' + e.message);
+  }
 }
 
 function toggleAll(kind, on) {

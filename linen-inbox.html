@@ -1,0 +1,454 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Linen inbox — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; }
+
+  /* PIN gate */
+  #pinGate { position:fixed; inset:0; background:var(--dark); display:flex; flex-direction:column; align-items:center; justify-content:center; z-index:9999; padding:20px; }
+  #pinGate h2 { color:#fff; font-size:18px; font-weight:600; margin-bottom:18px; }
+  #pinGate input { width:240px; padding:12px; font-size:20px; text-align:center; border-radius:8px; border:none; background:rgba(255,255,255,0.12); color:#fff; font-family:inherit; letter-spacing:8px; }
+  #pinGate input::placeholder { color:rgba(255,255,255,0.5); letter-spacing:normal; }
+  #pinGate .pin-err { color:#ff8a80; font-size:13px; margin-top:10px; min-height:18px; }
+  #pinGate .pin-back { color:rgba(255,255,255,0.5); margin-top:18px; font-size:12px; text-decoration:none; }
+
+  header { background:var(--dark); color:#fff; padding:18px 24px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:10px; }
+  header h1 { font-size:18px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.6; margin-top:2px; }
+  .hdr-actions { display:flex; gap:8px; flex-wrap:wrap; }
+  .hdr-btn { color:rgba(255,255,255,0.85); text-decoration:none; font-size:13px; font-weight:600; padding:7px 12px; border:1px solid rgba(255,255,255,0.25); border-radius:8px; background:transparent; cursor:pointer; font-family:inherit; }
+  .hdr-btn:hover { background:rgba(255,255,255,0.08); }
+
+  .container { max-width:1100px; margin:0 auto; padding:18px 22px 60px; }
+
+  .toolbar { display:flex; gap:10px; flex-wrap:wrap; align-items:center; margin-bottom:14px; }
+  .filter-pill { padding:7px 13px; background:#fff; border:1.5px solid var(--border); border-radius:18px; font-size:13px; font-weight:600; color:var(--sage); cursor:pointer; user-select:none; }
+  .filter-pill.on { background:var(--dark); color:#fff; border-color:var(--dark); }
+  .stats { margin-left:auto; font-size:13px; color:var(--sage-mid); }
+
+  .group-hdr { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--sage-mid); margin:18px 4px 8px; }
+  .group-hdr .count { background:var(--sage); color:#fff; padding:1px 8px; border-radius:10px; font-size:11px; margin-left:6px; }
+
+  .row { background:#fff; border-radius:12px; padding:14px 16px; margin-bottom:10px; box-shadow:0 1px 3px rgba(0,0,0,0.05); border-left:4px solid transparent; }
+  .row.new       { border-left-color:var(--amber); }
+  .row.in        { border-left-color:var(--blue); }
+  .row.actioned  { border-left-color:var(--green); opacity:0.92; }
+  .row.resolved  { border-left-color:var(--green); opacity:0.65; }
+  .row.wont      { border-left-color:var(--sage-mid); opacity:0.55; }
+
+  .row-head { display:flex; align-items:flex-start; gap:12px; flex-wrap:wrap; }
+  .row-prop { font-size:15px; font-weight:700; color:var(--dark); }
+  .row-meta { font-size:12px; color:var(--sage-mid); margin-top:3px; display:flex; flex-wrap:wrap; gap:10px; }
+  .row .badge { font-size:11px; font-weight:700; padding:3px 8px; border-radius:10px; white-space:nowrap; }
+  .badge.bed     { background:#faf3e8; color:#7a5c35; }
+  .badge.miss    { background:var(--amber-bg); color:var(--amber); }
+  .badge.damaged { background:var(--red-bg); color:var(--red); }
+  .badge.size    { background:var(--blue-bg); color:var(--blue); }
+  .badge.status-new      { background:var(--amber-bg); color:var(--amber); }
+  .badge.status-in       { background:var(--blue-bg); color:var(--blue); }
+  .badge.status-actioned { background:var(--green-bg); color:var(--green); }
+  .badge.status-resolved { background:var(--green-bg); color:var(--green); }
+  .badge.status-wont     { background:var(--cream); color:var(--sage-mid); }
+
+  .row-detail { margin-top:10px; padding-top:10px; border-top:1px dashed var(--border); display:none; }
+  .row.expanded .row-detail { display:block; }
+  .row-detail h4 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--sage); margin:6px 0 3px; }
+  .row-detail p  { font-size:13px; color:var(--dark); line-height:1.45; white-space:pre-wrap; margin-bottom:8px; }
+  .compare { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width: 600px) { .compare { grid-template-columns:1fr; } }
+  .compare .col { padding:10px 12px; border-radius:9px; }
+  .compare .col.expected { background:#faf3e8; }
+  .compare .col.found    { background:var(--red-bg); }
+  .compare .col h5 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.4px; margin-bottom:4px; }
+  .compare .col.expected h5 { color:#7a5c35; }
+  .compare .col.found    h5 { color:var(--red); }
+
+  .row-actions { display:flex; gap:8px; flex-wrap:wrap; align-items:center; margin-top:10px; }
+  .row-actions select, .row-actions button {
+    padding:7px 11px; border:1.5px solid var(--border); border-radius:8px; background:#fff;
+    font-family:inherit; font-size:12px; font-weight:600; cursor:pointer; color:var(--dark);
+  }
+  .row-actions button.primary { background:var(--dark); color:#fff; border-color:var(--dark); }
+  .row-actions textarea { padding:8px; border:1.5px solid var(--border); border-radius:8px; font-family:inherit; font-size:13px; resize:vertical; min-height:50px; flex:1 1 100%; }
+  .row-toggle { margin-left:auto; font-size:12px; color:var(--blue); cursor:pointer; user-select:none; padding:4px 8px; }
+
+  .toast { position:fixed; bottom:22px; left:50%; transform:translateX(-50%); background:var(--dark); color:#fff; padding:10px 18px; border-radius:24px; font-size:13px; font-weight:600; opacity:0; transition:opacity .15s; pointer-events:none; z-index:200; }
+  .toast.show { opacity:1; }
+  .setup-card { background:var(--amber-bg); border:1.5px solid var(--amber); border-radius:14px; padding:16px 18px; margin-bottom:14px; }
+  .setup-card.hide { display:none; }
+  .setup-card h3 { font-size:14px; color:var(--amber); margin-bottom:6px; }
+  .setup-card p { font-size:13px; color:var(--dark); margin-bottom:10px; }
+  .setup-btn { padding:9px 14px; background:var(--amber); color:#fff; border:0; border-radius:8px; font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+  .empty { text-align:center; color:var(--sage-mid); padding:50px 20px; }
+  .loading { color:var(--sage-mid); font-size:13px; padding:30px; text-align:center; }
+  .hide { display:none !important; }
+</style>
+</head>
+<body>
+
+<div id="pinGate">
+  <h2>Linen team PIN</h2>
+  <input type="password" id="pinInp" inputmode="numeric" maxlength="6" placeholder="••••••" autocomplete="off">
+  <div class="pin-err" id="pinErr"></div>
+  <a class="pin-back" href="hub.html">‹ Back to hub</a>
+</div>
+
+<div id="app" style="display:none">
+  <header>
+    <div>
+      <h1>🛏 Linen inbox</h1>
+      <div class="sub">Bedding, missing items, damage and size mismatches reported by the team</div>
+    </div>
+    <div class="hdr-actions">
+      <a href="report-linen.html" class="hdr-btn">+ New issue</a>
+      <a href="laundry-rota.html" class="hdr-btn">Laundry rota</a>
+      <a href="hub.html" class="hdr-btn">‹ Hub</a>
+    </div>
+  </header>
+
+  <div class="container">
+    <div id="setupCard" class="setup-card hide">
+      <h3>Linen Issues board not set up yet</h3>
+      <p>Press once to create the <strong>Be Here — Linen Issues</strong> board on Monday.</p>
+      <button class="setup-btn" id="setupBtn" onclick="bootstrap()">Create the linen board</button>
+    </div>
+
+    <div class="toolbar" id="toolbar"></div>
+    <div id="content" class="loading">Loading…</div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+</div>
+
+<script src="secrets.js"></script>
+<script src="pins-schema.js"></script>
+<script src="linens-schema.js"></script>
+
+<script>
+const TOKEN   = window.MONDAY_API_TOKEN;
+const URL_API = 'https://api.monday.com/v2';
+// Per-area PIN — managed via pin-admin.html. Falls back to legacy if the
+// registry isn't seeded yet. The 'linen-inbox' area is added to AREAS in
+// pins-schema.js below for completeness; existing pages don't need it
+// reserved up-front because the legacy fallback covers the gap.
+const AREA_KEY = 'linen-inbox';
+
+const STATUS_ORDER = ['New','In review','Actioned','Resolved',"Won't fix"];
+
+let _config = null;
+let _items  = [];
+let _filter = { status: 'open', cat: 'all' };
+let _expanded = new Set();
+
+async function tryPin(v) {
+  if (await window.PinsSchema.checkPin(mq, AREA_KEY, v)) {
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    boot();
+  } else {
+    document.getElementById('pinErr').textContent = 'Wrong PIN';
+    document.getElementById('pinInp').value = '';
+  }
+}
+document.addEventListener('DOMContentLoaded', () => {
+  if (window.PinsSchema.isUnlocked(AREA_KEY)) {
+    document.getElementById('pinGate').style.display = 'none';
+    document.getElementById('app').style.display = 'block';
+    boot();
+    return;
+  }
+  const inp = document.getElementById('pinInp');
+  inp.focus();
+  inp.addEventListener('input', () => { if (inp.value.length === 6) tryPin(inp.value); });
+});
+
+async function mq(query, variables) {
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json', Authorization: TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+function toast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2400);
+}
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtUK(iso) {
+  if (!iso || typeof iso !== 'string') return '';
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  if (!m) return iso;
+  return `${m[3]}-${m[2]}-${m[1].slice(2)}`;
+}
+
+async function boot() {
+  try {
+    _config = await window.LinensSchema.getLinensConfig(mq);
+    if (!_config) {
+      document.getElementById('setupCard').classList.remove('hide');
+      document.getElementById('content').innerHTML = '';
+      return;
+    }
+    await loadItems();
+    renderToolbar();
+    render();
+  } catch (e) {
+    console.error(e);
+    document.getElementById('content').innerHTML = `<div class="empty">Error: ${escapeHtml(e.message)}</div>`;
+  }
+}
+
+async function bootstrap() {
+  const btn = document.getElementById('setupBtn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    let cfg = await window.LinensSchema.findLinensBoard(mq);
+    if (!cfg) cfg = await window.LinensSchema.createLinensBoard(mq);
+    _config = cfg;
+    document.getElementById('setupCard').classList.add('hide');
+    await loadItems();
+    renderToolbar();
+    render();
+  } catch (e) {
+    btn.disabled = false; btn.textContent = 'Create the linen board';
+    toast('Setup failed: ' + e.message);
+  }
+}
+
+async function loadItems() {
+  const cols = _config.columns;
+  const want = ['category','status','property','bookingRef','expected','found','items','reporter','submitted','mgrNote','resolved']
+    .map(k => cols[k]).filter(Boolean);
+  const colsArg = want.map(c => `"${c}"`).join(',');
+  let items = [], cursor = null;
+  do {
+    const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+    const data = await mq(`{
+      boards(ids:[${_config.boardId}]) {
+        items_page(limit: 200${cursorPart}) {
+          cursor
+          items { id name created_at updated_at column_values(ids:[${colsArg}]) { id text value } }
+        }
+      }
+    }`);
+    const page = data.boards[0].items_page;
+    items = items.concat(page.items);
+    cursor = page.cursor;
+  } while (cursor);
+
+  _items = items.map(it => {
+    const cv = {}; for (const c of it.column_values) cv[c.id] = c;
+    const get = (k) => cols[k] ? (cv[cols[k]]?.text || '') : '';
+    const getDate = (k) => {
+      if (!cols[k]) return '';
+      try { return JSON.parse(cv[cols[k]]?.value || 'null')?.date || ''; } catch (_) { return ''; }
+    };
+    return {
+      id: it.id,
+      name: it.name,
+      created_at: it.created_at,
+      updated_at: it.updated_at,
+      category:   get('category')   || 'Wrong bed config',
+      status:     get('status')     || 'New',
+      property:   get('property'),
+      bookingRef: get('bookingRef'),
+      expected:   get('expected'),
+      found:      get('found'),
+      items:      get('items'),
+      reporter:   get('reporter'),
+      submitted:  getDate('submitted'),
+      mgrNote:    get('mgrNote'),
+      resolved:   getDate('resolved'),
+    };
+  });
+  // Newest-pending first; decided rows fall to the bottom.
+  _items.sort((a, b) => {
+    const ao = STATUS_ORDER.indexOf(a.status);
+    const bo = STATUS_ORDER.indexOf(b.status);
+    if (ao !== bo) return ao - bo;
+    return (b.submitted || b.created_at).localeCompare(a.submitted || a.created_at);
+  });
+}
+
+function renderToolbar() {
+  const tb = document.getElementById('toolbar');
+  const pill = (key, val, label) =>
+    `<span class="filter-pill ${_filter[key]===val?'on':''}" onclick="setFilter('${key}','${val}')">${label}</span>`;
+  const cats = ['Wrong bed config','Missing items','Damaged / stained','Wrong size or set'];
+  tb.innerHTML =
+    pill('status','open','Open') +
+    pill('status','all','All statuses') +
+    STATUS_ORDER.map(s => pill('status', s, s)).join('') +
+    '<span style="width:14px"></span>' +
+    pill('cat','all','All categories') +
+    cats.map(c => pill('cat', c, shortCat(c))).join('') +
+    `<span class="stats" id="stats"></span>`;
+}
+function shortCat(c) {
+  if (c === 'Wrong bed config')   return '🛏 Bed';
+  if (c === 'Missing items')      return '⚠️ Missing';
+  if (c === 'Damaged / stained')  return '🩹 Damaged';
+  if (c === 'Wrong size or set')  return '📐 Size';
+  return c;
+}
+function setFilter(k, v) { _filter[k] = v; render(); }
+
+function isOpen(item) {
+  return item.status !== 'Resolved' && item.status !== "Won't fix";
+}
+function visibleItems() {
+  return _items.filter(i => {
+    if (_filter.status === 'open' && !isOpen(i)) return false;
+    if (_filter.status !== 'open' && _filter.status !== 'all' && i.status !== _filter.status) return false;
+    if (_filter.cat !== 'all' && i.category !== _filter.cat) return false;
+    return true;
+  });
+}
+
+function render() {
+  const vis = visibleItems();
+  document.getElementById('stats').textContent = `${vis.length} of ${_items.length}`;
+  const c = document.getElementById('content');
+  if (!vis.length) {
+    c.innerHTML = `<div class="empty">No linen issues match this filter.</div>`;
+    return;
+  }
+  // Group by status in priority order.
+  const groups = {};
+  for (const i of vis) {
+    const k = i.status || 'New';
+    (groups[k] = groups[k] || []).push(i);
+  }
+  const order = STATUS_ORDER.filter(s => groups[s]).concat(Object.keys(groups).filter(s => !STATUS_ORDER.includes(s)));
+  c.innerHTML = order.map(st => `<div>
+    <div class="group-hdr">${st} <span class="count">${groups[st].length}</span></div>
+    ${groups[st].map(renderRow).join('')}
+  </div>`).join('');
+}
+
+function statusCls(s) {
+  if (s === 'New')        return 'new';
+  if (s === 'In review')  return 'in';
+  if (s === 'Actioned')   return 'actioned';
+  if (s === 'Resolved')   return 'resolved';
+  if (s === "Won't fix")  return 'wont';
+  return '';
+}
+function catCls(c) {
+  if (c === 'Wrong bed config')  return 'bed';
+  if (c === 'Missing items')     return 'miss';
+  if (c === 'Damaged / stained') return 'damaged';
+  if (c === 'Wrong size or set') return 'size';
+  return '';
+}
+
+function renderRow(i) {
+  const isExp = _expanded.has(i.id);
+  const meta = [];
+  if (i.bookingRef) meta.push(`📑 ${escapeHtml(i.bookingRef)}`);
+  if (i.reporter)   meta.push(`👤 ${escapeHtml(i.reporter)}`);
+  if (i.submitted)  meta.push(`📥 ${fmtUK(i.submitted)}`);
+  else if (i.created_at) meta.push(`📥 ${fmtUK(i.created_at.slice(0,10))}`);
+  if (i.resolved)   meta.push(`✅ ${fmtUK(i.resolved)}`);
+
+  // Detail block: side-by-side Expected/Found for bed/size cases, or items list for missing/damaged.
+  let detail = '';
+  const wantsBed   = (i.category === 'Wrong bed config' || i.category === 'Wrong size or set');
+  const wantsItems = (i.category === 'Missing items'   || i.category === 'Damaged / stained');
+  if (wantsBed && (i.expected || i.found)) {
+    detail += `<div class="compare">
+      <div class="col expected"><h5>Expected</h5><div>${escapeHtml(i.expected || '—')}</div></div>
+      <div class="col found"><h5>Found</h5><div>${escapeHtml(i.found || '—')}</div></div>
+    </div>`;
+  }
+  if (wantsItems && i.items) {
+    detail += `<h4>Items affected</h4><p>${escapeHtml(i.items)}</p>`;
+  }
+  if (i.mgrNote) detail += `<h4>Manager note</h4><p>${escapeHtml(i.mgrNote)}</p>`;
+
+  const actions = `
+    <div class="row-actions">
+      <select id="sel_${i.id}">
+        ${STATUS_ORDER.map(s => `<option ${i.status===s?'selected':''}>${s}</option>`).join('')}
+      </select>
+      <textarea id="note_${i.id}" placeholder="Manager note (optional)">${escapeHtml(i.mgrNote || '')}</textarea>
+      <button class="primary" onclick="updateItem('${i.id}')">Save changes</button>
+    </div>`;
+
+  return `<div class="row ${statusCls(i.status)} ${isExp?'expanded':''}" data-id="${i.id}">
+    <div class="row-head" onclick="toggle('${i.id}', event)">
+      <div style="flex:1 1 auto; min-width:0">
+        <div class="row-prop">${escapeHtml(i.property || '(no property)')}</div>
+        <div class="row-meta">
+          <span class="badge ${catCls(i.category)}">${escapeHtml(shortCat(i.category))}</span>
+          <span class="badge status-${statusCls(i.status)}">${escapeHtml(i.status)}</span>
+          ${meta.map(m => `<span>${m}</span>`).join('')}
+        </div>
+      </div>
+      <span class="row-toggle">${isExp ? '▴ collapse' : '▾ details'}</span>
+    </div>
+    <div class="row-detail">
+      ${detail}
+      ${actions}
+    </div>
+  </div>`;
+}
+
+function toggle(id, ev) {
+  // Don't toggle when the click was on a control inside the row.
+  if (ev && ev.target && ev.target.closest('.row-actions')) return;
+  if (_expanded.has(id)) _expanded.delete(id); else _expanded.add(id);
+  render();
+}
+
+async function updateItem(id) {
+  const item = _items.find(x => x.id === id);
+  if (!item) return;
+  const cols = _config.columns;
+  const newStatus = document.getElementById('sel_' + id).value;
+  const note = document.getElementById('note_' + id).value.trim();
+  const today = new Date().toISOString().slice(0,10);
+  const cv = {};
+  if (cols.status)  cv[cols.status]  = { label: newStatus };
+  if (cols.mgrNote) cv[cols.mgrNote] = note;
+  if (cols.resolved && (newStatus === 'Resolved' || newStatus === "Won't fix") && !item.resolved) {
+    cv[cols.resolved] = { date: today };
+  }
+  try {
+    await mq(
+      `mutation($i:ID!,$v:JSON!){ change_multiple_column_values(board_id:${_config.boardId}, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`,
+      { i: id, v: JSON.stringify(cv) }
+    );
+    item.status = newStatus;
+    item.mgrNote = note;
+    if (cv[cols.resolved]) item.resolved = today;
+    render();
+    toast('✓ Updated');
+  } catch (e) {
+    toast('Update failed: ' + e.message);
+  }
+}
+</script>
+</body>
+</html>

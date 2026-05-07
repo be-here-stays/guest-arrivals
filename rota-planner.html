@@ -700,7 +700,7 @@ const LAUNDRY_OPTIONS = ['Laundry van','Maintenance team','Staff car'];
 // Per-area PIN — managed via pin-admin.html. Falls back to legacy 652318
 // if the registry isn't seeded yet, so first-time use doesn't lock anyone out.
 const AREA_KEY = 'rota-planner';
-const STORE_KEY = 'rotaPlanner_v1';
+const STORE_KEY = 'rotaPlanner_v2';   // bumped 2026-05-06 — invalidate stale localStorage that was reviving phantom new-flagged cleans on every reload
 const EXT_KEY = 'rotaPlanner_extBookings_v1';
 
 /* ═══════════════════════════════════════════════════════════════════
@@ -2848,16 +2848,25 @@ function saveButtonClick() {
       '\n\nClicking OK will retry.'
     );
   }
-  // Auto-materialise any visible-week derived cleans that don't yet have a
-  // Cleans-board row. After the Arrivals refactor this is the explicit
-  // "commit pending bookings to the rota" action — without this, clicking
-  // Save with no manual edits would say "Nothing to save" and leave the
-  // booking-recon page reporting them as missing.
-  const pending = unmaterialisedDerivedInWindow();
-  if (pending.length) {
-    materialiseDerived(pending);
-    render();
-    toast(`Generated ${pending.length} clean${pending.length===1?'':'s'} from arrivals — saving…`, 1800);
+  // ── Auto-materialise temporarily DISABLED (2026-05-06) ───────────────
+  // Reason: createCleanRows-on-Save was creating duplicates of pre-refactor
+  // Cleans rows when findPlannedClean missed the older row (different name
+  // format, missing arrivalId, etc.). Until the matching logic is properly
+  // bullet-proofed, Save reverts to the legacy behaviour: only persists
+  // cleans the user explicitly clicked/dragged into the planner. Derived
+  // suggestions still appear on the planner UI; manager taps "Tap to plan"
+  // on each one they want to commit.
+  //
+  // To re-enable: flip MATERIALISE_ON_SAVE to true and verify findPlannedClean
+  // can match every existing Cleans row before any duplicates can be created.
+  const MATERIALISE_ON_SAVE = false;
+  if (MATERIALISE_ON_SAVE) {
+    const pending = unmaterialisedDerivedInWindow();
+    if (pending.length) {
+      materialiseDerived(pending);
+      render();
+      toast(`Generated ${pending.length} clean${pending.length===1?'':'s'} from arrivals — saving…`, 1800);
+    }
   }
   saveToMonday();
 }
@@ -3230,7 +3239,16 @@ function persistLocal() {
 function restoreLocal() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
-    if (Array.isArray(raw.cleans)) cleans = raw.cleans;
+    if (Array.isArray(raw.cleans)) {
+      // Defensive: drop any rows flagged `new` (i.e. created in-memory but
+      // never persisted to Monday). These should NEVER survive a reload —
+      // if they're real Cleans rows they'll be re-fetched from Monday with
+      // mondayId set; if they're not, they're stale phantoms that would
+      // get auto-saved on the next autosave tick. Reload-fragility for
+      // in-flight drag-drop work is the right trade vs. resurrecting
+      // phantoms forever.
+      cleans = raw.cleans.filter(c => !(c && c.new));
+    }
     if (raw.viewStart) { viewStart = new Date(raw.viewStart + 'T12:00'); viewStart.setHours(0,0,0,0); }
     if (raw.viewMode) viewMode = raw.viewMode;
     if (raw.roleFilter) roleFilter = raw.roleFilter;

@@ -134,6 +134,10 @@ const AR_ADULTS   = 'numeric_mm2a5s8r';
 const AR_CHILDREN = 'numeric_mm2add81';
 const AR_PETS     = 'numeric_mm2ahz0x';
 const AR_FORM_ST  = 'color_mm2aw8fx';
+// Bed config / notes column on Arrivals — Guesty's `notes` field gets
+// copied here on create so the linen team has the bed config without
+// having to look at Guesty.
+const AR_BEDCFG   = 'text_mm2ab56m';
 
 // localStorage key for cached Guesty credentials. Stored client-side only;
 // never leaves your browser. If you want to wipe them, click "Forget creds".
@@ -180,6 +184,50 @@ function toast(msg) {
 }
 
 function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+/* Walk an object graph looking for a numeric value at any key matching
+   the given regex. Used as a last-resort fallback for guest counts when
+   we don't know which exact field name the Guesty plan uses. Stops at
+   the first match. Bounded depth to avoid pathological trees. */
+function deepFindCount(obj, keyRegex, depth = 0) {
+  if (!obj || typeof obj !== 'object' || depth > 6) return 0;
+  for (const k of Object.keys(obj)) {
+    const v = obj[k];
+    if (keyRegex.test(k) && (typeof v === 'number' || (typeof v === 'string' && /^\d+$/.test(v)))) {
+      const n = Number(v);
+      if (n > 0) return n;
+    }
+  }
+  // Recurse into nested objects/arrays.
+  for (const k of Object.keys(obj)) {
+    const v = obj[k];
+    if (v && typeof v === 'object') {
+      const n = deepFindCount(v, keyRegex, depth + 1);
+      if (n > 0) return n;
+    }
+  }
+  return 0;
+}
+
+/* Coerce a Guesty notes-shaped field into a plain string. Handles:
+   - null / undefined / empty                           → ''
+   - plain strings                                       → trimmed string
+   - { text } / { value } / { body } objects            → first non-empty
+   - arrays of strings or those objects                  → "; "-joined
+   - anything else                                       → '' (NOT [object Object])
+   This stops `[object Object]` showing up in the table when Guesty
+   returns notes as a structured object on some plans. */
+function notesAsString(v) {
+  if (v == null) return '';
+  if (typeof v === 'string') return v.trim();
+  if (Array.isArray(v)) {
+    return v.map(notesAsString).filter(Boolean).join('; ');
+  }
+  if (typeof v === 'object') {
+    return (v.text || v.value || v.body || v.note || '').toString().trim();
+  }
+  return '';
+}
 
 function fmtUK(iso) {
   if (!iso) return '';
@@ -239,12 +287,39 @@ async function guestyGet(path) {
   return r.json();
 }
 
-/* Pull every reservation in the date window. Paginates if needed. */
+/* Pull every reservation in the date window. Paginates if needed.
+
+   Guesty's Open API returns only a minimal set of fields by default
+   (id, listing stub, guest stub, dates, confirmation code). To get
+   guest counts, pets, and reservation notes we MUST list each one in
+   the `fields` parameter explicitly — they're omitted otherwise.
+
+   We list every field name we know about so we're robust to whichever
+   shape the underlying reservation source uses (Airbnb / Booking.com /
+   direct / OTA channel each surface guest counts slightly differently).
+   parseRes below picks whichever variant came back non-empty.
+*/
 async function loadGuestyReservations(from, to) {
-  // We pull anything that overlaps the window — checkIn anywhere from
-  // `from` to `to`. Keeps simple, catches everything. Guesty's max page
-  // size is 100; loop with `skip` until empty.
-  const fields = 'listing checkIn checkOut checkInDateLocalized checkOutDateLocalized guest confirmationCode source numberOfPets guestsCount status _id';
+  const fields = [
+    // Identity
+    '_id', 'confirmationCode', 'status', 'source',
+    // Property + guest stubs
+    'listing', 'listing.nickname', 'listing.title',
+    'guest', 'guest.fullName', 'guest.firstName', 'guest.lastName',
+    // Dates
+    'checkIn', 'checkOut',
+    'checkInDateLocalized', 'checkOutDateLocalized',
+    // Guest counts — every variant we've seen
+    'guestsCount', 'guestsCount.adults', 'guestsCount.children', 'guestsCount.infants',
+    'numAdults', 'numChildren', 'numInfants', 'numberOfGuests',
+    'adults', 'children', 'infants',
+    // Pets
+    'numberOfPets', 'pets', 'numPets',
+    // Notes / bed config / special requests — also varies by Guesty plan
+    'notes', 'reservationNotes', 'guestNotes', 'specialRequests',
+    'description', 'customFields',
+  ].join(' ');
+
   let skip = 0, all = [], page = 0;
   while (true) {
     const url = `/v1/reservations?checkIn[$gte]=${encodeURIComponent(from)}&checkIn[$lte]=${encodeURIComponent(to)}&limit=100&skip=${skip}&fields=${encodeURIComponent(fields)}`;
@@ -254,8 +329,18 @@ async function loadGuestyReservations(from, to) {
     if (rows.length < 100) break;     // last page
     skip += 100;
     page++;
-    if (page > 20) break;             // safety: 2000 reservations is plenty for 90 days
+    if (page > 30) break;             // safety: 3000 reservations is plenty for 90 days
   }
+
+  // Diagnostic: stash the first raw reservation on window so the user can
+  // open DevTools console and run `__lastGuestyRow` to see exactly which
+  // fields came back. Helps when guest counts / notes still show empty —
+  // tells us which Guesty field names to add to the parser fallbacks.
+  if (all.length) {
+    window.__lastGuestyRow = all[0];
+    try { console.log('[guesty-sync] First reservation raw shape:', all[0]); } catch (_) {}
+  }
+
   return all.map(parseRes).filter(r => r.bookRef);  // skip rows with no booking ref
 }
 
@@ -264,18 +349,114 @@ function parseRes(res) {
   const listing  = res.listing || {};
   const checkIn  = (res.checkInDateLocalized  || res.checkIn  || '').slice(0, 10);
   const checkOut = (res.checkOutDateLocalized || res.checkOut || '').slice(0, 10);
-  const numAdults   = Number(res.guestsCount?.adults  ?? res.numAdults    ?? 0) || 0;
-  const numChildren = Number(res.guestsCount?.children ?? res.numChildren ?? 0) || 0;
-  const numPets     = Number(res.numberOfPets ?? 0) || 0;
-  const guestName   = guest.fullName || [guest.firstName, guest.lastName].filter(Boolean).join(' ') || '';
-  const propName    = listing.nickname || listing.title || '';
-  const bookRef     = res.confirmationCode || res.source?.confirmationCode || res.source?.bookingNumber || '';
+
+  // Guest counts — confirmed shape from Cotswold Water Park Retreats' Guesty
+  // tenant (raw response inspection, May 2026):
+  //
+  //   numberOfGuests: {
+  //     numberOfAdults: 8,
+  //     numberOfChildren: 0,
+  //     numberOfInfants: 0,
+  //     numberOfPets: null,
+  //     totalNumberOfGuests: 8
+  //   }
+  //
+  // Older/legacy fallbacks (guestsCount.*, top-level numAdults, etc.) kept
+  // as second-tier in case Guesty changes shape or another tenant differs.
+  const ng = res.numberOfGuests || {};
+  const numAdults = Number(
+    ng.numberOfAdults ??
+    res.guestsCount?.adults ??
+    res.numAdults ?? res.adults ?? 0
+  ) || 0;
+  const numChildren = Number(
+    ng.numberOfChildren ??
+    res.guestsCount?.children ??
+    res.numChildren ?? res.children ?? 0
+  ) || 0;
+  const numInfants = Number(
+    ng.numberOfInfants ??
+    res.guestsCount?.infants ??
+    res.numInfants ?? res.infants ?? 0
+  ) || 0;
+  const numPets = Number(
+    ng.numberOfPets ??
+    res.numberOfPets ?? res.pets ?? res.numPets ?? 0
+  ) || 0;
+
+  // Last-resort total when the breakdown is empty.
+  const adultsForDisplay = numAdults ||
+    Number(ng.totalNumberOfGuests ?? res.numberOfGuests ?? 0) || 0;
+
+  const guestName = guest.fullName ||
+                    [guest.firstName, guest.lastName].filter(Boolean).join(' ') ||
+                    '';
+  const propName  = listing.nickname || listing.title || '';
+  const bookRef   = res.confirmationCode ||
+                    res.source?.confirmationCode ||
+                    res.source?.bookingNumber || '';
+
+  // Reservation notes — confirmed shape from this Guesty tenant:
+  //
+  //   notes: {
+  //     cleaning: "...",     ← housekeeping notes
+  //     other:    "1SK 1 K 4S\nRepeat guest staying for Badminton",
+  //                          ← bed config + operational notes (the Be Here
+  //                            team uses this field for bed config)
+  //     guest:    "..."      ← guest-facing notes
+  //   }
+  //
+  // We read 'other' first (where bed config lives), then merge in cleaning
+  // and guest notes prefixed so the linen team has full context. Strings
+  // and other shapes still fall through notesAsString.
+  let notes = '';
+  if (res.notes && typeof res.notes === 'object' && !Array.isArray(res.notes)) {
+    const otherNote    = notesAsString(res.notes.other);
+    const cleaningNote = notesAsString(res.notes.cleaning);
+    const guestNote    = notesAsString(res.notes.guest);
+    const parts = [];
+    if (otherNote)    parts.push(otherNote);
+    if (cleaningNote) parts.push('Cleaning: ' + cleaningNote);
+    if (guestNote)    parts.push('Guest: ' + guestNote);
+    notes = parts.join(' · ');
+  } else {
+    notes = notesAsString(res.notes);
+  }
+  // Fallbacks if `notes` was missing or empty.
+  if (!notes) notes = notesAsString(res.specialRequests) ||
+                      notesAsString(res.reservationNotes) ||
+                      notesAsString(res.guestNotes) ||
+                      notesAsString(res.description);
+
+  // Custom fields fallback — some Guesty plans expose reservation notes
+  // through customFields[] as { fieldId, value, fieldName }. Walk it
+  // looking for anything that smells like notes / bed config.
+  if (!notes && Array.isArray(res.customFields)) {
+    for (const cf of res.customFields) {
+      const name = (cf?.fieldName || cf?.fieldId || '').toString().toLowerCase();
+      const val  = notesAsString(cf?.value);
+      if (!val) continue;
+      if (/note|bed|config|special|request/i.test(name)) {
+        notes = val;
+        break;
+      }
+    }
+    // Last resort: if there's only one custom field with text, use it.
+    if (!notes) {
+      const textFields = res.customFields
+        .map(cf => ({ name: cf?.fieldName, val: notesAsString(cf?.value) }))
+        .filter(x => x.val);
+      if (textFields.length === 1) notes = textFields[0].val;
+    }
+  }
+
   return {
     raw: res,
     guesty_id: res._id || '',
     bookRef, propName, guestName,
     checkIn, checkOut,
-    numAdults, numChildren, numPets,
+    numAdults: adultsForDisplay, numChildren, numInfants, numPets,
+    notes,
     status: res.status || '',
   };
 }
@@ -391,6 +572,9 @@ function renderResult(guestyCount, arrivalsCount) {
     <div class="stat ok"><div class="num">${_matched.length}</div><div class="lbl">In sync</div></div>
     <div class="stat ${_orphans.length ? 'warn' : 'ok'}"><div class="num">${_orphans.length}</div><div class="lbl">${_orphans.length === 1 ? 'Orphan on Arrivals' : 'Orphans on Arrivals'}</div></div>
     <div class="stat info"><div class="num">${guestyCount}</div><div class="lbl">Guesty total</div></div>
+    <div class="stat info" style="cursor:pointer" onclick="showRawSample()" title="Show raw JSON of one Guesty reservation">
+      <div class="num" style="font-size:18px">🔍</div><div class="lbl">View raw response</div>
+    </div>
   `;
 
   let html = '';
@@ -409,7 +593,7 @@ function renderResult(guestyCount, arrivalsCount) {
       </div>
       <div class="progress-bar hide" id="createPb"><div class="fill" id="createFill" style="width:0%"></div></div>
       <table id="missingTable">
-        <thead><tr><th><input type="checkbox" id="cbAll" checked onchange="toggleAllMissing(this.checked)"></th><th>Property</th><th>Check-in</th><th>Check-out</th><th>Guest</th><th>Booking ref</th><th>Status</th><th>Adults · Kids · Pets</th></tr></thead>
+        <thead><tr><th><input type="checkbox" id="cbAll" checked onchange="toggleAllMissing(this.checked)"></th><th>Property</th><th>Check-in</th><th>Check-out</th><th>Guest</th><th>Booking ref</th><th>Status</th><th>Adults · Kids · Pets</th><th>Notes (bed config)</th></tr></thead>
         <tbody>
         ${_missing.map((g, i) => `<tr id="missing_${i}">
           <td><input type="checkbox" class="cb-missing" data-idx="${i}" checked></td>
@@ -419,7 +603,8 @@ function renderResult(guestyCount, arrivalsCount) {
           <td>${escapeHtml(g.guestName || '<span class="muted">—</span>')}</td>
           <td><code>${escapeHtml(g.bookRef)}</code></td>
           <td>${escapeHtml(g.status)}</td>
-          <td class="muted">${g.numAdults} · ${g.numChildren} · ${g.numPets}</td>
+          <td class="muted">${g.numAdults} · ${g.numChildren}${g.numInfants?` (+${g.numInfants}i)`:''} · ${g.numPets}</td>
+          <td class="muted" title="${escapeHtml(g.notes)}" style="max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escapeHtml(g.notes || '—')}</td>
         </tr>`).join('')}
         </tbody>
       </table>
@@ -477,6 +662,30 @@ function renderResult(guestyCount, arrivalsCount) {
   document.getElementById('content').innerHTML = html;
 }
 
+/* Diagnostic: open a window with the raw JSON of the first reservation
+   pulled. Used when guest counts or notes still show empty — tells us
+   exactly which Guesty field names came back so we can extend parseRes.
+   The first row was stashed by loadGuestyReservations. */
+function showRawSample() {
+  const row = window.__lastGuestyRow;
+  if (!row) {
+    alert('Run a sync first — no reservation cached.');
+    return;
+  }
+  const w = window.open('', '_blank', 'width=720,height=620,resizable,scrollbars');
+  if (!w) {
+    alert('Popup blocked. Open DevTools console and run __lastGuestyRow instead.');
+    return;
+  }
+  const pretty = JSON.stringify(row, null, 2);
+  w.document.write(`<!doctype html><html><head><title>Guesty raw — first reservation</title>
+    <style>body{font-family:ui-monospace,Menlo,monospace;font-size:12px;padding:14px;background:#0e1116;color:#c9d1d9}pre{white-space:pre-wrap;word-break:break-word}</style>
+    </head><body><h3 style="font-family:system-ui;margin-bottom:10px">First reservation — raw JSON</h3>
+    <p style="font-family:system-ui;font-size:13px;color:#999;margin-bottom:14px">If guest counts or notes are blank in the table but you can see them populated in this raw response, copy the field names back to me and I'll add them to the parser.</p>
+    <pre>${pretty.replace(/[&<>]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;'}[c]))}</pre></body></html>`);
+  w.document.close();
+}
+
 function toggleAllMissing(on) {
   document.querySelectorAll('.cb-missing').forEach(cb => { cb.checked = !!on; });
   const all = document.getElementById('cbAll');
@@ -529,6 +738,9 @@ async function createSelected() {
         [AR_CHILDREN]: String(g.numChildren),
         [AR_PETS]:     String(g.numPets),
       };
+      // Notes (bed config) — only set when present so we don't blank-out
+      // the column on bookings without notes.
+      if (g.notes) cv[AR_BEDCFG] = g.notes.slice(0, 250);   // text col cap
       const cvStr = JSON.stringify(JSON.stringify(cv));
       const q = `mutation { create_item(board_id:${ARRIVALS_BOARD}, item_name:${JSON.stringify(itemName)}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
       await mq(q);

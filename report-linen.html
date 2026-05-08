@@ -147,6 +147,7 @@
 
 <script src="secrets.js"></script>
 <script src="linen-schema.js"></script>
+<script src="linen-rules.js"></script>
 <script src="linens-schema.js"></script>
 
 <div class="container">
@@ -264,10 +265,12 @@ let _arrivalBedConfig = '';  // pre-filled bed config snapshot from the Arrivals
 // item key (e.g. 'bathTowels') to the number that was packed. _itemReports
 // maps the same key to { missing, damaged, damageNote } per the housekeeper's
 // taps. Keys are taken from LINEN.bagsColumns.items so they survive a schema
-// rename in one place.
-let _packedTotals = {};
-let _itemReports  = {};
-let _packedReady  = false;   // true once loadPackedItems completed (success or empty)
+// rename in one place. _requiredTotals comes from LinenRules and lets us
+// pre-flag shortages (where packed<required) without the user needing to tap.
+let _packedTotals   = {};
+let _requiredTotals = {};
+let _itemReports    = {};
+let _packedReady    = false;   // true once loadPackedItems completed (success or empty)
 
 // Human-readable names for each item key on the Linen Bags board. Order here
 // determines display order in the packed-items list.
@@ -318,13 +321,16 @@ function setCat(label, btn) {
   document.getElementById('bedFields').classList.toggle('hide', !wantsBed);
   document.getElementById('itemFields').classList.toggle('hide', !wantsItems);
 
-  // Packed-items panel — only meaningful for Missing/Damaged AND only when
-  // we actually have packed-items data for this clean. If we have it, the
-  // panel becomes the primary input and the free-text textarea drops back to
-  // "anything else" / non-required.
-  const hasPacked = wantsItems && Object.keys(_packedTotals).length > 0;
-  document.getElementById('packedFields').classList.toggle('hide', !hasPacked);
-  if (hasPacked) {
+  // Packed-items panel — only meaningful for Missing/Damaged. We show it
+  // whenever we have either packed counts (from Linen Bags) OR required
+  // counts (from LinenRules). When we have both, the rows show packed
+  // vs required with auto-flagged shortages.
+  const hasData = wantsItems && (
+    Object.keys(_packedTotals).length > 0 ||
+    Object.keys(_requiredTotals).length > 0
+  );
+  document.getElementById('packedFields').classList.toggle('hide', !hasData);
+  if (hasData) {
     renderPackedItems(label);
     // Free-text becomes a fallback for items not on the packed list.
     document.getElementById('fItemsLbl').textContent = 'Anything else not in the list above';
@@ -403,41 +409,159 @@ async function loadPackedItems(arrivalId) {
   _packedReady  = true;
 }
 
+/* ───────────────────────────────────────────────────────────────────────
+   Linen requirements — compute what SHOULD have been packed for this
+   booking using LinenRules. Stored in _requiredTotals so renderPackedItems
+   can show "packed N of M" and pre-flag shortages without the housekeeper
+   needing to tap. Best-effort: silent failure leaves _requiredTotals = {}
+   and the panel falls back to showing only what's packed. */
+async function loadRequiredItems(arrivalId) {
+  if (!arrivalId) return;
+  if (!window.LinenRules) return;
+  if (typeof LINEN === 'undefined' || !LINEN.boards) return;
+
+  // Pull the arrival to get bedConfig + adults + children. AR_BED_CONFIG was
+  // already fetched earlier for the Expected field; here we go again with the
+  // extra columns we need. (Could be optimised to one query — left split for
+  // clarity.)
+  const AR_BOOKADULTS  = 'numeric_mm2a5s8r';
+  const AR_BOOKCHILDREN = 'numeric_mm2add81';
+  let arrivalRow = null;
+  try {
+    const data = await mq(`{
+      items(ids:[${arrivalId}]) {
+        column_values(ids:["${AR_BED_CONFIG}","${AR_BOOKADULTS}","${AR_BOOKCHILDREN}"]) { id text value }
+      }
+    }`);
+    arrivalRow = data?.items?.[0] || null;
+  } catch (_) { return; }
+  if (!arrivalRow) return;
+
+  const cv = Object.fromEntries((arrivalRow.column_values || []).map(c => [c.id, c]));
+  const bedConfig = cv[AR_BED_CONFIG]?.text || '';
+  const adults    = Number(cv[AR_BOOKADULTS]?.text || 0)  || 0;
+  const children  = Number(cv[AR_BOOKCHILDREN]?.text || 0) || 0;
+
+  // Pull the property config for this property — needed for bathrooms +
+  // hasHotTub + bedOptions + maxOccupancy. Property name comes from the
+  // staff app's URL param so we already have it.
+  const propertyName = (document.getElementById('fProp')?.value || '').trim();
+  if (!propertyName) return;
+  const PC_FIXED   = 'text_mm2a2a78';
+  const PC_OPTIONS = 'long_text_mm2a30dy';
+  const PC_BATHS   = 'numeric_mm2drc46';
+  const PC_HOTTUB  = 'boolean_mm2rpzzh';
+  let propCfg = null;
+  try {
+    const data = await mq(`{
+      boards(ids:[${LINEN.boards.propertyConfig}]) {
+        items_page(limit:200) {
+          items { id name column_values(ids:["${PC_FIXED}","${PC_OPTIONS}","${PC_BATHS}","${PC_HOTTUB}"]) { id text value } }
+        }
+      }
+    }`);
+    const items = data?.boards?.[0]?.items_page?.items || [];
+    const match = items.find(it => (it.name || '').trim().toLowerCase() === propertyName.toLowerCase());
+    if (match) {
+      const pcv = Object.fromEntries(match.column_values.map(c => [c.id, c]));
+      const optsRaw = (function () {
+        const v = pcv[PC_OPTIONS]?.value;
+        try { return v ? (JSON.parse(v).text || '') : (pcv[PC_OPTIONS]?.text || ''); }
+        catch (_) { return pcv[PC_OPTIONS]?.text || ''; }
+      })();
+      propCfg = {
+        fixedBeds:  pcv[PC_FIXED]?.text || '',
+        bedOptions: optsRaw.split(/\r?\n/).map(s => s.trim()).filter(Boolean),
+        bathrooms:  Number(pcv[PC_BATHS]?.text || 0) || 1,
+        hasHotTub:  !!(function () { try { return JSON.parse(pcv[PC_HOTTUB]?.value || 'null')?.checked; } catch (_) { return false; } })(),
+      };
+    }
+  } catch (_) { /* propCfg stays null — LinenRules handles missing config */ }
+
+  const r = LinenRules.requirementsFor({ bedConfig, adults, children }, propCfg || {});
+  _requiredTotals = r.required;
+}
+
 /* Render the packed-items list for the chosen category. Missing → step
    counter per item; Damaged → tap-to-toggle + optional note. Re-rendered
-   each time the category flips. */
+   each time the category flips.
+
+   Item set = union of items where packed>0 OR required>0. For each row we
+   show "packed N of M" so the housekeeper can immediately see whether the
+   bag was complete. Items where packed<required are pre-flagged as
+   auto-shorted on the Missing category — the housekeeper just confirms,
+   no tapping needed in the typical case. */
 function renderPackedItems(category) {
   const list = document.getElementById('packedList');
   const lbl  = document.getElementById('packedLbl');
   const hint = document.getElementById('packedHint');
-  const items = Object.keys(ITEM_LABELS).filter(k => _packedTotals[k] > 0);
+
+  // Union of canonical item keys (in display order) that have any data.
+  const items = Object.keys(ITEM_LABELS).filter(k =>
+    (_packedTotals[k] || 0) > 0 || (_requiredTotals[k] || 0) > 0
+  );
   if (!items.length) {
-    list.innerHTML = '<div class="pk-empty">No bags found for this clean.</div>';
+    list.innerHTML = '<div class="pk-empty">No bags or requirements found for this clean.</div>';
     return;
   }
 
   const isMissing = (category === 'Missing items');
+  const haveRequired = Object.keys(_requiredTotals).length > 0;
   if (isMissing) {
-    lbl.textContent  = 'Tap − / + for each item that\'s short';
-    hint.textContent = 'Shows what was packed for this clean. Tap + on any row that\'s short.';
+    lbl.textContent  = haveRequired
+      ? 'Auto-flagged shortages — tap − / + to adjust'
+      : 'Tap − / + for each item that\'s short';
+    hint.textContent = haveRequired
+      ? 'Shows packed vs required. Items in amber are short by what\'s shown.'
+      : 'Shows what was packed for this clean. Tap + on any row that\'s short.';
   } else {
     lbl.textContent  = 'Tap any item that\'s damaged or stained';
     hint.textContent = 'Add a note for each damaged item so the linen team can swap stock.';
   }
 
+  // For Missing: pre-populate _itemReports[k].missing with auto-shorted
+  // count (required - packed) on first render, but don't overwrite a value
+  // the user has explicitly tapped. We track this with the sentinel
+  // _itemReports[k].autoShorted to know what we set ourselves.
+  if (isMissing && haveRequired) {
+    for (const k of items) {
+      const req    = _requiredTotals[k] || 0;
+      const packed = _packedTotals[k]   || 0;
+      const autoShort = Math.max(0, req - packed);
+      const r = _itemReports[k] || (_itemReports[k] = { missing:0, damaged:false, damageNote:'' });
+      // Seed missing with auto-shorted count only if user hasn't touched it.
+      if (!r.userTouched && autoShort > 0 && (r.missing || 0) === 0) {
+        r.missing = autoShort;
+        r.autoShorted = autoShort;
+      }
+    }
+  }
+
   list.innerHTML = items.map(key => {
     const label  = ITEM_LABELS[key];
-    const packed = _packedTotals[key];
+    const packed = _packedTotals[key]   || 0;
+    const req    = _requiredTotals[key] || 0;
+    const haveBoth = req > 0 && packed > 0;
     const r = _itemReports[key] || { missing:0, damaged:false, damageNote:'' };
+
+    // Primary count line: "packed N of M" when we know required, just
+    // "packed N" when we don't.
+    const cntStr = req > 0
+      ? (haveBoth ? `packed ${packed} of ${req}` : `required ${req} · packed ${packed}`)
+      : `packed ${packed}`;
+
     if (isMissing) {
       const v = r.missing || 0;
       const flagged = v > 0 ? ' flagged' : '';
+      // Cap the + button when we know required: can't be short more than
+      // the required count. When we don't know required, cap at packed.
+      const ceiling = req > 0 ? req : packed;
       return `<div class="packed-row${flagged}" id="pkRow_${key}">
-        <div class="packed-name">${label}<span class="pk-cnt">packed ${packed}</span></div>
+        <div class="packed-name">${label}<span class="pk-cnt">${cntStr}</span></div>
         <div class="packed-ctrl">
           <button type="button" class="pk-step" onclick="bumpMissing('${key}', -1)" ${v<=0?'disabled':''}>−</button>
           <span class="pk-val ${v===0?'zero':''}" id="pkVal_${key}">${v}</span>
-          <button type="button" class="pk-step" onclick="bumpMissing('${key}', 1)" ${v>=packed?'disabled':''}>+</button>
+          <button type="button" class="pk-step" onclick="bumpMissing('${key}', 1)" ${v>=ceiling?'disabled':''}>+</button>
         </div>
       </div>`;
     } else {
@@ -445,7 +569,7 @@ function renderPackedItems(category) {
       const flagged = r.damaged ? ' flagged-dmg' : '';
       const noteVisible = r.damaged ? '' : ' style="display:none"';
       return `<div class="packed-row${flagged}" id="pkRow_${key}" style="flex-wrap:wrap">
-        <div class="packed-name">${label}<span class="pk-cnt">packed ${packed}</span></div>
+        <div class="packed-name">${label}<span class="pk-cnt">${cntStr}</span></div>
         <div class="packed-ctrl">
           <button type="button" class="pk-toggle${onClass}" id="pkTgl_${key}" onclick="toggleDamaged('${key}')">${r.damaged?'✓ Damaged':'Damaged?'}</button>
         </div>
@@ -459,8 +583,10 @@ function escapeAttr(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&a
 
 function bumpMissing(key, delta) {
   const r = _itemReports[key]; if (!r) return;
-  const max = _packedTotals[key] || 0;
+  // Cap at required when known, otherwise at packed (legacy behaviour).
+  const max = (_requiredTotals[key] || 0) || (_packedTotals[key] || 0);
   r.missing = Math.max(0, Math.min(max, (r.missing||0) + delta));
+  r.userTouched = true;   // stop auto-shorted from overwriting on re-render
   renderPackedItems('Missing items');
 }
 function toggleDamaged(key) {
@@ -483,8 +609,14 @@ function summariseItemReports(category) {
   if (category === 'Missing items') {
     for (const [key, r] of Object.entries(_itemReports)) {
       if ((r.missing||0) > 0) {
-        const packed = _packedTotals[key] || 0;
-        lines.push(`${r.missing}× ${ITEM_LABELS[key]} short (packed ${packed})`);
+        const packed = _packedTotals[key]   || 0;
+        const req    = _requiredTotals[key] || 0;
+        // Prefer "of N" framing when we know required; fall back to
+        // "packed N" when we only know what was bagged.
+        const ctx = req > 0
+          ? `packed ${packed} of ${req}`
+          : `packed ${packed}`;
+        lines.push(`${r.missing}× ${ITEM_LABELS[key]} short (${ctx})`);
       }
     }
   } else if (category === 'Damaged / stained') {
@@ -561,7 +693,10 @@ document.addEventListener('DOMContentLoaded', async () => {
 
     // Packed-items lookup runs in parallel-ish — uses LINEN constants from
     // linen-schema.js (different file from linens-schema.js, naming legacy).
+    // Required-items lookup runs after so it can use the property name set
+    // by the URL pre-fill. Both are best-effort; failures don't block the form.
     try { await loadPackedItems(_arrivalId); } catch (_) {}
+    try { await loadRequiredItems(_arrivalId); } catch (_) {}
   }
 });
 
@@ -720,7 +855,8 @@ function logAnother() {
   document.getElementById('itemFields').classList.add('hide');
   document.getElementById('packedFields').classList.add('hide');
   // Reset the per-item flags so the next submission starts from zero. Keep
-  // _packedTotals — same clean, same packed bags.
+  // _packedTotals and _requiredTotals — same clean, same packed bags + same
+  // requirements. userTouched is reset so auto-shortage seeding re-applies.
   for (const k of Object.keys(_itemReports)) {
     _itemReports[k] = { missing:0, damaged:false, damageNote:'' };
   }

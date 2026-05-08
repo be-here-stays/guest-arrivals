@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#272F2E">
+<title>Pack a bag — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+         background:var(--bg); color:var(--dark); min-height:100vh;
+         padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 96px); }
+
+  header { background:var(--dark); color:#fff; padding:16px 18px; padding-top:max(16px,env(safe-area-inset-top));
+           display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  header h1 { font-size:17px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.65; margin-top:2px; }
+  .hdr-back { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; }
+
+  .container { max-width:580px; margin:0 auto; padding:14px 14px; }
+
+  .ctx { background:var(--blue-bg); border-radius:9px; padding:10px 12px; margin-bottom:14px;
+         font-size:13px; color:var(--blue); }
+  .ctx strong { color:#0c3a5a; }
+  .ctx .row { padding:2px 0; }
+  .ctx .status-pill { display:inline-block; padding:2px 8px; border-radius:6px; font-size:11px;
+                       font-weight:700; margin-left:6px; vertical-align:middle; text-transform:uppercase; letter-spacing:0.4px; }
+  .ctx .status-pill.confirmed { background:var(--green); color:#fff; }
+  .ctx .status-pill.fixed     { background:var(--sage); color:#fff; }
+  .ctx .status-pill.assumed   { background:var(--amber); color:#fff; }
+
+  .card { background:var(--surface); border-radius:14px; padding:12px; margin-bottom:14px;
+          box-shadow:0 1px 4px rgba(39,47,46,0.08); }
+  .card-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px;
+                color:var(--sage); margin-bottom:8px; padding:0 4px; }
+
+  /* Pack list */
+  .pack-list { border:1px solid var(--border); border-radius:10px; overflow:hidden; }
+  .pack-row { display:flex; align-items:center; gap:10px; padding:10px 12px;
+              background:#fff; border-bottom:1px solid var(--border); cursor:pointer;
+              user-select:none; transition:background 0.15s; }
+  .pack-row:last-child { border-bottom:0; }
+  .pack-row:active { background:#f6f4ee; }
+  .pack-row.packed { background:var(--green-bg); }
+  .pack-row.packed .pack-name { color:var(--green); }
+  .pack-row.packed .pack-tick::before { content:'✓'; color:#fff; background:var(--green);
+                                         border-color:var(--green); }
+  .pack-row.short { background:var(--amber-bg); }
+
+  .pack-tick { flex:0 0 28px; height:28px; }
+  .pack-tick::before { content:''; display:inline-block; width:24px; height:24px;
+                       border:2px solid var(--sage-mid); border-radius:6px; line-height:20px;
+                       text-align:center; font-weight:700; font-size:15px; }
+
+  .pack-name { flex:1 1 auto; font-size:14px; font-weight:600; color:var(--dark); min-width:0; }
+  .pack-name .req { font-weight:500; color:var(--sage-mid); margin-left:6px; font-size:12px; }
+
+  .pack-qty { flex:0 0 auto; display:flex; align-items:center; gap:4px; }
+  .pack-step { width:28px; height:28px; display:inline-flex; align-items:center; justify-content:center;
+               border:1.5px solid var(--border); border-radius:7px; background:#fff;
+               font-size:18px; font-weight:700; color:var(--dark); cursor:pointer; user-select:none; }
+  .pack-step:disabled { opacity:0.3; cursor:not-allowed; }
+  .pack-val { min-width:24px; text-align:center; font-weight:700; font-size:14px; color:var(--dark); }
+
+  /* Sticky bottom bar */
+  .bottom-bar { position:fixed; bottom:0; left:0; right:0; background:var(--dark); color:#fff;
+                padding:14px 16px; padding-bottom:calc(14px + env(safe-area-inset-bottom, 0px));
+                display:flex; align-items:center; justify-content:space-between; gap:10px;
+                box-shadow:0 -2px 10px rgba(0,0,0,0.15); z-index:10; }
+  .bottom-bar .summary { font-size:13px; font-weight:600; }
+  .bottom-bar .summary .ok { color:#a3e2c0; }
+  .bottom-bar .summary .pending { color:var(--cream); }
+  .submit-btn { padding:11px 18px; background:var(--cream); color:var(--dark); border:0; border-radius:9px;
+                font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+  .submit-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+  .msg { padding:10px 14px; border-radius:9px; font-size:13px; font-weight:600; margin-bottom:14px; display:none; }
+  .msg.show { display:block; }
+  .msg.success { background:var(--green-bg); color:var(--green); }
+  .msg.error   { background:var(--red-bg); color:var(--red); }
+  .msg.info    { background:var(--blue-bg); color:var(--blue); }
+
+  .empty-state { text-align:center; padding:40px 20px; color:var(--sage-mid); font-size:14px; }
+
+  .controls { display:flex; gap:8px; margin:0 0 10px; flex-wrap:wrap; }
+  .ctrl-btn { padding:8px 12px; background:#fff; border:1.5px solid var(--border); border-radius:8px;
+              font-family:inherit; font-size:12px; font-weight:600; color:var(--dark); cursor:pointer; }
+  .ctrl-btn:hover { border-color:var(--sage); }
+
+  .hide { display:none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🧺 Pack a bag</h1>
+    <div class="sub">Required vs packed for one changeover</div>
+  </div>
+  <a id="backLink" class="hdr-back" href="hub.html">‹ Back</a>
+</header>
+
+<script src="secrets.js"></script>
+<script src="linen-schema.js"></script>
+<script src="linen-rules.js"></script>
+
+<div class="container">
+  <div id="msgBox" class="msg"></div>
+  <div id="ctxBox" class="ctx hide"></div>
+
+  <div class="card hide" id="packCard">
+    <div class="card-title">Packing list</div>
+    <div class="controls">
+      <button class="ctrl-btn" onclick="markAllRequired()">Tick all to required</button>
+      <button class="ctrl-btn" onclick="resetAll()">Reset</button>
+    </div>
+    <div class="pack-list" id="packList"></div>
+  </div>
+
+  <div class="empty-state hide" id="emptyState">
+    Loading booking…
+  </div>
+</div>
+
+<div class="bottom-bar hide" id="bottomBar">
+  <div class="summary" id="summary">—</div>
+  <button class="submit-btn" id="submitBtn" onclick="savePack()">Save bag</button>
+</div>
+
+<script>
+const URL_API       = 'https://api.monday.com/v2';
+const ARRIVALS_BOARD = '5094453064';
+// Arrivals columns (mirrors guesty-sync.html / staff.html constants)
+const AR_PROP    = 'text_mm2ahbrx';
+const AR_BOOKREF = 'text_mm2ah8s';
+const AR_BEDCFG  = 'text_mm2ab56m';
+const AR_DATE    = 'date_mm2adtwg';
+const AR_ADULTS  = 'numeric_mm2a5s8r';
+const AR_CHILD   = 'numeric_mm2add81';
+const AR_PETS    = 'numeric_mm2ahz0x';
+
+// Property Config columns from linen-schema (mirrored here so this page works
+// even if linen-schema.js loads slowly)
+const PC_FIXED    = 'text_mm2a2a78';
+const PC_OPTIONS  = 'long_text_mm2a30dy';
+const PC_BATHS    = 'numeric_mm2drc46';
+const PC_HOTTUB   = 'boolean_mm2rpzzh';
+
+let _arrivalId = '';
+let _arrival   = null;     // { property, bookRef, bedConfig, adults, children, ... }
+let _propCfg   = null;     // { fixedBeds, bedOptions, bathrooms, hasHotTub, maxOccupancy }
+let _required  = {};       // counts (output of LinenRules.requiredLinen)
+let _packed    = {};       // user-confirmed counts
+let _existingBagId = null; // if a bag for this arrival already exists, we update it
+
+async function mq(query) {
+  const r = await fetch(URL_API, {
+    method: 'POST',
+    headers: { 'Content-Type':'application/json',
+               Authorization: window.MONDAY_API_TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify({ query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error('Monday: ' + j.errors[0].message);
+  return j.data;
+}
+
+function showMsg(text, type) {
+  const box = document.getElementById('msgBox');
+  box.textContent = text;
+  box.className = 'msg show ' + type;
+  if (type === 'success') setTimeout(() => box.classList.remove('show'), 5000);
+}
+
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function pj(v) { if (v == null || v === '') return null; try { return typeof v==='string' ? JSON.parse(v) : v; } catch { return null; } }
+
+/* ── Load the arrival + property config ───────────────────────────────── */
+async function loadArrival(arrivalId) {
+  const data = await mq(`{
+    items(ids:[${arrivalId}]) {
+      id name
+      column_values(ids:["${AR_PROP}","${AR_BOOKREF}","${AR_BEDCFG}","${AR_DATE}","${AR_ADULTS}","${AR_CHILD}","${AR_PETS}"]) {
+        id text value
+      }
+    }
+  }`);
+  const it = data?.items?.[0];
+  if (!it) throw new Error('Arrival not found: id ' + arrivalId);
+  const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+  return {
+    id: it.id,
+    name: it.name,
+    property:  cv[AR_PROP]?.text || '',
+    bookRef:   cv[AR_BOOKREF]?.text || '',
+    bedConfig: cv[AR_BEDCFG]?.text || '',
+    checkIn:   pj(cv[AR_DATE]?.value)?.date || '',
+    adults:    Number(cv[AR_ADULTS]?.text || 0) || 0,
+    children:  Number(cv[AR_CHILD]?.text || 0) || 0,
+    pets:      Number(cv[AR_PETS]?.text || 0) || 0,
+  };
+}
+
+async function loadPropertyConfig(propertyName) {
+  if (!propertyName) return null;
+  if (typeof LINEN === 'undefined') return null;
+  const cols = [PC_FIXED, PC_OPTIONS, PC_BATHS, PC_HOTTUB].map(c => `"${c}"`).join(',');
+  const data = await mq(`{
+    boards(ids:[${LINEN.boards.propertyConfig}]) {
+      items_page(limit:200) {
+        items { id name column_values(ids:[${cols}]) { id text value } }
+      }
+    }
+  }`);
+  const items = data?.boards?.[0]?.items_page?.items || [];
+  const match = items.find(it => (it.name || '').trim().toLowerCase() === propertyName.trim().toLowerCase());
+  if (!match) return null;
+  const cv = Object.fromEntries(match.column_values.map(c => [c.id, c]));
+  const optsRaw = pj(cv[PC_OPTIONS]?.value)?.text || cv[PC_OPTIONS]?.text || '';
+  // bedOptions in long_text are typically newline-separated alternatives.
+  const bedOptions = optsRaw.split(/\r?\n/).map(s => s.trim()).filter(Boolean);
+  return {
+    propertyId: match.id,
+    fixedBeds:  cv[PC_FIXED]?.text || '',
+    bedOptions,
+    bathrooms:  Number(cv[PC_BATHS]?.text || 0) || 1,
+    hasHotTub:  !!(pj(cv[PC_HOTTUB]?.value)?.checked),
+  };
+}
+
+/* ── Existing bag for this arrival? Reuse rather than duplicate ─────────── */
+async function findExistingBag(arrivalId) {
+  if (typeof LINEN === 'undefined') return null;
+  const c = LINEN.bagsColumns;
+  const itemColIds = Object.values(c.items);
+  const colsArg = [c.arrival, c.linenType, c.status, ...itemColIds].map(x => `"${x}"`).join(',');
+  const data = await mq(`{
+    boards(ids:[${LINEN.boards.bags}]) {
+      items_page(limit:200) {
+        items {
+          id name
+          column_values(ids:[${colsArg}]) {
+            id text value
+            ... on BoardRelationValue { linked_item_ids }
+          }
+        }
+      }
+    }
+  }`);
+  const items = data?.boards?.[0]?.items_page?.items || [];
+  const want = String(arrivalId);
+  const match = items.find(it => {
+    const cv = it.column_values.find(x => x.id === c.arrival);
+    return cv && (cv.linked_item_ids || []).map(String).includes(want);
+  });
+  if (!match) return null;
+  const cv = Object.fromEntries(match.column_values.map(x => [x.id, x]));
+  const packed = {};
+  for (const [key, colId] of Object.entries(c.items)) {
+    packed[key] = Number(cv[colId]?.text || cv[colId]?.value || 0) || 0;
+  }
+  return { id: match.id, name: match.name, packed };
+}
+
+/* ── Render the pack list ─────────────────────────────────────────────── */
+function renderList() {
+  const list = document.getElementById('packList');
+  const items = window.LinenRules ? LinenRules.nonZeroItems(_required) : [];
+  if (!items.length) {
+    list.innerHTML = '<div class="empty-state" style="padding:24px">No items required for this booking. Check that the property config has fixedBeds set.</div>';
+    return;
+  }
+  list.innerHTML = items.map(key => {
+    const label  = LinenRules.ITEM_LABELS[key] || key;
+    const req    = _required[key] || 0;
+    const packed = _packed[key]   || 0;
+    let cls = '';
+    if (packed >= req && req > 0) cls = ' packed';
+    else if (packed > 0 && packed < req) cls = ' short';
+    return `<div class="pack-row${cls}" id="row_${key}" onclick="bumpPacked('${key}', 1, event)">
+      <div class="pack-tick"></div>
+      <div class="pack-name">${escapeHtml(label)}<span class="req">required ${req}</span></div>
+      <div class="pack-qty" onclick="event.stopPropagation()">
+        <button class="pack-step" onclick="bumpPacked('${key}', -1)" ${packed<=0?'disabled':''}>−</button>
+        <span class="pack-val" id="val_${key}">${packed}</span>
+        <button class="pack-step" onclick="bumpPacked('${key}', 1)">+</button>
+      </div>
+    </div>`;
+  }).join('');
+  updateSummary();
+}
+
+function bumpPacked(key, delta, ev) {
+  if (ev) ev.stopPropagation();
+  // Tap on the row body (delta=1 from row click) OR step buttons.
+  const cur = _packed[key] || 0;
+  const next = Math.max(0, cur + delta);
+  _packed[key] = next;
+  renderList();
+}
+
+function markAllRequired() {
+  if (!window.LinenRules) return;
+  for (const key of LinenRules.nonZeroItems(_required)) {
+    _packed[key] = _required[key];
+  }
+  renderList();
+}
+function resetAll() {
+  for (const key of Object.keys(_packed)) _packed[key] = 0;
+  renderList();
+}
+
+/* Bottom-bar summary line: "X of Y items packed" with status colour. */
+function updateSummary() {
+  if (!window.LinenRules) return;
+  const items = LinenRules.nonZeroItems(_required);
+  const ok = items.filter(k => (_packed[k] || 0) >= (_required[k] || 0)).length;
+  const total = items.length;
+  const sum = document.getElementById('summary');
+  const cls = ok === total ? 'ok' : 'pending';
+  sum.innerHTML = `<span class="${cls}">${ok}/${total}</span> items packed`;
+  document.getElementById('submitBtn').disabled = (total === 0);
+}
+
+/* ── Save: create or update the Linen Bags row ────────────────────────── */
+async function savePack() {
+  if (typeof LINEN === 'undefined') {
+    showMsg('Linen schema not loaded — refresh the page.', 'error');
+    return;
+  }
+  const c = LINEN.bagsColumns;
+  const today = new Date().toISOString().slice(0, 10);
+  const linenLabel = 'Own';     // pack-bag is generic; laundry-rota sets Regency where needed
+
+  const cv = {
+    [c.arrival]:    { item_ids: [Number(_arrivalId)] },
+    [c.linenType]:  { label: linenLabel },
+    [c.status]:     { label: 'Bagged' },
+    [c.baggedAt]:   { date: today },
+  };
+  for (const [key, colId] of Object.entries(c.items)) {
+    cv[colId] = String(_packed[key] || 0);
+  }
+
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true; btn.textContent = 'Saving…';
+  try {
+    const cvStr = JSON.stringify(JSON.stringify(cv));
+    if (_existingBagId) {
+      await mq(`mutation { change_multiple_column_values(board_id:"${LINEN.boards.bags}", item_id:"${_existingBagId}", column_values:${cvStr}, create_labels_if_missing:true) { id } }`);
+    } else {
+      const bagName = `${_arrival.property} · ${linenLabel} · ${today}`;
+      await mq(`mutation { create_item(board_id:${LINEN.boards.bags}, item_name:${JSON.stringify(bagName)}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`);
+    }
+    showMsg('✓ Bag saved', 'success');
+    btn.textContent = '✓ Saved';
+    setTimeout(() => { btn.textContent = 'Save bag'; btn.disabled = false; }, 1500);
+  } catch (e) {
+    showMsg('Save failed: ' + e.message, 'error');
+    btn.disabled = false; btn.textContent = 'Save bag';
+  }
+}
+
+/* ── Boot ─────────────────────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', async () => {
+  const params = new URLSearchParams(location.search);
+  _arrivalId = params.get('arrival_id') || params.get('id') || '';
+  if (params.get('from') === 'staff') {
+    document.getElementById('backLink').href = 'staff.html';
+    document.getElementById('backLink').textContent = '‹ My Day';
+  } else if (params.get('from') === 'rota') {
+    document.getElementById('backLink').href = 'laundry-rota.html';
+    document.getElementById('backLink').textContent = '‹ Laundry rota';
+  }
+
+  if (!_arrivalId) {
+    document.getElementById('emptyState').classList.remove('hide');
+    document.getElementById('emptyState').textContent = 'No arrival_id provided. Open this page from a clean card or laundry rota row.';
+    return;
+  }
+
+  document.getElementById('emptyState').classList.remove('hide');
+  document.getElementById('emptyState').textContent = 'Loading booking…';
+
+  try {
+    _arrival = await loadArrival(_arrivalId);
+  } catch (e) {
+    document.getElementById('emptyState').textContent = e.message;
+    return;
+  }
+
+  // Property config + existing bag run in parallel — both are best-effort.
+  let cfg = null, existing = null;
+  try { cfg = await loadPropertyConfig(_arrival.property); } catch (_) {}
+  try { existing = await findExistingBag(_arrivalId); } catch (_) {}
+  _propCfg = cfg;
+  if (existing) {
+    _existingBagId = existing.id;
+    _packed = { ...existing.packed };
+  }
+
+  // Compute requirements via the shared rules module.
+  if (!window.LinenRules) {
+    document.getElementById('emptyState').textContent = 'linen-rules.js not loaded — check the script tag.';
+    return;
+  }
+  const r = LinenRules.requirementsFor(_arrival, _propCfg || {});
+  _required = r.required;
+
+  // Render the booking-context pill at the top.
+  const ctx = document.getElementById('ctxBox');
+  ctx.classList.remove('hide');
+  const guests = (_arrival.adults || 0) + (_arrival.children || 0);
+  const statusLabel = r.status[0].toUpperCase() + r.status.slice(1);
+  ctx.innerHTML = `
+    <div class="row"><strong>${escapeHtml(_arrival.property)}</strong>
+      ${_arrival.bookRef ? ` · <code>${escapeHtml(_arrival.bookRef)}</code>` : ''}
+      ${_arrival.checkIn ? ` · check-in ${escapeHtml(_arrival.checkIn)}` : ''}
+    </div>
+    <div class="row">Beds: ${escapeHtml(r.summary || '—')}
+      <span class="status-pill ${r.status}">${statusLabel}</span>
+    </div>
+    <div class="row">${guests || '?'} guest${guests===1?'':'s'}
+      ${_arrival.adults  ? ` · ${_arrival.adults} adult${_arrival.adults===1?'':'s'}` : ''}
+      ${_arrival.children? ` · ${_arrival.children} child${_arrival.children===1?'':'ren'}` : ''}
+      ${_arrival.pets    ? ` · ${_arrival.pets} pet${_arrival.pets===1?'':'s'}` : ''}
+      ${_propCfg?.bathrooms ? ` · ${_propCfg.bathrooms} bathroom${_propCfg.bathrooms===1?'':'s'}` : ''}
+      ${_propCfg?.hasHotTub ? ' · hot tub' : ''}
+    </div>
+    ${_existingBagId ? '<div class="row" style="margin-top:6px;font-style:italic">📦 Existing bag found — editing in place.</div>' : ''}
+  `;
+
+  document.getElementById('emptyState').classList.add('hide');
+  document.getElementById('packCard').classList.remove('hide');
+  document.getElementById('bottomBar').classList.remove('hide');
+  renderList();
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,804 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Changeover radar — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+         background:var(--bg); color:var(--dark); min-height:100vh; padding:0; }
+
+  header { background:var(--dark); color:#fff; padding:14px 22px;
+           display:flex; align-items:center; justify-content:space-between; gap:14px; }
+  header h1 { font-size:18px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.65; margin-top:2px; }
+  .hdr-back { color:rgba(255,255,255,0.7); text-decoration:none; font-size:13px; font-weight:600; }
+
+  .container { max-width:1200px; margin:0 auto; padding:14px 16px 60px; }
+
+  .info-strip { background:var(--green-bg); border-left:4px solid var(--green); border-radius:8px;
+                padding:10px 14px; margin-bottom:12px; font-size:13px; line-height:1.5; }
+  .info-strip strong { color:var(--green); }
+
+  .card { background:var(--surface); border-radius:12px; padding:14px 16px; margin-bottom:12px;
+          box-shadow:0 1px 4px rgba(39,47,46,0.08); }
+
+  .filters { display:flex; gap:12px; flex-wrap:wrap; align-items:flex-end; }
+  .field { flex:0 1 180px; }
+  .field label { display:block; font-size:11px; font-weight:700; color:var(--sage);
+                 margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px; }
+  .field input, .field select {
+    width:100%; padding:9px 11px; border:1.5px solid var(--border); border-radius:8px;
+    font-family:inherit; font-size:14px; color:var(--dark); background:#fff; outline:none;
+  }
+
+  .run-btn { padding:10px 18px; background:var(--dark); color:var(--cream); border:0;
+             border-radius:8px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+  .run-btn:hover { background:var(--sage); }
+  .run-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .run-btn.amber { background:var(--amber); color:#fff; }
+  .run-btn.green { background:var(--green); color:#fff; }
+
+  .summary { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:10px;
+             margin-bottom:14px; }
+  .pill { background:var(--surface); border:1px solid var(--border); border-radius:10px;
+          padding:11px 14px; }
+  .pill .num { display:block; font-size:24px; font-weight:800; }
+  .pill .lbl { display:block; font-size:11px; color:var(--sage-mid); text-transform:uppercase;
+               letter-spacing:0.5px; margin-top:2px; }
+  .pill.bad   .num { color:var(--red); }
+  .pill.warn  .num { color:var(--amber); }
+  .pill.ok    .num { color:var(--green); }
+  .pill.info  .num { color:var(--blue); }
+
+  /* Filter chips */
+  .chips { display:flex; gap:6px; margin-bottom:10px; flex-wrap:wrap; }
+  .chip { padding:6px 12px; background:#fff; border:1.5px solid var(--border); border-radius:18px;
+          font-family:inherit; font-size:12px; font-weight:600; color:var(--sage); cursor:pointer; }
+  .chip:hover { border-color:var(--sage); color:var(--dark); }
+  .chip.active { background:var(--dark); color:var(--cream); border-color:var(--dark); }
+
+  table { width:100%; border-collapse:collapse; background:#fff; border-radius:11px; overflow:hidden;
+          box-shadow:0 1px 4px rgba(39,47,46,0.06); }
+  th, td { padding:10px 12px; text-align:left; font-size:13px; border-bottom:1px solid var(--border); }
+  th { font-size:11px; font-weight:700; color:var(--sage); text-transform:uppercase;
+       letter-spacing:0.5px; background:#fafaf6; position:sticky; top:0; z-index:1; }
+  tr:hover td { background:#fafaf6; }
+  td .ref { font-family:ui-monospace,Menlo,monospace; font-size:11px; color:var(--sage); }
+  td.muted { color:var(--sage-mid); font-size:12px; }
+
+  .status-pill { display:inline-flex; align-items:center; gap:5px; padding:4px 10px;
+                 border-radius:14px; font-size:12px; font-weight:700; cursor:pointer;
+                 border:1.5px solid transparent; user-select:none; }
+  .status-pill.ok      { background:var(--green-bg); color:var(--green); border-color:transparent; cursor:default; }
+  .status-pill.missing { background:var(--red-bg);   color:var(--red);   border-color:var(--red); }
+  .status-pill.dup     { background:var(--amber-bg); color:var(--amber); border-color:var(--amber); }
+  .status-pill.na      { background:#f3f0e6;         color:var(--sage-mid); cursor:default; }
+  .status-pill .dot { width:6px; height:6px; border-radius:50%; display:inline-block; background:currentColor; }
+  .status-pill:hover.missing,
+  .status-pill:hover.dup { filter:brightness(0.95); }
+
+  .bulk-bar { display:flex; gap:10px; align-items:center; margin-bottom:10px; flex-wrap:wrap; }
+  .bulk-bar .help { font-size:12px; color:var(--sage); }
+
+  .empty { padding:40px 20px; text-align:center; color:var(--sage-mid); font-style:italic; }
+
+  .msg { padding:11px 14px; border-radius:9px; font-size:13px; font-weight:600; margin-bottom:12px; display:none; }
+  .msg.show { display:block; }
+  .msg.success { background:var(--green-bg); color:var(--green); }
+  .msg.error   { background:var(--red-bg); color:var(--red); }
+  .msg.info    { background:var(--blue-bg); color:var(--blue); }
+
+  /* Modal for action confirmations */
+  .modal-overlay { position:fixed; top:0; left:0; right:0; bottom:0; background:rgba(0,0,0,0.45);
+                   display:none; align-items:center; justify-content:center; padding:14px; z-index:50; }
+  .modal-overlay.open { display:flex; }
+  .modal-card { background:#fff; border-radius:12px; padding:18px; max-width:520px; width:100%;
+                box-shadow:0 6px 28px rgba(0,0,0,0.25); }
+  .modal-card h3 { font-size:16px; font-weight:700; margin-bottom:10px; }
+  .modal-card p  { font-size:13px; line-height:1.5; color:var(--dark); margin-bottom:10px; }
+  .modal-card .modal-row { display:flex; gap:8px; justify-content:flex-end; margin-top:14px; flex-wrap:wrap; }
+  .modal-card .modal-row button { padding:9px 14px; border-radius:8px; font-family:inherit;
+                                  font-size:13px; font-weight:700; cursor:pointer; border:1.5px solid var(--border); background:#fff; color:var(--dark); }
+  .modal-card .modal-row button.primary { background:var(--dark); color:var(--cream); border-color:var(--dark); }
+  .modal-card .modal-row button.danger  { background:var(--red); color:#fff; border-color:var(--red); }
+
+  .dup-list { background:var(--amber-bg); padding:8px 10px; border-radius:8px; margin:6px 0;
+              font-size:12px; }
+  .dup-list .dup-item { display:flex; justify-content:space-between; gap:8px; padding:4px 0; }
+  .dup-list a { color:var(--amber); text-decoration:underline; font-weight:600; }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>📡 Changeover radar</h1>
+    <div class="sub">Coverage check across Arrivals · Cleans · Linen Bags · HT Cleans</div>
+  </div>
+  <a class="hdr-back" href="hub.html">‹ Hub</a>
+</header>
+
+<script src="secrets.js"></script>
+<script src="linen-schema.js"></script>
+
+<div class="container">
+  <div class="info-strip">
+    <strong>What this page does:</strong>
+    For every booking in the date window, checks whether you have <strong>exactly one</strong> Cleans row, Linen Bag, and (where the property has a hot tub) at least one HT Clean linked to it.
+    <strong>Missing</strong> shows red, <strong>duplicate</strong> shows amber. Tap a red pill to create the missing row; tap an amber pill to see and resolve duplicates.
+  </div>
+
+  <div id="msgBox" class="msg"></div>
+
+  <div class="card">
+    <div class="filters">
+      <div class="field">
+        <label for="fromInp">From (check-in)</label>
+        <input type="date" id="fromInp">
+      </div>
+      <div class="field">
+        <label for="toInp">To (check-in)</label>
+        <input type="date" id="toInp">
+      </div>
+      <div><button class="run-btn" id="runBtn" onclick="runRadar()">Scan</button></div>
+      <div><button class="run-btn green" id="bulkBtn" onclick="bulkCreateMissing()" disabled>✓ Create all missing</button></div>
+    </div>
+  </div>
+
+  <div class="summary" id="summary"></div>
+
+  <div class="chips" id="chips"></div>
+
+  <div id="content"></div>
+</div>
+
+<div class="modal-overlay" id="modal">
+  <div class="modal-card" id="modalCard">
+    <!-- populated dynamically -->
+  </div>
+</div>
+
+<script>
+/* ─── Config ──────────────────────────────────────────── */
+const URL_API = 'https://api.monday.com/v2';
+
+const ARRIVALS_BOARD     = 5094453064;
+const CLEANS_BOARD       = 5095134636;
+const HT_CLEANS_BOARD    = 5095259581;
+const PROP_CONFIG_BOARD  = 5094466278;
+// LINEN_BAGS_BOARD comes from linen-schema.js (LINEN.boards.bags = 5095654933)
+
+/* Arrivals columns */
+const AR_DATE     = 'date_mm2adtwg';
+const AR_CHECKOUT = 'date_mm31c5jt';
+const AR_PROP     = 'text_mm2ahbrx';
+const AR_BOOKREF  = 'text_mm2ah8s';
+
+/* Cleans columns */
+const CL_DATE     = 'date_mm2pphc';
+const CL_PROP     = 'board_relation_mm2psy0b';   // board_relation → Property Config
+const CL_HRS      = 'numeric_mm2pmqdt';
+const CL_START    = 'hour_mm2pskhh';
+const CL_ARRIVAL  = 'board_relation_mm31mkyp';   // → Arrivals
+
+/* HT Cleans columns */
+const HC_DATE    = 'date_mm2rvsp9';
+const HC_PROP    = 'board_relation_mm2rjw3';     // → Property Config
+const HC_TYPE    = 'color_mm2rr4cv';             // status: Full Clean / Mid-Stay / Mid-Vac
+const HC_STATUS  = 'color_mm2rqkeq';
+const HC_ARRIVAL = 'board_relation_mm31mzvh';    // → Arrivals
+
+/* Property Config columns */
+const PC_STD_HRS     = 'numeric_mm2pbsy1';
+const PC_DEF_CHECKIN = 'hour_mm2pbbnf';
+const PC_MANAGED     = 'boolean_mm2pjb1';
+const PC_LOCAL       = 'boolean_mm2p7m8p';
+const PC_HAS_TUB     = 'boolean_mm2rpzzh';
+
+/* ─── State ─────────────────────────────────────────── */
+let _arrivals  = [];     // [{id, name, property, checkin, checkout, bookRef}]
+let _cleans    = [];     // [{id, name, arrivalId}]
+let _hts       = [];     // [{id, name, arrivalId, type}]
+let _bags      = [];     // [{id, name, arrivalId}]
+let _props     = {};     // name → {itemId, managed, local, hasTub, stdHrs, defCheckin}
+let _rows      = [];     // computed coverage rows
+let _filter    = 'all';  // all / gaps / dups
+let _bagsConf  = null;   // LINEN config (boardId, columns) — set after load
+
+/* ─── Plumbing ──────────────────────────────────────── */
+async function mq(query, variables) {
+  const r = await fetch(URL_API, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json',
+              Authorization: window.MONDAY_API_TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error('Monday: ' + j.errors[0].message);
+  return j.data;
+}
+
+function pj(v) { if (v == null || v === '') return null; try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; } }
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtUK(iso) {
+  if (!iso) return '';
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}-${m[2]}-${m[1].slice(2)}` : iso;
+}
+function todayISO() { return new Date().toISOString().slice(0,10); }
+function addDaysISO(iso, n) { const d = new Date(iso + 'T12:00'); d.setDate(d.getDate()+n); return d.toISOString().slice(0,10); }
+function showMsg(text, type) {
+  const box = document.getElementById('msgBox');
+  box.textContent = text; box.className = 'msg show ' + type;
+  if (type === 'success') setTimeout(() => box.classList.remove('show'), 5000);
+}
+
+/* ─── Boot ──────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('fromInp').value = todayISO();
+  document.getElementById('toInp').value   = addDaysISO(todayISO(), 7);
+  renderChips();
+  // Auto-run on first load.
+  runRadar();
+});
+
+/* ─── Loaders ───────────────────────────────────────── */
+
+/* Arrivals: pull every row, filter client-side. We pull the full board
+   because Monday's date-column query_params silently 0-out on syntax
+   mismatch (we got bitten by this on guesty-sync). 50-page cap is overkill
+   for typical Arrivals boards but stops a runaway. */
+async function loadArrivals(from, to) {
+  let cursor = null, all = [], pages = 0;
+  do {
+    const cursorPart = cursor ? `, cursor:"${cursor}"` : '';
+    const data = await mq(`{
+      boards(ids:[${ARRIVALS_BOARD}]) {
+        items_page(limit:500${cursorPart}) {
+          cursor
+          items {
+            id name
+            column_values(ids:["${AR_DATE}","${AR_CHECKOUT}","${AR_PROP}","${AR_BOOKREF}"]) {
+              id text value
+            }
+          }
+        }
+      }
+    }`);
+    const page = data.boards[0].items_page;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+    pages++;
+    if (pages > 50) break;
+  } while (cursor);
+
+  const rows = all.map(it => {
+    const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+    const date = pj(cv[AR_DATE]?.value)?.date || '';
+    const out = pj(cv[AR_CHECKOUT]?.value)?.date || '';
+    return {
+      id: String(it.id),
+      name: it.name,
+      property: (cv[AR_PROP]?.text || '').trim(),
+      checkin:  date,
+      checkout: out,
+      bookRef:  (cv[AR_BOOKREF]?.text || '').trim(),
+    };
+  });
+  return rows.filter(a => a.checkin >= from && a.checkin <= to);
+}
+
+/* Cleans: pull all, keep only those linked to one of our in-window arrivals.
+   The link column is read with the BoardRelationValue fragment so
+   linked_item_ids is reliably populated. */
+async function loadCleans(arrivalIds) {
+  const wanted = new Set(arrivalIds);
+  let cursor = null, all = [], pages = 0;
+  do {
+    const cursorPart = cursor ? `, cursor:"${cursor}"` : '';
+    const data = await mq(`{
+      boards(ids:[${CLEANS_BOARD}]) {
+        items_page(limit:500${cursorPart}) {
+          cursor
+          items {
+            id name
+            column_values(ids:["${CL_ARRIVAL}","${CL_DATE}"]) {
+              id text value
+              ... on BoardRelationValue { linked_item_ids }
+            }
+          }
+        }
+      }
+    }`);
+    const page = data.boards[0].items_page;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+    pages++;
+    if (pages > 50) break;
+  } while (cursor);
+
+  return all.flatMap(it => {
+    const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+    const ids = (cv[CL_ARRIVAL]?.linked_item_ids || []).map(String);
+    return ids.filter(id => wanted.has(id)).map(id => ({ id: String(it.id), name: it.name, arrivalId: id }));
+  });
+}
+
+async function loadHTCleans(arrivalIds) {
+  const wanted = new Set(arrivalIds);
+  let cursor = null, all = [], pages = 0;
+  do {
+    const cursorPart = cursor ? `, cursor:"${cursor}"` : '';
+    const data = await mq(`{
+      boards(ids:[${HT_CLEANS_BOARD}]) {
+        items_page(limit:500${cursorPart}) {
+          cursor
+          items {
+            id name
+            column_values(ids:["${HC_ARRIVAL}","${HC_TYPE}","${HC_DATE}"]) {
+              id text value
+              ... on BoardRelationValue { linked_item_ids }
+            }
+          }
+        }
+      }
+    }`);
+    const page = data.boards[0].items_page;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+    pages++;
+    if (pages > 50) break;
+  } while (cursor);
+
+  return all.flatMap(it => {
+    const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+    const ids = (cv[HC_ARRIVAL]?.linked_item_ids || []).map(String);
+    const type = (cv[HC_TYPE]?.text || '').trim();
+    return ids.filter(id => wanted.has(id)).map(id => ({ id: String(it.id), name: it.name, arrivalId: id, type }));
+  });
+}
+
+async function loadLinenBags(arrivalIds) {
+  if (typeof LINEN === 'undefined' || !LINEN.boards?.bags) return [];
+  const arrivalCol = LINEN.bagsColumns.arrival;
+  const wanted = new Set(arrivalIds);
+  let cursor = null, all = [], pages = 0;
+  do {
+    const cursorPart = cursor ? `, cursor:"${cursor}"` : '';
+    const data = await mq(`{
+      boards(ids:[${LINEN.boards.bags}]) {
+        items_page(limit:500${cursorPart}) {
+          cursor
+          items {
+            id name
+            column_values(ids:["${arrivalCol}"]) {
+              id text value
+              ... on BoardRelationValue { linked_item_ids }
+            }
+          }
+        }
+      }
+    }`);
+    const page = data.boards[0].items_page;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+    pages++;
+    if (pages > 50) break;
+  } while (cursor);
+
+  _bagsConf = { boardId: LINEN.boards.bags, columns: LINEN.bagsColumns };
+
+  return all.flatMap(it => {
+    const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+    const ids = (cv[arrivalCol]?.linked_item_ids || []).map(String);
+    return ids.filter(id => wanted.has(id)).map(id => ({ id: String(it.id), name: it.name, arrivalId: id }));
+  });
+}
+
+async function loadProperties() {
+  const data = await mq(`{
+    boards(ids:[${PROP_CONFIG_BOARD}]) {
+      items_page(limit:200) {
+        items {
+          id name
+          column_values(ids:["${PC_STD_HRS}","${PC_DEF_CHECKIN}","${PC_MANAGED}","${PC_LOCAL}","${PC_HAS_TUB}"]) {
+            id text value
+          }
+        }
+      }
+    }
+  }`);
+  const items = data?.boards?.[0]?.items_page?.items || [];
+  const out = {};
+  for (const it of items) {
+    const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+    const std = parseFloat(pj(cv[PC_STD_HRS]?.value)) || null;
+    const chk = pj(cv[PC_DEF_CHECKIN]?.value);
+    const checkinStr = chk ? `${String(chk.hour||0).padStart(2,'0')}:${String(chk.minute||0).padStart(2,'0')}` : '15:00';
+    out[it.name] = {
+      itemId: String(it.id),
+      stdHrs: std,
+      defCheckin: checkinStr,
+      managed:  !!(pj(cv[PC_MANAGED]?.value)?.checked),
+      local:    !!(pj(cv[PC_LOCAL]?.value)?.checked),
+      hasTub:   !!(pj(cv[PC_HAS_TUB]?.value)?.checked),
+    };
+  }
+  return out;
+}
+
+/* ─── Run + categorise ─────────────────────────────── */
+async function runRadar() {
+  const from = document.getElementById('fromInp').value;
+  const to   = document.getElementById('toInp').value;
+  if (!from || !to) { showMsg('Pick both dates', 'error'); return; }
+  if (from > to)    { showMsg('From must be before To', 'error'); return; }
+
+  const btn = document.getElementById('runBtn');
+  btn.disabled = true; btn.textContent = 'Scanning…';
+  document.getElementById('content').innerHTML = '<div class="card"><div class="empty">Loading boards in parallel…</div></div>';
+  document.getElementById('summary').innerHTML = '';
+
+  try {
+    _arrivals = await loadArrivals(from, to);
+    if (!_arrivals.length) {
+      document.getElementById('content').innerHTML = '<div class="card"><div class="empty">No arrivals in this window.</div></div>';
+      btn.disabled = false; btn.textContent = 'Scan';
+      return;
+    }
+    const arrivalIds = _arrivals.map(a => a.id);
+    const [cleans, hts, bags, props] = await Promise.all([
+      loadCleans(arrivalIds),
+      loadHTCleans(arrivalIds),
+      loadLinenBags(arrivalIds),
+      loadProperties(),
+    ]);
+    _cleans = cleans; _hts = hts; _bags = bags; _props = props;
+    _rows = computeCoverage();
+    renderSummary();
+    renderTable();
+  } catch (e) {
+    document.getElementById('content').innerHTML = '<div class="card"><div class="empty">Failed: ' + escapeHtml(e.message) + '</div></div>';
+    showMsg('Failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = 'Scan';
+  }
+}
+
+/* For each arrival, compute expected vs actual counts and the per-column
+   status ('ok' / 'missing' / 'dup' / 'na'). The status is purely a function
+   of the property's managed/local/hasTub flags + the actual row counts,
+   no judgement calls. */
+function computeCoverage() {
+  // Index links by arrival id.
+  const cleansByArr = {};
+  for (const c of _cleans) (cleansByArr[c.arrivalId] = cleansByArr[c.arrivalId] || []).push(c);
+  const htsByArr = {};
+  for (const h of _hts) (htsByArr[h.arrivalId] = htsByArr[h.arrivalId] || []).push(h);
+  const bagsByArr = {};
+  for (const b of _bags) (bagsByArr[b.arrivalId] = bagsByArr[b.arrivalId] || []).push(b);
+
+  const rows = [];
+  for (const a of _arrivals) {
+    const prop = _props[a.property] || null;
+    const isManaged = !!(prop && prop.managed);
+    const isLocal   = !!(prop && prop.local);
+    const hasTub    = !!(prop && prop.hasTub);
+
+    // Cleans: only managed-and-not-local properties expect a Cleans row.
+    let cleanStatus = 'na';
+    const cleansHere = cleansByArr[a.id] || [];
+    if (isManaged && !isLocal) {
+      if (cleansHere.length === 0)      cleanStatus = 'missing';
+      else if (cleansHere.length === 1) cleanStatus = 'ok';
+      else                               cleanStatus = 'dup';
+    }
+
+    // Linen Bag: managed properties expect a bag (local properties still
+    // get bags per Barry's confirmation).
+    let bagStatus = 'na';
+    const bagsHere = bagsByArr[a.id] || [];
+    if (isManaged) {
+      if (bagsHere.length === 0)      bagStatus = 'missing';
+      else if (bagsHere.length === 1) bagStatus = 'ok';
+      else                             bagStatus = 'dup';
+    }
+
+    // HT Clean: hasTub properties expect at least one HT row of any type.
+    // Multiple is fine (mid-stay + mid-vac visits), so we don't flag dups.
+    let htStatus = 'na';
+    const htsHere = htsByArr[a.id] || [];
+    if (hasTub) {
+      htStatus = htsHere.length === 0 ? 'missing' : 'ok';
+    }
+
+    rows.push({
+      arrival: a,
+      prop, isManaged, isLocal, hasTub,
+      cleansHere, bagsHere, htsHere,
+      cleanStatus, bagStatus, htStatus,
+      hasGap: cleanStatus === 'missing' || bagStatus === 'missing' || htStatus === 'missing',
+      hasDup: cleanStatus === 'dup' || bagStatus === 'dup',
+    });
+  }
+  rows.sort((a, b) => (a.arrival.checkin || '').localeCompare(b.arrival.checkin || ''));
+  return rows;
+}
+
+/* ─── Render ─────────────────────────────────────────── */
+function renderSummary() {
+  const total = _rows.length;
+  const gaps  = _rows.filter(r => r.hasGap).length;
+  const dups  = _rows.filter(r => r.hasDup).length;
+  const ok    = _rows.filter(r => !r.hasGap && !r.hasDup).length;
+  document.getElementById('summary').innerHTML = `
+    <div class="pill info"><span class="num">${total}</span><span class="lbl">Arrivals in window</span></div>
+    <div class="pill ok"><span class="num">${ok}</span><span class="lbl">Fully covered</span></div>
+    <div class="pill bad"><span class="num">${gaps}</span><span class="lbl">With gaps</span></div>
+    <div class="pill warn"><span class="num">${dups}</span><span class="lbl">With duplicates</span></div>
+  `;
+  document.getElementById('bulkBtn').disabled = (gaps === 0);
+  document.getElementById('bulkBtn').textContent = gaps === 0
+    ? '✓ All covered'
+    : `✓ Create all ${gaps} missing`;
+}
+
+function renderChips() {
+  const div = document.getElementById('chips');
+  div.innerHTML = ['all','gaps','dups'].map(k => {
+    const lbl = k === 'all' ? 'Show all' : k === 'gaps' ? 'Gaps only' : 'Duplicates only';
+    return `<button class="chip ${_filter===k?'active':''}" onclick="setFilter('${k}')">${lbl}</button>`;
+  }).join('');
+}
+function setFilter(f) { _filter = f; renderChips(); renderTable(); }
+
+function renderTable() {
+  let rows = _rows;
+  if (_filter === 'gaps') rows = rows.filter(r => r.hasGap);
+  else if (_filter === 'dups') rows = rows.filter(r => r.hasDup);
+
+  if (!rows.length) {
+    document.getElementById('content').innerHTML = '<div class="card"><div class="empty">Nothing matches the current filter.</div></div>';
+    return;
+  }
+
+  const html = `<table>
+    <thead><tr>
+      <th>Check-in</th>
+      <th>Property</th>
+      <th>Guest / ref</th>
+      <th>Cleans</th>
+      <th>Linen Bag</th>
+      <th>HT Clean</th>
+    </tr></thead>
+    <tbody>
+    ${rows.map(r => `<tr id="row_${r.arrival.id}">
+      <td>${fmtUK(r.arrival.checkin)}</td>
+      <td><strong>${escapeHtml(r.arrival.property || '—')}</strong>
+        ${r.isManaged && r.isLocal ? '<br><span class="muted">local cleaner</span>' : ''}
+        ${!r.isManaged ? '<br><span class="muted">non-managed</span>' : ''}
+      </td>
+      <td>${escapeHtml(r.arrival.name || '')}<br><span class="ref">${escapeHtml(r.arrival.bookRef || '')}</span></td>
+      <td>${pillHtml(r, 'clean')}</td>
+      <td>${pillHtml(r, 'bag')}</td>
+      <td>${pillHtml(r, 'ht')}</td>
+    </tr>`).join('')}
+    </tbody>
+  </table>`;
+  document.getElementById('content').innerHTML = html;
+}
+
+function pillHtml(r, kind) {
+  let status, count;
+  if (kind === 'clean') { status = r.cleanStatus; count = r.cleansHere.length; }
+  if (kind === 'bag')   { status = r.bagStatus;   count = r.bagsHere.length; }
+  if (kind === 'ht')    { status = r.htStatus;    count = r.htsHere.length; }
+  if (status === 'na') return '<span class="status-pill na">—</span>';
+  if (status === 'ok') return `<span class="status-pill ok">✓ ${count}</span>`;
+  if (status === 'missing') {
+    return `<span class="status-pill missing" onclick="askCreate('${r.arrival.id}','${kind}')">✗ Create</span>`;
+  }
+  if (status === 'dup') {
+    return `<span class="status-pill dup" onclick="askResolveDup('${r.arrival.id}','${kind}')">⚠ ${count} dupes</span>`;
+  }
+  return '';
+}
+
+/* ─── Modal ──────────────────────────────────────────── */
+function openModal(html) {
+  document.getElementById('modalCard').innerHTML = html;
+  document.getElementById('modal').classList.add('open');
+}
+function closeModal() {
+  document.getElementById('modal').classList.remove('open');
+}
+
+/* ─── Create missing ─────────────────────────────────── */
+function askCreate(arrivalId, kind) {
+  const r = _rows.find(x => x.arrival.id === arrivalId);
+  if (!r) return;
+  const label = kind === 'clean' ? 'Cleans row' : kind === 'bag' ? 'Linen Bag' : 'HT Clean';
+  openModal(`
+    <h3>Create ${label} for ${escapeHtml(r.arrival.property)}?</h3>
+    <p>Check-in <strong>${fmtUK(r.arrival.checkin)}</strong> · ${escapeHtml(r.arrival.name)}.</p>
+    <p>This creates a placeholder row linked to this Arrivals booking. The row appears on the rota for the manager to fill in (assign cleaners, etc.).</p>
+    <div class="modal-row">
+      <button onclick="closeModal()">Cancel</button>
+      <button class="primary" onclick="doCreate('${arrivalId}','${kind}')">✓ Create now</button>
+    </div>
+  `);
+}
+
+async function doCreate(arrivalId, kind) {
+  closeModal();
+  const r = _rows.find(x => x.arrival.id === arrivalId);
+  if (!r) return;
+  showMsg('Creating ' + kind + '…', 'info');
+  try {
+    if (kind === 'clean')      await createCleansRow(r);
+    else if (kind === 'bag')   await createBagRow(r);
+    else if (kind === 'ht')    await createHtRow(r);
+    showMsg('✓ Created.', 'success');
+    await runRadar();   // refresh
+  } catch (e) {
+    showMsg('Failed: ' + e.message, 'error');
+  }
+}
+
+/* Idempotent create — re-checks the link before writing in case another tab
+   landed it since the radar's snapshot. */
+async function createCleansRow(r) {
+  const check = await mq(`{
+    items_page_by_column_values(board_id:${CLEANS_BOARD},
+      columns:[{column_id:"${CL_ARRIVAL}", column_values:["${r.arrival.id}"]}], limit:1) {
+      items { id }
+    }
+  }`);
+  if (check?.items_page_by_column_values?.items?.length) return;   // already exists
+
+  const prop = r.prop || {};
+  const cv = {};
+  cv[CL_DATE]    = { date: r.arrival.checkin };
+  cv[CL_ARRIVAL] = { item_ids: [Number(r.arrival.id)] };
+  if (prop.itemId) cv[CL_PROP] = { item_ids: [Number(prop.itemId)] };
+  if (prop.stdHrs) cv[CL_HRS]  = String(prop.stdHrs);
+  if (prop.defCheckin) {
+    const [h, m] = prop.defCheckin.split(':');
+    cv[CL_START] = { hour: Number(h)||0, minute: Number(m)||0 };
+  }
+  const itemName = `${r.arrival.property} · ${r.arrival.checkin}`.slice(0, 250);
+  const cvStr = JSON.stringify(JSON.stringify(cv));
+  await mq(`mutation { create_item(board_id:${CLEANS_BOARD},
+    item_name:${JSON.stringify(itemName)}, column_values:${cvStr},
+    create_labels_if_missing:true) { id } }`);
+}
+
+async function createBagRow(r) {
+  if (!_bagsConf) throw new Error('Linen Bags board not loaded — refresh');
+  const c = _bagsConf.columns;
+  const check = await mq(`{
+    items_page_by_column_values(board_id:${_bagsConf.boardId},
+      columns:[{column_id:"${c.arrival}", column_values:["${r.arrival.id}"]}], limit:1) {
+      items { id }
+    }
+  }`);
+  if (check?.items_page_by_column_values?.items?.length) return;
+
+  const cv = {};
+  cv[c.arrival]   = { item_ids: [Number(r.arrival.id)] };
+  if (c.linenType) cv[c.linenType] = { label: 'Own' };   // safe default
+  if (c.status)    cv[c.status]    = { label: 'Planned' };
+  const today = todayISO();
+  const itemName = `${r.arrival.property} · Own · ${today}`.slice(0, 250);
+  const cvStr = JSON.stringify(JSON.stringify(cv));
+  await mq(`mutation { create_item(board_id:${_bagsConf.boardId},
+    item_name:${JSON.stringify(itemName)}, column_values:${cvStr},
+    create_labels_if_missing:true) { id } }`);
+}
+
+async function createHtRow(r) {
+  const check = await mq(`{
+    items_page_by_column_values(board_id:${HT_CLEANS_BOARD},
+      columns:[{column_id:"${HC_ARRIVAL}", column_values:["${r.arrival.id}"]}], limit:1) {
+      items { id }
+    }
+  }`);
+  if (check?.items_page_by_column_values?.items?.length) return;
+
+  const prop = r.prop || {};
+  const cv = {};
+  cv[HC_DATE]    = { date: r.arrival.checkin };
+  cv[HC_ARRIVAL] = { item_ids: [Number(r.arrival.id)] };
+  if (prop.itemId) cv[HC_PROP] = { item_ids: [Number(prop.itemId)] };
+  cv[HC_TYPE]    = { label: 'Full Clean' };
+  cv[HC_STATUS]  = { label: 'Planned' };
+  const itemName = `${r.arrival.property} · Full Clean · ${r.arrival.checkin}`.slice(0, 250);
+  const cvStr = JSON.stringify(JSON.stringify(cv));
+  await mq(`mutation { create_item(board_id:${HT_CLEANS_BOARD},
+    item_name:${JSON.stringify(itemName)}, column_values:${cvStr},
+    create_labels_if_missing:true) { id } }`);
+}
+
+/* ─── Bulk create ───────────────────────────────────── */
+async function bulkCreateMissing() {
+  const tasks = [];
+  for (const r of _rows) {
+    if (r.cleanStatus === 'missing') tasks.push({ r, kind: 'clean' });
+    if (r.bagStatus   === 'missing') tasks.push({ r, kind: 'bag' });
+    if (r.htStatus    === 'missing') tasks.push({ r, kind: 'ht' });
+  }
+  if (!tasks.length) return;
+  if (!confirm(`Create ${tasks.length} missing rows?\n\nThis writes placeholder rows to Cleans / Linen Bags / HT Cleans. Manager can edit each on the relevant rota.`)) return;
+
+  const btn = document.getElementById('bulkBtn');
+  btn.disabled = true;
+  let done = 0, failed = 0;
+  for (const t of tasks) {
+    btn.textContent = `Creating ${done+failed+1} of ${tasks.length}…`;
+    try {
+      if (t.kind === 'clean') await createCleansRow(t.r);
+      else if (t.kind === 'bag')   await createBagRow(t.r);
+      else if (t.kind === 'ht')    await createHtRow(t.r);
+      done++;
+    } catch (e) {
+      console.error('Bulk create failed for', t, e);
+      failed++;
+    }
+    await new Promise(r => setTimeout(r, 200));   // gentle throttle
+  }
+  showMsg(`✓ Created ${done}${failed ? ` · ${failed} failed (see console)` : ''}`, failed ? 'error' : 'success');
+  await runRadar();
+}
+
+/* ─── Resolve duplicates ────────────────────────────── */
+function askResolveDup(arrivalId, kind) {
+  const r = _rows.find(x => x.arrival.id === arrivalId);
+  if (!r) return;
+  const list = kind === 'clean' ? r.cleansHere : r.bagsHere;
+  const board = kind === 'clean' ? CLEANS_BOARD : (_bagsConf?.boardId || '?');
+
+  const itemRows = list.map(x =>
+    `<div class="dup-item">
+      <span><a href="https://cotswoldwaterparkretreats.monday.com/boards/${board}/pulses/${x.id}" target="_blank">${escapeHtml(x.name)}</a> <span class="ref">id ${x.id}</span></span>
+      <button onclick="deleteDupRow('${arrivalId}','${kind}','${x.id}')" style="padding:3px 9px; background:var(--red); color:#fff; border:0; border-radius:6px; font-size:11px; font-weight:700; cursor:pointer">Delete</button>
+    </div>`
+  ).join('');
+
+  openModal(`
+    <h3>${list.length} duplicate ${kind === 'clean' ? 'Cleans rows' : 'Linen Bags'} for ${escapeHtml(r.arrival.property)}</h3>
+    <p>Check-in ${fmtUK(r.arrival.checkin)} · ${escapeHtml(r.arrival.name)}.</p>
+    <p>Open each on Monday to compare, then click <strong>Delete</strong> on the ones to remove. Keep at least one.</p>
+    <div class="dup-list">${itemRows}</div>
+    <div class="modal-row">
+      <button onclick="closeModal()">Done</button>
+    </div>
+  `);
+}
+
+async function deleteDupRow(arrivalId, kind, itemId) {
+  if (!confirm('Delete this row from Monday? This cannot be undone.')) return;
+  try {
+    await mq(`mutation { delete_item(item_id: ${itemId}) { id } }`);
+    showMsg('Deleted.', 'success');
+    closeModal();
+    await runRadar();
+  } catch (e) {
+    showMsg('Delete failed: ' + e.message, 'error');
+  }
+}
+</script>
+</body>
+</html>

@@ -474,12 +474,22 @@ async function mq(query) {
 }
 
 async function loadArrivals(from, to) {
-  // Pull every Arrivals row in the window. Compares booking refs against
-  // Guesty. We don't filter aggressively here — the comparison is by ref.
+  // Pull every Arrivals row, then filter client-side by check-in date.
+  //
+  // We cannot use Monday's query_params on items_page reliably here:
+  // the rule syntax for date columns has changed between API versions,
+  // and a malformed rule silently returns zero matches rather than an
+  // error — so a typo in the rule looks identical to a board with no
+  // matching rows. After getting bitten by that once, we now pull
+  // everything and filter locally, with a generously-high page cap.
+  //
+  // Cap: 50 pages × 500 = 25000 items. Way more than realistic for a
+  // managed property portfolio. If we ever hit it, the warning below
+  // will surface in console.
   let cursor = null, all = [], pages = 0;
   do {
     const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
-    const data = await mq(`{
+    const q = `{
       boards(ids:[${ARRIVALS_BOARD}]) {
         items_page(limit: 500${cursorPart}) {
           cursor
@@ -491,20 +501,40 @@ async function loadArrivals(from, to) {
           }
         }
       }
-    }`);
+    }`;
+    const data = await mq(q);
     const page = data.boards[0].items_page;
     all = all.concat(page.items || []);
     cursor = page.cursor;
     pages++;
-    if (pages > 10) break;
+    if (pages > 50) {
+      console.warn(`loadArrivals: hit 50-page cap (${all.length} items pulled). Recon may be incomplete — Arrivals board has more than ~25000 rows.`);
+      break;
+    }
   } while (cursor);
+
+  console.log(`[guesty-sync] loadArrivals pulled ${all.length} total Arrivals rows across ${pages} page(s).`);
 
   return all.map(it => {
     const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));
     let arrivalDate = '';
     let checkout = '';
-    try { arrivalDate = JSON.parse(cv[AR_DATE]?.value || 'null')?.date || ''; } catch (_) {}
+    try { arrivalDate = JSON.parse(cv[AR_DATE]?.value     || 'null')?.date || ''; } catch (_) {}
     try { checkout    = JSON.parse(cv[AR_CHECKOUT]?.value || 'null')?.date || ''; } catch (_) {}
+    // Fallback: when the date column's `value` is null/empty but the `text`
+    // field has a usable date string, use that. This catches rows imported
+    // by Make.com or older flows that may have written the date in a
+    // non-standard shape.
+    if (!arrivalDate) {
+      const txt = (cv[AR_DATE]?.text || '').trim();
+      const m = txt.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (m) arrivalDate = m[1];
+    }
+    if (!checkout) {
+      const txt = (cv[AR_CHECKOUT]?.text || '').trim();
+      const m = txt.match(/^(\d{4}-\d{2}-\d{2})/);
+      if (m) checkout = m[1];
+    }
     return {
       id: it.id,
       name: it.name,
@@ -513,7 +543,11 @@ async function loadArrivals(from, to) {
       arrivalDate,
       checkout,
     };
-  }).filter(a => a.arrivalDate >= from && a.arrivalDate <= to);
+  });
+  // Note: NO date-window filter here. The matching path needs every Arrivals
+  // row regardless of date so a freshly-created row whose AR_DATE didn't
+  // populate correctly still counts as "in sync" rather than "missing".
+  // The window filter is applied later, only to compute orphans.
 }
 
 /* ── Run sync ───────────────────────────────────────────────────────── */
@@ -538,25 +572,44 @@ async function runSync() {
       loadArrivals(from, to),
     ]);
 
-    // Index Arrivals by booking ref.
+    // Index ALL Arrivals rows by booking ref — no date filter here. The
+    // matching question is "is this Guesty booking on Arrivals at all?";
+    // a row whose AR_DATE wasn't populated correctly (Make.com legacy,
+    // import script bug, etc.) still counts as "in sync" because the
+    // booking ref is the unique identity.
     const arrivalsByRef = new Map();
     for (const a of arrivalsList) {
       if (a.bookRef) arrivalsByRef.set(a.bookRef.trim(), a);
     }
 
-    // Categorise.
+    // Categorise Guesty bookings into matched vs missing.
     _missing = [];
     _matched = [];
     const guestyRefs = new Set();
     for (const g of guestyList) {
-      guestyRefs.add(g.bookRef);
-      if (arrivalsByRef.has(g.bookRef)) _matched.push({ guesty: g, arrivals: arrivalsByRef.get(g.bookRef) });
-      else _missing.push(g);
+      const ref = (g.bookRef || '').trim();
+      guestyRefs.add(ref);
+      if (arrivalsByRef.has(ref)) {
+        _matched.push({ guesty: g, arrival: arrivalsByRef.get(ref) });
+      } else {
+        _missing.push(g);
+      }
     }
-    _orphans = arrivalsList.filter(a => a.bookRef && !guestyRefs.has(a.bookRef.trim()));
 
-    renderResult(guestyList.length, arrivalsList.length);
-    setStatus(`✓ Synced — Guesty ${guestyList.length} · Arrivals ${arrivalsList.length} · ${_missing.length} missing · ${_orphans.length} orphans`,
+    // Orphans = Arrivals rows whose check-in falls IN the user's window
+    // but whose booking ref isn't in Guesty's window-set. Date filter is
+    // applied only here so we don't surface ancient/historical orphans.
+    _orphans = arrivalsList.filter(a => {
+      if (!a.bookRef || guestyRefs.has(a.bookRef.trim())) return false;
+      return a.arrivalDate >= from && a.arrivalDate <= to;
+    });
+
+    // Visible counts: total Arrivals on board (helpful) and the in-window
+    // subset (the historical context for orphan numbers).
+    const arrivalsInWindow = arrivalsList.filter(a => a.arrivalDate >= from && a.arrivalDate <= to).length;
+
+    renderResult(guestyList.length, arrivalsInWindow);
+    setStatus(`✓ Synced — Guesty ${guestyList.length} · Arrivals ${arrivalsInWindow} in window (${arrivalsList.length} total) · ${_missing.length} missing · ${_orphans.length} orphans`,
               _missing.length ? 'error' : 'success');
   } catch (e) {
     console.error(e);
@@ -703,7 +756,10 @@ async function createSelected() {
   const status = document.getElementById('createStatus');
   const fill = document.getElementById('createFill');
 
-  let done = 0, failed = 0;
+  // Three counters now so we can see the difference between "actually
+  // created" and "dedup said it's already there". Previously these were
+  // combined as `done`, hiding the fact that 100% of clicks were dedup-hits.
+  let created = 0, skipped = 0, failed = 0;
   const total = cbs.length;
   const GAP_MS = 200;
   const sleep = ms => new Promise(r => setTimeout(r, ms));
@@ -719,10 +775,16 @@ async function createSelected() {
       // since the sync ran. Skips if found.
       const exists = await mq(`{ items_page_by_column_values(board_id:${ARRIVALS_BOARD}, columns:[{column_id:"${AR_BOOKREF}", column_values:["${g.bookRef.replace(/"/g,'\\"')}"]}], limit:1){ items{ id } } }`);
       if (exists?.items_page_by_column_values?.items?.length) {
-        if (tr) { tr.classList.remove('processing'); tr.classList.add('done'); }
-        done++;
-        fill.style.width = `${Math.round(((done+failed)/total)*100)}%`;
-        status.textContent = `${done+failed}/${total} — ${g.bookRef} already there, skipped`;
+        if (tr) {
+          tr.classList.remove('processing');
+          tr.classList.add('done');
+          // Visible flag in the row so user knows this wasn't created.
+          const td = tr.querySelector('td:last-child');
+          if (td) td.innerHTML += ' <span style="color:var(--amber); font-weight:600" title="Found existing row on Arrivals">⊝ exists</span>';
+        }
+        skipped++;
+        fill.style.width = `${Math.round(((created+skipped+failed)/total)*100)}%`;
+        status.textContent = `${created+skipped+failed}/${total} — ${created} created · ${skipped} already there`;
         await sleep(GAP_MS);
         continue;
       }
@@ -743,8 +805,11 @@ async function createSelected() {
       if (g.notes) cv[AR_BEDCFG] = g.notes.slice(0, 250);   // text col cap
       const cvStr = JSON.stringify(JSON.stringify(cv));
       const q = `mutation { create_item(board_id:${ARRIVALS_BOARD}, item_name:${JSON.stringify(itemName)}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
-      await mq(q);
-      done++;
+      const result = await mq(q);
+      if (!result?.create_item?.id) {
+        throw new Error('Create returned no id (Monday may have silently rejected the payload)');
+      }
+      created++;
       if (tr) { tr.classList.remove('processing'); tr.classList.add('done'); }
     } catch (e) {
       failed++;
@@ -753,20 +818,28 @@ async function createSelected() {
         tr.classList.remove('processing');
         tr.classList.add('failed');
         const td = tr.querySelector('td:last-child');
-        if (td) td.innerHTML += ` <span style="color:var(--red); font-weight:600">✗ ${escapeHtml(e.message.slice(0,80))}</span>`;
+        if (td) td.innerHTML += ` <span style="color:var(--red); font-weight:600">✗ ${escapeHtml((e.message||'').slice(0,80))}</span>`;
       }
     }
-    fill.style.width = `${Math.round(((done+failed)/total)*100)}%`;
-    status.textContent = `${done+failed}/${total}`;
+    fill.style.width = `${Math.round(((created+skipped+failed)/total)*100)}%`;
+    status.textContent = `${created+skipped+failed}/${total} — ${created} created · ${skipped} already there${failed?` · ${failed} failed`:''}`;
     await sleep(GAP_MS);
   }
 
   btn.disabled = false; btn.textContent = '✓ Create selected on Arrivals';
-  status.textContent = `✓ Created ${done}${failed ? ` · ${failed} failed (see red rows)` : ''}`;
-  toast(`✓ ${done} created${failed ? ` · ${failed} failed` : ''}`);
+  const summary = `✓ ${created} created · ${skipped} already there${failed ? ` · ${failed} failed (see red rows)` : ''}`;
+  status.textContent = summary;
+  toast(summary);
 
-  if (failed === 0 && done > 0) {
+  // Only auto-rerun if at least one was actually created (skipped doesn't
+  // change recon state since they were already there).
+  if (failed === 0 && created > 0) {
     setTimeout(() => runSync(), 1500);
+  } else if (skipped === total && created === 0 && failed === 0) {
+    // Every booking was reported as "already there" but the recon shows
+    // them as missing. That means loadArrivals isn't seeing them — most
+    // likely a pagination cap (now 50 pages) or a date-window mismatch.
+    toast('All ' + total + ' rows reported as "already there" — but the recon flagged them as missing. Open the orphans tab on Monday and check whether AR_BOOKREF is populated. Tell Barry.');
   }
 }
 

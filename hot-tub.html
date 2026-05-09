@@ -523,12 +523,26 @@ const API_TOKEN = window.MONDAY_API_TOKEN;
 const CHARGING_BOARD = 1621263971;
 const STATUS_BOARD   = 1918769299;
 
+// Staff board (used to populate the Tester dropdown so each reading links
+// to a canonical Staff item rather than free text — fixes the "3 Megs" bug
+// on manager-reports). Same board id as laundry-rota / staff-records.
+const STAFF_BOARD = 5095127554;
+const ST_ROLE     = 'color_mm2psadz';   // status: A Team / Housekeeper / Manager / Owner / etc.
+const ST_STATUS   = 'color_mm2psvh2';   // Active / Annual leave / Sick / Off
+
 // Charging board column IDs
 const CC = {
   status:       'status6__1',
   dateCleaned:  'date4',
   nextClean:    'date_mkzc57k0',
   tester:       'text__1',
+  // testerStaff is auto-bootstrapped: the first time hot-tub.html runs after
+  // this code ships, ensureTesterStaffColumn() introspects the Charging
+  // board and creates a board_relation column called "Tester (Staff)" if
+  // missing. The id is cached in localStorage so subsequent loads use it
+  // without a fresh introspection. Stays empty string until bootstrap
+  // completes — submit logic guards with `if (CC.testerStaff)`.
+  testerStaff:  localStorage.getItem('cache_cc_tester_staff_col') || '',
   temp:         'numbers__1',
   finalPH:      'numbers9__1',
   finalBrom:    'numbers5__1',
@@ -594,9 +608,94 @@ document.addEventListener('DOMContentLoaded', async () => {
   const local = new Date(now.getTime() - off * 60000);
   document.getElementById('fDateTime').value = local.toISOString().slice(0, 16);
 
-  await loadProperties();
+  // Run independent loaders in parallel — each is best-effort, so one
+  // failing doesn't block the others.
+  await Promise.allSettled([
+    loadProperties(),
+    ensureTesterStaffColumn(),     // creates the new column on first run
+    loadStaffTesters(),            // replaces hardcoded dropdown
+  ]);
   applyUrlPrefill();
 });
+
+/* ─── Tester (Staff) bootstrap ──────────────────────────────────────
+   Discovers (or creates on first run) a board_relation column on the
+   Charging board called "Tester (Staff)" linking to the Staff board.
+   Column id is cached in localStorage so subsequent loads skip the
+   introspection. Failure mode is silent — the form falls back to
+   writing free-text only, exactly like the previous behaviour. */
+async function ensureTesterStaffColumn() {
+  if (CC.testerStaff) return;
+  try {
+    const data = await mq(`{ boards(ids:[${CHARGING_BOARD}]){ columns{ id title type } } }`);
+    const cols = data?.boards?.[0]?.columns || [];
+    const found = cols.find(c =>
+      (c.title || '').toLowerCase().trim() === 'tester (staff)' && c.type === 'board_relation'
+    );
+    if (found) {
+      CC.testerStaff = found.id;
+      localStorage.setItem('cache_cc_tester_staff_col', CC.testerStaff);
+      return;
+    }
+    // Create the column. board_relation requires settings_str to bind it
+    // to the target board; without that it's an unconnected dependency.
+    const settings = JSON.stringify({ boardIds: [STAFF_BOARD] });
+    const created = await mq(
+      `mutation{ create_column(board_id:${CHARGING_BOARD}, title:"Tester (Staff)", description:"Canonical link to the Staff board — populated by hot-tub.html. Free-text Tester column kept for legacy.", column_type:board_relation, defaults:${JSON.stringify(settings)}){ id } }`
+    );
+    const newId = created?.create_column?.id;
+    if (newId) {
+      CC.testerStaff = newId;
+      localStorage.setItem('cache_cc_tester_staff_col', CC.testerStaff);
+    }
+  } catch (e) {
+    console.warn('ensureTesterStaffColumn failed; tester will be free-text only:', e);
+  }
+}
+
+/* ─── Load active staff into the Tester dropdown ────────────────────
+   Replaces the hardcoded Saul/Barry/Mike/Meg/Alan options with a
+   dynamic list keyed by Staff board item_id. Each option's `value`
+   carries the staff id; the visible text is the staff name. Submit
+   reads .selectedOptions[0].value as the id and .text as the name. */
+async function loadStaffTesters() {
+  try {
+    const data = await mq(`{
+      boards(ids:[${STAFF_BOARD}]) {
+        items_page(limit:200) {
+          items {
+            id name
+            column_values(ids:["${ST_ROLE}","${ST_STATUS}"]) { id text }
+          }
+        }
+      }
+    }`);
+    const items = data?.boards?.[0]?.items_page?.items || [];
+    // Filter out staff explicitly marked Annual leave / Sick / Off — keep
+    // Active and untagged (in case Status hasn't been set yet).
+    const active = items.filter(it => {
+      const status = (it.column_values.find(c => c.id === ST_STATUS)?.text || '').toLowerCase();
+      return !status || status === 'active' || status === 'training';
+    });
+    active.sort((a, b) => a.name.localeCompare(b.name));
+
+    const sel = document.getElementById('fTester');
+    if (!sel) return;
+    sel.innerHTML = '<option value="">Select…</option>' +
+      active.map(s => `<option value="${s.id}">${esc(s.name)}</option>`).join('');
+  } catch (e) {
+    console.warn('loadStaffTesters failed; falling back to hardcoded list:', e);
+    // Hardcoded fallback list mirrors the original options so the form
+    // still works if the Staff board is unreachable. Values are negative
+    // sentinels so the submit logic knows to skip the board_relation
+    // and just write the name as legacy text.
+    const sel = document.getElementById('fTester');
+    if (!sel) return;
+    const fallback = ['Saul', 'Barry', 'Mike', 'Meg', 'Alan'];
+    sel.innerHTML = '<option value="">Select…</option>' +
+      fallback.map(n => `<option value="legacy:${n}">${n}</option>`).join('');
+  }
+}
 
 // Pre-fill the visit setup from URL params handed in by staff.html so the
 // engineer doesn't have to re-pick property + their own name on every clean.
@@ -629,25 +728,20 @@ function applyUrlPrefill() {
       }
     }
 
-    // Tester — match the staff name against the dropdown. The dropdown uses
-    // first names, but staff records often hold the full name, so accept a
-    // first-token match too. If nothing matches, add the name as a new option
-    // so we still pre-select it rather than silently falling back to "Select…".
+    // Tester — match the staff name against the dropdown. Options now carry
+    // the Staff item id as value with the visible name as text, so the lookup
+    // is by display text rather than value. Bidirectional / first-token
+    // matching handles "Barry" vs "Barry Thurston" cases.
     const nameParam = p.get('name');
     if (nameParam) {
       const tSel = document.getElementById('fTester');
       const opts = Array.from(tSel.options);
-      const lc = nameParam.trim().toLowerCase();
-      const firstTok = lc.split(/\s+/)[0];
-      let hit = opts.find(o => o.value && o.value.toLowerCase() === lc);
-      if (!hit) hit = opts.find(o => o.value && o.value.toLowerCase() === firstTok);
-      if (!hit) {
-        const o = document.createElement('option');
-        o.value = nameParam; o.textContent = nameParam;
-        tSel.insertBefore(o, tSel.options[1] || null);
-        hit = o;
-      }
-      tSel.value = hit.value;
+      const want = nameParam.trim().toLowerCase();
+      const wantFirst = want.split(/\s+/)[0];
+      let hit = opts.find(o => o.text && o.text.toLowerCase() === want);
+      if (!hit) hit = opts.find(o => o.text && o.text.toLowerCase().split(/\s+/)[0] === wantFirst);
+      if (!hit) hit = opts.find(o => o.text && o.text.toLowerCase().includes(wantFirst));
+      if (hit) tSel.value = hit.value;
     }
 
     // Date — accept YYYY-MM-DD; combine with the current time so it lands as
@@ -999,7 +1093,13 @@ async function submitForm() {
 
   try {
     const property = g('fProperty');
-    const tester   = g('fTester');
+    // Tester dropdown options now carry the Staff item id as `value` and
+    // the visible name as `text`. Pull both: id for the canonical
+    // board_relation, text for the legacy free-text column.
+    const testerSel = document.getElementById('fTester');
+    const testerOpt = testerSel?.selectedOptions?.[0] || null;
+    const testerId  = testerOpt?.value || '';        // "" or "12345" or "legacy:Barry"
+    const tester    = testerOpt?.text  || g('fTester');   // visible name for legacy text col
     const dtVal    = g('fDateTime');
     const dtParts  = dtVal.split('T');
     const dateStr  = dtParts[0];
@@ -1014,10 +1114,16 @@ async function submitForm() {
     // NOTE: structured columns (dates etc.) must be plain objects — NOT pre-stringified.
     const cv = {};
     cv[CC.dateCleaned] = { date: dateStr, time: timeStr };
-    cv[CC.tester]      = tester;
+    cv[CC.tester]      = tester;     // legacy text column (kept so existing reports still work)
     cv[CC.waterMaint]  = String(waterMaintNum);
     cv[CC.waterChange] = waterChange === 'none' ? 'N' : waterChange === 'partial' ? 'Partial' : 'Y';
     cv[CC.lodge]       = property;
+    // Canonical staff link — only when the Tester (Staff) column has been
+    // bootstrapped AND the user picked a real staff option (not a legacy
+    // sentinel from the offline-fallback list).
+    if (CC.testerStaff && testerId && !testerId.startsWith('legacy:')) {
+      cv[CC.testerStaff] = { item_ids: [Number(testerId)] };
+    }
 
     if (gn('fInitTemp') !== null) cv[CC.temp]     = String(gn('fInitTemp'));
     if (gn('fInitPH')   !== null) cv[CC.initPH]   = String(gn('fInitPH'));
@@ -1135,9 +1241,13 @@ function enterDoneState({ property, vtLabel, dt, queued }) {
     const dur       = g('fDuration');
     const wcLabel   = waterChange === 'none' ? 'No water change' : waterChange === 'partial' ? 'Partial water change' : 'Full water change';
     const dtPretty  = (dt || '').replace('T',' ');
+    // Tester display — pull the visible name from the selected option,
+    // not the value (which is now the Staff item id, not the name).
+    const tSelOpt   = document.getElementById('fTester')?.selectedOptions?.[0];
+    const testerName = tSelOpt?.text || g('fTester');
     const rows = [
       `<strong>${property}</strong> · ${vtLabel} · ${dtPretty}`,
-      `Tester: ${g('fTester')}`,
+      `Tester: ${testerName}`,
       `Initial — Temp ${initTemp || '—'}°C · pH ${initPH || '—'} · Brom ${initBrom || '—'} · TDS ${initTDS || '—'}`,
       `Final — pH ${finalPH || '—'} · Brom ${finalBrom || '—'}`,
       `${wcLabel}${dur ? ' · ' + dur + ' min' : ''}`,

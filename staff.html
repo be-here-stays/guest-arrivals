@@ -74,6 +74,14 @@
 
     /* Shift summary */
     .shift-card { background:#fff; border-radius:12px; padding:14px 16px; margin-bottom:10px; display:flex; align-items:center; gap:12px; box-shadow:0 1px 3px rgba(39,47,46,.05); }
+    /* MOTD / direct message cards at top of My Day */
+    .msg-card { background:var(--cream); border-radius:12px; padding:12px 14px; margin-bottom:10px; box-shadow:0 1px 3px rgba(39,47,46,.05); border-left:4px solid var(--gold); }
+    .msg-card.all { border-left-color:#1a5276; background:#eaf4fb; }
+    .msg-card-hdr { display:flex; align-items:flex-start; justify-content:space-between; gap:8px; }
+    .msg-card-title { font-size:14px; font-weight:700; color:var(--dark); }
+    .msg-card-meta  { font-size:11px; color:var(--sage); margin-top:2px; font-weight:500; }
+    .msg-card-body  { font-size:13px; color:var(--dark); line-height:1.4; margin-top:7px; white-space:pre-wrap; }
+    .msg-card-actions { display:flex; gap:8px; margin-top:10px; }
     .shift-card.leave { background:#fdf5e8; }
     .shift-icon { font-size:22px; }
     .shift-body { flex:1; }
@@ -214,6 +222,8 @@
 
 <!-- Shared linen schema (board IDs, column IDs, role→transport map) -->
 <script src="linen-schema.js"></script>
+<!-- Messages: shared schema + visibility helpers. Used by the MOTD render. -->
+<script src="messages-schema.js"></script>
 
 <!-- ── Maintenance Exception modal ───────────────────────────── -->
 <div class="cl-overlay" id="exOverlay">
@@ -519,6 +529,7 @@ const ME_CACHE_KEY = 'bh.me';   // cached resolved staff record so we can skip
 
 let me = null;          // resolved staff { id, name, role }
 let cleans = [];
+let _myMessages = [];   // active messages visible to me (MOTDs + direct), parsed from board
 let shifts = [];
 let hotTubCleans = [];  // hot tub cleans assigned to this staff member
 let maintTasks = [];    // scheduled work from window/jet/PAT/ad-hoc boards
@@ -692,6 +703,7 @@ async function boot() {
     maintTasks = JSON.parse(localStorage.getItem('cache_maint') || '[]');
     shifts = JSON.parse(localStorage.getItem('cache_shifts') || '[]');
     linenBags = JSON.parse(localStorage.getItem('cache_linen_bags') || '[]');
+    _myMessages = JSON.parse(localStorage.getItem('cache_my_messages') || '[]');
     if (cleans.length || hotTubCleans.length || maintTasks.length || shifts.length || linenBags.length) {
       renderDayNav();
       renderDay();
@@ -713,8 +725,8 @@ async function boot() {
   catch (e) { console.warn('loadArrivals failed — cleans/HT will use legacy CL/HC fields:', e); }
 
   // Run loaders independently
-  const results = await Promise.allSettled([loadCleans(), loadShifts(), loadHotTubCleans(), loadMaintenanceTasks(), loadLinenBags()]);
-  const labels = ['cleans', 'shifts', 'hot tub cleans', 'maintenance tasks', 'linen bags'];
+  const results = await Promise.allSettled([loadCleans(), loadShifts(), loadHotTubCleans(), loadMaintenanceTasks(), loadLinenBags(), loadMessages()]);
+  const labels = ['cleans', 'shifts', 'hot tub cleans', 'maintenance tasks', 'linen bags', 'messages'];
   const failures = results
     .map((r, i) => r.status === 'rejected' ? { label: labels[i], err: r.reason } : null)
     .filter(Boolean);
@@ -741,6 +753,73 @@ async function boot() {
    guestName, bookingRef). Cleans / HT Cleans rows look up their linked
    booking here via CL_ARRIVAL / HC_ARRIVAL board_relation columns. */
 let arrivalsById = new Map();
+
+/* ─── Messages loader ────────────────────────────────────────
+   Pulls every active message visible to me (broadcasts + direct).
+   Filters out withdrawn / expired / dismissed-by-me. Result cached in
+   _myMessages and rendered at the top of My Day by renderDay(). */
+async function loadMessages() {
+  if (!window.MessagesSchema) { _myMessages = []; return; }
+  const cfg = await window.MessagesSchema.getMessagesConfig(mondayFetch);
+  if (!cfg || !cfg.boardId) { _myMessages = []; return; }
+  const c = cfg.columns;
+  const colIds = Object.values(c).filter(Boolean).map(id => `"${id}"`).join(',');
+
+  let cursor = null, all = [], pages = 0;
+  do {
+    const cursorPart = cursor ? `, cursor:"${cursor}"` : '';
+    const data = await mondayFetch(`{
+      boards(ids:[${cfg.boardId}]) {
+        items_page(limit:200${cursorPart}) {
+          cursor
+          items {
+            id name
+            column_values(ids:[${colIds}]) {
+              id text value
+              ... on BoardRelationValue { linked_item_ids }
+            }
+          }
+        }
+      }
+    }`);
+    const page = data?.boards?.[0]?.items_page;
+    if (!page) break;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+    pages++;
+    if (pages > 10) break;
+  } while (cursor);
+
+  const today = todayISO();
+  const parsed = all.map(it => parseMessageRow(it, c));
+  _myMessages = parsed
+    .filter(m => window.MessagesSchema.visibleToStaff(m, me.id, today))
+    .filter(m => String(m.senderStaffId) !== String(me.id))   // don't surface my own posts as MOTD
+    .sort((a,b) => (b.postedAt || '').localeCompare(a.postedAt || ''));
+
+  localStorage.setItem('cache_my_messages', JSON.stringify(_myMessages));
+}
+
+function parseMessageRow(it, c) {
+  const cv = Object.fromEntries((it.column_values || []).map(x => [x.id, x]));
+  const postedObj  = c.postedAt  ? pj(cv[c.postedAt]?.value)  : null;
+  const expiresObj = c.expiresAt ? pj(cv[c.expiresAt]?.value) : null;
+  return {
+    id: it.id,
+    title: it.name,
+    body: (cv[c.body]?.text || pj(cv[c.body]?.value)?.text || '').trim(),
+    senderName:    (cv[c.senderName]?.text || '').trim(),
+    senderStaffId: ((c.senderStaff && cv[c.senderStaff]?.linked_item_ids) || [])[0] || '',
+    audience:    (cv[c.audience]?.text || 'All staff').trim(),
+    recipients:  ((c.recipients  && cv[c.recipients]?.linked_item_ids)  || []).map(String),
+    postedAt:    postedObj?.date ? `${postedObj.date}T${postedObj.time || '00:00:00'}` : '',
+    expiresAt:   expiresObj?.date || '',
+    threadId:    (cv[c.threadId]?.text || '').trim() || it.id,
+    readBy:      ((c.readBy && cv[c.readBy]?.linked_item_ids) || []).map(String),
+    dismissedBy: ((c.dismissedBy && cv[c.dismissedBy]?.linked_item_ids) || []).map(String),
+    status:      (cv[c.status]?.text || 'Active').trim(),
+  };
+}
 
 /* ─── Lifecycle column bootstrap ─────────────────────────────
    Discovers (or, on first run, creates) the "Started at" column on the
@@ -1302,6 +1381,41 @@ function renderDay() {
   const maint = isMaintenanceUser();
 
   const parts = [];
+
+  // MOTD / direct messages — only on today's view, so they don't clutter
+  // the past/future day chips. Active messages addressed to me are shown
+  // as compact cards. View link opens messages.html, dismiss hides locally
+  // immediately + writes the dismissedBy column on Monday in the background.
+  if (day === todayISO() && _myMessages && _myMessages.length) {
+    const today = todayISO();
+    const active = _myMessages.filter(m =>
+      m.status !== 'Withdrawn' &&
+      (!m.expiresAt || m.expiresAt >= today) &&
+      !(m.dismissedBy || []).map(String).includes(String(me.id))
+    );
+    if (active.length) {
+      parts.push('<div class="section-label">Messages <span class="count">' + active.length + '</span></div>');
+      for (const m of active) {
+        const isAll = m.audience === 'All staff';
+        const senderLine = (m.senderName || 'Unknown') +
+          (isAll ? ' · to all staff' : ' · direct') +
+          (m.expiresAt ? ' · expires ' + prettyDate(m.expiresAt) : '');
+        const linkUrl = `messages.html?from=staff&name=${encodeURIComponent(me.name)}`;
+        parts.push(`<div class="msg-card${isAll ? ' all' : ''}">
+          <div class="msg-card-hdr">
+            <div class="msg-card-title">${isAll ? '📣 ' : '👤 '}${escapeHtml(m.title || '(no subject)')}</div>
+          </div>
+          <div class="msg-card-meta">${escapeHtml(senderLine)}</div>
+          ${m.body ? `<div class="msg-card-body">${escapeHtml(m.body.slice(0, 280))}${m.body.length > 280 ? '…' : ''}</div>` : ''}
+          <div class="msg-card-actions">
+            <a class="cc-btn primary" href="${linkUrl}" style="flex:1; text-align:center; padding:9px; text-decoration:none">View / reply</a>
+            <button class="cc-btn secondary" onclick="dismissMessageLocal('${m.id}')" style="flex:0 0 auto; padding:9px 14px">Dismiss</button>
+          </div>
+        </div>`);
+      }
+    }
+  }
+
   parts.push(`<div style="font-size:13px;color:var(--sage);margin-bottom:12px">${prettyDate(day)}</div>`);
 
   // Shift card — show for everyone
@@ -1421,6 +1535,22 @@ function renderDay() {
     </a>
   </div>`);
 
+  // Messages — show with an unread badge if any. The unread count is the
+  // number of active messages where I'm not in readBy AND I didn't send it.
+  // Cached _myMessages already filters out my own posts, so the count is just
+  // those without my id in readBy.
+  const unreadCount = (_myMessages || []).filter(m =>
+    m.status !== 'Withdrawn' &&
+    (!m.expiresAt || m.expiresAt >= todayISO()) &&
+    !(m.dismissedBy || []).map(String).includes(String(me.id)) &&
+    !(m.readBy || []).map(String).includes(String(me.id))
+  ).length;
+  parts.push(`<div style="margin-top:8px">
+    <a href="messages.html?from=staff&name=${encodeURIComponent(me.name)}" class="cc-btn secondary" style="display:flex; align-items:center; justify-content:center; gap:8px; padding:11px; font-weight:700; text-decoration:none; border-radius:10px; background:#fff; color:#272F2E; border:1.5px solid #989782">
+      💬 Messages${unreadCount ? ` <span style="background:var(--red); color:#fff; font-size:11px; padding:1px 8px; border-radius:9px; font-weight:800">${unreadCount} new</span>` : ''}
+    </a>
+  </div>`);
+
   // Request leave — submits to the Leave Requests board for manager review.
   // Sits below feedback so it's not the first thing staff see; still always
   // available without hunting for it.
@@ -1533,6 +1663,35 @@ function renderCleanCard(c) {
    taps. The Monday write happens in the background and is queued via the
    existing offline outbox if the device is offline. On API failure we revert
    the local state and toast the error so they know to try again. */
+/* Dismiss a top-of-day message. Optimistic: hide locally + re-render right
+   away, then push the dismissedBy column update to Monday in the background.
+   On API failure we toast but don't reverse — next page load will show the
+   message again if the write didn't land, which is the safe bias. */
+async function dismissMessageLocal(msgId) {
+  const m = _myMessages.find(x => x.id === msgId);
+  if (!m) return;
+  if (!m.dismissedBy) m.dismissedBy = [];
+  if (!m.dismissedBy.map(String).includes(String(me.id))) m.dismissedBy.push(String(me.id));
+  try { localStorage.setItem('cache_my_messages', JSON.stringify(_myMessages)); } catch (_) {}
+  renderDay();
+
+  if (!window.MessagesSchema) return;
+  try {
+    const cfg = await window.MessagesSchema.getMessagesConfig(mondayFetch);
+    if (!cfg || !cfg.columns?.dismissedBy) return;
+    const cv = { [cfg.columns.dismissedBy]: { item_ids: m.dismissedBy.map(Number) } };
+    await mondayFetch(
+      `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v){ id } }`,
+      { b: String(cfg.boardId), i: String(msgId), v: JSON.stringify(cv) },
+      true   // useOutbox — survives offline
+    );
+  } catch (e) {
+    if (e.message !== 'OFFLINE_QUEUED') {
+      toast('Could not save dismiss: ' + (e.message || e), 'error');
+    }
+  }
+}
+
 async function startClean(cleanId) {
   const c = cleans.find(x => x.id === cleanId);
   if (!c) return;

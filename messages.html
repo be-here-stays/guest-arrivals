@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="theme-color" content="#272F2E">
+<title>Messages — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+         background:var(--bg); color:var(--dark); min-height:100vh;
+         padding-bottom:calc(env(safe-area-inset-bottom, 0px) + 96px); }
+
+  header { background:var(--dark); color:#fff; padding:14px 18px;
+           padding-top:max(14px, env(safe-area-inset-top));
+           display:flex; align-items:center; justify-content:space-between; gap:10px; }
+  header h1 { font-size:17px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.65; margin-top:2px; }
+  .hdr-back { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; font-weight:600; }
+  .hdr-back:hover { color:#fff; }
+
+  .container { max-width:680px; margin:0 auto; padding:14px 14px 60px; }
+
+  /* Tabs */
+  .tabs { display:grid; grid-template-columns:repeat(3, 1fr); gap:0; background:var(--surface);
+          border-radius:11px; overflow:hidden; box-shadow:0 1px 4px rgba(39,47,46,0.08);
+          margin-bottom:14px; }
+  .tab { padding:11px 8px; background:#fff; border:0; font-family:inherit;
+         font-size:13px; font-weight:700; color:var(--sage-mid); cursor:pointer;
+         transition:all 0.15s; border-bottom:3px solid transparent; }
+  .tab:hover { color:var(--dark); }
+  .tab.active { color:var(--dark); border-bottom-color:var(--gold); background:#faf8f1; }
+  .tab .tab-badge { display:inline-block; min-width:18px; padding:1px 6px; background:var(--red);
+                    color:#fff; border-radius:9px; font-size:10px; font-weight:800; margin-left:5px; }
+
+  .card { background:var(--surface); border-radius:13px; padding:14px 16px; margin-bottom:11px;
+          box-shadow:0 1px 4px rgba(39,47,46,0.08); }
+  .card-title { font-size:12px; font-weight:700; text-transform:uppercase; letter-spacing:.6px;
+                color:var(--sage); margin-bottom:10px; }
+
+  .field { margin-bottom:11px; }
+  .field label { display:block; font-size:11px; font-weight:700; color:var(--sage);
+                 margin-bottom:5px; text-transform:uppercase; letter-spacing:0.5px; }
+  .field label .req { color:var(--red); margin-left:2px; }
+  input[type=text], textarea, select, input[type=date] {
+    width:100%; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px;
+    font-family:inherit; font-size:14px; color:var(--dark); background:#fff; outline:none;
+    -webkit-appearance:none; appearance:none;
+  }
+  textarea { min-height:90px; resize:vertical; line-height:1.4; }
+  input:focus, textarea:focus, select:focus { border-color:var(--dark); }
+
+  .audience-row { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .aud-chip { padding:11px 8px; background:#fff; border:2px solid var(--border); border-radius:9px;
+              font-family:inherit; font-size:13px; font-weight:700; color:var(--sage-mid);
+              cursor:pointer; text-align:center; transition:all 0.15s; }
+  .aud-chip:hover { color:var(--dark); border-color:var(--sage); }
+  .aud-chip.active { color:var(--dark); border-color:var(--gold); background:#faf3e8; }
+  .aud-chip .desc { display:block; font-weight:500; font-size:11px; opacity:0.75; margin-top:3px; line-height:1.3; }
+
+  /* Recipient picker (multi-select chips) */
+  .recip-grid { display:flex; flex-wrap:wrap; gap:6px; padding:6px 0; }
+  .recip-chip { padding:6px 10px; background:#fff; border:1.5px solid var(--border); border-radius:14px;
+                font-size:12px; font-weight:600; color:var(--sage-mid); cursor:pointer; }
+  .recip-chip.on { background:var(--cream); color:var(--dark); border-color:var(--gold); }
+
+  .submit-btn { width:100%; padding:13px; background:var(--dark); color:var(--cream); border:0;
+                border-radius:10px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+  .submit-btn:hover { background:var(--sage); }
+  .submit-btn:disabled { opacity:0.5; cursor:not-allowed; }
+
+  .msg { padding:10px 12px; border-radius:8px; font-size:13px; font-weight:600; margin-bottom:12px; display:none; }
+  .msg.show { display:block; }
+  .msg.success { background:var(--green-bg); color:var(--green); }
+  .msg.error   { background:var(--red-bg); color:var(--red); }
+  .msg.info    { background:var(--blue-bg); color:var(--blue); }
+
+  .setup-card { background:var(--amber-bg); border:1.5px solid var(--amber); border-radius:12px;
+                padding:14px 16px; margin-bottom:14px; }
+  .setup-card h3 { font-size:14px; color:var(--amber); margin-bottom:6px; }
+  .setup-card p  { font-size:13px; color:var(--dark); margin-bottom:9px; }
+  .setup-btn { padding:9px 14px; background:var(--amber); color:#fff; border:0; border-radius:8px;
+               font-family:inherit; font-size:13px; font-weight:700; cursor:pointer; }
+
+  /* Message card (inbox & sent) */
+  .m-card { background:var(--surface); border-radius:11px; padding:12px 14px; margin-bottom:9px;
+            border:1px solid var(--border); cursor:pointer; transition:background 0.12s; }
+  .m-card:hover { background:#fafaf6; }
+  .m-card.unread { border-left:4px solid var(--red); padding-left:10px; }
+  .m-card.expanded { background:#fafaf6; cursor:default; }
+  .m-top { display:flex; align-items:flex-start; justify-content:space-between; gap:10px; }
+  .m-title { font-size:14px; font-weight:700; color:var(--dark); flex:1 1 auto; min-width:0; }
+  .m-meta  { font-size:11px; color:var(--sage-mid); margin-top:2px; }
+  .m-badges { display:flex; flex-wrap:wrap; gap:5px; flex:0 0 auto; }
+  .m-badge { display:inline-block; padding:2px 7px; border-radius:6px; font-size:10px; font-weight:700;
+             text-transform:uppercase; letter-spacing:0.3px; }
+  .m-badge.audience-all    { background:var(--blue-bg); color:var(--blue); }
+  .m-badge.audience-direct { background:var(--cream); color:var(--dark); }
+  .m-badge.expired         { background:#ddd; color:#666; }
+  .m-badge.unread          { background:var(--red); color:#fff; }
+
+  .m-body { display:none; font-size:14px; color:var(--dark); line-height:1.5;
+            white-space:pre-wrap; padding:10px 0 4px; border-top:1px solid var(--border); margin-top:8px; }
+  .m-card.expanded .m-body { display:block; }
+  .m-actions { display:flex; gap:8px; margin-top:10px; flex-wrap:wrap; }
+  .m-actions button {
+    padding:7px 12px; border:1.5px solid var(--border); border-radius:8px;
+    background:#fff; color:var(--dark); font-family:inherit; font-size:12px; font-weight:600; cursor:pointer;
+  }
+  .m-actions .primary { background:var(--dark); color:var(--cream); border-color:var(--dark); }
+  .m-actions .secondary:hover { border-color:var(--sage); }
+
+  .m-replies { padding:8px 0 0; border-top:1px dashed var(--border); margin-top:10px; }
+  .m-reply { background:#fafaf6; padding:8px 10px; border-radius:8px; margin-bottom:6px;
+             font-size:13px; color:var(--dark); }
+  .m-reply .who { font-size:11px; color:var(--sage-mid); margin-bottom:3px; }
+
+  .m-receipts { font-size:11px; color:var(--sage-mid); margin-top:6px; }
+
+  .empty { padding:40px 20px; text-align:center; color:var(--sage-mid); font-style:italic; }
+
+  .hide { display:none !important; }
+
+  /* Compose extras */
+  .compose-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width: 480px) { .compose-grid { grid-template-columns:1fr; } }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>💬 Messages</h1>
+    <div class="sub" id="subTitle">Loading…</div>
+  </div>
+  <a class="hdr-back" id="backLink" href="staff.html">‹ My Day</a>
+</header>
+
+<script src="secrets.js"></script>
+<script src="messages-schema.js"></script>
+
+<div class="container">
+  <div id="msgBox" class="msg"></div>
+
+  <div id="setupCard" class="setup-card hide">
+    <h3>Messages board not set up yet</h3>
+    <p>The Messages board doesn't exist on Monday yet. Press once to create it (board name: <strong>Be Here — Messages</strong>).</p>
+    <button class="setup-btn" id="setupBtn" onclick="bootstrap()">Create the messages board</button>
+  </div>
+
+  <div class="tabs" id="tabs">
+    <button class="tab active" id="tabInbox"   onclick="switchTab('inbox')">Inbox <span class="tab-badge hide" id="badgeInbox"></span></button>
+    <button class="tab"        id="tabSent"    onclick="switchTab('sent')">Sent</button>
+    <button class="tab"        id="tabCompose" onclick="switchTab('compose')">Compose</button>
+  </div>
+
+  <!-- Inbox -->
+  <section id="paneInbox"></section>
+
+  <!-- Sent -->
+  <section id="paneSent" class="hide"></section>
+
+  <!-- Compose -->
+  <section id="paneCompose" class="hide">
+    <div class="card">
+      <div class="card-title">New message</div>
+
+      <div class="field">
+        <label>Audience <span class="req">*</span></label>
+        <div class="audience-row">
+          <button type="button" class="aud-chip active" id="audAll"    onclick="setAudience('All staff', this)">📣 All staff<span class="desc">Everyone sees it</span></button>
+          <button type="button" class="aud-chip"        id="audDirect" onclick="setAudience('Direct', this)">👤 Direct<span class="desc">Pick recipients</span></button>
+        </div>
+      </div>
+
+      <div class="field hide" id="recipField">
+        <label>Recipients <span class="req">*</span></label>
+        <div class="recip-grid" id="recipGrid"><span class="empty" style="font-size:12px; padding:10px">Loading staff…</span></div>
+      </div>
+
+      <div class="field">
+        <label for="cTitle">Subject <span class="req">*</span></label>
+        <input type="text" id="cTitle" maxlength="120" placeholder="e.g. Hot tub at Mallard out of action 12–15 May">
+      </div>
+
+      <div class="field">
+        <label for="cBody">Message <span class="req">*</span></label>
+        <textarea id="cBody" placeholder="Body of your message…"></textarea>
+      </div>
+
+      <div class="compose-grid">
+        <div class="field">
+          <label for="cExpires">Expires</label>
+          <input type="date" id="cExpires">
+        </div>
+        <div class="field" style="display:flex; align-items:flex-end">
+          <button class="submit-btn" id="sendBtn" onclick="sendMessage()">📨 Post message</button>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<script>
+const URL_API     = 'https://api.monday.com/v2';
+const STAFF_BOARD = 5095127554;
+const ST_CODE     = 'text_mm2qd59j';   // 4-digit staff code (auth)
+const ST_ROLE     = 'color_mm2psadz';
+const ST_STATUS   = 'color_mm2psvh2';
+
+let _config       = null;        // { boardId, columns }
+let _staffList    = [];          // [{id,name,role}]
+let _me           = null;        // { id, name, role }
+let _messages     = [];          // raw parsed messages, all visible to me + sent by me
+let _selectedAud  = 'All staff';
+let _selectedRecips = new Set();
+let _expandedId   = null;        // currently expanded thread root id
+
+/* ─── Plumbing ──────────────────────────────────────────── */
+async function mq(query, variables) {
+  const r = await fetch(URL_API, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json',
+              Authorization: window.MONDAY_API_TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify(variables ? { query, variables } : { query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error('Monday: ' + j.errors[0].message);
+  return j.data;
+}
+
+function pj(v) { if (v == null || v === '') return null; try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; } }
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+function fmtUK(iso) {
+  if (!iso) return '';
+  const m = iso.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m ? `${m[3]}-${m[2]}-${m[1].slice(2)}` : iso;
+}
+function todayISO() { return new Date().toISOString().slice(0,10); }
+function nowDateTime() {
+  const d = new Date();
+  return { date: d.toISOString().slice(0,10), time: d.toTimeString().slice(0,8) };
+}
+
+function showMsg(text, type) {
+  const box = document.getElementById('msgBox');
+  box.textContent = text; box.className = 'msg show ' + type;
+  if (type === 'success') setTimeout(() => box.classList.remove('show'), 5000);
+}
+
+function switchTab(t) {
+  for (const k of ['inbox','sent','compose']) {
+    document.getElementById('tab' + k.charAt(0).toUpperCase() + k.slice(1)).classList.toggle('active', t === k);
+    document.getElementById('pane' + k.charAt(0).toUpperCase() + k.slice(1)).classList.toggle('hide', t !== k);
+  }
+}
+
+function setAudience(a, btn) {
+  _selectedAud = a;
+  document.querySelectorAll('.aud-chip').forEach(c => c.classList.remove('active'));
+  btn.classList.add('active');
+  document.getElementById('recipField').classList.toggle('hide', a !== 'Direct');
+}
+
+/* ─── Staff identification ────────────────────────────────────
+   The page reads `?name=` or session storage to know who's using it.
+   This is the same lightweight identity model as the rest of the staff
+   pages — no PIN re-entry, just matching by name against the Staff
+   board to get a canonical id. */
+async function identifyMe() {
+  const params = new URLSearchParams(location.search);
+  const nameParam = params.get('name') || sessionStorage.getItem('bh.staffName') || '';
+  if (!nameParam) return null;
+
+  // Find a Staff item matching by name (full or first-token).
+  const staff = _staffList.find(s => {
+    const n = s.name.toLowerCase();
+    const want = nameParam.toLowerCase();
+    return n === want || n.split(/\s+/)[0] === want.split(/\s+/)[0];
+  });
+  return staff || null;
+}
+
+/* ─── Boot ─────────────────────────────────────────────── */
+document.addEventListener('DOMContentLoaded', async () => {
+  const params = new URLSearchParams(location.search);
+  if (params.get('from') === 'staff') {
+    document.getElementById('backLink').href = 'staff.html?name=' + encodeURIComponent(params.get('name')||'');
+  }
+  document.getElementById('cExpires').value = '';   // empty default — no expiry
+
+  try {
+    await loadStaff();
+  } catch (e) {
+    showMsg('Could not load staff list: ' + e.message, 'error');
+    return;
+  }
+
+  _me = await identifyMe();
+  if (!_me) {
+    document.getElementById('subTitle').textContent = 'Not logged in';
+    document.getElementById('tabs').classList.add('hide');
+    document.getElementById('paneInbox').innerHTML = '<div class="card"><div class="empty">Open this page from staff.html so we know who you are.<br><br><a href="staff.html" class="submit-btn" style="display:inline-block; padding:10px 20px; text-decoration:none; width:auto">Go to My Day</a></div></div>';
+    return;
+  }
+  document.getElementById('subTitle').textContent = 'Hi ' + _me.name;
+
+  try {
+    _config = await window.MessagesSchema.getMessagesConfig(mq);
+    if (!_config) {
+      document.getElementById('setupCard').classList.remove('hide');
+      document.getElementById('tabs').classList.add('hide');
+      return;
+    }
+  } catch (e) {
+    showMsg('Could not load Messages board: ' + e.message, 'error');
+    return;
+  }
+
+  renderRecipChips();
+  await refreshMessages();
+});
+
+async function bootstrap() {
+  const btn = document.getElementById('setupBtn');
+  btn.disabled = true; btn.textContent = 'Creating…';
+  try {
+    _config = await window.MessagesSchema.createMessagesBoard(mq);
+    document.getElementById('setupCard').classList.add('hide');
+    document.getElementById('tabs').classList.remove('hide');
+    showMsg('✓ Messages board ready.', 'success');
+    renderRecipChips();
+    await refreshMessages();
+  } catch (e) {
+    showMsg('Setup failed: ' + e.message, 'error');
+    btn.disabled = false; btn.textContent = 'Create the messages board';
+  }
+}
+
+async function loadStaff() {
+  const data = await mq(`{
+    boards(ids:[${STAFF_BOARD}]) {
+      items_page(limit:200) {
+        items {
+          id name
+          column_values(ids:["${ST_ROLE}","${ST_STATUS}"]) { id text }
+        }
+      }
+    }
+  }`);
+  const items = data?.boards?.[0]?.items_page?.items || [];
+  _staffList = items.map(it => {
+    const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+    return { id: it.id, name: it.name,
+             role: cv[ST_ROLE]?.text || '',
+             status: cv[ST_STATUS]?.text || 'Active' };
+  }).filter(s => {
+    const st = s.status.toLowerCase();
+    return !st || st === 'active' || st === 'training';
+  }).sort((a,b) => a.name.localeCompare(b.name));
+}
+
+function renderRecipChips() {
+  const grid = document.getElementById('recipGrid');
+  if (!_staffList.length) { grid.innerHTML = '<span class="empty" style="font-size:12px">No staff loaded.</span>'; return; }
+  grid.innerHTML = _staffList
+    .filter(s => s.id !== _me?.id)   // can't message yourself directly
+    .map(s => `<span class="recip-chip" data-id="${s.id}" onclick="toggleRecip('${s.id}', this)">${escapeHtml(s.name)}</span>`)
+    .join('');
+}
+function toggleRecip(id, el) {
+  if (_selectedRecips.has(id)) { _selectedRecips.delete(id); el.classList.remove('on'); }
+  else                          { _selectedRecips.add(id);    el.classList.add('on'); }
+}
+
+/* ─── Read messages ────────────────────────────────────── */
+async function refreshMessages() {
+  const c = _config.columns;
+  const colIds = Object.values(c).filter(Boolean).map(id => `"${id}"`).join(',');
+  let cursor = null, all = [], pages = 0;
+  do {
+    const cursorPart = cursor ? `, cursor:"${cursor}"` : '';
+    const data = await mq(`{
+      boards(ids:[${_config.boardId}]) {
+        items_page(limit:500${cursorPart}) {
+          cursor
+          items {
+            id name created_at
+            column_values(ids:[${colIds}]) {
+              id text value
+              ... on BoardRelationValue { linked_item_ids }
+            }
+          }
+        }
+      }
+    }`);
+    const page = data?.boards?.[0]?.items_page;
+    if (!page) break;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+    pages++;
+    if (pages > 30) break;
+  } while (cursor);
+
+  _messages = all.map(parseMessage).sort((a,b) => (b.postedAt || '').localeCompare(a.postedAt || ''));
+  renderInbox();
+  renderSent();
+  updateInboxBadge();
+}
+
+function parseMessage(it) {
+  const c = _config.columns;
+  const cv = Object.fromEntries((it.column_values || []).map(x => [x.id, x]));
+  const postedObj = c.postedAt ? pj(cv[c.postedAt]?.value) : null;
+  const expiresObj = c.expiresAt ? pj(cv[c.expiresAt]?.value) : null;
+  const senderStaffIds  = (c.senderStaff && cv[c.senderStaff]?.linked_item_ids) || [];
+  const recipientIds    = (c.recipients  && cv[c.recipients]?.linked_item_ids)  || [];
+  const readByIds       = (c.readBy      && cv[c.readBy]?.linked_item_ids)      || [];
+  const dismissedByIds  = (c.dismissedBy && cv[c.dismissedBy]?.linked_item_ids) || [];
+  return {
+    id: it.id,
+    title: it.name,
+    body: (cv[c.body]?.text || pj(cv[c.body]?.value)?.text || '').trim(),
+    senderName:   (cv[c.senderName]?.text || '').trim(),
+    senderStaffId: senderStaffIds.length ? String(senderStaffIds[0]) : '',
+    audience:    (cv[c.audience]?.text || 'All staff').trim(),
+    recipients:  recipientIds.map(String),
+    postedAt:    postedObj?.date ? `${postedObj.date}T${postedObj.time || '00:00:00'}` : '',
+    expiresAt:   expiresObj?.date || '',
+    threadId:    (cv[c.threadId]?.text || '').trim() || it.id,    // root msg uses its own id
+    readBy:      readByIds.map(String),
+    dismissedBy: dismissedByIds.map(String),
+    status:      (cv[c.status]?.text || 'Active').trim(),
+  };
+}
+
+/* Group flat messages into threads keyed by root id. Returns [{root, replies[]}]
+   sorted by root.postedAt desc; replies sorted asc within thread. */
+function groupThreads(msgs) {
+  const byThread = new Map();
+  for (const m of msgs) {
+    const key = m.threadId || m.id;
+    if (!byThread.has(key)) byThread.set(key, []);
+    byThread.get(key).push(m);
+  }
+  const threads = [];
+  for (const [key, ms] of byThread) {
+    ms.sort((a,b) => (a.postedAt || '').localeCompare(b.postedAt || ''));
+    const root = ms.find(m => m.id === key) || ms[0];
+    const replies = ms.filter(m => m !== root);
+    threads.push({ root, replies });
+  }
+  threads.sort((a,b) => (b.root.postedAt || '').localeCompare(a.root.postedAt || ''));
+  return threads;
+}
+
+/* ─── Inbox tab ────────────────────────────────────────── */
+function renderInbox() {
+  const today = todayISO();
+  const visible = _messages.filter(m => window.MessagesSchema.visibleToStaff(m, _me.id, today));
+  const threads = groupThreads(visible);
+  const div = document.getElementById('paneInbox');
+  if (!threads.length) {
+    div.innerHTML = '<div class="card"><div class="empty">No messages right now.</div></div>';
+    return;
+  }
+  div.innerHTML = threads.map(t => renderMessageCard(t.root, t.replies, /*forSent*/ false)).join('');
+}
+
+/* ─── Sent tab ─────────────────────────────────────────── */
+function renderSent() {
+  const mine = _messages.filter(m => String(m.senderStaffId) === String(_me.id));
+  const threads = groupThreads(mine);
+  const div = document.getElementById('paneSent');
+  if (!threads.length) {
+    div.innerHTML = '<div class="card"><div class="empty">You haven\'t sent anything yet.</div></div>';
+    return;
+  }
+  div.innerHTML = threads.map(t => renderMessageCard(t.root, t.replies, /*forSent*/ true)).join('');
+}
+
+function updateInboxBadge() {
+  const today = todayISO();
+  const unread = _messages.filter(m =>
+    window.MessagesSchema.visibleToStaff(m, _me.id, today) &&
+    window.MessagesSchema.isUnreadFor(m, _me.id)
+  ).length;
+  const badge = document.getElementById('badgeInbox');
+  if (unread > 0) {
+    badge.textContent = unread;
+    badge.classList.remove('hide');
+  } else {
+    badge.classList.add('hide');
+  }
+}
+
+function renderMessageCard(root, replies, forSent) {
+  const today = todayISO();
+  const expired = root.expiresAt && root.expiresAt < today;
+  const unread = !forSent && window.MessagesSchema.isUnreadFor(root, _me.id);
+  const open = (_expandedId === root.id);
+  const audClass = root.audience === 'All staff' ? 'audience-all' : 'audience-direct';
+
+  // Build receipts info (Sent tab) — read counts based on the audience.
+  let receiptsHtml = '';
+  if (forSent) {
+    const target = root.audience === 'All staff'
+      ? _staffList.length
+      : root.recipients.length;
+    receiptsHtml = `<div class="m-receipts">Read by ${root.readBy.length}${target ? ' of ' + target : ''}${root.dismissedBy.length ? ' · dismissed by ' + root.dismissedBy.length : ''}</div>`;
+  }
+
+  // Recipient names for direct messages
+  const recipNames = root.recipients.length
+    ? root.recipients.map(id => (_staffList.find(s => s.id === id)?.name) || ('Staff ' + id)).join(', ')
+    : '';
+
+  const repliesHtml = replies.length
+    ? `<div class="m-replies">
+        ${replies.map(r => `<div class="m-reply">
+          <div class="who">${escapeHtml(r.senderName || '?')} · ${escapeHtml(fmtPostedAt(r.postedAt))}</div>
+          ${escapeHtml(r.body).replace(/\n/g, '<br>')}
+        </div>`).join('')}
+      </div>`
+    : '';
+
+  // Action buttons depend on context:
+  // - Inbox: Reply, Dismiss
+  // - Sent:  Reply, Withdraw (delete)
+  let actionsHtml = '';
+  if (open) {
+    if (!forSent) {
+      actionsHtml = `<div class="m-actions">
+        <button class="primary" onclick="event.stopPropagation(); openReply('${root.id}')">↩ Reply</button>
+        <button class="secondary" onclick="event.stopPropagation(); dismissMessage('${root.id}')">✕ Dismiss</button>
+      </div>`;
+    } else {
+      actionsHtml = `<div class="m-actions">
+        <button class="primary" onclick="event.stopPropagation(); openReply('${root.id}')">↩ Reply</button>
+        <button class="secondary" onclick="event.stopPropagation(); withdrawMessage('${root.id}')">🗑 Withdraw</button>
+      </div>`;
+    }
+  }
+
+  return `<div class="m-card ${unread ? 'unread' : ''} ${open ? 'expanded' : ''}" onclick="toggleExpand('${root.id}')">
+    <div class="m-top">
+      <div>
+        <div class="m-title">${escapeHtml(root.title || '(no subject)')}</div>
+        <div class="m-meta">
+          ${escapeHtml(root.senderName || '?')}
+          · ${escapeHtml(fmtPostedAt(root.postedAt))}
+          ${root.expiresAt ? ' · expires ' + fmtUK(root.expiresAt) : ''}
+          ${forSent && root.audience === 'Direct' ? ' · to ' + escapeHtml(recipNames) : ''}
+          ${replies.length ? ' · ' + replies.length + ' repl' + (replies.length === 1 ? 'y' : 'ies') : ''}
+        </div>
+      </div>
+      <div class="m-badges">
+        ${unread ? '<span class="m-badge unread">New</span>' : ''}
+        <span class="m-badge ${audClass}">${escapeHtml(root.audience)}</span>
+        ${expired ? '<span class="m-badge expired">Expired</span>' : ''}
+      </div>
+    </div>
+    <div class="m-body">${escapeHtml(root.body).replace(/\n/g, '<br>')}${repliesHtml}${actionsHtml}${receiptsHtml}</div>
+  </div>`;
+}
+
+function fmtPostedAt(iso) {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (isNaN(d)) return iso;
+  const today = new Date(); today.setHours(0,0,0,0);
+  const dDate = new Date(d); dDate.setHours(0,0,0,0);
+  const diffDays = Math.round((today - dDate) / 86400000);
+  const time = iso.slice(11,16);
+  if (diffDays === 0) return 'today ' + time;
+  if (diffDays === 1) return 'yesterday ' + time;
+  if (diffDays < 7)   return diffDays + ' days ago';
+  return fmtUK(iso.slice(0,10));
+}
+
+async function toggleExpand(id) {
+  if (_expandedId === id) {
+    _expandedId = null;
+  } else {
+    _expandedId = id;
+    // Mark as read on first expand (best-effort, async).
+    const m = _messages.find(x => x.id === id);
+    if (m && !m.readBy.includes(String(_me.id)) && String(m.senderStaffId) !== String(_me.id)) {
+      try {
+        m.readBy.push(String(_me.id));
+        await markRead(id, m.readBy);
+      } catch (_) { /* swallow — UI updated locally either way */ }
+    }
+  }
+  renderInbox();
+  renderSent();
+  updateInboxBadge();
+}
+
+async function markRead(itemId, allReadIds) {
+  const c = _config.columns;
+  if (!c.readBy) return;
+  const cv = { [c.readBy]: { item_ids: allReadIds.map(Number) } };
+  await mq(
+    `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v){ id } }`,
+    { b: String(_config.boardId), i: String(itemId), v: JSON.stringify(cv) }
+  );
+}
+
+async function dismissMessage(itemId) {
+  const m = _messages.find(x => x.id === itemId);
+  if (!m) return;
+  if (!m.dismissedBy.includes(String(_me.id))) m.dismissedBy.push(String(_me.id));
+  const c = _config.columns;
+  if (!c.dismissedBy) return;
+  const cv = { [c.dismissedBy]: { item_ids: m.dismissedBy.map(Number) } };
+  try {
+    await mq(
+      `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v){ id } }`,
+      { b: String(_config.boardId), i: String(itemId), v: JSON.stringify(cv) }
+    );
+    showMsg('Dismissed.', 'success');
+    _expandedId = null;
+    renderInbox();
+    updateInboxBadge();
+  } catch (e) {
+    showMsg('Could not dismiss: ' + e.message, 'error');
+  }
+}
+
+async function withdrawMessage(itemId) {
+  if (!confirm('Withdraw this message? It will disappear from everyone\'s inbox.')) return;
+  const c = _config.columns;
+  if (!c.status) { showMsg('Status column not configured.', 'error'); return; }
+  const cv = { [c.status]: { label: 'Withdrawn' } };
+  try {
+    await mq(
+      `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`,
+      { b: String(_config.boardId), i: String(itemId), v: JSON.stringify(cv) }
+    );
+    showMsg('Withdrawn.', 'success');
+    await refreshMessages();
+  } catch (e) {
+    showMsg('Could not withdraw: ' + e.message, 'error');
+  }
+}
+
+/* ─── Reply ────────────────────────────────────────────── */
+function openReply(rootId) {
+  const root = _messages.find(m => m.id === rootId);
+  if (!root) return;
+  switchTab('compose');
+  document.getElementById('cTitle').value = (root.title.startsWith('Re: ') ? root.title : 'Re: ' + root.title).slice(0, 120);
+  document.getElementById('cBody').value = '';
+  // Audience: a reply mirrors the root's audience model. For All-staff
+  // broadcasts we default the reply to All; for Direct we default to
+  // the original sender as the recipient (most useful case).
+  if (root.audience === 'All staff') {
+    document.getElementById('audAll').click();
+    _selectedRecips.clear();
+  } else {
+    document.getElementById('audDirect').click();
+    _selectedRecips = new Set([root.senderStaffId].filter(Boolean));
+    document.querySelectorAll('.recip-chip').forEach(el => {
+      el.classList.toggle('on', _selectedRecips.has(el.dataset.id));
+    });
+  }
+  // Stash root id so sendMessage can set the threadId.
+  document.getElementById('cTitle').dataset.threadRoot = rootId;
+}
+
+/* ─── Send ─────────────────────────────────────────────── */
+async function sendMessage() {
+  const title = document.getElementById('cTitle').value.trim();
+  const body  = document.getElementById('cBody').value.trim();
+  const expires = document.getElementById('cExpires').value || '';
+  const threadRoot = document.getElementById('cTitle').dataset.threadRoot || '';
+
+  if (!title || !body) { showMsg('Subject + body required', 'error'); return; }
+  if (_selectedAud === 'Direct' && _selectedRecips.size === 0) {
+    showMsg('Pick at least one recipient', 'error'); return;
+  }
+
+  const c = _config.columns;
+  const now = nowDateTime();
+  const cv = {};
+  if (c.body)        cv[c.body]        = body;
+  if (c.senderName)  cv[c.senderName]  = _me.name;
+  if (c.senderStaff) cv[c.senderStaff] = { item_ids: [Number(_me.id)] };
+  if (c.audience)    cv[c.audience]    = { label: _selectedAud };
+  if (c.recipients && _selectedAud === 'Direct') {
+    cv[c.recipients] = { item_ids: Array.from(_selectedRecips).map(Number) };
+  }
+  if (c.postedAt)    cv[c.postedAt]    = { date: now.date, time: now.time };
+  if (c.expiresAt && expires) cv[c.expiresAt] = { date: expires };
+  if (c.threadId && threadRoot) cv[c.threadId] = threadRoot;
+  if (c.status)      cv[c.status]      = { label: 'Active' };
+
+  const btn = document.getElementById('sendBtn');
+  btn.disabled = true; btn.textContent = 'Sending…';
+  try {
+    await mq(
+      `mutation($b:ID!,$n:String!,$v:JSON!){ create_item(board_id:$b, item_name:$n, column_values:$v, create_labels_if_missing:true){ id } }`,
+      { b: String(_config.boardId), n: title.slice(0, 250), v: JSON.stringify(cv) }
+    );
+    showMsg('✓ Posted.', 'success');
+    document.getElementById('cTitle').value = '';
+    document.getElementById('cBody').value = '';
+    document.getElementById('cExpires').value = '';
+    delete document.getElementById('cTitle').dataset.threadRoot;
+    _selectedRecips.clear();
+    renderRecipChips();
+    document.getElementById('audAll').click();
+    await refreshMessages();
+    switchTab('inbox');
+  } catch (e) {
+    showMsg('Send failed: ' + e.message, 'error');
+  } finally {
+    btn.disabled = false; btn.textContent = '📨 Post message';
+  }
+}
+</script>
+</body>
+</html>

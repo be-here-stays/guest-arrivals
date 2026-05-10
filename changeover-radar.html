@@ -686,12 +686,27 @@ function closeModal() {
 
 /* ─── Create missing ─────────────────────────────────── */
 function askCreate(arrivalId, kind) {
+  console.log('[radar] askCreate fired:', { arrivalId, kind });
   // Belt-and-braces: bag pills now show as 'pending' not 'missing', but
   // guard here too in case the action is called from a stale UI state.
-  if (kind === 'bag') return;
+  if (kind === 'bag') {
+    console.warn('[radar] askCreate called for bag — bags are pending-only, no action');
+    return;
+  }
   const r = _rows.find(x => x.arrival.id === arrivalId);
-  if (!r) return;
+  if (!r) {
+    console.error('[radar] askCreate: no row found for arrivalId', arrivalId, '— rows:', _rows.length);
+    showMsg('Internal: row not found for arrival ' + arrivalId, 'error');
+    return;
+  }
   const label = kind === 'clean' ? 'Cleans row' : 'HT Clean';
+  const modalEl = document.getElementById('modal');
+  const cardEl = document.getElementById('modalCard');
+  if (!modalEl || !cardEl) {
+    console.error('[radar] askCreate: modal element missing', { modalEl, cardEl });
+    showMsg('Internal: modal element missing — refresh the page', 'error');
+    return;
+  }
   openModal(`
     <h3>Create ${label} for ${escapeHtml(r.arrival.property)}?</h3>
     <p>Check-in <strong>${fmtUK(r.arrival.checkin)}</strong> · ${escapeHtml(r.arrival.name)}.</p>
@@ -720,46 +735,91 @@ async function doCreate(arrivalId, kind) {
 }
 
 /* Idempotent create — re-checks the link before writing in case another tab
-   landed it since the radar's snapshot. */
+   landed it since the radar's snapshot. The dedup check is best-effort: if
+   the search query fails (Monday's items_page_by_column_values has been
+   known to reject board_relation column searches on some API versions),
+   we LOG and proceed with the create. The radar's main load already
+   showed cleansHere=0 for this row, so duplicating is unlikely. */
 async function createCleansRow(r) {
-  const check = await mq(`{
-    items_page_by_column_values(board_id:${CLEANS_BOARD},
-      columns:[{column_id:"${CL_ARRIVAL}", column_values:["${r.arrival.id}"]}], limit:1) {
-      items { id }
-    }
-  }`);
-  if (check?.items_page_by_column_values?.items?.length) return;   // already exists
+  try {
+    const check = await mq(`{
+      items_page_by_column_values(board_id:${CLEANS_BOARD},
+        columns:[{column_id:"${CL_ARRIVAL}", column_values:["${r.arrival.id}"]}], limit:1) {
+        items { id }
+      }
+    }`);
+    if (check?.items_page_by_column_values?.items?.length) return;   // already exists
+  } catch (e) {
+    console.warn('[radar] Cleans dedup check failed; proceeding with create:', e.message || e);
+  }
 
-  const prop = r.prop || {};
+  // Send the minimum required to establish the Cleans row + Arrivals link.
+  // CL_PROP, CL_HRS, CL_START are all useful but optional — the manager
+  // fills them in via rota-planner if needed, and staff.html reads
+  // property/booking shape from the Arrivals join (via CL_ARRIVAL) so
+  // they aren't even needed for staff visibility.
+  //
+  // We deliberately keep this minimal because Monday rejects writes with
+  // "items not in connected boards" if any board_relation column has a
+  // misconfigured connection (e.g. CL_PROP wired to an old board). By
+  // sending only CL_ARRIVAL we isolate the link that actually matters.
   const cv = {};
   cv[CL_DATE]    = { date: r.arrival.checkin };
-  cv[CL_ARRIVAL] = { item_ids: [Number(r.arrival.id)] };
-  if (prop.itemId) cv[CL_PROP] = { item_ids: [Number(prop.itemId)] };
-  if (prop.stdHrs) cv[CL_HRS]  = String(prop.stdHrs);
-  if (prop.defCheckin) {
-    const [h, m] = prop.defCheckin.split(':');
-    cv[CL_START] = { hour: Number(h)||0, minute: Number(m)||0 };
-  }
+  cv[CL_ARRIVAL] = { linkedPulseIds: [{ linkedPulseId: Number(r.arrival.id) }] };
   const itemName = `${r.arrival.property} · ${r.arrival.checkin}`.slice(0, 250);
   const cvStr = JSON.stringify(JSON.stringify(cv));
-  await mq(`mutation { create_item(board_id:${CLEANS_BOARD},
+  console.log('[radar] Creating Cleans row:', { itemName, cv });
+  const result = await mq(`mutation { create_item(board_id:${CLEANS_BOARD},
     item_name:${JSON.stringify(itemName)}, column_values:${cvStr},
     create_labels_if_missing:true) { id } }`);
+  if (!result?.create_item?.id) {
+    throw new Error('create_item returned no id — Monday may have rejected the payload silently');
+  }
+  console.log('[radar] Cleans row created:', result.create_item.id);
+
+  // Best-effort: try to set the optional convenience fields in a separate
+  // mutation. If any of them fail (e.g. CL_PROP connected to the wrong
+  // board) the Cleans row still exists with the correct Arrivals link,
+  // which is the bit that matters for staff visibility.
+  const prop = r.prop || {};
+  const extras = {};
+  if (prop.itemId) extras[CL_PROP] = { linkedPulseIds: [{ linkedPulseId: Number(prop.itemId) }] };
+  if (prop.stdHrs) extras[CL_HRS]  = String(prop.stdHrs);
+  if (prop.defCheckin) {
+    const [h, m] = prop.defCheckin.split(':');
+    extras[CL_START] = { hour: Number(h)||0, minute: Number(m)||0 };
+  }
+  if (Object.keys(extras).length) {
+    try {
+      const extrasStr = JSON.stringify(JSON.stringify(extras));
+      await mq(`mutation { change_multiple_column_values(board_id:${CLEANS_BOARD},
+        item_id:${result.create_item.id}, column_values:${extrasStr},
+        create_labels_if_missing:true) { id } }`);
+    } catch (e) {
+      console.warn('[radar] Optional Cleans fields not set (row created OK):', e.message || e);
+    }
+  }
 }
 
 async function createBagRow(r) {
   if (!_bagsConf) throw new Error('Linen Bags board not loaded — refresh');
   const c = _bagsConf.columns;
-  const check = await mq(`{
-    items_page_by_column_values(board_id:${_bagsConf.boardId},
-      columns:[{column_id:"${c.arrival}", column_values:["${r.arrival.id}"]}], limit:1) {
-      items { id }
-    }
-  }`);
-  if (check?.items_page_by_column_values?.items?.length) return;
+  // Same dedup-best-effort as createCleansRow — the items_page_by_column_values
+  // filter doesn't work on board_relation columns, so we proceed if it errors.
+  try {
+    const check = await mq(`{
+      items_page_by_column_values(board_id:${_bagsConf.boardId},
+        columns:[{column_id:"${c.arrival}", column_values:["${r.arrival.id}"]}], limit:1) {
+        items { id }
+      }
+    }`);
+    if (check?.items_page_by_column_values?.items?.length) return;
+  } catch (e) {
+    console.warn('[radar] Bag dedup check failed; proceeding with create:', e.message || e);
+  }
 
   const cv = {};
-  cv[c.arrival]   = { item_ids: [Number(r.arrival.id)] };
+  cv[c.arrival]   = { linkedPulseIds: [{ linkedPulseId: Number(r.arrival.id) }] };
   if (c.linenType) cv[c.linenType] = { label: 'Own' };   // safe default
   if (c.status)    cv[c.status]    = { label: 'Planned' };
   const today = todayISO();
@@ -771,26 +831,53 @@ async function createBagRow(r) {
 }
 
 async function createHtRow(r) {
-  const check = await mq(`{
-    items_page_by_column_values(board_id:${HT_CLEANS_BOARD},
-      columns:[{column_id:"${HC_ARRIVAL}", column_values:["${r.arrival.id}"]}], limit:1) {
-      items { id }
-    }
-  }`);
-  if (check?.items_page_by_column_values?.items?.length) return;
+  // Same dedup-best-effort: items_page_by_column_values doesn't filter on
+  // board_relation columns, so we wrap in a try/catch and proceed.
+  try {
+    const check = await mq(`{
+      items_page_by_column_values(board_id:${HT_CLEANS_BOARD},
+        columns:[{column_id:"${HC_ARRIVAL}", column_values:["${r.arrival.id}"]}], limit:1) {
+        items { id }
+      }
+    }`);
+    if (check?.items_page_by_column_values?.items?.length) return;
+  } catch (e) {
+    console.warn('[radar] HT dedup check failed; proceeding with create:', e.message || e);
+  }
 
-  const prop = r.prop || {};
+  // Minimum-viable: HC_DATE + HC_ARRIVAL + HC_TYPE + HC_STATUS. HC_PROP
+  // (board_relation to Property Config) added in a separate update call —
+  // if its connection is misconfigured, the row still exists with the
+  // correct Arrivals link.
   const cv = {};
   cv[HC_DATE]    = { date: r.arrival.checkin };
-  cv[HC_ARRIVAL] = { item_ids: [Number(r.arrival.id)] };
-  if (prop.itemId) cv[HC_PROP] = { item_ids: [Number(prop.itemId)] };
+  cv[HC_ARRIVAL] = { linkedPulseIds: [{ linkedPulseId: Number(r.arrival.id) }] };
   cv[HC_TYPE]    = { label: 'Full Clean' };
   cv[HC_STATUS]  = { label: 'Planned' };
   const itemName = `${r.arrival.property} · Full Clean · ${r.arrival.checkin}`.slice(0, 250);
   const cvStr = JSON.stringify(JSON.stringify(cv));
-  await mq(`mutation { create_item(board_id:${HT_CLEANS_BOARD},
+  console.log('[radar] Creating HT row:', { itemName, cv });
+  const result = await mq(`mutation { create_item(board_id:${HT_CLEANS_BOARD},
     item_name:${JSON.stringify(itemName)}, column_values:${cvStr},
     create_labels_if_missing:true) { id } }`);
+  if (!result?.create_item?.id) {
+    throw new Error('create_item returned no id — Monday may have rejected the payload silently');
+  }
+  console.log('[radar] HT row created:', result.create_item.id);
+
+  // Best-effort: optional Property Config link in a follow-up update.
+  const prop = r.prop || {};
+  if (prop.itemId) {
+    try {
+      const extras = { [HC_PROP]: { linkedPulseIds: [{ linkedPulseId: Number(prop.itemId) }] } };
+      const extrasStr = JSON.stringify(JSON.stringify(extras));
+      await mq(`mutation { change_multiple_column_values(board_id:${HT_CLEANS_BOARD},
+        item_id:${result.create_item.id}, column_values:${extrasStr},
+        create_labels_if_missing:true) { id } }`);
+    } catch (e) {
+      console.warn('[radar] Optional HT property link not set (row created OK):', e.message || e);
+    }
+  }
 }
 
 /* ─── Bulk create ───────────────────────────────────── */

@@ -84,6 +84,48 @@
     return 'group { id title }';
   }
 
+  /* ── Active-group lookup ─────────────────────────────────────────────
+     Returns the id of the first non-archive group on the Arrivals board
+     so create_item can be aimed at it explicitly. Without this, Monday
+     puts the new row in some default group — which has been observed
+     putting newly-created rows into the Archive group itself, with the
+     result that a freshly-"created" row immediately gets filtered out
+     by filterLive and the recon keeps flagging it as missing.
+
+     Cached in localStorage so first run hits Monday once, subsequent
+     runs reuse. Pass `forceRefresh:true` if you suspect the group id has
+     changed (board renamed, group deleted etc).
+
+     `mq` is the page's Monday GraphQL helper — same shape as everywhere
+     else, takes a query string and returns the parsed `data` object. */
+  const ACTIVE_GROUP_CACHE_KEY = 'bh.arrivals.liveGroupId';
+
+  async function getLiveGroupId(mq, opts) {
+    const force = !!(opts && opts.forceRefresh);
+    if (!force) {
+      try {
+        const cached = localStorage.getItem(ACTIVE_GROUP_CACHE_KEY);
+        if (cached) return cached;
+      } catch (_) {}
+    }
+
+    const data = await mq(`{
+      boards(ids:[${ARRIVALS_BOARD_ID}]) {
+        groups { id title archived deleted }
+      }
+    }`);
+    const groups = (data?.boards?.[0]?.groups || []).filter(g => !g.archived && !g.deleted);
+    // Pick the first group whose title is NOT archive-named. This is the
+    // top-most live group on the board, which is where the team adds new
+    // bookings by default.
+    const live = groups.find(g => !ARCHIVE_RE.test(g.title || ''));
+    if (!live) {
+      throw new Error('No live group found on Arrivals board (every group looks archived). Check the Arrivals board on Mondays.');
+    }
+    try { localStorage.setItem(ACTIVE_GROUP_CACHE_KEY, live.id); } catch (_) {}
+    return live.id;
+  }
+
   global.ArrivalsHelpers = {
     ARRIVALS_BOARD_ID,
     ARCHIVE_RE,
@@ -92,6 +134,7 @@
     partitionLive,
     groupQueryFragment,
     groupTitleOf,
+    getLiveGroupId,
   };
 
 })(typeof window !== 'undefined' ? window : globalThis);

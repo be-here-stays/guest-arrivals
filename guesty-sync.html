@@ -776,6 +776,21 @@ async function createSelected() {
   const GAP_MS = 200;
   const sleep = ms => new Promise(r => setTimeout(r, ms));
 
+  // Resolve the active (non-archive) group id once before the loop. New
+  // rows MUST be aimed at this explicitly — Monday's default placement
+  // has been seen putting freshly-created rows in the Archive group,
+  // which then get filtered out by ArrivalsHelpers and the recon keeps
+  // flagging them as missing forever. If the lookup fails we abort the
+  // bulk create rather than let any row land in the wrong place.
+  let liveGroupId;
+  try {
+    liveGroupId = await window.ArrivalsHelpers.getLiveGroupId(mq);
+  } catch (e) {
+    showMsg('Could not find the live Arrivals group: ' + e.message + '. Aborting create.', 'error');
+    btn.disabled = false; btn.textContent = '✓ Create selected on Arrivals';
+    return;
+  }
+
   for (const cb of cbs) {
     const idx = parseInt(cb.dataset.idx, 10);
     const g = _missing[idx];
@@ -784,9 +799,21 @@ async function createSelected() {
     try {
       // Belt-and-braces dedup: re-check Monday for this booking ref RIGHT
       // before creating, in case another tab / Make scenario landed it
-      // since the sync ran. Skips if found.
-      const exists = await mq(`{ items_page_by_column_values(board_id:${ARRIVALS_BOARD}, columns:[{column_id:"${AR_BOOKREF}", column_values:["${g.bookRef.replace(/"/g,'\\"')}"]}], limit:1){ items{ id } } }`);
-      if (exists?.items_page_by_column_values?.items?.length) {
+      // since the sync ran.
+      //
+      // IMPORTANT: items_page_by_column_values searches every group on the
+      // board, including Archive. We must filter the result the same way
+      // loadArrivals does — otherwise an archived Green Haven (or similar)
+      // is treated as "already exists" and blocks the create, even though
+      // the recon (which uses the group filter) correctly flagged it as
+      // missing. We pull the group on each match and only count it as a
+      // duplicate if it sits in a live group.
+      const exists = await mq(`{ items_page_by_column_values(board_id:${ARRIVALS_BOARD}, columns:[{column_id:"${AR_BOOKREF}", column_values:["${g.bookRef.replace(/"/g,'\\"')}"]}], limit:5){ items{ id group { id title } } } }`);
+      const matches = exists?.items_page_by_column_values?.items || [];
+      const liveMatches = window.ArrivalsHelpers
+        ? window.ArrivalsHelpers.filterLive(matches)
+        : matches;
+      if (liveMatches.length) {
         if (tr) {
           tr.classList.remove('processing');
           tr.classList.add('done');
@@ -815,8 +842,10 @@ async function createSelected() {
       // Notes (bed config) — only set when present so we don't blank-out
       // the column on bookings without notes.
       if (g.notes) cv[AR_BEDCFG] = g.notes.slice(0, 250);   // text col cap
+      // group_id is mandatory here — without it Monday picks a default
+      // that has been observed putting new rows in the Archive group.
       const cvStr = JSON.stringify(JSON.stringify(cv));
-      const q = `mutation { create_item(board_id:${ARRIVALS_BOARD}, item_name:${JSON.stringify(itemName)}, column_values:${cvStr}, create_labels_if_missing:true) { id } }`;
+      const q = `mutation { create_item(board_id:${ARRIVALS_BOARD}, group_id:"${liveGroupId}", item_name:${JSON.stringify(itemName)}, column_values:${cvStr}, create_labels_if_missing:true) { id group { id title } } }`;
       const result = await mq(q);
       if (!result?.create_item?.id) {
         throw new Error('Create returned no id (Monday may have silently rejected the payload)');

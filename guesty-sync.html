@@ -122,6 +122,7 @@
      Guesty calls fail CORS from file:// (and even from deployed origins
      unless Guesty has explicitly allowlisted them). -->
 <script src="secrets.js"></script>
+<script src="arrivals-helpers.js"></script>
 
 <script>
 const URL_API = 'https://api.monday.com/v2';
@@ -489,12 +490,15 @@ async function loadArrivals(from, to) {
   let cursor = null, all = [], pages = 0;
   do {
     const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
+    // `group { id title }` lets ArrivalsHelpers drop archived rows so
+    // they don't get reported as "missing on Arrivals" or as orphans.
     const q = `{
       boards(ids:[${ARRIVALS_BOARD}]) {
         items_page(limit: 500${cursorPart}) {
           cursor
           items {
             id name
+            group { id title }
             column_values(ids:["${AR_DATE}","${AR_CHECKOUT}","${AR_PROP}","${AR_BOOKREF}"]) {
               id text value
             }
@@ -513,7 +517,15 @@ async function loadArrivals(from, to) {
     }
   } while (cursor);
 
-  console.log(`[guesty-sync] loadArrivals pulled ${all.length} total Arrivals rows across ${pages} page(s).`);
+  // Drop archived rows so they don't get counted as missing/orphan/duplicate.
+  if (window.ArrivalsHelpers) {
+    const before = all.length;
+    all = window.ArrivalsHelpers.filterLive(all);
+    if (all.length !== before) {
+      console.log(`[guesty-sync] Skipped ${before - all.length} archived Arrivals rows`);
+    }
+  }
+  console.log(`[guesty-sync] loadArrivals pulled ${all.length} live Arrivals rows across ${pages} page(s).`);
 
   return all.map(it => {
     const cv = Object.fromEntries((it.column_values || []).map(c => [c.id, c]));

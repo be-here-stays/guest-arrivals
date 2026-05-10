@@ -918,8 +918,12 @@
     </div>
   </div>
 
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
+<script src="arrivals-helpers.js"></script>
+
   <script>
-    const BOARD_ID = '5094453064';
+    const ARRIVALS_BOARD = '5094453064';
     const PROP_BOARD = '5094466278';
     const HOT_TUB_STATUS_BOARD = '1918769299'; // one item per hot-tub property
     const REFRESH_MINS = 20;
@@ -927,7 +931,7 @@
     // ── READ-ONLY API TOKEN ──
     // Paste the Be Here viewer account's Monday.com API token here.
     // Use a dedicated Monday.com user with Viewer-only access to the two boards above.
-    const MONDAY_API_TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+    const MONDAY_API_TOKEN = window.MONDAY_API_TOKEN;
 
     let apiToken = MONDAY_API_TOKEN;
     let allItems = [];
@@ -987,11 +991,13 @@
       let items = [], cursor = null;
       do {
         const cp = cursor ? `, cursor: "${cursor}"` : '';
-        const d = await mondayFetch(`{ boards(ids:[${BOARD_ID}]){ items_page(limit:500${cp}){ cursor items{ id name column_values(ids:["date_mm2adtwg","color_mm2aw8fx","text_mm2ahbrx","text_mm2ab56m","numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x"]){ id value } } } } }`);
+        // `group { id title }` so ArrivalsHelpers can drop archived rows.
+        const d = await mondayFetch(`{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500${cp}){ cursor items{ id name group { id title } column_values(ids:["date_mm2adtwg","color_mm2aw8fx","text_mm2ahbrx","text_mm2ab56m","numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x"]){ id value } } } } }`);
         const page = d.boards[0].items_page;
         items = items.concat(page.items);
         cursor = page.cursor;
       } while (cursor);
+      if (window.ArrivalsHelpers) items = window.ArrivalsHelpers.filterLive(items);
       allItems = items;
 
       // Fetch property config — fixed beds, bed options, bathrooms, max occupancy

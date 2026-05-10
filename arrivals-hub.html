@@ -391,6 +391,7 @@
 <div class="sup-toast" id="supToast"></div>
 <!-- Runtime-decoded API tokens -->
 <script src="secrets.js"></script>
+<script src="arrivals-helpers.js"></script>
 
 <script>
 // Arrivals is the canonical source of booking data — every consumer derives
@@ -461,11 +462,13 @@ async function fetchAllItems(token) {
   let items = [], cursor = null;
   do {
     const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
-    const data = await mondayQuery(token, `{ boards(ids: [${ARRIVALS_BOARD}]) { items_page(limit: 500${cursorPart}) { cursor items { id name column_values(ids: ["date_mm2adtwg","${AR_CHECKOUT}","color_mm2aw8fx","text_mm2ahbrx","text_mm2ab56m","numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x","text_mm2ah8s"${WAIVER_COL_ID ? ',"'+WAIVER_COL_ID+'"' : ''}]) { id value } } } } }`);
+    // `group { id title }` so ArrivalsHelpers.filterLive can drop archived rows.
+    const data = await mondayQuery(token, `{ boards(ids: [${ARRIVALS_BOARD}]) { items_page(limit: 500${cursorPart}) { cursor items { id name group { id title } column_values(ids: ["date_mm2adtwg","${AR_CHECKOUT}","color_mm2aw8fx","text_mm2ahbrx","text_mm2ab56m","numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x","text_mm2ah8s"${WAIVER_COL_ID ? ',"'+WAIVER_COL_ID+'"' : ''}]) { id value } } } } }`);
     const page = data.boards[0].items_page;
     items = items.concat(page.items);
     cursor = page.cursor;
   } while (cursor);
+  if (window.ArrivalsHelpers) items = window.ArrivalsHelpers.filterLive(items);
   return items;
 }
 async function fetchPropConfigs(token) {

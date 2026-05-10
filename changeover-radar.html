@@ -85,6 +85,7 @@
   .status-pill.ok      { background:var(--green-bg); color:var(--green); border-color:transparent; cursor:default; }
   .status-pill.missing { background:var(--red-bg);   color:var(--red);   border-color:var(--red); }
   .status-pill.dup     { background:var(--amber-bg); color:var(--amber); border-color:var(--amber); }
+  .status-pill.pending { background:var(--blue-bg);  color:var(--blue);  border-color:transparent; cursor:default; }
   .status-pill.na      { background:#f3f0e6;         color:var(--sage-mid); cursor:default; }
   .status-pill .dot { width:6px; height:6px; border-radius:50%; display:inline-block; background:currentColor; }
   .status-pill:hover.missing,
@@ -133,12 +134,13 @@
 
 <script src="secrets.js"></script>
 <script src="linen-schema.js"></script>
+<script src="arrivals-helpers.js"></script>
 
 <div class="container">
   <div class="info-strip">
     <strong>What this page does:</strong>
-    For every booking in the date window, checks whether you have <strong>exactly one</strong> Cleans row, Linen Bag, and (where the property has a hot tub) at least one HT Clean linked to it.
-    <strong>Missing</strong> shows red, <strong>duplicate</strong> shows amber. Tap a red pill to create the missing row; tap an amber pill to see and resolve duplicates.
+    For every booking in the date window, checks that you have a <strong>Cleans row</strong> (so the housekeeper sees it on My Day) and an <strong>HT Clean</strong> (where the property has a tub).
+    <strong>Linen Bags</strong> are shown as informational only — the bagging team creates the row when they pack, the booking is on their rota regardless. Missing Cleans/HT shows red — tap to create. Duplicates show amber on any column — tap to resolve.
   </div>
 
   <div id="msgBox" class="msg"></div>
@@ -260,7 +262,14 @@ document.addEventListener('DOMContentLoaded', () => {
 /* Arrivals: pull every row, filter client-side. We pull the full board
    because Monday's date-column query_params silently 0-out on syntax
    mismatch (we got bitten by this on guesty-sync). 50-page cap is overkill
-   for typical Arrivals boards but stops a runaway. */
+   for typical Arrivals boards but stops a runaway.
+
+   IMPORTANT: each item carries `group { id title }` so we can filter out
+   anything sitting in an "Archive" group. Without this, a booking that's
+   been moved to Archive (instead of deleted) when superseded shows up
+   alongside its replacement and gets counted as a duplicate. We skip any
+   group whose title contains "archive" / "archived" / "cancel" — adjust
+   the regex below if your board uses different wording. */
 async function loadArrivals(from, to) {
   let cursor = null, all = [], pages = 0;
   do {
@@ -271,6 +280,7 @@ async function loadArrivals(from, to) {
           cursor
           items {
             id name
+            group { id title }
             column_values(ids:["${AR_DATE}","${AR_CHECKOUT}","${AR_PROP}","${AR_BOOKREF}"]) {
               id text value
             }
@@ -285,19 +295,40 @@ async function loadArrivals(from, to) {
     if (pages > 50) break;
   } while (cursor);
 
-  const rows = all.map(it => {
+  // Group filter — drop any row sitting in an archive-named group. We log a
+  // count to status so the user can see the filter is doing something,
+  // and surface the names of excluded groups for transparency.
+  const ARCHIVE_RE = /\b(archive|archived|cancell?ed)\b/i;
+  const skippedByGroup = {};
+  const rows = [];
+  for (const it of all) {
+    const groupName = (it.group?.title || '').trim();
+    if (ARCHIVE_RE.test(groupName)) {
+      skippedByGroup[groupName] = (skippedByGroup[groupName] || 0) + 1;
+      continue;
+    }
     const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
     const date = pj(cv[AR_DATE]?.value)?.date || '';
     const out = pj(cv[AR_CHECKOUT]?.value)?.date || '';
-    return {
+    rows.push({
       id: String(it.id),
       name: it.name,
+      group: groupName,
       property: (cv[AR_PROP]?.text || '').trim(),
       checkin:  date,
       checkout: out,
       bookRef:  (cv[AR_BOOKREF]?.text || '').trim(),
-    };
-  });
+    });
+  }
+  if (Object.keys(skippedByGroup).length) {
+    const skippedTotal = Object.values(skippedByGroup).reduce((s,n) => s+n, 0);
+    const detail = Object.entries(skippedByGroup).map(([g,n]) => `${g} (${n})`).join(', ');
+    console.log(`[changeover-radar] Skipped ${skippedTotal} archived Arrivals: ${detail}`);
+    // Stash for the summary bar so the manager can see the filter at work.
+    window.__radarArchiveSkipped = { total: skippedTotal, detail };
+  } else {
+    window.__radarArchiveSkipped = null;
+  }
   return rows.filter(a => a.checkin >= from && a.checkin <= to);
 }
 
@@ -507,12 +538,19 @@ function computeCoverage() {
       else                               cleanStatus = 'dup';
     }
 
-    // Linen Bag: managed properties expect a bag (local properties still
-    // get bags per Barry's confirmation).
+    // Linen Bag: managed properties WILL appear on the laundry-rota's
+    // bagging list automatically (it derives from Arrivals). The bag row
+    // on the Linen Bags board is a *packing record* — it gets created
+    // when the bagging team physically packs, not in advance. So:
+    //   - 0 bags pre-packing → "pending" (neutral, no action) — the
+    //     booking shows on the bagging list, the team will pack it
+    //   - 1 bag → packed ✓
+    //   - 2+ bags → duplicate ⚠ (real problem worth flagging)
+    //   - non-managed → N/A
     let bagStatus = 'na';
     const bagsHere = bagsByArr[a.id] || [];
     if (isManaged) {
-      if (bagsHere.length === 0)      bagStatus = 'missing';
+      if (bagsHere.length === 0)      bagStatus = 'pending';
       else if (bagsHere.length === 1) bagStatus = 'ok';
       else                             bagStatus = 'dup';
     }
@@ -530,7 +568,10 @@ function computeCoverage() {
       prop, isManaged, isLocal, hasTub,
       cleansHere, bagsHere, htsHere,
       cleanStatus, bagStatus, htStatus,
-      hasGap: cleanStatus === 'missing' || bagStatus === 'missing' || htStatus === 'missing',
+      // Linen Bag "pending" is NOT a gap — the bagging team creates that
+      // row when they pack. Only Cleans and HT Cleans missing represent
+      // actual missed-changeover risk.
+      hasGap: cleanStatus === 'missing' || htStatus === 'missing',
       hasDup: cleanStatus === 'dup' || bagStatus === 'dup',
     });
   }
@@ -544,11 +585,23 @@ function renderSummary() {
   const gaps  = _rows.filter(r => r.hasGap).length;
   const dups  = _rows.filter(r => r.hasDup).length;
   const ok    = _rows.filter(r => !r.hasGap && !r.hasDup).length;
+
+  // Group-filter notice: if any items were skipped because they sit in an
+  // Archive group, surface the count so the user sees the filter at work.
+  const skipped = window.__radarArchiveSkipped;
+  const skippedHtml = skipped
+    ? `<div class="pill" style="grid-column:1/-1; background:var(--blue-bg); border-color:var(--blue)">
+         <span class="num" style="color:var(--blue); font-size:14px">ℹ Archived rows skipped: ${skipped.total}</span>
+         <span class="lbl">${escapeHtml(skipped.detail)} — duplicates here are not counted as duplicates</span>
+       </div>`
+    : '';
+
   document.getElementById('summary').innerHTML = `
     <div class="pill info"><span class="num">${total}</span><span class="lbl">Arrivals in window</span></div>
     <div class="pill ok"><span class="num">${ok}</span><span class="lbl">Fully covered</span></div>
     <div class="pill bad"><span class="num">${gaps}</span><span class="lbl">With gaps</span></div>
     <div class="pill warn"><span class="num">${dups}</span><span class="lbl">With duplicates</span></div>
+    ${skippedHtml}
   `;
   document.getElementById('bulkBtn').disabled = (gaps === 0);
   document.getElementById('bulkBtn').textContent = gaps === 0
@@ -608,6 +661,11 @@ function pillHtml(r, kind) {
   if (kind === 'ht')    { status = r.htStatus;    count = r.htsHere.length; }
   if (status === 'na') return '<span class="status-pill na">—</span>';
   if (status === 'ok') return `<span class="status-pill ok">✓ ${count}</span>`;
+  if (status === 'pending') {
+    // Bags only — the bagging team will pack and create the row when
+    // they do. No Create action; this is informational.
+    return '<span class="status-pill pending" title="Booking is on the laundry rota — the bagging team will pack and create the row when they do.">○ On bag list</span>';
+  }
   if (status === 'missing') {
     return `<span class="status-pill missing" onclick="askCreate('${r.arrival.id}','${kind}')">✗ Create</span>`;
   }
@@ -628,9 +686,12 @@ function closeModal() {
 
 /* ─── Create missing ─────────────────────────────────── */
 function askCreate(arrivalId, kind) {
+  // Belt-and-braces: bag pills now show as 'pending' not 'missing', but
+  // guard here too in case the action is called from a stale UI state.
+  if (kind === 'bag') return;
   const r = _rows.find(x => x.arrival.id === arrivalId);
   if (!r) return;
-  const label = kind === 'clean' ? 'Cleans row' : kind === 'bag' ? 'Linen Bag' : 'HT Clean';
+  const label = kind === 'clean' ? 'Cleans row' : 'HT Clean';
   openModal(`
     <h3>Create ${label} for ${escapeHtml(r.arrival.property)}?</h3>
     <p>Check-in <strong>${fmtUK(r.arrival.checkin)}</strong> · ${escapeHtml(r.arrival.name)}.</p>
@@ -734,14 +795,16 @@ async function createHtRow(r) {
 
 /* ─── Bulk create ───────────────────────────────────── */
 async function bulkCreateMissing() {
+  // Linen Bag "pending" state is not a gap — the bagging team creates the
+  // row at packing time, so the radar should never auto-create one. Bulk
+  // Create only acts on Cleans + HT Cleans.
   const tasks = [];
   for (const r of _rows) {
     if (r.cleanStatus === 'missing') tasks.push({ r, kind: 'clean' });
-    if (r.bagStatus   === 'missing') tasks.push({ r, kind: 'bag' });
     if (r.htStatus    === 'missing') tasks.push({ r, kind: 'ht' });
   }
   if (!tasks.length) return;
-  if (!confirm(`Create ${tasks.length} missing rows?\n\nThis writes placeholder rows to Cleans / Linen Bags / HT Cleans. Manager can edit each on the relevant rota.`)) return;
+  if (!confirm(`Create ${tasks.length} missing rows?\n\nThis writes placeholder rows to Cleans and HT Cleans. The manager can edit each on the relevant rota. Linen Bags are never auto-created — the bagging team makes those when they pack.`)) return;
 
   const btn = document.getElementById('bulkBtn');
   btn.disabled = true;

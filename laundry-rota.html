@@ -629,6 +629,7 @@
 
 <!-- Shared schema -->
 <script src="linen-schema.js"></script>
+<script src="arrivals-helpers.js"></script>
 
 <!-- Runtime-decoded API tokens -->
 <script src="linen-nav.js"></script>
@@ -719,11 +720,18 @@
   }
 
   async function fetchArrivals() {
+    // Pull each item with its group so we can skip archived rows. Without
+    // this filter, an Arrivals row that's been moved to the "Archive" group
+    // (rather than deleted) still gets drawn on the rota — which is what
+    // caused the "Green Haven appears twice on Sunday" phantom.
+    const ARCHIVE_RE = /\b(archive|archived|cancell?ed)\b/i;
     let items = [], cursor = null;
     do {
       const cp = cursor ? `, cursor: "${cursor}"` : '';
       const d = await mondayFetch(`{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500${cp}){ cursor items{
-        id name column_values(ids:[
+        id name
+        group { id title }
+        column_values(ids:[
           "date_mm2adtwg","text_mm2ahbrx","text_mm2ab56m",
           "numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x"
         ]){ id value }
@@ -733,13 +741,16 @@
       cursor = page.cursor;
     } while (cursor);
 
-    return items.map(item => {
+    let skipped = 0;
+    const out = [];
+    for (const item of items) {
+      if (ARCHIVE_RE.test(item.group?.title || '')) { skipped++; continue; }
       const cv = {};
       for (const c of item.column_values) cv[c.id] = c.value;
       const p = v => { try { return JSON.parse(v); } catch { return null; } };
       const dv = p(cv['date_mm2adtwg']);
       const prop = p(cv['text_mm2ahbrx']) || item.name || '';
-      return {
+      const row = {
         id:          item.id,
         property:    prop.trim(),
         arrivalDate: dv?.date || null,
@@ -748,7 +759,10 @@
         children:    parseInt(p(cv['numeric_mm2add81'])) || 0,
         pets:        parseInt(p(cv['numeric_mm2ahz0x'])) || 0,
       };
-    }).filter(i => i.arrivalDate && i.property);
+      if (row.arrivalDate && row.property) out.push(row);
+    }
+    if (skipped > 0) console.log(`[laundry-rota] Skipped ${skipped} archived Arrivals rows`);
+    return out;
   }
 
   async function fetchPropConfigs() {

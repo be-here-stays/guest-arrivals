@@ -63,6 +63,7 @@
 </div>
 
 <script src="secrets.js"></script>
+<script src="arrivals-helpers.js"></script>
 
 <section>
   <h2>Window <span class="muted" style="font-weight:400;font-size:12px">— how far ahead to check</span></h2>
@@ -153,11 +154,14 @@ async function loadArrivals(from, to) {
   let items = [], cursor = null;
   do {
     const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
-    const data = await mq(`{ boards(ids:[${ARRIVALS_BOARD}]) { items_page(limit:500${cursorPart}) { cursor items { id name created_at column_values(ids:${cols}) { id text value } } } } }`);
+    // `group { id title }` for ArrivalsHelpers.filterLive — drops archived rows.
+    const data = await mq(`{ boards(ids:[${ARRIVALS_BOARD}]) { items_page(limit:500${cursorPart}) { cursor items { id name created_at group { id title } column_values(ids:${cols}) { id text value } } } } }`);
     const page = data.boards[0].items_page;
     items = items.concat(page.items);
     cursor = page.cursor;
   } while (cursor);
+
+  if (window.ArrivalsHelpers) items = window.ArrivalsHelpers.filterLive(items);
 
   return items.map(it => {
     const cv = {}; for (const c of it.column_values) cv[c.id] = c;

@@ -508,6 +508,7 @@
 <!-- Runtime-decoded API tokens -->
 <script src="secrets.js"></script>
 <script src="pins-schema.js"></script>
+<script src="arrivals-helpers.js"></script>
 
 <script>
 /* ═══════════════════════════════════════════════════════════════════
@@ -752,18 +753,23 @@ function durationForType(p, type) {
    source of truth). Cleans rows are now just the operational *output* of
    this rota, not its input. */
 async function fetchBookings() {
+  // `group { id title }` lets ArrivalsHelpers.filterLive drop archived rows
+  // (Archive / Cancelled groups). Without this, archived dupes paint phantom
+  // cards on the rota — the bug Barry found on 10 May for Green Haven.
   const cols = `["${AR_DATE}","${AR_CHECKOUT}","${AR_PROP}","${AR_BOOKREF}"]`;
   let cursor = null, all = [];
   do {
     const q = cursor
-      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${cols}){ id value text } } } }`
-      : `{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${cols}){ id value text } } } } }`;
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name group { id title } column_values(ids:${cols}){ id value text } } } }`
+      : `{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500){ cursor items{ id name group { id title } column_values(ids:${cols}){ id value text } } } } }`;
     const d = await mondayFetch(q);
     const page = cursor ? d?.next_items_page : d?.boards?.[0]?.items_page;
     if (!page) break;
     all = all.concat(page.items || []);
     cursor = page.cursor;
   } while (cursor);
+
+  if (window.ArrivalsHelpers) all = window.ArrivalsHelpers.filterLive(all);
 
   bookings = {};
   for (const it of all) {

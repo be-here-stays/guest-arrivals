@@ -606,6 +606,7 @@
 
 <script src="work-dispatch.js"></script>
 <script src="pins-schema.js"></script>
+<script src="arrivals-helpers.js"></script>
 <!-- Runtime-decoded API tokens -->
 <script src="secrets.js"></script>
 
@@ -872,18 +873,23 @@ let _arrivalsCache = [];
 async function fetchBookings() {
   // 1. Pull the entire Arrivals board, paginated. Same shape as fetchCleans
   //    so the page load cost is one extra paginated fetch, not a flood.
+  //    `group { id title }` is included so ArrivalsHelpers.filterLive can
+  //    drop any row sitting in the Archive group — without this, archived
+  //    duplicates would draw phantom "tap to plan" cards on the rota.
   const cols = `["${AR_DATE}","${AR_CHECKOUT}","${AR_PROP}","${AR_BOOKREF}","${AR_FORM_ST}","${AR_REVIEW}","${AR_REVIEW_NT}"]`;
   let cursor = null;
   let raw = [];
   do {
     const q = cursor
-      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${cols}){ id value text } } } }`
-      : `{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${cols}){ id value text } } } } }`;
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name group { id title } column_values(ids:${cols}){ id value text } } } }`
+      : `{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500){ cursor items{ id name group { id title } column_values(ids:${cols}){ id value text } } } } }`;
     const d = await mondayFetch(q);
     const page = cursor ? d.next_items_page : d.boards[0].items_page;
     raw = raw.concat(page.items);
     cursor = page.cursor;
   } while (cursor);
+
+  if (window.ArrivalsHelpers) raw = window.ArrivalsHelpers.filterLive(raw);
 
   // 2. Parse each Arrivals row into a flat per-booking object. The check-out
   //    column was added 2026-05-04 so historical rows may have a blank

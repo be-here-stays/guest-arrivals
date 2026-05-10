@@ -182,6 +182,7 @@
 
 <!-- Runtime-decoded API tokens -->
 <script src="secrets.js"></script>
+<script src="arrivals-helpers.js"></script>
 
 <script>
 // ── Config ───────────────────────────────────────────────────
@@ -243,15 +244,17 @@ async function load() {
       let cursor = null, all = [];
       const cols = `["${AR_DATE}","${AR_CHECKOUT}","${AR_PROP}","${AR_BOOKREF}"]`;
       do {
+        // `group { id title }` so ArrivalsHelpers.filterLive can drop archived rows.
         const q = cursor
-          ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${cols}){ id text value } } } }`
-          : `{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${cols}){ id text value } } } } }`;
+          ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name group { id title } column_values(ids:${cols}){ id text value } } } }`
+          : `{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500){ cursor items{ id name group { id title } column_values(ids:${cols}){ id text value } } } } }`;
         const r = await gql(q);
         const page = cursor ? r.data?.next_items_page : r.data?.boards?.[0]?.items_page;
         if (!page) break;
         all = all.concat(page.items || []);
         cursor = page.cursor;
       } while (cursor);
+      if (window.ArrivalsHelpers) all = window.ArrivalsHelpers.filterLive(all);
       return all;
     }
 

@@ -224,6 +224,9 @@
 <script src="linen-schema.js"></script>
 <!-- Messages: shared schema + visibility helpers. Used by the MOTD render. -->
 <script src="messages-schema.js"></script>
+<!-- Arrivals helpers: shared archive-group filter (so My Day never shows
+     bookings that were moved to the Archive group on Mondays). -->
+<script src="arrivals-helpers.js"></script>
 
 <!-- ── Maintenance Exception modal ───────────────────────────── -->
 <div class="cl-overlay" id="exOverlay">
@@ -858,17 +861,24 @@ async function loadArrivals() {
                                                 // missed when their clean is
                                                 // within range.
   const colIds = `["${AR_DATE}","${AR_CHECKOUT}","${AR_PROP}","${AR_BOOKREF}"]`;
+  // Pull `group { id title }` so we can filter out archived rows via the
+  // shared ArrivalsHelpers — without this, archived dupes show up here
+  // and propagate into the Cleans→Arrivals join.
   let cursor = null, all = [];
   do {
     const q = cursor
-      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name column_values(ids:${colIds}){ id text value } } } }`
-      : `{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500){ cursor items{ id name column_values(ids:${colIds}){ id text value } } } } }`;
+      ? `{ next_items_page(limit:500,cursor:"${cursor}"){ cursor items{ id name group { id title } column_values(ids:${colIds}){ id text value } } } }`
+      : `{ boards(ids:[${ARRIVALS_BOARD}]){ items_page(limit:500){ cursor items{ id name group { id title } column_values(ids:${colIds}){ id text value } } } } }`;
     const data = await mondayFetch(q);
     const page = cursor ? data?.next_items_page : data?.boards?.[0]?.items_page;
     if (!page) break;
     cursor = page.cursor;
     all = all.concat(page.items || []);
   } while (cursor);
+
+  // Skip archived groups (Archive / Cancelled etc.) so phantom rows can't
+  // show up on My Day. Helper logs a count to console for diagnostics.
+  if (window.ArrivalsHelpers) all = window.ArrivalsHelpers.filterLive(all);
 
   arrivalsById = new Map();
   for (const it of all) {

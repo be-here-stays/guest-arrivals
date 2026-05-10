@@ -108,6 +108,43 @@
     .cc-badge.rf { background:#fdab3d; color:#fff; }
     .cc-badge.comp { background:var(--green); color:#fff; }
     .cc-badge.ip { background:var(--gold); color:#fff; }   /* in-progress */
+
+    /* Property check tiles (maintenance role only — header tank, softener) */
+    .pc-tile { display:flex; align-items:center; gap:12px; background:#fff; border:1.5px solid var(--border);
+               border-radius:11px; padding:11px 13px; margin-bottom:8px; cursor:pointer; transition:background 0.15s; }
+    .pc-tile:hover { background:#fafaf6; }
+    .pc-tile.done { background:#edf7f2; border-color:transparent; cursor:default; }
+    .pc-icon { font-size:22px; flex:0 0 32px; text-align:center; }
+    .pc-body { flex:1 1 auto; min-width:0; }
+    .pc-prop { font-size:14px; font-weight:700; color:var(--dark); }
+    .pc-prop .pc-type { font-weight:500; color:var(--sage-mid); }
+    .pc-sub  { font-size:12px; color:var(--sage); margin-top:2px; }
+    .pc-tile.done .pc-sub { color:#2d6a4f; font-weight:600; }
+    .pc-status { font-size:18px; font-weight:700; color:var(--sage-mid); flex:0 0 24px; text-align:right; }
+    .pc-tile.done .pc-status { color:#2d6a4f; }
+
+    /* Check modal */
+    .pc-modal-overlay { position:fixed; inset:0; background:rgba(0,0,0,0.45); display:none; align-items:center;
+                        justify-content:center; padding:14px; z-index:80; }
+    .pc-modal-overlay.open { display:flex; }
+    .pc-modal-card { background:#fff; border-radius:14px; padding:18px; max-width:480px; width:100%;
+                     box-shadow:0 6px 28px rgba(0,0,0,0.25); max-height:90vh; overflow-y:auto; }
+    .pc-modal-card h3 { font-size:15px; font-weight:700; margin-bottom:12px; }
+    .pc-modal-q { font-size:14px; color:var(--dark); margin-bottom:10px; font-weight:600; }
+    .pc-actions { display:grid; gap:8px; }
+    .pc-action { padding:13px 14px; border-radius:10px; border:1.5px solid var(--border); background:#fff;
+                 font-family:inherit; font-size:14px; font-weight:700; color:var(--dark); cursor:pointer; text-align:left; }
+    .pc-action.primary   { background:var(--dark); color:var(--cream); border-color:var(--dark); }
+    .pc-action.secondary:hover { border-color:var(--sage); }
+    .pc-label { display:block; font-size:11px; font-weight:700; color:var(--sage); margin-bottom:5px;
+                text-transform:uppercase; letter-spacing:0.5px; }
+    .pc-qty { flex:1 1 auto; padding:10px 12px; border:1.5px solid var(--border); border-radius:8px;
+              font-family:inherit; font-size:15px; }
+    .pc-notes { width:100%; padding:9px 11px; border:1.5px solid var(--border); border-radius:8px;
+                font-family:inherit; font-size:13px; min-height:55px; resize:vertical; }
+    .pc-modal-close { background:none; border:0; color:var(--sage); font-size:14px; cursor:pointer; margin-top:14px;
+                      padding:8px 12px; border-radius:7px; }
+    .pc-modal-close:hover { background:#f5f5f0; }
     .cc-meta { font-size:13px; color:var(--sage); margin-bottom:8px; }
     .cc-meta .role-pill { display:inline-block; padding:1px 7px; background:#eeeae0; color:var(--dark); border-radius:4px; margin-left:4px; font-size:11px; font-weight:700; }
     .cc-with { font-size:12px; color:var(--sage); margin-bottom:4px; font-style:italic; }
@@ -186,6 +223,15 @@
   </div>
   <div class="day-nav" id="dayNav"></div>
   <div id="dayContent"></div>
+
+<!-- Property check log modal — opened by maintenance from My Day tiles -->
+<div class="pc-modal-overlay" id="checkModal">
+  <div class="pc-modal-card">
+    <h3 id="checkModalTitle">Log check</h3>
+    <div id="checkModalBody"></div>
+    <button type="button" class="pc-modal-close" onclick="closeCheckModal()">Cancel</button>
+  </div>
+</div>
 </div>
 
 <!-- ── Changeover checklist modal ─────────────────────────────── -->
@@ -227,6 +273,8 @@
 <!-- Arrivals helpers: shared archive-group filter (so My Day never shows
      bookings that were moved to the Archive group on Mondays). -->
 <script src="arrivals-helpers.js"></script>
+<!-- Property checks: schema + helpers for maintenance changeover checks. -->
+<script src="property-checks-schema.js"></script>
 
 <!-- ── Maintenance Exception modal ───────────────────────────── -->
 <div class="cl-overlay" id="exOverlay">
@@ -533,6 +581,16 @@ const ME_CACHE_KEY = 'bh.me';   // cached resolved staff record so we can skip
 let me = null;          // resolved staff { id, name, role }
 let cleans = [];
 let _myMessages = [];   // active messages visible to me (MOTDs + direct), parsed from board
+let _propFlags = {};    // property name → { hasHeaderTank, hasSoftener, propertyId } (Property Config flags)
+let _propChecks = [];   // existing Property Checks rows in window (so we render Done state, not pending)
+let _propChecksCfg = null; // resolved board config from PropertyChecksSchema
+
+// Property Config board id + the two flags we care about for changeover checks.
+// PC_HEADER_TANK + PC_SOFTENER were added by Barry — we read them to know
+// which properties need maintenance to log on changeover day.
+const PROP_CONFIG_BOARD = 5094466278;
+const PC_HEADER_TANK    = 'boolean_mm372xj3';
+const PC_SOFTENER       = 'boolean_mm37e6gy';
 let shifts = [];
 let hotTubCleans = [];  // hot tub cleans assigned to this staff member
 let maintTasks = [];    // scheduled work from window/jet/PAT/ad-hoc boards
@@ -728,8 +786,8 @@ async function boot() {
   catch (e) { console.warn('loadArrivals failed — cleans/HT will use legacy CL/HC fields:', e); }
 
   // Run loaders independently
-  const results = await Promise.allSettled([loadCleans(), loadShifts(), loadHotTubCleans(), loadMaintenanceTasks(), loadLinenBags(), loadMessages()]);
-  const labels = ['cleans', 'shifts', 'hot tub cleans', 'maintenance tasks', 'linen bags', 'messages'];
+  const results = await Promise.allSettled([loadCleans(), loadShifts(), loadHotTubCleans(), loadMaintenanceTasks(), loadLinenBags(), loadMessages(), loadPropertyChecks()]);
+  const labels = ['cleans', 'shifts', 'hot tub cleans', 'maintenance tasks', 'linen bags', 'messages', 'property checks'];
   const failures = results
     .map((r, i) => r.status === 'rejected' ? { label: labels[i], err: r.reason } : null)
     .filter(Boolean);
@@ -756,6 +814,96 @@ async function boot() {
    guestName, bookingRef). Cleans / HT Cleans rows look up their linked
    booking here via CL_ARRIVAL / HC_ARRIVAL board_relation columns. */
 let arrivalsById = new Map();
+
+/* ─── Property checks loader ─────────────────────────────────
+   Two-part load for the changeover maintenance checks (header tank +
+   water softener). Only useful for maintenance staff; we still run it
+   for everyone so the data is cached if their role changes.
+
+   Step 1: pull Property Config rows + the two boolean flags so we know
+           which properties need each check.
+   Step 2: pull the Property Checks board (this week's rows) so we can
+           render Done state and avoid duplicate logging.
+
+   Both stages are best-effort. Either failing leaves the maintenance
+   section in a "no data" state rather than blocking the My Day render. */
+async function loadPropertyChecks() {
+  // Step 1: Property Config flags
+  try {
+    const data = await mondayFetch(`{
+      boards(ids:[${PROP_CONFIG_BOARD}]) {
+        items_page(limit:200) {
+          items {
+            id name
+            column_values(ids:["${PC_HEADER_TANK}","${PC_SOFTENER}"]) { id value }
+          }
+        }
+      }
+    }`);
+    const items = data?.boards?.[0]?.items_page?.items || [];
+    _propFlags = {};
+    for (const it of items) {
+      const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+      const hasHeader   = !!(pj(cv[PC_HEADER_TANK]?.value)?.checked);
+      const hasSoftener = !!(pj(cv[PC_SOFTENER]?.value)?.checked);
+      if (hasHeader || hasSoftener) {
+        _propFlags[it.name] = {
+          propertyId: String(it.id),
+          hasHeaderTank: hasHeader,
+          hasSoftener,
+        };
+      }
+    }
+  } catch (e) {
+    console.warn('loadPropertyChecks: property config fetch failed', e);
+    _propFlags = {};
+  }
+
+  // Step 2: Existing Property Checks rows (this week's window)
+  try {
+    if (typeof PropertyChecksSchema === 'undefined') { _propChecks = []; return; }
+    const cfg = await window.PropertyChecksSchema.getChecksConfig(mondayFetch);
+    if (!cfg || !cfg.boardId) { _propChecksCfg = null; _propChecks = []; return; }
+    _propChecksCfg = cfg;
+    const c = cfg.columns;
+    const colIds = ['type','arrivalLink','checkDate','status','headerAction','softenerType','softenerQty','performedBy']
+      .map(k => c[k]).filter(Boolean).map(id => `"${id}"`).join(',');
+    if (!colIds) { _propChecks = []; return; }
+    const data = await mondayFetch(`{
+      boards(ids:[${cfg.boardId}]) {
+        items_page(limit:500) {
+          items {
+            id name
+            column_values(ids:[${colIds}]) {
+              id text value
+              ... on BoardRelationValue { linked_item_ids }
+            }
+          }
+        }
+      }
+    }`);
+    const rows = data?.boards?.[0]?.items_page?.items || [];
+    _propChecks = rows.map(it => {
+      const cv = Object.fromEntries(it.column_values.map(x => [x.id, x]));
+      const dateObj = pj(cv[c.checkDate]?.value);
+      const arrIds = (cv[c.arrivalLink]?.linked_item_ids || []).map(String);
+      return {
+        id: it.id,
+        type:       (cv[c.type]?.text || '').trim(),    // 'Header tank' / 'Water softener'
+        date:       dateObj?.date || '',
+        status:     (cv[c.status]?.text || '').trim(),  // 'Done' / 'N/A' / 'Skipped'
+        arrivalId:  arrIds[0] || '',
+        headerAction:  (cv[c.headerAction]?.text  || '').trim(),
+        softenerType:  (cv[c.softenerType]?.text  || '').trim(),
+        softenerQty:   parseFloat(cv[c.softenerQty]?.text || '0') || 0,
+        performedBy:   (cv[c.performedBy]?.text || '').trim(),
+      };
+    });
+  } catch (e) {
+    console.warn('loadPropertyChecks: property checks fetch failed', e);
+    _propChecks = [];
+  }
+}
 
 /* ─── Messages loader ────────────────────────────────────────
    Pulls every active message visible to me (broadcasts + direct).
@@ -1510,6 +1658,18 @@ function renderDay() {
     for (const m of dayMaint) parts.push(renderMaintTaskCard(m, day));
   }
 
+  // ── Property checks (maintenance role only) ──
+  // For each changeover happening today on a property with the relevant
+  // Property Config flag set, render a compact check tile. Tap → log.
+  // Once logged, the tile flips to a tick.
+  if (maint) {
+    const checkTiles = buildPropertyCheckTiles(day);
+    if (checkTiles.length) {
+      parts.push(`<div class="section-label">Property checks <span class="count">${checkTiles.filter(t => !t.done).length}</span></div>`);
+      for (const t of checkTiles) parts.push(renderPropertyCheckTile(t));
+    }
+  }
+
   // Always-available link to hot-tub.html so staff can drop in to log readings
   // regardless of whether they have an assigned card today.
   if (maint) {
@@ -1673,6 +1833,201 @@ function renderCleanCard(c) {
    taps. The Monday write happens in the background and is queued via the
    existing offline outbox if the device is offline. On API failure we revert
    the local state and toast the error so they know to try again. */
+/* ─── Property checks: build + render + log ──────────────────
+   For each clean happening on `day`, if the property has hasHeaderTank
+   or hasSoftener set on Property Config AND no Done row exists yet,
+   surface a tile so maintenance can log the check. Done tiles render
+   greyed; tap shows the recorded result rather than re-opening the modal. */
+function buildPropertyCheckTiles(day) {
+  const tiles = [];
+  const dayCleans = (cleans || []).filter(c => c.day === day);
+  for (const c of dayCleans) {
+    const flags = _propFlags[c.property];
+    if (!flags) continue;
+    if (flags.hasHeaderTank) tiles.push(buildOneTile(c, flags, 'Header tank', '🛢'));
+    if (flags.hasSoftener)   tiles.push(buildOneTile(c, flags, 'Water softener', '🧂'));
+  }
+  return tiles;
+}
+function buildOneTile(c, flags, type, emoji) {
+  const done = (_propChecks || []).find(p =>
+    p.type === type &&
+    p.date === c.day &&
+    (p.arrivalId === c.arrivalId || (!p.arrivalId && c.arrivalId === undefined))
+  );
+  return {
+    property: c.property,
+    propertyId: flags.propertyId,
+    type,
+    emoji,
+    day: c.day,
+    arrivalId: c.arrivalId,
+    done: !!done,
+    result: done || null,
+  };
+}
+
+function renderPropertyCheckTile(t) {
+  const cls = t.done ? 'pc-tile done' : 'pc-tile';
+  const subline = t.done
+    ? `<div class="pc-sub">${escapeHtml(formatCheckResult(t.result))}${t.result.performedBy ? ' · by ' + escapeHtml(t.result.performedBy) : ''}</div>`
+    : `<div class="pc-sub">Tap to log</div>`;
+  const onClick = t.done
+    ? '' // already done — no further action
+    : `onclick="openCheckModal('${t.type === 'Header tank' ? 'header' : 'softener'}', '${encodeURIComponent(t.property)}', '${t.day}', '${t.arrivalId || ''}', '${t.propertyId || ''}')"`;
+  return `<div class="${cls}" ${onClick}>
+    <div class="pc-icon">${t.emoji}</div>
+    <div class="pc-body">
+      <div class="pc-prop">${escapeHtml(t.property)}<span class="pc-type"> · ${escapeHtml(t.type)}</span></div>
+      ${subline}
+    </div>
+    <div class="pc-status">${t.done ? '✓' : '›'}</div>
+  </div>`;
+}
+
+function formatCheckResult(r) {
+  if (!r) return '';
+  if (r.type === 'Header tank') return r.headerAction || 'Done';
+  if (r.type === 'Water softener') {
+    const qty = r.softenerQty || 0;
+    const unit = r.softenerType === 'Balls' ? 'kg' : (r.softenerType === 'Blocks' ? (qty === 1 ? 'block' : 'blocks') : '');
+    return `${r.softenerType || 'Done'} · ${qty}${unit ? ' ' + unit : ''}`;
+  }
+  return 'Done';
+}
+
+/* ─── Check modal ────────────────────────────────────────────
+   Quick log form. For header tank: two big buttons (Topped up / No action)
+   and a notes box. For softener: salt type chips + numeric quantity. Submit
+   creates a row on the Property Checks board. */
+let _checkCtx = null;   // { kind, property, day, arrivalId, propertyId }
+function openCheckModal(kind, propertyEnc, day, arrivalId, propertyId) {
+  const property = decodeURIComponent(propertyEnc);
+  _checkCtx = { kind, property, day, arrivalId: arrivalId || '', propertyId: propertyId || '' };
+  const modal  = document.getElementById('checkModal');
+  const title  = document.getElementById('checkModalTitle');
+  const body   = document.getElementById('checkModalBody');
+  title.textContent = `${kind === 'header' ? '🛢 Header tank' : '🧂 Water softener'} · ${property} · ${prettyDate(day)}`;
+
+  if (kind === 'header') {
+    body.innerHTML = `
+      <p class="pc-modal-q">Did you top up the header tank?</p>
+      <div class="pc-actions">
+        <button type="button" class="pc-action primary" onclick="submitHeaderCheck('Topped up')">✓ Topped up</button>
+        <button type="button" class="pc-action secondary" onclick="submitHeaderCheck('No action')">○ No action needed</button>
+      </div>
+      <div style="margin-top:14px">
+        <label class="pc-label">Notes (optional)</label>
+        <textarea id="checkNotes" class="pc-notes" placeholder="Any observations…"></textarea>
+      </div>`;
+  } else {
+    body.innerHTML = `
+      <p class="pc-modal-q">What salt did you add?</p>
+      <div class="pc-actions">
+        <button type="button" class="pc-action secondary" onclick="setSaltType('Blocks')">🧱 Blocks</button>
+        <button type="button" class="pc-action secondary" onclick="setSaltType('Balls')">⚪ Balls (kg)</button>
+        <button type="button" class="pc-action secondary" onclick="submitSoftenerCheck(null, 0)">○ No action</button>
+      </div>
+      <div id="saltQtyRow" style="margin-top:12px; display:none">
+        <label class="pc-label" id="saltQtyLabel">Quantity</label>
+        <div style="display:flex; gap:8px; align-items:center">
+          <input type="number" step="0.1" min="0" id="saltQty" class="pc-qty" placeholder="0">
+          <button type="button" class="pc-action primary" style="flex:0 0 auto" onclick="submitSoftenerWithQty()">✓ Log</button>
+        </div>
+      </div>
+      <div style="margin-top:14px">
+        <label class="pc-label">Notes (optional)</label>
+        <textarea id="checkNotes" class="pc-notes" placeholder="Any observations…"></textarea>
+      </div>`;
+  }
+
+  modal.classList.add('open');
+}
+function closeCheckModal() {
+  document.getElementById('checkModal').classList.remove('open');
+  _checkCtx = null;
+}
+
+let _saltTypePicked = null;
+function setSaltType(type) {
+  _saltTypePicked = type;
+  document.getElementById('saltQtyRow').style.display = '';
+  document.getElementById('saltQtyLabel').textContent =
+    type === 'Blocks' ? 'How many blocks? (1 or 2)' : 'How many kg of balls?';
+  document.getElementById('saltQty').focus();
+}
+function submitSoftenerWithQty() {
+  const qty = parseFloat(document.getElementById('saltQty').value) || 0;
+  if (qty <= 0) { toast('Enter a quantity', 'error'); return; }
+  submitSoftenerCheck(_saltTypePicked, qty);
+}
+
+async function submitHeaderCheck(action) {
+  const notes = document.getElementById('checkNotes')?.value?.trim() || '';
+  await writeCheckRow({ type: 'Header tank', headerAction: action, notes });
+}
+async function submitSoftenerCheck(saltType, qty) {
+  const notes = document.getElementById('checkNotes')?.value?.trim() || '';
+  await writeCheckRow({ type: 'Water softener', softenerType: saltType, softenerQty: qty, notes });
+}
+
+async function writeCheckRow(payload) {
+  if (!_checkCtx) return;
+  if (!_propChecksCfg || !_propChecksCfg.boardId) {
+    // Lazy-bootstrap the board on first use.
+    try { _propChecksCfg = await window.PropertyChecksSchema.createChecksBoard(mondayFetch); }
+    catch (e) { toast('Could not set up Property Checks board: ' + (e.message||e), 'error'); return; }
+  }
+  const c = _propChecksCfg.columns;
+  const today = todayISO();
+  const time  = new Date().toTimeString().slice(0, 8);
+  const cv = {};
+  if (c.type)        cv[c.type]        = { label: payload.type };
+  if (c.property)    cv[c.property]    = _checkCtx.property;
+  if (c.checkDate)   cv[c.checkDate]   = { date: _checkCtx.day };
+  if (c.status)      cv[c.status]      = { label: 'Done' };
+  if (c.performedAt) cv[c.performedAt] = { date: today, time };
+  if (c.performedBy) cv[c.performedBy] = me.name;
+  if (c.performedByLink) cv[c.performedByLink] = { linkedPulseIds: [{ linkedPulseId: Number(me.id) }] };
+  if (c.arrivalLink && _checkCtx.arrivalId) {
+    cv[c.arrivalLink] = { linkedPulseIds: [{ linkedPulseId: Number(_checkCtx.arrivalId) }] };
+  }
+  if (payload.headerAction && c.headerAction) cv[c.headerAction] = { label: payload.headerAction };
+  if (payload.softenerType && c.softenerType) cv[c.softenerType] = { label: payload.softenerType };
+  if (typeof payload.softenerQty === 'number' && c.softenerQty) cv[c.softenerQty] = String(payload.softenerQty);
+  if (payload.notes && c.notes) cv[c.notes] = payload.notes;
+
+  const itemName = `${_checkCtx.property} · ${_checkCtx.day} · ${payload.type}`.slice(0, 250);
+  try {
+    const cvStr = JSON.stringify(JSON.stringify(cv));
+    await mondayFetch(`mutation { create_item(board_id:${_propChecksCfg.boardId},
+      item_name:${JSON.stringify(itemName)}, column_values:${cvStr},
+      create_labels_if_missing:true) { id } }`, null, true);
+    toast('✓ Logged', 'success');
+    // Update local cache so the tile flips to Done immediately.
+    _propChecks.push({
+      id: 'local_' + Date.now(),
+      type: payload.type,
+      date: _checkCtx.day,
+      status: 'Done',
+      arrivalId: _checkCtx.arrivalId,
+      headerAction:  payload.headerAction || '',
+      softenerType:  payload.softenerType || '',
+      softenerQty:   payload.softenerQty || 0,
+      performedBy:   me.name,
+    });
+    closeCheckModal();
+    renderDay();
+  } catch (e) {
+    if (e.message === 'OFFLINE_QUEUED') {
+      toast('Queued for sync', 'success');
+      closeCheckModal();
+      return;
+    }
+    toast('Save failed: ' + (e.message||e), 'error');
+  }
+}
+
 /* Dismiss a top-of-day message. Optimistic: hide locally + re-render right
    away, then push the dismissedBy column update to Monday in the background.
    On API failure we toast but don't reverse — next page load will show the

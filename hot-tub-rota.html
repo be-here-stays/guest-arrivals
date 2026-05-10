@@ -1135,12 +1135,33 @@ function autoDeriveCleans() {
           // Mid-stay (guests in midnight-to-midnight — tub-only service)
           want = { type: 'Mid-stay', start: '10:00' };
         } else if (broughtForwardOn.has(d)) {
-          // Pre-pass decided this day should host a brought-forward
-          // Changeover. Earliest start is 10:00 if guests are leaving today
-          // (checkout day, must wait for them to leave) otherwise 09:00.
-          // Covers BOTH the fully-vacant-day and the checkout-day-with-
-          // checkin-tomorrow cases — they auto-bring-forward identically.
-          want = { type: 'Changeover', start: isCheckout ? '10:00' : '09:00' };
+          // Move-back guard: if the planner has explicitly moved the
+          // Changeover back to the actual check-in day, a real Changeover
+          // already sits on tomorrow. Emitting a virtual Changeover here
+          // would duplicate that booking's clean (and every subsequent
+          // Move Back tap would commit the virtual to a fresh real row).
+          // Fall through to Mid-vac so the 48h gap is still covered on
+          // hot-tub properties.
+          const tomorrow = addDaysISO(d, 1);
+          const realChangeoverTomorrow = cleans.some(c =>
+            !c.virtual && !c.deleted && c.property === p.name
+            && c.type === 'Changeover' && c.day === tomorrow);
+          if (!realChangeoverTomorrow) {
+            // Default state: emit the brought-forward Changeover. Earliest
+            // start is 10:00 if guests are leaving today (checkout day,
+            // must wait for them to leave) otherwise 09:00.
+            want = { type: 'Changeover', start: isCheckout ? '10:00' : '09:00' };
+          } else if (isCheckout) {
+            // Back-to-back move-back: guests leaving today, Changeover
+            // tomorrow. Mid-vac at 10:00 services the tub now; shiftClean-
+            // ToCheckin commits a Mid-vac here too, this just keeps auto-
+            // derive consistent if the real Mid-vac wasn't created.
+            want = { type: 'Mid-vacancy', start: '10:00' };
+          } else {
+            // Fully vacant day with real Changeover tomorrow: 48h-rule
+            // Mid-vac at 09:00.
+            want = { type: 'Mid-vacancy', start: '09:00' };
+          }
         } else if (isCheckout) {
           // Check-out today and NOT a back-to-back (no check-in tomorrow).
           // Vacant from this morning. Mid-vac at 10:00 (after guests leave).

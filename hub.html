@@ -494,6 +494,7 @@
 
 <!-- Shared linen schema -->
 <script src="linen-schema.js"></script>
+<script src="arrivals-helpers.js"></script>
 
 <!-- Runtime-decoded API tokens -->
 <script src="secrets.js"></script>
@@ -589,9 +590,15 @@ async function loadStats() {
     let cursor = null;
     do {
       const cursorPart = cursor ? `, cursor: "${cursor}"` : '';
-      const d = await mq(`{ boards(ids:[5094453064]) { items_page(limit:500${cursorPart}) { cursor items { column_values(ids:["date_mm2adtwg"]) { id value } } } } }`);
+      // Pull `group { id title }` so ArrivalsHelpers.filterLive can drop
+      // archived rows — without this, hub headline counts are inflated by
+      // bookings that have been moved to Archive.
+      const d = await mq(`{ boards(ids:[5094453064]) { items_page(limit:500${cursorPart}) { cursor items { id name group { id title } column_values(ids:["date_mm2adtwg"]) { id value } } } } }`);
       const page = d?.boards?.[0]?.items_page;
-      for (const g of page?.items || []) {
+      const items = window.ArrivalsHelpers
+        ? window.ArrivalsHelpers.filterLive(page?.items || [])
+        : (page?.items || []);
+      for (const g of items) {
         let dateVal = null;
         try { dateVal = JSON.parse(g.column_values[0]?.value || 'null')?.date; } catch {}
         if (!dateVal) continue;

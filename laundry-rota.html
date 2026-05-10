@@ -1005,9 +1005,30 @@
   // New arrivals are added with assignedDay = arrivalDate.
   // Existing entries (matched by Monday item id) are not moved — manual overrides persist.
   function mergeArrivals(arrivals) {
-    const existingIds = new Set(rota.map(r => r.id));
+    const arrivalIds = new Set(arrivals.map(a => String(a.id)));
+
+    // STEP 1: Prune arrival-sourced rota entries whose ids are no longer
+    // in the live fetch. This catches the "duplicate at top and bottom"
+    // bug — when an Arrivals row gets moved to the Archive group on
+    // Mondays, fetchArrivals stops returning it, but the old localStorage
+    // entry persisted. The replacement (live) row then got merged with a
+    // different id, so the rota ended up with both.
+    //
+    // Manual entries (source:'manual') stay regardless — those are
+    // operator-added non-Arrivals bookings.
+    const before = rota.length;
+    rota = rota.filter(r =>
+      r.source !== 'arrival' || arrivalIds.has(String(r.id))
+    );
+    const dropped = before - rota.length;
+    if (dropped > 0) {
+      console.log(`[laundry-rota] Pruned ${dropped} stale arrival-sourced entries (no longer in live Arrivals)`);
+    }
+
+    // STEP 2: Add new arrivals / refresh existing ones, same as before.
+    const existingIds = new Set(rota.map(r => String(r.id)));
     for (const a of arrivals) {
-      if (!existingIds.has(a.id)) {
+      if (!existingIds.has(String(a.id))) {
         rota.push({
           id:          a.id,
           property:    a.property,
@@ -1024,7 +1045,7 @@
         });
       } else {
         // Keep day assignment & bagged status, but refresh live data from Monday
-        const entry = rota.find(r => r.id === a.id);
+        const entry = rota.find(r => String(r.id) === String(a.id));
         if (entry) {
           entry.originalDay = a.arrivalDate;
           entry.adults    = a.adults;

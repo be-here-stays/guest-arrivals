@@ -1,0 +1,359 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Arrivals setup — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --green:#2d6a4f; --green-bg:#edf7f2;
+    --amber:#a86c00; --amber-bg:#fdf5e8;
+    --red:#8B2020; --red-bg:#fdf0ec;
+    --blue:#1a5276; --blue-bg:#eaf4fb;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:'Instrument Sans',-apple-system,BlinkMacSystemFont,sans-serif;
+         background:var(--bg); color:var(--dark); min-height:100vh; padding:0; }
+  header { background:var(--dark); color:#fff; padding:14px 22px;
+           display:flex; align-items:center; justify-content:space-between; gap:14px; }
+  header h1 { font-size:18px; font-weight:700; }
+  header .sub { font-size:12px; opacity:0.65; margin-top:2px; }
+  .hdr-back { color:rgba(255,255,255,0.7); text-decoration:none; font-size:13px; font-weight:600; }
+
+  .container { max-width:900px; margin:0 auto; padding:18px 18px 60px; }
+
+  .info { background:var(--blue-bg); border-left:4px solid var(--blue); border-radius:9px;
+          padding:12px 16px; margin-bottom:14px; font-size:13px; line-height:1.6; }
+  .info strong { color:var(--blue); }
+  .info ul { margin:8px 0 0 18px; }
+
+  .card { background:var(--surface); border-radius:13px; padding:16px 18px; margin-bottom:14px;
+          box-shadow:0 1px 4px rgba(39,47,46,0.08); }
+  .card h2 { font-size:14px; font-weight:700; text-transform:uppercase; letter-spacing:.5px;
+             color:var(--sage); margin-bottom:12px; }
+
+  .run-btn { padding:12px 22px; background:var(--dark); color:var(--cream); border:0;
+             border-radius:9px; font-family:inherit; font-size:14px; font-weight:700; cursor:pointer; }
+  .run-btn:hover { background:var(--sage); }
+  .run-btn:disabled { opacity:0.5; cursor:not-allowed; }
+  .run-btn.success { background:var(--green); color:#fff; }
+
+  table { width:100%; border-collapse:collapse; font-size:13px; }
+  th, td { padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); }
+  th { font-size:11px; font-weight:700; color:var(--sage); text-transform:uppercase;
+       letter-spacing:0.5px; background:#fafaf6; }
+  td.muted { color:var(--sage-mid); }
+  td code { font-family:ui-monospace,Menlo,monospace; font-size:11px; background:#f7f5ee; padding:2px 6px; border-radius:4px; }
+
+  .status-pill { display:inline-block; padding:3px 9px; border-radius:11px; font-size:11px;
+                 font-weight:700; text-transform:uppercase; letter-spacing:0.3px; }
+  .status-pill.exists  { background:var(--green-bg); color:var(--green); }
+  .status-pill.missing { background:var(--red-bg); color:var(--red); }
+  .status-pill.manual  { background:var(--amber-bg); color:var(--amber); }
+  .status-pill.created { background:var(--blue-bg); color:var(--blue); }
+  .status-pill.error   { background:var(--amber-bg); color:var(--amber); }
+
+  .msg { padding:11px 14px; border-radius:9px; font-size:13px; font-weight:600;
+         margin-bottom:14px; display:none; }
+  .msg.show { display:block; }
+  .msg.success { background:var(--green-bg); color:var(--green); }
+  .msg.error   { background:var(--red-bg); color:var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>🛠 Arrivals setup</h1>
+    <div class="sub">One-shot provisioning of planning columns on Arrivals</div>
+  </div>
+  <a class="hdr-back" href="hub.html">‹ Hub</a>
+</header>
+
+<script src="secrets.js"></script>
+
+<div class="container">
+  <div class="info">
+    <strong>What this page does:</strong>
+    Provisions the new <strong>planning columns</strong> on the Arrivals board so cleaner assignments, hours, start times, and the linen / hot-tub / dirties drivers live directly on each booking — not on separate Cleans / HT Cleans rows.
+    <ul>
+      <li><strong>Idempotent.</strong> Re-runs are safe. Columns matched by title — won't duplicate if already there.</li>
+      <li><strong>No data is touched.</strong> Existing Arrivals rows keep all current values. New columns start empty.</li>
+      <li><strong>board_relation columns target the Staff board.</strong> So renames don't break assignments.</li>
+    </ul>
+  </div>
+
+  <div id="msgBox" class="msg"></div>
+
+  <div class="card">
+    <h2>1. Scan the Arrivals board</h2>
+    <p style="font-size:13px; color:var(--sage); margin-bottom:10px">
+      Reads every column on the Arrivals board to see which planning columns already exist.
+    </p>
+    <button class="run-btn" id="scanBtn" onclick="runScan()">🔍 Scan board</button>
+    <div id="scanResult" style="margin-top:14px"></div>
+  </div>
+
+  <div class="card hide" id="provisionCard">
+    <h2>2. Provision API-creatable columns</h2>
+    <p style="font-size:13px; color:var(--sage); margin-bottom:10px">
+      Creates simple-type columns (numbers, hour, long_text) via Monday's API. Click only once — the API queues them.
+    </p>
+    <button class="run-btn" id="provBtn" onclick="runProvision()">🛠 Create missing columns</button>
+    <div id="provResult" style="margin-top:14px"></div>
+  </div>
+
+  <div class="card hide" id="manualCard">
+    <h2>3. Manual setup — Staff-linked columns</h2>
+    <p style="font-size:13px; color:var(--sage); margin-bottom:12px; line-height:1.55">
+      Monday's API no longer permits creating board-relation columns on existing boards. Add these manually on the Arrivals board — takes about 2 minutes.
+    </p>
+    <div style="background:var(--amber-bg); border-left:4px solid var(--amber); border-radius:8px; padding:12px 14px; margin-bottom:14px; font-size:13px; line-height:1.55">
+      <strong>How to add each one:</strong>
+      <ol style="margin:8px 0 0 18px; line-height:1.7">
+        <li>Open the <strong>Guest Arrivals</strong> board on Monday.</li>
+        <li>Click the <strong>+</strong> at the rightmost column header → <strong>More columns</strong> → <strong>Connect boards</strong>.</li>
+        <li>Name it exactly as shown below (case-sensitive matching).</li>
+        <li>Select the <strong>Staff</strong> board as the connected board.</li>
+        <li>Save. Repeat for each remaining column.</li>
+      </ol>
+    </div>
+    <div id="manualList"></div>
+    <p style="font-size:13px; color:var(--sage); margin-top:12px">
+      Once added, come back to this page and click <strong>🔍 Scan board</strong> again — they'll show as Exists.
+    </p>
+  </div>
+</div>
+
+<script>
+const URL_API        = 'https://api.monday.com/v2';
+const ARRIVALS_BOARD = '5094453064';
+const STAFF_BOARD    = '5095127554';
+
+/* The planning columns we're adding to Arrivals. Order matters for visual
+   layout on the Monday board — keep clean assignments grouped, then HT,
+   then linen, then notes.
+   Monday API 2024-01 enum names:
+     - `numbers` (NOT `numeric` — that's the older name, now deprecated)
+   board_relation columns (the Staff-linked ones) can NO LONGER be created
+   via the API on existing boards — Monday returns "not supported yet in
+   the API". We mark those with manualOnly:true and surface clear UI
+   instructions instead of attempting a doomed create. */
+const COLUMN_DEFS = [
+  { key: 'cleanerPrimary', title: 'Cleaner (Primary)', column_type: 'board_relation', boardId: STAFF_BOARD, manualOnly: true },
+  { key: 'cleanerPartner', title: 'Cleaner (Partner)', column_type: 'board_relation', boardId: STAFF_BOARD, manualOnly: true },
+  { key: 'checker',        title: 'Checker',           column_type: 'board_relation', boardId: STAFF_BOARD, manualOnly: true },
+  { key: 'cleanHours',     title: 'Clean hours',       column_type: 'numbers' },
+  { key: 'cleanStart',     title: 'Clean start',       column_type: 'hour' },
+  { key: 'htEngineer',     title: 'HT Engineer',       column_type: 'board_relation', boardId: STAFF_BOARD, manualOnly: true },
+  { key: 'linenDriver',    title: 'Linen Driver',      column_type: 'board_relation', boardId: STAFF_BOARD, manualOnly: true },
+  { key: 'dirtiesDriver',  title: 'Dirties Driver',    column_type: 'board_relation', boardId: STAFF_BOARD, manualOnly: true },
+  { key: 'opsNotes',       title: 'Ops notes',         column_type: 'long_text' },
+];
+
+let _existingByTitle = {};
+let _missing = [];
+
+async function mq(query) {
+  const r = await fetch(URL_API, {
+    method:'POST',
+    headers:{ 'Content-Type':'application/json', Authorization: window.MONDAY_API_TOKEN, 'API-Version':'2024-01' },
+    body: JSON.stringify({ query }),
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error('Monday: ' + j.errors[0].message);
+  return j.data;
+}
+
+function showMsg(text, type) {
+  const box = document.getElementById('msgBox');
+  box.textContent = text; box.className = 'msg show ' + type;
+  if (type === 'success') setTimeout(() => box.classList.remove('show'), 6000);
+}
+
+function escapeHtml(s) { return String(s||'').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+async function runScan() {
+  const btn = document.getElementById('scanBtn');
+  btn.disabled = true; btn.textContent = 'Scanning…';
+  const out = document.getElementById('scanResult');
+  out.innerHTML = '';
+  try {
+    const data = await mq(`{ boards(ids:[${ARRIVALS_BOARD}]) { columns { id title type } } }`);
+    const cols = data?.boards?.[0]?.columns || [];
+    _existingByTitle = {};
+    for (const c of cols) _existingByTitle[(c.title || '').trim().toLowerCase()] = c;
+
+    _missing = COLUMN_DEFS.filter(d => !_existingByTitle[d.title.toLowerCase()]);
+
+    const rows = COLUMN_DEFS.map(d => {
+      const existing = _existingByTitle[d.title.toLowerCase()];
+      const status = existing ? 'exists' : (d.manualOnly ? 'manual' : 'missing');
+      const idCell = existing ? `<code>${existing.id}</code>` : '—';
+      const typeNote = d.column_type === 'board_relation' ? ' → Staff board' : '';
+      let pillLabel;
+      if (status === 'exists') pillLabel = '✓ Exists';
+      else if (status === 'manual') pillLabel = '⚠ Add manually';
+      else pillLabel = '✗ Missing';
+      return `<tr>
+        <td><strong>${escapeHtml(d.title)}</strong></td>
+        <td class="muted">${escapeHtml(d.column_type)}${typeNote}</td>
+        <td>${idCell}</td>
+        <td><span class="status-pill ${status}">${pillLabel}</span></td>
+      </tr>`;
+    }).join('');
+
+    // Auto-creatable missing vs manual-only missing.
+    const apiCreatable = _missing.filter(d => !d.manualOnly);
+    const manualNeeded = _missing.filter(d =>  d.manualOnly);
+
+    let summary = '';
+    if (_missing.length === 0) {
+      summary = '<span style="color:var(--green); font-weight:600">✓ All columns already exist — nothing to provision.</span>';
+    } else {
+      const bits = [];
+      if (apiCreatable.length) bits.push(`<strong>${apiCreatable.length}</strong> ${apiCreatable.length === 1 ? 'column' : 'columns'} can be created by this page (button below).`);
+      if (manualNeeded.length) bits.push(`<strong>${manualNeeded.length}</strong> ${manualNeeded.length === 1 ? 'column needs' : 'columns need'} to be added manually on Mondays (instructions below).`);
+      summary = bits.join('<br>');
+    }
+
+    out.innerHTML = `
+      <table>
+        <thead><tr><th>Title</th><th>Type</th><th>Existing column id</th><th>Status</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <p style="font-size:13px; color:var(--sage); margin-top:12px">${summary}</p>
+    `;
+
+    // Show provision button only if at least one column is API-creatable.
+    document.getElementById('provisionCard').classList.toggle('hide', apiCreatable.length === 0);
+
+    // Show manual-setup card if any board_relation columns need adding.
+    renderManualSetup(manualNeeded);
+
+    btn.disabled = false; btn.textContent = '🔍 Scan board';
+    showMsg('Scan complete.', 'success');
+  } catch (e) {
+    out.innerHTML = `<div style="color:var(--red)">Scan failed: ${escapeHtml(e.message)}</div>`;
+    btn.disabled = false; btn.textContent = '🔍 Scan board';
+    showMsg('Scan failed: ' + e.message, 'error');
+  }
+}
+
+async function runProvision() {
+  // Only act on API-creatable columns. Manual-only ones are skipped silently
+  // (they're surfaced in the separate Manual Setup card instead).
+  const todo = _missing.filter(d => !d.manualOnly);
+  if (!todo.length) { showMsg('Nothing to provision via API — see Manual Setup below.', 'success'); return; }
+  if (!confirm(`Create ${todo.length} column${todo.length === 1 ? '' : 's'} on the Arrivals board?\n\nThis is idempotent — safe to re-run. Existing data on the board is not touched. Board-relation columns (Cleaner, Engineer, Driver) need adding manually — see instructions below.`)) return;
+
+  const btn = document.getElementById('provBtn');
+  btn.disabled = true;
+  const out = document.getElementById('provResult');
+  out.innerHTML = '';
+  const results = [];
+
+  for (let i = 0; i < _missing.length; i++) {
+    const def = _missing[i];
+    btn.textContent = `Creating ${i + 1} of ${_missing.length}: ${def.title}…`;
+    try {
+      let defaults = null;
+      if (def.column_type === 'board_relation' && def.boardId) {
+        defaults = { boardIds: [parseInt(def.boardId, 10)] };
+      }
+      const defStr = defaults
+        ? `, defaults: ${JSON.stringify(JSON.stringify(defaults))}`
+        : '';
+      let q = `mutation { create_column(board_id: ${ARRIVALS_BOARD},
+        title: ${JSON.stringify(def.title)},
+        column_type: ${def.column_type}${defStr}) { id title } }`;
+      let result;
+      try {
+        result = await mq(q);
+      } catch (e) {
+        // Fallback: some Monday plans reject the defaults arg on
+        // board_relation creates. Retry without it — the column is
+        // created unconnected and the user wires it manually.
+        if (defStr) {
+          q = `mutation { create_column(board_id: ${ARRIVALS_BOARD},
+            title: ${JSON.stringify(def.title)},
+            column_type: ${def.column_type}) { id title } }`;
+          result = await mq(q);
+          results.push({ def, status: 'partial', id: result?.create_column?.id || '?',
+                         note: 'Created but Staff connection not auto-wired — open column settings on Mondays and connect to Staff board.' });
+          await new Promise(r => setTimeout(r, 250));
+          continue;
+        }
+        throw e;
+      }
+      results.push({ def, status: 'created', id: result?.create_column?.id || '?' });
+    } catch (e) {
+      results.push({ def, status: 'error', error: e.message });
+    }
+    // Gentle throttle so we don't hit Monday's rate limits on consecutive
+    // create_column mutations.
+    await new Promise(r => setTimeout(r, 250));
+  }
+
+  btn.disabled = false; btn.textContent = '🛠 Create missing columns';
+  out.innerHTML = `
+    <table>
+      <thead><tr><th>Title</th><th>Result</th><th>New column id / note</th></tr></thead>
+      <tbody>
+      ${results.map(r => {
+        const cls = r.status === 'created' ? 'created' : r.status === 'partial' ? 'error' : 'error';
+        const label = r.status === 'created' ? '✓ Created' : r.status === 'partial' ? '⚠ Partial' : '✗ Failed';
+        const detail = r.error ? escapeHtml(r.error) : r.note ? escapeHtml(r.note) : `<code>${r.id}</code>`;
+        return `<tr>
+          <td><strong>${escapeHtml(r.def.title)}</strong></td>
+          <td><span class="status-pill ${cls}">${label}</span></td>
+          <td class="muted">${detail}</td>
+        </tr>`;
+      }).join('')}
+      </tbody>
+    </table>
+    <p style="font-size:13px; color:var(--sage); margin-top:12px">
+      Now re-scan to confirm. After all columns show <strong>Exists</strong>, this page's job is done.
+    </p>
+  `;
+  const ok = results.filter(r => r.status === 'created').length;
+  const partial = results.filter(r => r.status === 'partial').length;
+  const failed = results.filter(r => r.status === 'error').length;
+  showMsg(`Done: ${ok} created${partial ? ` · ${partial} partial` : ''}${failed ? ` · ${failed} failed` : ''}`, failed ? 'error' : 'success');
+}
+
+/* Renders the "what to add manually on Mondays" checklist for the
+   board_relation columns we can't create via API. Empty list hides the
+   whole card. */
+function renderManualSetup(missingList) {
+  const card = document.getElementById('manualCard');
+  if (!missingList || !missingList.length) { card.classList.add('hide'); return; }
+  card.classList.remove('hide');
+  const listEl = document.getElementById('manualList');
+  listEl.innerHTML = missingList.map(d => `<tr>
+    <td><strong>${escapeHtml(d.title)}</strong></td>
+    <td class="muted">Connect boards → <strong>Staff</strong></td>
+  </tr>`).join('');
+  // Wrap rows in a table for layout
+  listEl.innerHTML = `<table>
+    <thead><tr><th>Column name (exact)</th><th>Settings</th></tr></thead>
+    <tbody>${listEl.innerHTML}</tbody>
+  </table>`;
+}
+
+document.addEventListener('DOMContentLoaded', () => {
+  document.getElementById('provisionCard').classList.add('hide');
+  document.getElementById('manualCard').classList.add('hide');
+});
+
+/* Show/hide helper class */
+const styleSheet = document.styleSheets[0];
+styleSheet.insertRule('.hide { display: none !important; }', styleSheet.cssRules.length);
+</script>
+</body>
+</html>

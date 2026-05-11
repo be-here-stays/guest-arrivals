@@ -420,6 +420,21 @@ function addDays(d,n){ const x=new Date(d); x.setDate(x.getDate()+n); return x; 
 // compensation logic must be removed at the same time AND historic shifts
 // migrated forward by 1 day.
 function isoDate(d){ return d.toISOString().slice(0,10); }
+
+// Reverse of isoDate(): given a stored ISO string, return the local Date
+// that the matrix cell represented. Compensates for the BST/UTC offset
+// without hard-coding it — if isoDate() of a candidate local-midnight
+// doesn't round-trip to the stored ISO, the stored ISO is one day earlier
+// (BST case) and we bump by a day. In GMT this returns the same calendar
+// day. Fixes the "click 14 May, editor shows 13 May" bug (2026-05-11).
+function dateForIso(iso){
+  const [y, m, d] = iso.split('-').map(Number);
+  const local = new Date(y, m - 1, d);
+  if (isoDate(local) !== iso) {
+    local.setDate(local.getDate() + 1);
+  }
+  return local;
+}
 function fmtDay(d){ return d.toLocaleDateString('en-GB',{weekday:'short',day:'2-digit',month:'short'}); }
 function fmtDayShort(d){ return d.toLocaleDateString('en-GB',{weekday:'short',day:'numeric'}); }
 function fmtRange(a,b){ return a.toLocaleDateString('en-GB',{day:'numeric',month:'short'}) + ' – ' + b.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'}); }
@@ -873,7 +888,7 @@ function openShift(id){
   editingStaffId = sh.staffId;
   editingDate = sh.date;
   document.getElementById('smTitle').textContent = sf ? sf.name : 'Shift';
-  document.getElementById('smSub').textContent = new Date(sh.date).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('smSub').textContent = dateForIso(sh.date).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   populateShiftRoleDropdown(sh.role || '');
   document.getElementById('smStart').value = sh.start || '';
   document.getElementById('smEnd').value   = sh.end || '';
@@ -891,7 +906,7 @@ function openNew(staffId, iso){
   editingDate = iso;
   const sf = staff.find(x => x.id === staffId);
   document.getElementById('smTitle').textContent = sf ? sf.name : 'New shift';
-  document.getElementById('smSub').textContent = new Date(iso).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
+  document.getElementById('smSub').textContent = dateForIso(iso).toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'long',year:'numeric'});
   // If this is a Maintenance staff member, default the shift role to Maintenance
   // so they don't have to pick it every time. Otherwise blank.
   const defaultRole = (sf && sf.role === 'Maintenance' && shiftRoleLabels.includes('Maintenance'))

@@ -1007,22 +1007,32 @@
   function mergeArrivals(arrivals) {
     const arrivalIds = new Set(arrivals.map(a => String(a.id)));
 
-    // STEP 1: Prune arrival-sourced rota entries whose ids are no longer
-    // in the live fetch. This catches the "duplicate at top and bottom"
-    // bug — when an Arrivals row gets moved to the Archive group on
-    // Mondays, fetchArrivals stops returning it, but the old localStorage
-    // entry persisted. The replacement (live) row then got merged with a
-    // different id, so the rota ended up with both.
+    // STEP 1: Enforce Arrivals-canonical invariants on the persisted rota.
+    //   • At most one non-manual entry per Arrival id (no twins).
+    //   • Non-manual entries only survive if their id is in the live fetch.
+    //   • Untagged legacy entries get upgraded in place to source:'arrival'
+    //     so the user's day/bagged overrides aren't lost on this load.
     //
-    // Manual entries (source:'manual') stay regardless — those are
-    // operator-added non-Arrivals bookings.
+    // Tightened 2026-05-11 — old filter only dropped tagged arrival
+    // entries whose ids had vanished. Pre-tagging legacy rows (no
+    // `source` field) survived AND coexisted with the refreshed live
+    // row → Epsom appeared twice on 11 May. This was the smoking gun
+    // Barry called out: derive from Arrivals, don't accumulate twins.
     const before = rota.length;
-    rota = rota.filter(r =>
-      r.source !== 'arrival' || arrivalIds.has(String(r.id))
-    );
+    const seenIds = new Set();
+    rota = rota.filter(r => {
+      if (r.source === 'manual') return true;                 // user-added one-off
+      const idKey = String(r.id);
+      if (seenIds.has(idKey)) return false;                   // collapse twins
+      const live = arrivalIds.has(idKey);
+      if (!live) return false;                                // arrival gone → drop
+      seenIds.add(idKey);
+      if (r.source !== 'arrival') r.source = 'arrival';       // upgrade legacy
+      return true;
+    });
     const dropped = before - rota.length;
     if (dropped > 0) {
-      console.log(`[laundry-rota] Pruned ${dropped} stale arrival-sourced entries (no longer in live Arrivals)`);
+      console.log(`[laundry-rota] Pruned ${dropped} stale/duplicate rota entries (Arrivals is canonical)`);
     }
 
     // STEP 2: Add new arrivals / refresh existing ones, same as before.

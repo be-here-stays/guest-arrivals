@@ -992,6 +992,75 @@ async function fetchCleans() {
       console.warn('fetchCleans: skipping item', it?.id, e);
     }
   }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Architectural dedup (2026-05-11) — Arrivals is canonical, HT Cleans
+  // is meant to be one row per arrival × type. Stale planning rows on the
+  // HT Cleans board (from old saves before move-back / bring-forward
+  // guards) were rendering twice on the rota — e.g. Firefly appearing
+  // twice on 11 May. We collapse by (linked arrivalId, type) and keep
+  // the "best" representative. Discarded duplicates are NOT deleted from
+  // Monday — they're just suppressed from the rota. A cleanup tool can
+  // tidy the board separately.
+  // ─────────────────────────────────────────────────────────────────────
+  {
+    const rank = s => s === 'Completed' ? 3 : s === 'In Progress' ? 2 : s === 'Scheduled' ? 1 : 0;
+    const groups = new Map();
+    for (const c of cleans) {
+      // Key: linked arrival id wins (canonical). Fallback to property+day
+      // so unlinked legacy rows still collapse with their twins.
+      const key = (c.arrivalId || (c.property + '|' + c.day)) + '|' + c.type;
+      const prev = groups.get(key);
+      if (!prev) { groups.set(key, c); continue; }
+      const a = rank(c.status), b = rank(prev.status);
+      const newer = Number(c.mondayId || 0) > Number(prev.mondayId || 0);
+      if (a > b || (a === b && newer)) groups.set(key, c);
+    }
+    const dropped = cleans.length - groups.size;
+    cleans = Array.from(groups.values());
+    if (dropped > 0) console.log(`[hot-tub-rota] Suppressed ${dropped} duplicate HT Cleans row(s) from display`);
+  }
+
+  // ─────────────────────────────────────────────────────────────────────
+  // Orphan suppression (2026-05-11) — Arrivals is canonical. If a clean
+  // row's linked Arrival no longer exists in the live fetch (deleted or
+  // archived), the rota must not render it. These are phantoms — Ascot
+  // appearing on a day with no matching Arrival was this exact case.
+  //
+  // Build a Set of live arrival ids from the bookings map (populated by
+  // fetchBookings) and drop any clean whose arrivalId points outside it.
+  // Cleans with no arrivalId at all are tolerated (manual unlisted rows
+  // and pre-link legacy rows still need to render); we log them so we
+  // can manually relink them on the Cleans board if needed.
+  // ─────────────────────────────────────────────────────────────────────
+  {
+    const liveArrivalIds = new Set();
+    for (const stays of Object.values(bookings || {})) {
+      for (const s of stays) if (s.arrivalId) liveArrivalIds.add(String(s.arrivalId));
+    }
+    const orphans = [];
+    const unlinked = [];
+    const survivors = [];
+    for (const c of cleans) {
+      if (c.arrivalId) {
+        if (liveArrivalIds.has(String(c.arrivalId))) survivors.push(c);
+        else orphans.push(c);
+      } else {
+        // No link — keep, but report so we can backfill the link.
+        unlinked.push(c);
+        survivors.push(c);
+      }
+    }
+    cleans = survivors;
+    if (orphans.length) {
+      console.warn(`[hot-tub-rota] Suppressed ${orphans.length} orphan HT Cleans row(s) (linked Arrival not in live fetch):`,
+        orphans.map(o => ({ id: o.mondayId, prop: o.property, day: o.day, type: o.type, arrivalId: o.arrivalId, status: o.status })));
+    }
+    if (unlinked.length) {
+      console.info(`[hot-tub-rota] ${unlinked.length} HT Cleans row(s) have no linked Arrival — kept for display, but consider backfilling:`,
+        unlinked.map(o => ({ id: o.mondayId, prop: o.property, day: o.day, type: o.type, status: o.status })));
+    }
+  }
 }
 
 async function refreshAll() {

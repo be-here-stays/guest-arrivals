@@ -49,6 +49,12 @@
   button.secondary { background:#fff; color:var(--dark); border:1.5px solid var(--border); }
   button.danger    { background:var(--red); color:#fff; }
   button.success   { background:var(--green); color:#fff; }
+  /* Per-row delete buttons in the downstream health tables — small,
+     inline, mutes to grey on hover so they're clearly affordances but
+     not as loud as the main action buttons. */
+  button.del-btn { background:#fff; color:#a9434a; border:1px solid #e8c5c5; font-size:12px; font-weight:600; padding:4px 9px; border-radius:6px; }
+  button.del-btn:hover { background:#fde8e8; color:var(--red); }
+  button.del-btn:disabled { background:#f7f5ee; color:var(--sage-mid); border-color:var(--border); }
 
   .status-bar { font-size:13px; color:var(--sage); margin-top:12px; padding:8px 12px; background:#f7f5ee; border-radius:8px; }
   .status-bar.error   { background:var(--red-bg);   color:var(--red); font-weight:600; }
@@ -138,6 +144,21 @@ const AR_FORM_ST  = 'color_mm2aw8fx';
 // copied here on create so the linen team has the bed config without
 // having to look at Guesty.
 const AR_BEDCFG   = 'text_mm2ab56m';
+
+// === Phase 6: downstream board health ====================================
+// Each downstream board has a board_relation column linking back to the
+// canonical Arrival. The unified diagnostic below walks all three boards
+// and flags any Arrival that has multiple downstream rows pointing at it
+// (duplicates) or any downstream row whose link target isn't in the live
+// Arrivals set (orphan — Arrival was archived or deleted). Same definitions
+// the in-page dedup logic in hot-tub-rota.html and laundry-rota.html
+// already use; this just surfaces them in one screen.
+const DOWNSTREAM_BOARDS = [
+  { key: 'ht',     label: 'Hot Tub Cleans',  emoji: '🛁', boardId: '5095259581', arrivalCol: 'board_relation_mm2rjw3' },
+  { key: 'cleans', label: 'Cleans / Checks', emoji: '🏠', boardId: '5095134636', arrivalCol: 'board_relation_mm31mkyp' },
+  { key: 'linen',  label: 'Linen Bags',      emoji: '🛏', boardId: '5095654933', arrivalCol: 'board_relation_mm2y42yx' },
+];
+let _downstreamHealth = {}; // { ht: {total, duplicates, orphans, ok}, cleans: ..., linen: ... }
 
 // localStorage key for cached Guesty credentials. Stored client-side only;
 // never leaves your browser. If you want to wipe them, click "Forget creds".
@@ -622,6 +643,13 @@ async function runSync() {
     renderResult(guestyList.length, arrivalsInWindow);
     setStatus(`✓ Synced — Guesty ${guestyList.length} · Arrivals ${arrivalsInWindow} in window (${arrivalsList.length} total) · ${_missing.length} missing · ${_orphans.length} orphans`,
               _missing.length ? 'error' : 'success');
+
+    // Phase 6: kick off the downstream data-health check. Runs after the
+    // primary Guesty/Arrivals render so the user sees the headline result
+    // immediately; downstream sections stream in below as they complete.
+    // Failures here never block — they just print a single warning section.
+    window._arrivals = arrivalsList;
+    triggerDataHealth();
   } catch (e) {
     console.error(e);
     setStatus('✗ ' + e.message, 'error');
@@ -724,6 +752,183 @@ function renderResult(guestyCount, arrivalsCount) {
   }
 
   document.getElementById('content').innerHTML = html;
+}
+
+/* === Phase 6 — downstream data health ===================================
+   Walks Hot Tub Cleans, Cleans/Checks and Linen Bags, classifying each
+   row against the live Arrivals set the existing recon already built.
+
+   Two failure modes per board:
+   - Duplicate: same Arrival linked from 2+ downstream rows (same kind of
+     drift that produced "Firefly twice" / "Epsom twice" on the rotas).
+   - Orphan: downstream row's linked Arrival isn't in the live set
+     (Arrival archived or deleted while a downstream row still points at
+     it — usually a cancellation that wasn't tidied).
+
+   Both render as additional sections appended below the existing Guesty
+   sync output, so nothing in the main flow has to change. Failures here
+   never block the Guesty sync result. */
+async function loadBoardDownstream(boardId, arrivalCol) {
+  let cursor = null, all = [], pages = 0;
+  do {
+    const cp = cursor ? `, cursor: "${cursor}"` : '';
+    const q = `{ boards(ids:[${boardId}]) { items_page(limit: 500${cp}) {
+      cursor
+      items {
+        id name
+        column_values(ids:["${arrivalCol}"]) {
+          id text
+          ... on BoardRelationValue { linked_item_ids }
+        }
+      }
+    } } }`;
+    const data = await mq(q);
+    const page = data?.boards?.[0]?.items_page;
+    if (!page) break;
+    all = all.concat(page.items || []);
+    cursor = page.cursor;
+    pages++;
+    if (pages > 50) { console.warn(`loadBoardDownstream(${boardId}): hit 50-page cap`); break; }
+  } while (cursor);
+  return all;
+}
+
+function classifyDownstream(rows, liveArrivalIds) {
+  // Build arrival-id → [rows] map; rows with no link are skipped from the
+  // duplicate check but not flagged (an unlinked row is a manual / pre-link
+  // legacy entry, not a data-health issue per se).
+  const byArrival = new Map();
+  const orphans = [];
+  for (const it of rows) {
+    const cv = (it.column_values || [])[0];
+    const linkedIds = cv?.linked_item_ids || [];
+    if (!linkedIds.length) continue;
+    const arrId = String(linkedIds[0]);
+    if (!liveArrivalIds.has(arrId)) {
+      orphans.push({ id: it.id, name: it.name, arrivalId: arrId });
+      continue;
+    }
+    if (!byArrival.has(arrId)) byArrival.set(arrId, []);
+    byArrival.get(arrId).push({ id: it.id, name: it.name });
+  }
+  const duplicates = [];
+  let okCount = 0;
+  for (const [arrId, dupRows] of byArrival) {
+    if (dupRows.length > 1) duplicates.push({ arrivalId: arrId, rows: dupRows });
+    else okCount++;
+  }
+  return { total: rows.length, orphans, duplicates, ok: okCount };
+}
+
+function renderHealthSection(spec, health) {
+  if (!health) return '';
+  const d = health.duplicates.length;
+  const o = health.orphans.length;
+  if (!d && !o) {
+    return `<section>
+      <h2 class="ok">${spec.emoji} ${escapeHtml(spec.label)} <span class="count">✓ no issues</span></h2>
+      <p class="desc muted">${health.ok} unique Arrival → row mapping(s). Skipped ${health.total - health.ok - o} unlinked / aggregated row(s).</p>
+    </section>`;
+  }
+  let html = `<section data-health-section="${spec.key}"><h2 class="warn">${spec.emoji} ${escapeHtml(spec.label)} <span class="count">${d + o}</span></h2>`;
+  if (d) {
+    // Flatten dup groups into one row per downstream item so each can be
+    // deleted independently. Keep the Arrival id alongside so you can see
+    // which rows belong together.
+    const flatDups = [];
+    for (const dup of health.duplicates) {
+      for (const r of dup.rows) flatDups.push({ arrivalId: dup.arrivalId, id: r.id, name: r.name });
+    }
+    html += `<p class="desc"><strong>${d}</strong> Arrival${d === 1 ? '' : 's'} with duplicate downstream row(s). Pick the canonical row to keep on the board and delete the rest — each click is independent and confirmed.</p>
+      <table><thead><tr><th>Arrival ID</th><th>Row name</th><th>Item ID</th><th></th></tr></thead><tbody>`;
+    for (const row of flatDups.slice(0, 200)) {
+      html += `<tr data-row-id="${row.id}"><td><code>${row.arrivalId}</code></td><td>${escapeHtml(row.name || '—')}</td><td><code>${row.id}</code></td><td><button class="del-btn" onclick="deleteDownstreamRow('${spec.boardId}','${spec.key}','${row.id}',this)">🗑 Delete</button></td></tr>`;
+    }
+    if (flatDups.length > 200) html += `<tr><td colspan="4" class="muted">… and ${flatDups.length - 200} more</td></tr>`;
+    html += `</tbody></table>`;
+  }
+  if (o) {
+    html += `<p class="desc"><strong>${o}</strong> orphan row${o === 1 ? '' : 's'} — linked Arrival is archived or deleted. Usually a cancellation that wasn't tidied downstream.</p>
+      <table><thead><tr><th>Row name</th><th>Item ID</th><th>Was linked to Arrival</th><th></th></tr></thead><tbody>`;
+    for (const orp of health.orphans.slice(0, 200)) {
+      html += `<tr data-row-id="${orp.id}"><td>${escapeHtml(orp.name || '—')}</td><td><code>${orp.id}</code></td><td><code>${orp.arrivalId}</code></td><td><button class="del-btn" onclick="deleteDownstreamRow('${spec.boardId}','${spec.key}','${orp.id}',this)">🗑 Delete</button></td></tr>`;
+    }
+    if (health.orphans.length > 200) html += `<tr><td colspan="4" class="muted">… and ${health.orphans.length - 200} more</td></tr>`;
+    html += `</tbody></table>`;
+  }
+  html += `</section>`;
+  return html;
+}
+
+// Delete an item from a downstream board. Used by the per-row 🗑 button
+// in the duplicate + orphan tables. Confirms once per click. On success
+// the row fades out and the section's count is decremented. Failures
+// surface inline next to the button so you can see what went wrong
+// without leaving the page.
+async function deleteDownstreamRow(boardId, sectionKey, itemId, btn) {
+  if (!btn || btn.disabled) return;
+  if (!confirm(`Delete row ${itemId} from this board?\n\nThis can't be undone. The Arrival is unaffected.`)) return;
+  btn.disabled = true;
+  const originalText = btn.textContent;
+  btn.textContent = 'Deleting…';
+  try {
+    await mq(`mutation { delete_item(item_id: ${itemId}) { id } }`);
+    // Fade the row out and remove after the transition.
+    const tr = btn.closest('tr');
+    if (tr) {
+      tr.style.transition = 'opacity 0.35s';
+      tr.style.opacity = '0.3';
+      setTimeout(() => tr.remove(), 350);
+    }
+    // Decrement the section's count badge.
+    const section = document.querySelector(`section[data-health-section="${sectionKey}"]`);
+    const countEl = section?.querySelector('h2 .count');
+    if (countEl) {
+      const n = parseInt(countEl.textContent, 10);
+      if (!isNaN(n) && n > 0) countEl.textContent = String(n - 1);
+    }
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = originalText;
+    btn.style.background = '#fde8e8';
+    btn.title = e.message;
+    btn.textContent = '⚠ Failed — retry';
+    console.error('[delete] item', itemId, e);
+  }
+}
+
+async function triggerDataHealth() {
+  // Build the live Arrivals id set from the recon we already did.
+  // _arrivals is populated by loadArrivals + filterLive — exactly the
+  // canonical "Arrivals that are live and visible to the rest of the
+  // system". A downstream row pointing outside this set is, by definition,
+  // pointing at something that nothing else in the app can see → orphan.
+  const liveArrivalIds = new Set((window._arrivals || []).map(a => String(a.id)));
+  if (!liveArrivalIds.size) {
+    console.warn('[data-health] No live arrivals loaded — skipping downstream health checks.');
+    return;
+  }
+  // Append a "loading" placeholder so the user knows more is coming.
+  const placeholder = '<section id="dataHealthLoading"><div class="empty">⏳ Checking downstream boards…</div></section>';
+  document.getElementById('content').insertAdjacentHTML('beforeend', placeholder);
+  try {
+    const results = await Promise.all(
+      DOWNSTREAM_BOARDS.map(spec => loadBoardDownstream(spec.boardId, spec.arrivalCol))
+    );
+    let html = '';
+    DOWNSTREAM_BOARDS.forEach((spec, i) => {
+      const health = classifyDownstream(results[i], liveArrivalIds);
+      _downstreamHealth[spec.key] = health;
+      html += renderHealthSection(spec, health);
+    });
+    document.getElementById('dataHealthLoading')?.remove();
+    document.getElementById('content').insertAdjacentHTML('beforeend', html);
+  } catch (e) {
+    console.error('[data-health] Failed:', e);
+    document.getElementById('dataHealthLoading')?.remove();
+    document.getElementById('content').insertAdjacentHTML('beforeend',
+      `<section><h2 class="warn">⚠ Downstream health check failed</h2><p class="desc muted">${escapeHtml(e.message)}</p></section>`);
+  }
 }
 
 /* Diagnostic: open a window with the raw JSON of the first reservation

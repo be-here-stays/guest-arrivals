@@ -38,10 +38,19 @@
     .stat-lbl { font-size:12px; color:rgba(255,255,255,.6); }
     .stat-num { font-size:14px; font-weight:700; color:#fff; }
 
+    /* ── Tabs ── */
+    .tab-row { background:var(--dark); border-top:1px solid rgba(255,255,255,.08); display:flex; padding:0 12px; }
+    .tab-btn { padding:10px 14px; font-family:inherit; font-size:12px; font-weight:700; color:rgba(255,255,255,.45); background:transparent; border:none; border-bottom:2px solid transparent; cursor:pointer; letter-spacing:.3px; transition:color .15s; }
+    .tab-btn.active { color:#fff; border-bottom-color:var(--gold); }
+
     /* ── Main ── */
     .main { padding:16px 16px 0; max-width:720px; margin:0 auto; }
     .section-lbl { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--sage-mid); margin:0 0 10px; display:flex; align-items:center; gap:8px; }
     .section-lbl::after { content:''; flex:1; height:1px; background:var(--border); }
+    .section-action { display:flex; justify-content:space-between; align-items:center; margin-bottom:10px; }
+    .section-action .section-lbl { margin-bottom:0; flex:1; }
+    .add-btn { font-family:inherit; font-size:12px; font-weight:700; padding:6px 14px; background:var(--dark); color:var(--cream); border:none; border-radius:8px; cursor:pointer; white-space:nowrap; flex-shrink:0; }
+    .add-btn:hover { opacity:.85; }
 
     /* ── Board grid ── */
     .board-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:20px; }
@@ -63,6 +72,7 @@
     .bc-badge.maintenance { background:#f0eeea; color:var(--sage-mid); }
 
     .bc-loc { font-size:11px; color:var(--sage-mid); margin-bottom:8px; }
+    .bc-booked-soon { font-size:10px; color:var(--green); font-weight:700; margin-bottom:6px; padding:3px 7px; background:var(--green-bg); border-radius:6px; display:inline-block; }
     .bc-guest { font-size:13px; font-weight:600; color:var(--dark); margin-bottom:2px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
     .bc-prop  { font-size:11px; color:var(--sage); margin-bottom:2px; }
     .bc-due   { font-size:11px; font-weight:600; margin-bottom:8px; }
@@ -71,11 +81,47 @@
     .bc-due.overdue  { color:var(--red); }
     .bc-dur  { font-size:10px; color:var(--sage-mid); margin-bottom:8px; }
 
-    .bc-btn { width:100%; padding:8px 6px; border:none; border-radius:8px; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; transition:opacity .15s; }
+    .bc-btn { width:100%; padding:8px 6px; border:none; border-radius:8px; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; transition:opacity .15s; margin-bottom:4px; }
+    .bc-btn:last-child { margin-bottom:0; }
     .bc-btn.handout  { background:var(--dark); color:var(--cream); }
+    .bc-btn.book     { background:transparent; border:1.5px solid var(--border); color:var(--sage); }
     .bc-btn.collect  { background:#8B2020; color:#fff; }
     .bc-btn.collect-soon { background:#a86c00; color:#fff; }
     .bc-btn:hover { opacity:.85; }
+
+    /* ── Week grid ── */
+    .week-grid { background:var(--surface); border-radius:12px; overflow:hidden; margin-bottom:16px; box-shadow:0 1px 4px rgba(39,47,46,.08); }
+    .wg-head, .wg-row { display:grid; }
+    .wg-head { background:#f7f5f1; border-bottom:1px solid var(--border); }
+    .wg-row  { border-bottom:1px solid var(--border); }
+    .wg-row:last-child { border-bottom:none; }
+    .wg-cell { padding:7px 4px; font-size:10px; text-align:center; border-right:1px solid var(--border); min-width:0; overflow:hidden; }
+    .wg-cell:last-child { border-right:none; }
+    .wg-cell.board-lbl { font-weight:700; color:var(--sage-mid); text-align:left; padding-left:8px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+    .wg-cell.day-lbl   { font-weight:700; color:var(--dark); line-height:1.3; }
+    .wg-cell.today-lbl { color:var(--gold); }
+    .wg-cell.booked    { background:var(--green-bg); }
+    .wg-cell.booked::after   { content:'●'; color:var(--green); font-size:8px; }
+    .wg-cell.hired     { background:#fff8e6; }
+    .wg-cell.hired::after    { content:'●'; color:#a07000; font-size:8px; }
+
+    /* ── Booking cards ── */
+    .booking-card { background:var(--surface); border-radius:12px; padding:13px 14px; margin-bottom:10px; box-shadow:0 1px 4px rgba(39,47,46,.08); border-left:4px solid var(--green-bdr); }
+    .booking-card.today  { border-left-color:var(--gold); }
+    .booking-card.admin-card { border-left-color:var(--sage-mid); }
+    .bk-head   { display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:4px; }
+    .bk-board  { font-size:11px; font-weight:700; color:var(--sage-mid); text-transform:uppercase; letter-spacing:.3px; }
+    .bk-badge  { font-size:10px; font-weight:700; padding:2px 8px; border-radius:10px; background:var(--green-bg); color:var(--green); }
+    .bk-badge.today { background:#fdf5e8; color:var(--amber); }
+    .bk-guest  { font-size:14px; font-weight:700; color:var(--dark); }
+    .bk-lodge  { font-size:12px; color:var(--sage); }
+    .bk-dates  { font-size:11px; color:var(--sage-mid); margin-top:3px; }
+    .bk-actions { display:flex; gap:8px; margin-top:10px; }
+    .bk-btn { flex:1; padding:8px; border:1.5px solid var(--border); border-radius:8px; background:transparent; font-family:inherit; font-size:12px; font-weight:600; color:var(--sage); cursor:pointer; transition:opacity .15s; }
+    .bk-btn:hover { opacity:.75; }
+    .bk-btn.activate { background:var(--dark); color:var(--cream); border-color:var(--dark); }
+    .bk-btn.cancel-bk { color:var(--red); border-color:var(--red); }
+    .bk-empty { text-align:center; padding:32px 16px; color:var(--sage-mid); font-size:13px; }
 
     /* ── Modal overlay ── */
     .modal-overlay { position:fixed; inset:0; background:rgba(39,47,46,.55); z-index:200; display:flex; align-items:flex-end; justify-content:center; }
@@ -88,7 +134,7 @@
     /* ── Form fields ── */
     .fld { margin-bottom:14px; }
     .fld label { display:block; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--sage-mid); margin-bottom:6px; }
-    .fld select, .fld input[type="text"], .fld input[type="datetime-local"], .fld textarea {
+    .fld select, .fld input[type="text"], .fld input[type="date"], .fld input[type="datetime-local"], .fld textarea {
       width:100%; padding:11px 12px; border:1.5px solid var(--border); border-radius:9px;
       font-family:inherit; font-size:15px; color:var(--dark); background:#fff; outline:none;
       -webkit-appearance:none; transition:border-color .15s;
@@ -145,13 +191,16 @@
     .issue-flag.show { display:block; }
     .issue-flag strong { display:block; margin-bottom:4px; font-size:13px; }
 
+    /* ── Conflict warning ── */
+    .conflict-warn { background:var(--red-bg); border:1.5px solid var(--red); border-radius:9px; padding:10px 12px; font-size:12px; color:var(--red); font-weight:600; margin-bottom:12px; display:none; }
+    .conflict-warn.show { display:block; }
+
     /* ── Submit ── */
     .submit-btn { width:100%; padding:15px; background:var(--dark); color:var(--cream); border:none; border-radius:12px; font-family:inherit; font-size:15px; font-weight:700; cursor:pointer; transition:background .15s; margin-top:16px; }
     .submit-btn:hover:not(:disabled) { background:var(--sage); }
     .submit-btn:disabled { opacity:.4; cursor:not-allowed; }
     .submit-btn.danger { background:var(--red); }
     .submit-btn.danger:hover:not(:disabled) { background:#7a1a1a; }
-
     .btn-cancel { width:100%; padding:12px; background:transparent; border:1.5px solid var(--border); border-radius:12px; font-family:inherit; font-size:14px; font-weight:600; color:var(--sage); cursor:pointer; margin-top:8px; }
 
     /* ── Toast ── */
@@ -180,7 +229,7 @@
       <path d="M40.5754,5.4963l-5.4656-.2394c-4.4287-.1941-8.2128,3.2233-8.4095,7.594l-.243,5.4044,14.0587-12.6953.0595-.0638Z" fill="#fff"/>
       <path d="M27.6033,19.3885l5.4768-.2207c4.4294-.1785,7.9053-3.901,7.7245-8.2724l-.2232-5.3945-.0656.0592-12.9125,13.8284Z" fill="#fff"/>
       <polygon points="23.5662 22.0664 23.5662 0 22.0665 0 22.0665 22.0664 0 22.0664 0 23.5661 22.0665 23.5661 22.0665 45.6329 23.5662 45.6329 23.5662 23.5661 45.6329 23.5661 45.6329 22.0664 23.5662 22.0664" fill="#fff"/>
-      <path d="M12.5345,33.8375c-1.8062-.127-3.257-2.1802-5.0582-1.9879-1.5029.1609-2.5817,1.8435-4.0738,2.0993-.319.0545-.6313.0405-.9396-.0181v3.1036c.3165.0619.6371.0784.9636.0222,1.4922-.2549,2.5709-1.9384,4.0739-2.0993,1.8012-.1931,3.2519,1.86,5.0581,1.9879,2.0581.1453,3.7267-2.2256,5.7881-2.1563.2469.0084.4863.0521.7199.1205v-3.1003c-.2418-.0726-.4888-.1188-.744-.1279-2.0605-.0693-3.7299,2.3015-5.788,2.1563Z" fill="#fff"/>
+      <path d="M12.5345,33.8375c-1.8062-.127-3.257-2.1802-5.0582-1.9879-1.5029.1609-2.5817,1.8435-4.0738,2.0993-.319.0545-.6313.0405-.9396-.0181v3.1036c.3165.0619.6371.0784.9636.0222,1.4922-.2549,2.5709-1.9384,4.0739-2.0993,1.8012-.1931,3.2519,1.86,5.0581,1.9879,2.0581.1453,3.7267-2.2256,5.7881-2.1563.2469.0084.4863.0521.7199.1205v-3.1003c-.2418-.0726-.4888-.1188-.744-.1279-2.0605-.0693-3.7299,2.3015-5.788,2.1562Z" fill="#fff"/>
       <path d="M12.5229,28.1871c-1.8062-.1263-3.257-2.1794-5.0582-1.9872-1.5029.1609-2.5817,1.8436-4.0738,2.0994-.3149.0536-.6231.0404-.928-.0157v3.1037c.3132.0602.6297.0751.952.0197,1.4922-.2549,2.5709-1.9384,4.0739-2.0993,1.8012-.193,3.252,1.8609,5.0581,1.9879,2.0581.1453,3.7267-2.2255,5.788-2.1562.2511.0082.4948.0536.7316.1237v-3.1011c-.2452-.0743-.4962-.1221-.7556-.1312-2.0605-.0693-3.73,2.3015-5.788,2.1562Z" fill="#fff"/>
       <path d="M12.5774,39.4868c-1.8061-.127-3.2569-2.1802-5.058-1.9879-1.503.1609-2.5817,1.8435-4.0739,2.0993-.3339.057-.6603.0388-.9835-.0255v3.1036c.3306.0693.6653.0891,1.0075.0314,1.4921-.255,2.5709-1.9385,4.0738-2.0994,1.8012-.1922,3.252,1.8609,5.0581,1.988,2.0581.1452,3.7267-2.2257,5.7881-2.1563.2319.0074.4565.047.6769.108v-3.1028c-.2279-.0651-.4606-.1064-.701-.1146-2.0604-.0693-3.7299,2.3015-5.788,2.1562Z" fill="#fff"/>
       <path d="M79.2201,29.1735c0,5.3627-4.4154,8.2131-11.8064,8.2131h-12.0464l.144-1.6426,2.4956-.2899c.9119-.0966,1.2479-.2898,1.2479-.6763V9.752c0-.3865-.24-.4831-1.2479-.6281l-2.4956-.2899-.144-1.6426h12.2384c7.9189,0,10.5106,3.1403,10.5106,6.6671,0,3.865-2.9756,7.0053-7.2951,7.7783v.1932c5.8073.6281,8.3989,3.7684,8.3989,7.3435ZM75.0447,29.5117c0-4.493-3.6955-6.7154-8.8788-6.7154h-2.9757v12.1747l3.7435.6764,1.3919-.0483c3.5515-.1933,6.7191-2.1741,6.7191-6.0874ZM73.8928,15.0663c0-3.7683-2.3517-6.1357-7.679-6.1357h-3.0236v12.078l3.7915-.0483c4.7994-.0483,6.9111-3.1403,6.9111-5.8941Z" fill="#fff"/>
@@ -206,12 +255,17 @@
   <div class="stat-chip"><div class="stat-dot over"></div><span class="stat-num" id="cntOver">—</span><span class="stat-lbl">&nbsp;Overdue</span></div>
 </div>
 
-<div class="main">
-  <div class="section-lbl">Boards 1–4 · WatersEdge base</div>
-  <div class="board-grid" id="gridWE"></div>
+<!-- Tabs -->
+<div class="tab-row">
+  <button class="tab-btn active" id="tabLive"     onclick="switchTab('live')">Live Status</button>
+  <button class="tab-btn"        id="tabUpcoming" onclick="switchTab('upcoming')">Upcoming</button>
+  <button class="tab-btn"        id="tabBoards"   onclick="switchTab('boards')">Boards</button>
+</div>
 
-  <div class="section-lbl">Boards 5–6 · Little Horseshoe base</div>
-  <div class="board-grid" id="gridLH"></div>
+<div class="main">
+  <div id="liveSection"></div>
+  <div id="upcomingSection" style="display:none"></div>
+  <div id="boardsSection"   style="display:none"></div>
 </div>
 
 <!-- ══════════════════════════════════════
@@ -221,12 +275,10 @@
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-inner">
-      <div class="modal-title">Hand Out — Board <span id="hoBoardNum">1</span></div>
+      <div class="modal-title">Hand Out — <span id="hoBoardNum">1</span></div>
       <div class="modal-sub" id="hoSub">WatersEdge</div>
-
       <div id="hoMsg" class="msg"></div>
 
-      <!-- Guest from current arrivals -->
       <div class="fld">
         <label>Guest / Current Booking <span style="color:var(--red)">*</span></label>
         <select id="hoGuest" onchange="onGuestSelect()">
@@ -298,10 +350,7 @@
     <div class="modal-handle"></div>
     <div class="modal-inner">
       <div class="modal-title">Collect — Board <span id="retBoardNum">1</span></div>
-
-      <!-- Hire summary -->
       <div class="hire-summary" id="retSummary"></div>
-
       <div id="retMsg" class="msg"></div>
 
       <div class="fld">
@@ -343,12 +392,10 @@
         <button class="cond-btn" onclick="setCondition('missing',this)">✕ Board missing</button>
       </div>
 
-      <!-- Issue panel — shown when anything flagged -->
       <div class="issue-flag" id="issueFlag">
         <strong>⚠ Issue will be flagged to management</strong>
         <span id="issueFlagItems"></span>
       </div>
-
       <div class="fld" id="issueField" style="display:none; margin-top:12px;">
         <label>Issue description <span style="color:var(--red)">*</span></label>
         <textarea id="retIssues" placeholder="Describe damage or missing items for the management record…"></textarea>
@@ -365,62 +412,188 @@
   </div>
 </div>
 
+<!-- ══════════════════════════════════════
+     BOOKING MODAL
+══════════════════════════════════════ -->
+<div class="modal-overlay" id="bkModal" style="display:none" onclick="outsideClose(event,'bkModal')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-inner">
+      <div class="modal-title">New Booking</div>
+      <div class="modal-sub">Advance booking — generates drop-off &amp; collection tasks</div>
+      <div id="bkMsg" class="msg"></div>
+
+      <div class="fld">
+        <label>Board <span style="color:var(--red)">*</span></label>
+        <select id="bkBoard" onchange="checkBookingConflict()">
+          <option value="">Select board…</option>
+        </select>
+      </div>
+
+      <div class="fld">
+        <label>Guest / Booking <span style="color:var(--red)">*</span></label>
+        <select id="bkGuest" onchange="updateBkSubmit()">
+          <option value="">Loading guests…</option>
+        </select>
+      </div>
+
+      <div class="fld-row">
+        <div class="fld">
+          <label>Start date <span style="color:var(--red)">*</span></label>
+          <input type="date" id="bkStart" onchange="onBkStartChange()">
+        </div>
+        <div class="fld">
+          <label>End date <span style="color:var(--red)">*</span></label>
+          <input type="date" id="bkEnd" onchange="checkBookingConflict()">
+        </div>
+      </div>
+
+      <div class="conflict-warn" id="conflictWarn"></div>
+
+      <div class="fld">
+        <label>Notes (optional)</label>
+        <textarea id="bkNotes" placeholder="Any special instructions for drop-off or collection…"></textarea>
+      </div>
+
+      <button class="submit-btn" id="bkSubmit" onclick="submitBooking()" disabled>Create Booking + Tasks</button>
+      <button class="btn-cancel" onclick="closeModal('bkModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     ADD BOARD MODAL
+══════════════════════════════════════ -->
+<div class="modal-overlay" id="abModal" style="display:none" onclick="outsideClose(event,'abModal')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-inner">
+      <div class="modal-title">Add Board</div>
+      <div class="modal-sub">Add a board at any location</div>
+      <div id="abMsg" class="msg"></div>
+
+      <div class="fld">
+        <label>Board name <span style="color:var(--red)">*</span></label>
+        <input type="text" id="abName" placeholder="e.g. Board 7">
+      </div>
+
+      <div class="fld">
+        <label>Location / base <span style="color:var(--red)">*</span></label>
+        <input type="text" id="abLocation" placeholder="e.g. The Farmhouse" oninput="renderLocChips()">
+        <div id="locChips" style="display:flex;flex-wrap:wrap;gap:6px;margin-top:8px;"></div>
+      </div>
+
+      <button class="submit-btn" onclick="submitAddBoard()">Add Board</button>
+      <button class="btn-cancel" onclick="closeModal('abModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div class="toast" id="toast"></div>
+
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
 
 <script>
 /* ════════════════════════════════════
    CONFIG
 ════════════════════════════════════ */
-const API_TOKEN      = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const API_TOKEN      = window.MONDAY_API_TOKEN;
 const ARRIVALS_BOARD = 5094453064;
 const WAIVER_COL     = 'date_mm2jrjej';
 const PROP_COL       = 'text_mm2ahbrx';
 const ARRIVAL_COL    = 'date_mm2adtwg';
-const GUEST_NAME_COL = 'text_mm2ah8s';   // booking ref / lead guest column
+const GUEST_NAME_COL = 'text_mm2ah8s';
 
-const LS_STATE    = 'pbState_v1';
-const LS_BOARD_ID = 'pbMondayBoardId';
+const LS_STATE       = 'pbState_v1';
+const LS_BOARD_ID    = 'pbMondayBoardId';
+const LS_BOARDS_CFG  = 'pbBoardsConfig_v1';
+const LS_BOOKINGS    = 'pbBookings_v1';
+const LS_TASKS_BOARD = 'pbTasksBoardId';
 
-const BOARD_BASE = {
-  1:'WatersEdge', 2:'WatersEdge', 3:'WatersEdge', 4:'WatersEdge',
-  5:'Little Horseshoe', 6:'Little Horseshoe'
-};
+const DEFAULT_BOARDS = [
+  { id:1, name:'Board 1', location:'WatersEdge' },
+  { id:2, name:'Board 2', location:'WatersEdge' },
+  { id:3, name:'Board 3', location:'WatersEdge' },
+  { id:4, name:'Board 4', location:'WatersEdge' },
+  { id:5, name:'Board 5', location:'Little Horseshoe' },
+  { id:6, name:'Board 6', location:'Little Horseshoe' },
+];
 
 /* ════════════════════════════════════
    STATE
 ════════════════════════════════════ */
-let state = {};          // { [1..6]: { status, location, hire } }
-let activeBoard = null;
-let hireDur = 24;
-let returnIssues = [];   // flagged items on return
-let condition = 'good';
-let guestList = [];      // [{id, name, property, hasWaiver, arrivalDate}]
+let boardsConfig = [];
+let state        = {};
+let bookings     = [];
+let activeBoard  = null;
+let hireDur      = 24;
+let returnIssues = [];
+let condition    = 'good';
+let guestList    = [];
 let mondayBoardId = null;
+let tasksBoardId  = null;
+let currentTab    = 'live';
+
+function loadBoardsConfig() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(LS_BOARDS_CFG) || 'null');
+    if (saved && Array.isArray(saved) && saved.length) { boardsConfig = saved; return; }
+  } catch(e) {}
+  boardsConfig = DEFAULT_BOARDS.map(b => ({...b}));
+}
+
+function saveBoardsConfig() {
+  localStorage.setItem(LS_BOARDS_CFG, JSON.stringify(boardsConfig));
+}
 
 function loadState() {
   try { state = JSON.parse(localStorage.getItem(LS_STATE) || '{}'); } catch(e) { state = {}; }
-  for (let i = 1; i <= 6; i++) {
-    if (!state[i]) state[i] = { status:'available', location:BOARD_BASE[i], hire:null };
+  for (const cfg of boardsConfig) {
+    if (!state[cfg.id]) state[cfg.id] = { status:'available', location:cfg.location, hire:null };
   }
   mondayBoardId = localStorage.getItem(LS_BOARD_ID) || null;
+  tasksBoardId  = localStorage.getItem(LS_TASKS_BOARD) || null;
 }
 
 function saveState() {
   localStorage.setItem(LS_STATE, JSON.stringify(state));
 }
 
+function loadBookings() {
+  try { bookings = JSON.parse(localStorage.getItem(LS_BOOKINGS) || '[]'); } catch(e) { bookings = []; }
+}
+
+function saveBookings() {
+  localStorage.setItem(LS_BOOKINGS, JSON.stringify(bookings));
+}
+
 function checkOverdue() {
   const now = Date.now();
   let changed = false;
-  for (let i = 1; i <= 6; i++) {
-    const b = state[i];
-    if ((b.status === 'out') && b.hire?.dueBack) {
+  for (const cfg of boardsConfig) {
+    const b = state[cfg.id];
+    if (b && b.status === 'out' && b.hire?.dueBack) {
       if (new Date(b.hire.dueBack).getTime() < now) {
         b.status = 'overdue'; changed = true;
       }
     }
   }
   if (changed) saveState();
+}
+
+/* ════════════════════════════════════
+   TABS
+════════════════════════════════════ */
+function switchTab(tab) {
+  currentTab = tab;
+  ['live','upcoming','boards'].forEach(t => {
+    document.getElementById(t + 'Section').style.display = t === tab ? 'block' : 'none';
+    const btn = document.getElementById('tab' + t.charAt(0).toUpperCase() + t.slice(1));
+    if (btn) btn.classList.toggle('active', t === tab);
+  });
+  if (tab === 'upcoming') renderUpcoming();
+  if (tab === 'boards')   renderBoardsAdmin();
 }
 
 /* ════════════════════════════════════
@@ -440,106 +613,101 @@ async function mq(query) {
 async function getOrCreateHireBoard() {
   if (mondayBoardId) return mondayBoardId;
   try {
-    const d = await mq(`mutation {
-      create_board(board_name: "Paddle Board Hires", board_kind: public) { id }
-    }`);
+    const d = await mq(`mutation { create_board(board_name: "Paddle Board Hires", board_kind: public) { id } }`);
     mondayBoardId = String(d.create_board.id);
     localStorage.setItem(LS_BOARD_ID, mondayBoardId);
     return mondayBoardId;
-  } catch(e) {
-    console.error('Could not create Monday board:', e);
-    return null;
-  }
+  } catch(e) { console.error('Could not create hire board:', e); return null; }
+}
+
+async function getOrCreateTasksBoard() {
+  if (tasksBoardId) return tasksBoardId;
+  try {
+    const d = await mq(`mutation { create_board(board_name: "Paddle Board Tasks", board_kind: public) { id } }`);
+    tasksBoardId = String(d.create_board.id);
+    localStorage.setItem(LS_TASKS_BOARD, tasksBoardId);
+    return tasksBoardId;
+  } catch(e) { console.warn('Could not create tasks board:', e); return null; }
 }
 
 async function logToMonday(boardId, itemName, updateText) {
   if (!boardId) return null;
   try {
-    const d = await mq(`mutation {
-      create_item(board_id: ${boardId}, item_name: "${esc(itemName)}") { id }
-    }`);
+    const d = await mq(`mutation { create_item(board_id: ${boardId}, item_name: "${esc(itemName)}") { id } }`);
     const itemId = d.create_item.id;
-    await mq(`mutation {
-      create_update(item_id: ${itemId}, body: "${esc(updateText)}") { id }
-    }`);
+    await mq(`mutation { create_update(item_id: ${itemId}, body: "${esc(updateText)}") { id } }`);
     return itemId;
-  } catch(e) {
-    console.warn('Monday log failed:', e.message);
-    return null;
-  }
+  } catch(e) { console.warn('Monday log failed:', e.message); return null; }
 }
 
 async function appendMondayUpdate(itemId, text) {
   if (!itemId || !mondayBoardId) return;
   try {
-    await mq(`mutation {
-      create_update(item_id: ${itemId}, body: "${esc(text)}") { id }
-    }`);
-  } catch(e) {
-    console.warn('Monday update failed:', e.message);
-  }
+    await mq(`mutation { create_update(item_id: ${itemId}, body: "${esc(text)}") { id } }`);
+  } catch(e) { console.warn('Monday update failed:', e.message); }
+}
+
+async function createMondayTask(name, body) {
+  const bId = await getOrCreateTasksBoard();
+  return bId ? await logToMonday(bId, name, body) : null;
 }
 
 /* ════════════════════════════════════
-   LOAD CURRENT GUESTS FROM MONDAY
+   LOAD GUESTS FROM MONDAY
 ════════════════════════════════════ */
-async function loadGuests() {
-  const sel = document.getElementById('hoGuest');
+async function loadGuestsInto(selectId, daysAhead = 30) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  sel.innerHTML = '<option value="">Loading…</option>';
   try {
     const d = await mq(`{
       boards(ids:[${ARRIVALS_BOARD}]) {
-        items_page(limit:100) {
+        items_page(limit:200) {
           items {
-            id
-            name
-            column_values(ids:["${PROP_COL}","${ARRIVAL_COL}","${WAIVER_COL}","${GUEST_NAME_COL}"]) {
-              id text
-            }
+            id name
+            column_values(ids:["${PROP_COL}","${ARRIVAL_COL}","${WAIVER_COL}","${GUEST_NAME_COL}"]) { id text }
           }
         }
       }
     }`);
     const items = d?.boards?.[0]?.items_page?.items || [];
     const today = new Date(); today.setHours(0,0,0,0);
-    const cutoff = new Date(today); cutoff.setDate(cutoff.getDate() + 30);
-    const cutoffPast = new Date(today); cutoffPast.setDate(cutoffPast.getDate() - 14);
+    const cutoffFuture = new Date(today); cutoffFuture.setDate(cutoffFuture.getDate() + daysAhead);
+    const cutoffPast   = new Date(today); cutoffPast.setDate(cutoffPast.getDate() - 14);
 
     guestList = [];
     for (const item of items) {
       const cv = {};
       for (const c of item.column_values) cv[c.id] = c.text || '';
-      const property = cv[PROP_COL] || item.name;
-      const arrStr   = cv[ARRIVAL_COL];
-      const waiverDt = cv[WAIVER_COL];
+      const arrStr = cv[ARRIVAL_COL];
       if (arrStr) {
         const arr = new Date(arrStr);
-        if (arr < cutoffPast || arr > cutoff) continue; // outside window
+        if (arr < cutoffPast || arr > cutoffFuture) continue;
       }
       guestList.push({
-        id: item.id,
-        name: item.name,
-        property,
-        hasWaiver: !!(waiverDt && waiverDt.trim()),
+        id: item.id, name: item.name,
+        property:    cv[PROP_COL] || item.name,
+        hasWaiver:   !!(cv[WAIVER_COL] && cv[WAIVER_COL].trim()),
         arrivalDate: cv[ARRIVAL_COL] || '',
-        bookingRef: cv[GUEST_NAME_COL] || ''
+        bookingRef:  cv[GUEST_NAME_COL] || ''
       });
     }
 
-    sel.innerHTML = '<option value="">Select current guest…</option>';
-    if (guestList.length === 0) {
-      sel.innerHTML = '<option value="">— No current arrivals found —</option>';
-    } else {
-      guestList.forEach((g, idx) => {
-        const o = document.createElement('option');
-        o.value = idx;
-        o.textContent = `${g.name}${g.property ? ' · ' + g.property : ''}`;
-        sel.appendChild(o);
-      });
-    }
+    sel.innerHTML = guestList.length
+      ? '<option value="">Select guest / booking…</option>'
+      : '<option value="">— No bookings in window —</option>';
+    guestList.forEach((g, idx) => {
+      const o = document.createElement('option');
+      o.value = idx;
+      o.textContent = `${g.name}${g.property ? ' · ' + g.property : ''}`;
+      sel.appendChild(o);
+    });
   } catch(e) {
-    sel.innerHTML = '<option value="">Error loading guests: ' + e.message.slice(0,40) + '</option>';
+    sel.innerHTML = '<option value="">Error: ' + e.message.slice(0,40) + '</option>';
   }
 }
+
+function loadGuests() { loadGuestsInto('hoGuest', 30); }
 
 function onGuestSelect() {
   const idx = document.getElementById('hoGuest').value;
@@ -547,88 +715,111 @@ function onGuestSelect() {
   if (idx === '') { res.className = 'waiver-result'; updateHoSubmit(); return; }
   const g = guestList[parseInt(idx)];
   if (!g) { res.className = 'waiver-result'; updateHoSubmit(); return; }
-  if (g.hasWaiver) {
-    res.className = 'waiver-result ok';
-    res.textContent = '✓ Waiver on file — signed';
-  } else {
-    res.className = 'waiver-result warn';
-    res.textContent = '⚠ No waiver found — confirm with management before proceeding';
-  }
+  res.className = g.hasWaiver ? 'waiver-result ok' : 'waiver-result warn';
+  res.textContent = g.hasWaiver ? '✓ Waiver on file — signed' : '⚠ No waiver found — confirm with management before proceeding';
   updateHoSubmit();
 }
 
 /* ════════════════════════════════════
-   RENDER BOARDS
+   RENDER LIVE
 ════════════════════════════════════ */
 function fmtDue(dueStr) {
   if (!dueStr) return { text:'—', cls:'ok' };
-  const due = new Date(dueStr);
+  const due  = new Date(dueStr);
   const diff = due - Date.now();
-  const h = Math.floor(diff / 3600000);
-  const now = new Date();
+  const h    = Math.floor(diff / 3600000);
   const dueDate = due.toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short' });
   const dueTime = due.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
-  let cls = 'ok';
-  let text = '';
   if (diff < 0) {
-    const over = Math.abs(h);
-    text = `Overdue by ${over}h${Math.abs(Math.round((diff/60000)%60))}m`;
-    cls = 'overdue';
+    return { text:`Overdue by ${Math.abs(h)}h${Math.abs(Math.round((diff/60000)%60))}m`, cls:'overdue' };
   } else if (h <= 3) {
-    text = `Due back in ${h}h — ${dueTime}`;
-    cls = 'soon';
-  } else {
-    text = `Due back ${dueDate} ${dueTime}`;
-    cls = 'ok';
+    return { text:`Due back in ${h}h — ${dueTime}`, cls:'soon' };
   }
-  return { text, cls };
+  return { text:`Due back ${dueDate} ${dueTime}`, cls:'ok' };
 }
 
-function renderBoards() {
-  checkOverdue();
-  const weGrid = document.getElementById('gridWE');
-  const lhGrid = document.getElementById('gridLH');
-  weGrid.innerHTML = '';
-  lhGrid.innerHTML = '';
+function fmtHandedOut(dtStr) {
+  if (!dtStr) return '—';
+  return new Date(dtStr).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+}
 
+function renderLive() {
+  checkOverdue();
+  const todayStr = toDateStr(new Date());
   let avail = 0, out = 0, over = 0;
 
-  for (let i = 1; i <= 6; i++) {
-    const b = state[i];
-    const status = b.status || 'available';
-    if (status === 'available') avail++;
-    else if (status === 'overdue') over++;
-    else out++;
+  // Group boards by location
+  const locationOrder = [];
+  const locationMap   = {};
+  for (const cfg of boardsConfig) {
+    if (!locationMap[cfg.location]) {
+      locationMap[cfg.location] = [];
+      locationOrder.push(cfg.location);
+    }
+    locationMap[cfg.location].push(cfg);
+  }
 
-    const card = document.createElement('div');
-    card.className = `board-card ${status}`;
+  const section = document.getElementById('liveSection');
+  section.innerHTML = '';
 
-    const badgeText = { available:'Available', out:'Out on hire', overdue:'Overdue', maintenance:'Maintenance' }[status] || status;
-    let inner = `
-      <div class="bc-head">
-        <div class="bc-num">Board ${i}</div>
-        <div class="bc-badge ${status}">${badgeText}</div>
-      </div>
-      <div class="bc-loc">${b.location || BOARD_BASE[i]}</div>`;
+  for (const loc of locationOrder) {
+    const lbl = document.createElement('div');
+    lbl.className = 'section-lbl';
+    lbl.textContent = loc;
+    section.appendChild(lbl);
 
-    if ((status === 'out' || status === 'overdue') && b.hire) {
-      const due = fmtDue(b.hire.dueBack);
-      inner += `
-        <div class="bc-guest">${b.hire.guestName || '—'}</div>
-        <div class="bc-prop">${b.hire.property || ''}</div>
-        <div class="bc-due ${due.cls}">${due.text}</div>
-        <div class="bc-dur">Hire: ${b.hire.duration || 24}h · Out: ${fmtHandedOut(b.hire.handedOut)}</div>`;
-      const btnCls = status === 'overdue' ? 'collect' : (due.cls === 'soon' ? 'collect-soon' : 'collect');
-      inner += `<button class="bc-btn ${btnCls}" onclick="openReturnModal(${i})">Record Return</button>`;
-    } else if (status === 'available') {
-      inner += `<button class="bc-btn handout" onclick="openHandOutModal(${i})">Hand Out</button>`;
-    } else if (status === 'maintenance') {
-      inner += `<div class="bc-dur" style="color:var(--sage-mid);margin-bottom:8px">In maintenance</div>`;
+    const grid = document.createElement('div');
+    grid.className = 'board-grid';
+
+    for (const cfg of locationMap[loc]) {
+      const b      = state[cfg.id] || { status:'available', location:cfg.location, hire:null };
+      const status = b.status || 'available';
+      if (status === 'available') avail++;
+      else if (status === 'overdue') over++;
+      else out++;
+
+      // Find soonest upcoming booking for this board
+      const upcoming = bookings
+        .filter(bk => bk.boardId === cfg.id && bk.status === 'upcoming' && bk.endDate >= todayStr)
+        .sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
+
+      const badgeText = { available:'Available', out:'Out on hire', overdue:'Overdue', maintenance:'Maintenance' }[status] || status;
+
+      let inner = `
+        <div class="bc-head">
+          <div class="bc-num">${cfg.name}</div>
+          <div class="bc-badge ${status}">${badgeText}</div>
+        </div>
+        <div class="bc-loc">${b.location || cfg.location}</div>`;
+
+      if (upcoming) {
+        const isToday = upcoming.startDate <= todayStr && upcoming.endDate >= todayStr;
+        inner += `<div class="bc-booked-soon">${isToday ? '📅 Booked today' : '📅 Booked ' + fmtDateShort(upcoming.startDate)}</div>`;
+      }
+
+      if ((status === 'out' || status === 'overdue') && b.hire) {
+        const due    = fmtDue(b.hire.dueBack);
+        const btnCls = status === 'overdue' ? 'collect' : (due.cls === 'soon' ? 'collect-soon' : 'collect');
+        inner += `
+          <div class="bc-guest">${b.hire.guestName || '—'}</div>
+          <div class="bc-prop">${b.hire.property || ''}</div>
+          <div class="bc-due ${due.cls}">${due.text}</div>
+          <div class="bc-dur">Hire: ${b.hire.duration || 24}h · Out: ${fmtHandedOut(b.hire.handedOut)}</div>
+          <button class="bc-btn ${btnCls}" onclick="openReturnModal(${cfg.id})">Record Return</button>`;
+      } else if (status === 'available') {
+        inner += `<button class="bc-btn handout" onclick="openHandOutModal(${cfg.id})">Hand Out</button>`;
+        inner += `<button class="bc-btn book"    onclick="openBookModal(${cfg.id})">Book Ahead</button>`;
+      } else if (status === 'maintenance') {
+        inner += `<div class="bc-dur" style="color:var(--sage-mid);margin-bottom:8px">In maintenance</div>`;
+      }
+
+      const card = document.createElement('div');
+      card.className = `board-card ${status}`;
+      card.innerHTML = inner;
+      grid.appendChild(card);
     }
 
-    card.innerHTML = inner;
-    if (i <= 4) weGrid.appendChild(card);
-    else        lhGrid.appendChild(card);
+    section.appendChild(grid);
   }
 
   document.getElementById('cntAvail').textContent = avail;
@@ -636,9 +827,126 @@ function renderBoards() {
   document.getElementById('cntOver').textContent  = over;
 }
 
-function fmtHandedOut(dtStr) {
-  if (!dtStr) return '—';
-  return new Date(dtStr).toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+/* ════════════════════════════════════
+   RENDER UPCOMING
+════════════════════════════════════ */
+function renderWeekGrid() {
+  const days = [];
+  const today = new Date(); today.setHours(0,0,0,0);
+  for (let i = 0; i < 7; i++) {
+    const d = new Date(today); d.setDate(d.getDate() + i);
+    days.push(d);
+  }
+  const todayStr   = toDateStr(today);
+  const colTemplate = `grid-template-columns: 72px repeat(7, 1fr)`;
+
+  let html = `<div class="week-grid">`;
+
+  // Header
+  html += `<div class="wg-head" style="${colTemplate}">`;
+  html += `<div class="wg-cell board-lbl">Board</div>`;
+  days.forEach((d, i) => {
+    const dayName = d.toLocaleDateString('en-GB', { weekday:'short' });
+    const dayNum  = d.getDate();
+    html += `<div class="wg-cell day-lbl${i === 0 ? ' today-lbl' : ''}">${dayName}<br>${dayNum}</div>`;
+  });
+  html += `</div>`;
+
+  // Rows
+  for (const cfg of boardsConfig) {
+    html += `<div class="wg-row" style="${colTemplate}">`;
+    html += `<div class="wg-cell board-lbl">${cfg.name}</div>`;
+    days.forEach(d => {
+      const dStr = toDateStr(d);
+      const isBooked = bookings.some(bk =>
+        bk.boardId === cfg.id && bk.status === 'upcoming' &&
+        bk.startDate <= dStr && bk.endDate >= dStr
+      );
+      const b = state[cfg.id];
+      const isHiredNow = (b?.status === 'out' || b?.status === 'overdue') && dStr === todayStr;
+      if (isBooked)    html += `<div class="wg-cell booked"></div>`;
+      else if (isHiredNow) html += `<div class="wg-cell hired"></div>`;
+      else             html += `<div class="wg-cell"></div>`;
+    });
+    html += `</div>`;
+  }
+
+  html += `</div>`;
+  return html;
+}
+
+function renderUpcoming() {
+  const todayStr = toDateStr(new Date());
+  const section  = document.getElementById('upcomingSection');
+
+  let html = renderWeekGrid();
+
+  html += `<div class="section-action">
+    <div class="section-lbl" style="flex:1;margin-bottom:0">Upcoming Bookings</div>
+    <button class="add-btn" onclick="openBookModal(null)">+ New Booking</button>
+  </div>`;
+
+  const relevant = bookings
+    .filter(bk => bk.status === 'upcoming' && bk.endDate >= todayStr)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate));
+
+  if (relevant.length === 0) {
+    html += `<div class="bk-empty">No upcoming bookings — use + New Booking to add one</div>`;
+  } else {
+    for (const bk of relevant) {
+      const cfg     = boardsConfig.find(b => b.id === bk.boardId);
+      const isToday = bk.startDate <= todayStr && bk.endDate >= todayStr;
+      const boardLabel = cfg ? `${cfg.name} · ${cfg.location}` : `Board ${bk.boardId}`;
+      const canActivate = isToday && (state[bk.boardId]?.status === 'available');
+      html += `<div class="booking-card${isToday ? ' today' : ''}">
+        <div class="bk-head">
+          <div class="bk-board">${boardLabel}</div>
+          <div class="bk-badge${isToday ? ' today' : ''}">${isToday ? 'Active today' : 'Upcoming'}</div>
+        </div>
+        <div class="bk-guest">${bk.guestName}</div>
+        <div class="bk-lodge">${bk.property || ''}</div>
+        <div class="bk-dates">📅 ${fmtDateRange(bk.startDate, bk.endDate)}</div>
+        ${bk.notes ? `<div class="bk-dates" style="margin-top:2px">📝 ${bk.notes}</div>` : ''}
+        <div class="bk-actions">
+          ${canActivate ? `<button class="bk-btn activate" onclick="openHandOutModal(${bk.boardId})">Hand Out Now</button>` : ''}
+          <button class="bk-btn cancel-bk" onclick="cancelBooking('${bk.id}')">Cancel Booking</button>
+        </div>
+      </div>`;
+    }
+  }
+
+  section.innerHTML = html;
+}
+
+/* ════════════════════════════════════
+   RENDER ADMIN BOARDS
+════════════════════════════════════ */
+function renderBoardsAdmin() {
+  const section = document.getElementById('boardsSection');
+
+  let html = `<div class="section-action">
+    <div class="section-lbl" style="flex:1;margin-bottom:0">All Boards</div>
+    <button class="add-btn" onclick="openAddBoardModal()">+ Add Board</button>
+  </div>`;
+
+  for (const cfg of boardsConfig) {
+    const b = state[cfg.id];
+    const status = b?.status || 'available';
+    const statusLabel = { available:'Available', out:'Out', overdue:'Overdue', maintenance:'Maintenance' }[status] || status;
+    const upcomingCount = bookings.filter(bk => bk.boardId === cfg.id && bk.status === 'upcoming' && bk.endDate >= toDateStr(new Date())).length;
+    html += `<div class="booking-card admin-card">
+      <div class="bk-head">
+        <div class="bk-board">${cfg.name}</div>
+        <div class="bk-badge">${cfg.location}</div>
+      </div>
+      <div class="bk-guest" style="font-size:13px">${statusLabel}${upcomingCount ? ` · ${upcomingCount} upcoming booking${upcomingCount > 1 ? 's' : ''}` : ''}</div>
+      <div class="bk-actions">
+        <button class="bk-btn cancel-bk" onclick="removeBoard(${cfg.id})">Remove Board</button>
+      </div>
+    </div>`;
+  }
+
+  section.innerHTML = html;
 }
 
 /* ════════════════════════════════════
@@ -647,12 +955,11 @@ function fmtHandedOut(dtStr) {
 function openHandOutModal(boardNum) {
   activeBoard = boardNum;
   hireDur = 24;
+  const cfg = boardsConfig.find(b => b.id === boardNum);
 
-  document.getElementById('hoBoardNum').textContent = boardNum;
-  document.getElementById('hoSub').textContent = `Currently at: ${state[boardNum]?.location || BOARD_BASE[boardNum]}`;
+  document.getElementById('hoBoardNum').textContent = cfg ? cfg.name : `Board ${boardNum}`;
+  document.getElementById('hoSub').textContent = `Currently at: ${state[boardNum]?.location || cfg?.location || boardNum}`;
   document.getElementById('hoMsg').className = 'msg';
-
-  // Reset form
   document.getElementById('hoGuest').value = '';
   document.getElementById('hoStaff').value = '';
   document.getElementById('hoNotes').value = '';
@@ -678,11 +985,9 @@ function setDur(d, btn) {
 }
 
 function updateReturnNote() {
-  const el = document.getElementById('hoReturnNote');
+  const el  = document.getElementById('hoReturnNote');
   const due = new Date(Date.now() + hireDur * 3600000);
-  const dueStr = due.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'short' }) + ' at ' +
-    due.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' });
-  el.textContent = `Due back: ${dueStr}`;
+  el.textContent = `Due back: ${due.toLocaleDateString('en-GB', { weekday:'long', day:'numeric', month:'short' })} at ${due.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit' })}`;
   el.style.display = 'block';
 }
 
@@ -705,45 +1010,40 @@ async function submitHandOut() {
   if (guestIdx === '' || !staff) return;
 
   const g = guestList[parseInt(guestIdx)];
-  const btn = document.getElementById('hoSubmit');
-  btn.disabled = true;
+  document.getElementById('hoSubmit').disabled = true;
   showMsgEl('hoMsg', 'Logging to Monday…', 'loading');
 
-  const now = new Date();
+  const now    = new Date();
   const dueBack = new Date(now.getTime() + hireDur * 3600000);
+  const cfg     = boardsConfig.find(b => b.id === activeBoard);
 
-  // Log to Monday
-  const boardId = await getOrCreateHireBoard();
-  const itemName = `Board ${activeBoard} · ${g.name} · ${now.toLocaleDateString('en-GB')}`;
-  const updateText = `🏄 HAND OUT — Board ${activeBoard}\\nGuest: ${g.name}\\nProperty: ${g.property}\\nHanded out: ${now.toLocaleString('en-GB')}\\nDue back: ${dueBack.toLocaleString('en-GB')}\\nDuration: ${hireDur}h\\nStaff: ${staff}\\nWaiver on file: ${g.hasWaiver ? 'Yes' : 'NOT CONFIRMED'}\\nEquipment check: All items confirmed\\n${notes ? 'Notes: ' + notes : ''}`;
-  const mondayItemId = await logToMonday(boardId, itemName, updateText);
+  const hireBoard = await getOrCreateHireBoard();
+  const itemName  = `${cfg?.name || 'Board ' + activeBoard} · ${g.name} · ${now.toLocaleDateString('en-GB')}`;
+  const updateText = `🏄 HAND OUT — ${cfg?.name || 'Board ' + activeBoard}\\nGuest: ${g.name}\\nProperty: ${g.property}\\nHanded out: ${now.toLocaleString('en-GB')}\\nDue back: ${dueBack.toLocaleString('en-GB')}\\nDuration: ${hireDur}h\\nStaff: ${staff}\\nWaiver on file: ${g.hasWaiver ? 'Yes' : 'NOT CONFIRMED'}\\nEquipment check: All items confirmed\\n${notes ? 'Notes: ' + notes : ''}`;
+  const mondayItemId = await logToMonday(hireBoard, itemName, updateText);
 
-  // Update local state
   state[activeBoard] = {
     status: 'out',
-    location: g.property || state[activeBoard]?.location || BOARD_BASE[activeBoard],
+    location: g.property || state[activeBoard]?.location || cfg?.location,
     hire: {
-      guestName:    g.name,
-      guestMondayId: g.id,
-      property:     g.property,
-      handedOut:    now.toISOString(),
-      dueBack:      dueBack.toISOString(),
-      duration:     hireDur,
-      staff,
-      waiverOk:     g.hasWaiver,
-      mondayItemId: mondayItemId || null,
-      notes
+      guestName: g.name, guestMondayId: g.id, property: g.property,
+      handedOut: now.toISOString(), dueBack: dueBack.toISOString(),
+      duration: hireDur, staff, waiverOk: g.hasWaiver,
+      mondayItemId: mondayItemId || null, notes
     }
   };
   saveState();
 
-  showMsgEl('hoMsg', `✓ Board ${activeBoard} handed out to ${g.name} — due back ${dueBack.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})} ${dueBack.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}`, 'success');
+  // Mark matching booking active
+  const todayStr = toDateStr(now);
+  const match = bookings.find(bk =>
+    bk.boardId === activeBoard && bk.status === 'upcoming' &&
+    bk.startDate <= todayStr && bk.endDate >= todayStr
+  );
+  if (match) { match.status = 'active'; saveBookings(); }
 
-  setTimeout(() => {
-    closeModal('hoModal');
-    renderBoards();
-    showToast(`Board ${activeBoard} out · ${g.name}`, 'ok');
-  }, 1800);
+  showMsgEl('hoMsg', `✓ ${cfg?.name || 'Board ' + activeBoard} handed out to ${g.name} — due back ${dueBack.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})} ${dueBack.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}`, 'success');
+  setTimeout(() => { closeModal('hoModal'); renderLive(); showToast(`${cfg?.name || 'Board ' + activeBoard} out · ${g.name}`, 'ok'); }, 1800);
 }
 
 /* ════════════════════════════════════
@@ -751,10 +1051,11 @@ async function submitHandOut() {
 ════════════════════════════════════ */
 function openReturnModal(boardNum) {
   activeBoard = boardNum;
-  const b = state[boardNum];
+  const b   = state[boardNum];
   const hire = b?.hire;
+  const cfg  = boardsConfig.find(x => x.id === boardNum);
 
-  document.getElementById('retBoardNum').textContent = boardNum;
+  document.getElementById('retBoardNum').textContent = cfg?.name || boardNum;
   document.getElementById('retMsg').className = 'msg';
   document.getElementById('retStaff').value = '';
   document.getElementById('retNotes').value = '';
@@ -762,11 +1063,9 @@ function openReturnModal(boardNum) {
   returnIssues = [];
   condition = 'good';
 
-  // Reset condition buttons
   document.querySelectorAll('.cond-btn').forEach(b => b.classList.remove('active','good','damaged','missing','minor'));
   document.querySelector('.cond-btn').classList.add('active','good');
 
-  // Reset return checklist to all ticked
   ['rh_board','rh_fin','rh_lj','rh_oar'].forEach(id => {
     const el = document.getElementById(id);
     if (el) { el.checked = true; el.closest('.check-item')?.classList.add('ticked'); el.closest('.check-item')?.classList.remove('flagged'); }
@@ -774,13 +1073,12 @@ function openReturnModal(boardNum) {
   document.getElementById('issueFlag').classList.remove('show');
   document.getElementById('issueField').style.display = 'none';
 
-  // Hire summary
   const sumEl = document.getElementById('retSummary');
   if (hire) {
-    const due = fmtDue(hire.dueBack);
+    const due    = fmtDue(hire.dueBack);
     const isOver = b.status === 'overdue';
     sumEl.innerHTML = `
-      <div class="hs-board">Board ${boardNum}</div>
+      <div class="hs-board">${cfg?.name || 'Board ' + boardNum}</div>
       <div class="hs-guest">${hire.guestName || '—'}</div>
       <div class="hs-meta">${hire.property || ''} · ${hire.duration || 24}h hire</div>
       <div class="hs-row">
@@ -800,10 +1098,7 @@ function fmtTime(isoStr) {
 
 function tickReturnCheck(cb, wrapperId, label) {
   const el = document.getElementById(wrapperId);
-  if (el) {
-    el.classList.toggle('ticked', cb.checked);
-    el.classList.toggle('flagged', !cb.checked);
-  }
+  if (el) { el.classList.toggle('ticked', cb.checked); el.classList.toggle('flagged', !cb.checked); }
   if (!cb.checked && !returnIssues.includes(label)) returnIssues.push(label);
   if (cb.checked) returnIssues = returnIssues.filter(x => x !== label);
   updateIssueFlag();
@@ -813,17 +1108,15 @@ function setCondition(c, btn) {
   condition = c;
   document.querySelectorAll('.cond-btn').forEach(b => b.classList.remove('active','good','damaged','missing','minor'));
   btn.classList.add('active', c);
-  if (c !== 'good' && !returnIssues.includes('Board condition')) returnIssues.push('Board condition: ' + c);
+  if (c !== 'good' && !returnIssues.find(x => x.startsWith('Board condition'))) returnIssues.push('Board condition: ' + c);
   if (c === 'good') returnIssues = returnIssues.filter(x => !x.startsWith('Board condition'));
   updateIssueFlag();
 }
 
 function updateIssueFlag() {
   const hasIssues = returnIssues.length > 0;
-  const flagEl = document.getElementById('issueFlag');
-  const fieldEl = document.getElementById('issueField');
-  flagEl.classList.toggle('show', hasIssues);
-  fieldEl.style.display = hasIssues ? 'block' : 'none';
+  document.getElementById('issueFlag').classList.toggle('show', hasIssues);
+  document.getElementById('issueField').style.display = hasIssues ? 'block' : 'none';
   document.getElementById('issueFlagItems').textContent = hasIssues ? ' Missing/damaged: ' + returnIssues.join(', ') : '';
 }
 
@@ -832,50 +1125,260 @@ async function submitReturn() {
   const notes  = document.getElementById('retNotes').value.trim();
   const issues = document.getElementById('retIssues').value.trim();
   const hasIssues = returnIssues.length > 0;
+  const cfg    = boardsConfig.find(b => b.id === activeBoard);
 
   if (!staff) { showMsgEl('retMsg','Please select staff member','error'); return; }
   if (hasIssues && !issues) { showMsgEl('retMsg','Please describe the issues','error'); return; }
 
-  const btn = document.getElementById('retSubmit');
-  btn.disabled = true;
+  document.getElementById('retSubmit').disabled = true;
   showMsgEl('retMsg', 'Logging return…', 'loading');
 
-  const now = new Date();
-  const hire = state[activeBoard]?.hire;
-  const boardId = await getOrCreateHireBoard();
+  const now    = new Date();
+  const hire   = state[activeBoard]?.hire;
+  const hireBoard = await getOrCreateHireBoard();
+  const returnText = `✅ RETURNED — ${cfg?.name || 'Board ' + activeBoard}\\nCollected: ${now.toLocaleString('en-GB')}\\nCollected by: ${staff}\\nCondition: ${condition}\\n${hasIssues ? '⚠ ISSUES: ' + returnIssues.join(', ') + '\\nDetail: ' + issues : 'No issues'}\\n${notes ? 'Notes: ' + notes : ''}`;
 
-  // Update Monday item with return details
-  const returnText = `✅ RETURNED — Board ${activeBoard}\\nCollected: ${now.toLocaleString('en-GB')}\\nCollected by: ${staff}\\nCondition: ${condition}\\n${hasIssues ? '⚠ ISSUES: ' + returnIssues.join(', ') + '\\nDetail: ' + issues : 'No issues'}\\n${notes ? 'Notes: ' + notes : ''}`;
   if (hire?.mondayItemId) {
     await appendMondayUpdate(hire.mondayItemId, returnText);
-  } else if (boardId) {
-    const itemName = `Return: Board ${activeBoard} · ${hire?.guestName || '?'} · ${now.toLocaleDateString('en-GB')}`;
-    await logToMonday(boardId, itemName, returnText);
+  } else if (hireBoard) {
+    await logToMonday(hireBoard, `Return: ${cfg?.name || 'Board ' + activeBoard} · ${hire?.guestName || '?'} · ${now.toLocaleDateString('en-GB')}`, returnText);
   }
 
-  // Update local state
-  state[activeBoard] = {
-    status: 'available',
-    location: BOARD_BASE[activeBoard],
-    hire: null
-  };
+  state[activeBoard] = { status:'available', location:cfg?.location || state[activeBoard]?.location, hire:null };
   saveState();
 
-  const msg = hasIssues
-    ? `⚠ Board ${activeBoard} returned — issues flagged to management`
-    : `✓ Board ${activeBoard} returned — all good`;
+  // Mark matching booking completed
+  const match = bookings.find(bk => bk.boardId === activeBoard && (bk.status === 'active' || bk.status === 'upcoming'));
+  if (match) { match.status = 'completed'; saveBookings(); }
 
+  const msg = hasIssues ? `⚠ ${cfg?.name || 'Board ' + activeBoard} returned — issues flagged` : `✓ ${cfg?.name || 'Board ' + activeBoard} returned — all good`;
   showMsgEl('retMsg', msg, hasIssues ? 'loading' : 'success');
   setTimeout(() => {
     closeModal('retModal');
-    renderBoards();
-    showToast(hasIssues ? `Board ${activeBoard} returned — issues flagged` : `Board ${activeBoard} returned ✓`, hasIssues ? 'warn' : 'ok');
+    renderLive();
+    if (currentTab === 'upcoming') renderUpcoming();
+    showToast(hasIssues ? `${cfg?.name || 'Board ' + activeBoard} returned — issues flagged` : `${cfg?.name || 'Board ' + activeBoard} returned ✓`, hasIssues ? 'warn' : 'ok');
   }, 1800);
+}
+
+/* ════════════════════════════════════
+   BOOKING MODAL
+════════════════════════════════════ */
+function openBookModal(preselectedBoardId) {
+  const sel = document.getElementById('bkBoard');
+  sel.innerHTML = boardsConfig.map(cfg =>
+    `<option value="${cfg.id}"${cfg.id === preselectedBoardId ? ' selected' : ''}>${cfg.name} (${cfg.location})</option>`
+  ).join('');
+
+  document.getElementById('bkGuest').innerHTML = '<option value="">Loading…</option>';
+  document.getElementById('bkStart').value = '';
+  document.getElementById('bkEnd').value   = '';
+  document.getElementById('bkNotes').value = '';
+  document.getElementById('bkMsg').className = 'msg';
+  document.getElementById('conflictWarn').classList.remove('show');
+  document.getElementById('bkSubmit').disabled = true;
+
+  const todayStr = toDateStr(new Date());
+  document.getElementById('bkStart').min = todayStr;
+  document.getElementById('bkEnd').min   = todayStr;
+
+  document.getElementById('bkModal').style.display = 'flex';
+  loadGuestsInto('bkGuest', 90);
+}
+
+function onBkStartChange() {
+  const start = document.getElementById('bkStart').value;
+  if (start) document.getElementById('bkEnd').min = start;
+  checkBookingConflict();
+}
+
+function checkBookingConflict() {
+  const boardId   = parseInt(document.getElementById('bkBoard').value);
+  const startDate = document.getElementById('bkStart').value;
+  const endDate   = document.getElementById('bkEnd').value;
+  const warnEl    = document.getElementById('conflictWarn');
+
+  if (!boardId || !startDate || !endDate) { warnEl.classList.remove('show'); updateBkSubmit(); return; }
+
+  // Check against existing bookings
+  const conflict = bookings.find(bk =>
+    bk.boardId === boardId && bk.status === 'upcoming' &&
+    bk.startDate <= endDate && bk.endDate >= startDate
+  );
+  if (conflict) {
+    warnEl.textContent = `⚠ Already booked: ${conflict.guestName} · ${fmtDateRange(conflict.startDate, conflict.endDate)}`;
+    warnEl.classList.add('show');
+    updateBkSubmit(); return;
+  }
+
+  // Check live hire overlapping today
+  const todayStr = toDateStr(new Date());
+  const b = state[boardId];
+  if (b && (b.status === 'out' || b.status === 'overdue') && startDate <= todayStr && endDate >= todayStr) {
+    warnEl.textContent = `⚠ Board is currently out on hire — it may not be back in time`;
+    warnEl.classList.add('show');
+    updateBkSubmit(); return;
+  }
+
+  warnEl.classList.remove('show');
+  updateBkSubmit();
+}
+
+function updateBkSubmit() {
+  const boardId   = document.getElementById('bkBoard').value;
+  const guestIdx  = document.getElementById('bkGuest').value;
+  const startDate = document.getElementById('bkStart').value;
+  const endDate   = document.getElementById('bkEnd').value;
+  const hasConflict = document.getElementById('conflictWarn').classList.contains('show');
+  document.getElementById('bkSubmit').disabled = !(boardId && guestIdx !== '' && startDate && endDate && !hasConflict);
+}
+
+async function submitBooking() {
+  const boardId   = parseInt(document.getElementById('bkBoard').value);
+  const guestIdx  = document.getElementById('bkGuest').value;
+  const startDate = document.getElementById('bkStart').value;
+  const endDate   = document.getElementById('bkEnd').value;
+  const notes     = document.getElementById('bkNotes').value.trim();
+
+  if (!boardId || guestIdx === '' || !startDate || !endDate) {
+    showMsgEl('bkMsg', 'Please fill in all required fields', 'error'); return;
+  }
+  if (startDate > endDate) {
+    showMsgEl('bkMsg', 'End date must be on or after start date', 'error'); return;
+  }
+
+  const g   = guestList[parseInt(guestIdx)];
+  const cfg = boardsConfig.find(b => b.id === boardId);
+
+  document.getElementById('bkSubmit').disabled = true;
+  showMsgEl('bkMsg', 'Creating booking and Monday tasks…', 'loading');
+
+  const lodge     = g.property || cfg?.location || 'lodge';
+  const boardName = cfg?.name || `Board ${boardId}`;
+
+  const dropName = `🚚 Drop-off ${boardName} → ${lodge} — ${fmtDate(startDate)}`;
+  const dropBody = `Deliver ${boardName} to ${lodge} for ${g.name} on ${fmtDate(startDate)}.\\nBooking period: ${fmtDateRange(startDate, endDate)}\\n${notes ? 'Notes: ' + notes : ''}`;
+  const dropTaskId = await createMondayTask(dropName, dropBody);
+
+  const pickName = `📦 Collect ${boardName} from ${lodge} — ${fmtDate(endDate)}`;
+  const pickBody = `Collect ${boardName} from ${lodge} from ${g.name} on ${fmtDate(endDate)}.\\nBooking period: ${fmtDateRange(startDate, endDate)}\\n${notes ? 'Notes: ' + notes : ''}`;
+  const pickTaskId = await createMondayTask(pickName, pickBody);
+
+  const booking = {
+    id: 'bk_' + Date.now(),
+    boardId, guestMondayId: g.id, guestName: g.name,
+    property: g.property, startDate, endDate, notes,
+    status: 'upcoming',
+    mondayDropTaskId: dropTaskId,
+    mondayPickupTaskId: pickTaskId,
+    createdAt: new Date().toISOString()
+  };
+  bookings.push(booking);
+  saveBookings();
+
+  showMsgEl('bkMsg', `✓ Booking created — drop-off and collection tasks added to Monday`, 'success');
+  setTimeout(() => {
+    closeModal('bkModal');
+    renderLive();
+    showToast(`Booking created for ${g.name}`, 'ok');
+  }, 1800);
+}
+
+function cancelBooking(bookingId) {
+  const bk = bookings.find(b => b.id === bookingId);
+  if (!bk) return;
+  if (!confirm(`Cancel booking for ${bk.guestName} (${fmtDateRange(bk.startDate, bk.endDate)})?`)) return;
+  bk.status = 'cancelled';
+  saveBookings();
+  renderUpcoming();
+  renderLive();
+  showToast('Booking cancelled', 'warn');
+}
+
+/* ════════════════════════════════════
+   ADD BOARD MODAL
+════════════════════════════════════ */
+function openAddBoardModal() {
+  document.getElementById('abName').value = '';
+  document.getElementById('abLocation').value = '';
+  document.getElementById('abMsg').className = 'msg';
+  renderLocChips();
+  document.getElementById('abModal').style.display = 'flex';
+}
+
+function renderLocChips() {
+  const input   = document.getElementById('abLocation').value;
+  const locations = [...new Set(boardsConfig.map(b => b.location))];
+  const el = document.getElementById('locChips');
+  el.innerHTML = locations.map(loc =>
+    `<button type="button" class="loc-chip${input === loc ? ' active' : ''}" onclick="selectLocChip('${esc(loc)}')">${loc}</button>`
+  ).join('');
+}
+
+function selectLocChip(loc) {
+  document.getElementById('abLocation').value = loc;
+  renderLocChips();
+}
+
+function submitAddBoard() {
+  const name     = document.getElementById('abName').value.trim();
+  const location = document.getElementById('abLocation').value.trim();
+  if (!name || !location) { showMsgEl('abMsg', 'Please enter name and location', 'error'); return; }
+
+  const maxId = boardsConfig.reduce((m, b) => Math.max(m, b.id), 0);
+  const newId = maxId + 1;
+  boardsConfig.push({ id: newId, name, location });
+  saveBoardsConfig();
+
+  if (!state[newId]) { state[newId] = { status:'available', location, hire:null }; saveState(); }
+
+  closeModal('abModal');
+  renderLive();
+  renderBoardsAdmin();
+  showToast(`${name} added at ${location}`, 'ok');
+}
+
+function removeBoard(id) {
+  const cfg = boardsConfig.find(b => b.id === id);
+  const b   = state[id];
+  if (b && (b.status === 'out' || b.status === 'overdue')) {
+    showToast('Board is currently out on hire — return it first', 'err'); return;
+  }
+  const activeBookings = bookings.filter(bk => bk.boardId === id && bk.status === 'upcoming');
+  if (activeBookings.length > 0) {
+    showToast(`Cancel the ${activeBookings.length} upcoming booking(s) first`, 'err'); return;
+  }
+  if (!confirm(`Remove ${cfg?.name || 'Board ' + id}? This cannot be undone.`)) return;
+  boardsConfig = boardsConfig.filter(b => b.id !== id);
+  saveBoardsConfig();
+  renderBoardsAdmin();
+  renderLive();
+  showToast(`${cfg?.name || 'Board ' + id} removed`, 'ok');
 }
 
 /* ════════════════════════════════════
    UTILITIES
 ════════════════════════════════════ */
+function toDateStr(date) {
+  return date.toISOString().slice(0, 10);
+}
+
+function fmtDate(dateStr) {
+  if (!dateStr) return '—';
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-GB', { weekday:'short', day:'numeric', month:'short', year:'numeric' });
+}
+
+function fmtDateShort(dateStr) {
+  if (!dateStr) return '—';
+  return new Date(dateStr + 'T12:00:00').toLocaleDateString('en-GB', { day:'numeric', month:'short' });
+}
+
+function fmtDateRange(start, end) {
+  if (!start) return '—';
+  if (start === end) return fmtDate(start);
+  return `${fmtDate(start)} – ${fmtDate(end)}`;
+}
+
 function esc(s) {
   return String(s).replace(/\\/g,'\\\\').replace(/"/g,'\\"').replace(/\n/g,'\\n');
 }
@@ -886,7 +1389,7 @@ function outsideClose(e, modalId) {
 
 function closeModal(id) {
   document.getElementById(id).style.display = 'none';
-  activeBoard = null;
+  if (id !== 'bkModal' && id !== 'abModal') activeBoard = null;
 }
 
 function showMsgEl(id, text, type) {
@@ -907,10 +1410,11 @@ function showToast(text, type = '') {
    INIT
 ════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', () => {
+  loadBoardsConfig();
   loadState();
-  renderBoards();
-  // Refresh every 5 minutes to update countdowns
-  setInterval(() => renderBoards(), 300000);
+  loadBookings();
+  renderLive();
+  setInterval(() => { renderLive(); if (currentTab === 'upcoming') renderUpcoming(); }, 300000);
 });
 </script>
 </body>

@@ -1032,13 +1032,21 @@ function aggregateBookings(arrivals) {
 function parsePropertyFromItemName(name) {
   if (!name) return '';
   let n = name.trim();
-  // "Egret — 2026-04-25" → "Egret"
+  // "Egret — 2026-04-25" → "Egret" (em-dash with spaces — rota-planner save)
   const emIdx = n.indexOf(' — ');
   if (emIdx >= 0) n = n.slice(0, emIdx).trim();
-  // "Sat 25 · Egret" → "Egret"
+  // Middle-dot legacy formats from changeover-radar (retired 2026-05-12):
+  //   "Maricor · Full Clean · 2026-05-13" → "Maricor"
+  //   "Maricor · 2026-05-13"              → "Maricor"
+  // Without this strip, rows created by changeover-radar in the past show
+  // up on the rota with the date appended to the property name, which then
+  // doesn't match Property Config and looks broken (no booking ref, no
+  // hours, just a weird title).
+  n = n.replace(/\s*·\s*(?:Full Clean\s*·\s*)?\d{4}-\d{2}-\d{2}\s*$/i, '').trim();
+  // "Sat 25 · Egret" → "Egret" (bulk-load format)
   const bulletMatch = n.match(/^[A-Za-z]{3}\s+\d{1,2}\s+·\s+(.+)$/);
   if (bulletMatch) n = bulletMatch[1].trim();
-  // Strip "CL " prefix if present
+  // Strip "CL " prefix if present (Cherry Lakes Clean-Only variant)
   n = n.replace(/^CL\s+/i, '').trim();
   return n;
 }
@@ -1490,11 +1498,16 @@ function renderDayView() {
     for (const d of unplanned) {
       const prop = properties[d.property];
       if (prop?.local && !showLocal) continue;
-      // Managed properties are fully driven by the Cleans board — every turnover
-      // has a planned row with a booking reference. Suppress Lodge-Status-derived
-      // phantoms for managed houses so they can't appear as "Tap to plan" cards.
-      // Only non-managed (external) properties can legitimately surface here.
-      if (prop?.managed) continue;
+      // 2026-05-12 — managed-property suppression removed.
+      //
+      // History: this used to filter out "tap to plan" cards for managed
+      // properties because back-when (pre-v51) Lodge Status could emit
+      // phantom derived rows for managed houses that already had a real
+      // Cleans-board planning row. Lodge Status was removed in v51 and
+      // Arrivals is now canonical, so any derived clean without a planned
+      // counterpart is a real gap — it should be shown so the planner can
+      // assign someone. Hiding it left valid Arrivals (e.g. Jose Nelio
+      // Beaver Brook 15 May) invisible on the rota.
       if (!derivedVisibleForRoleFilter(d)) continue;
       cards.push(renderUnplannedCard(d, dayStr));
     }

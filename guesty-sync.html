@@ -128,6 +128,7 @@
      unless Guesty has explicitly allowlisted them). -->
 <script src="secrets.js"></script>
 <script src="arrivals-helpers.js"></script>
+<script src="linen-rules.js"></script>
 
 <script>
 const URL_API = 'https://api.monday.com/v2';
@@ -169,6 +170,9 @@ let _guestyTokenExp = 0;
 let _missing = [];   // Guesty bookings not on Arrivals
 let _matched = [];   // both
 let _orphans = [];   // on Arrivals but not in Guesty
+let _modifications = []; // matched but fields differ (guest counts / bed config)
+let _arrivalsDups = [];  // groups of Arrivals rows sharing the same booking ref
+let _unlinked = [];      // Arrivals rows with empty/missing booking ref (parse guest name from item name + try to auto-match Guesty)
 
 document.addEventListener('DOMContentLoaded', () => {
   // Default date window: today → +90 days. Catches everything in pipeline.
@@ -519,7 +523,7 @@ async function loadArrivals(from, to) {
           items {
             id name
             group { id title }
-            column_values(ids:["${AR_DATE}","${AR_CHECKOUT}","${AR_PROP}","${AR_BOOKREF}"]) {
+            column_values(ids:["${AR_DATE}","${AR_CHECKOUT}","${AR_PROP}","${AR_BOOKREF}","${AR_ADULTS}","${AR_CHILDREN}","${AR_PETS}","${AR_BEDCFG}"]) {
               id text value
             }
           }
@@ -567,6 +571,14 @@ async function loadArrivals(from, to) {
       const m = txt.match(/^(\d{4}-\d{2}-\d{2})/);
       if (m) checkout = m[1];
     }
+    // Guest counts + bed config (added 2026-05-12 for the Modifications
+    // panel below). Empty / null fields are normalised to 0 / '' so the
+    // diff comparison can do strict equality without false positives from
+    // "0" vs 0 etc.
+    const adults   = parseInt(cv[AR_ADULTS]?.text   || '0') || 0;
+    const children = parseInt(cv[AR_CHILDREN]?.text || '0') || 0;
+    const pets     = parseInt(cv[AR_PETS]?.text     || '0') || 0;
+    const bedCfg   = (cv[AR_BEDCFG]?.text || '').trim();
     return {
       id: it.id,
       name: it.name,
@@ -574,6 +586,10 @@ async function loadArrivals(from, to) {
       property: cv[AR_PROP]?.text || '',
       arrivalDate,
       checkout,
+      adults,
+      children,
+      pets,
+      bedCfg,
     };
   });
   // Note: NO date-window filter here. The matching path needs every Arrivals
@@ -617,12 +633,42 @@ async function runSync() {
     // Categorise Guesty bookings into matched vs missing.
     _missing = [];
     _matched = [];
+    _modifications = [];
     const guestyRefs = new Set();
     for (const g of guestyList) {
       const ref = (g.bookRef || '').trim();
       guestyRefs.add(ref);
       if (arrivalsByRef.has(ref)) {
-        _matched.push({ guesty: g, arrival: arrivalsByRef.get(ref) });
+        const a = arrivalsByRef.get(ref);
+        _matched.push({ guesty: g, arrival: a });
+
+        // === Modifications panel — Phase 6 ============================
+        // Compare guest counts and bed config between Guesty and Arrivals.
+        // Surface any drift so it can be one-click pushed to Arrivals.
+        // The watcher only updates these on certain status changes; this
+        // catches the 90% of modifications that the watcher silently
+        // drops (guest count tweaks, bed config edits).
+        const diffs = [];
+        const gAdults   = parseInt(g.numAdults  ?? 0) || 0;
+        const gChildren = parseInt(g.numChildren ?? 0) || 0;
+        const gPets     = parseInt(g.numPets ?? 0) || 0;
+        const gNotes    = (g.notes || '').trim();
+        if (gAdults   !== a.adults)   diffs.push({ field: 'adults',   col: AR_ADULTS,   from: a.adults,   to: gAdults });
+        if (gChildren !== a.children) diffs.push({ field: 'children', col: AR_CHILDREN, from: a.children, to: gChildren });
+        if (gPets     !== a.pets)     diffs.push({ field: 'pets',     col: AR_PETS,     from: a.pets,     to: gPets });
+        // Bed config: compare via parseBedString so cosmetic differences
+        // (extra whitespace, "Super-King" vs "SK", etc.) don't fire as a
+        // diff. Only surface if the parsed bed counts actually differ.
+        const parser = (window.LinenRules && window.LinenRules.parseBedString) || (s => ({ raw: (s||'').trim() }));
+        const gBeds = parser(gNotes);
+        const aBeds = parser(a.bedCfg);
+        const bedsDiffer = parser === window.LinenRules?.parseBedString
+          ? (gBeds.superKing !== aBeds.superKing || gBeds.king !== aBeds.king || gBeds.double !== aBeds.double || gBeds.single !== aBeds.single)
+          : (gNotes !== a.bedCfg);
+        if (bedsDiffer) diffs.push({ field: 'bedCfg', col: AR_BEDCFG, from: a.bedCfg, to: gNotes });
+        if (diffs.length) {
+          _modifications.push({ guesty: g, arrival: a, diffs });
+        }
       } else {
         _missing.push(g);
       }
@@ -635,6 +681,93 @@ async function runSync() {
       if (!a.bookRef || guestyRefs.has(a.bookRef.trim())) return false;
       return a.arrivalDate >= from && a.arrivalDate <= to;
     });
+
+    // === Arrivals duplicates — Phase 6 =========================
+    // Group every Arrival row by its booking ref. Any ref with 2+ rows
+    // is a duplicate group. This catches the Daily Upcoming-created
+    // doubles we found (Greg Levine, Miriam Wichmann, etc.) plus any
+    // residual ones from past sync churn.
+    //
+    // Suggested keeper for each group: the row with the plainest item
+    // name (no `— date` suffix — that's the watcher's native format)
+    // and the oldest created_at. The user can override per row by
+    // clicking 🗑 on whichever row they want gone.
+    _arrivalsDups = [];
+    {
+      const byRef = new Map();
+      for (const a of arrivalsList) {
+        const ref = (a.bookRef || '').trim();
+        if (!ref) continue;
+        if (!byRef.has(ref)) byRef.set(ref, []);
+        byRef.get(ref).push(a);
+      }
+      for (const [ref, rows] of byRef) {
+        if (rows.length < 2) continue;
+        // Suggested keeper: plain-name rows score higher; tie-broken by
+        // the row that has more populated fields (suggesting it's the
+        // one operators have actually been working with).
+        const score = r => {
+          const n = (r.name || '').trim();
+          const plain = / — \d{4}-\d{2}-\d{2}$/.test(n) ? 0 : 10;
+          const filled = (r.adults || 0) + (r.children || 0) + (r.pets || 0) + (r.bedCfg ? 5 : 0);
+          return plain + filled;
+        };
+        const sorted = [...rows].sort((a, b) => score(b) - score(a));
+        const keeperId = sorted[0].id;
+        _arrivalsDups.push({ ref, rows: sorted, keeperId });
+      }
+      // Stable sort: groups with the soonest check-in first.
+      _arrivalsDups.sort((a, b) => (a.rows[0].arrivalDate || '').localeCompare(b.rows[0].arrivalDate || ''));
+    }
+
+    // === Unlinked Arrivals — Phase 6 ============================
+    // Arrival rows that have no booking ref AT ALL. These slip through
+    // the matched/missing/orphan logic above (every branch keys off
+    // booking ref). Usually rows created by some legacy flow that put
+    // guest name + date in the item name but left the ref column empty.
+    //
+    // For each, we parse the guest name out of the item name and try
+    // to find the matching Guesty booking by name + check-in date.
+    // If found, the user can apply the ref in one click. If not, we
+    // surface it for manual entry.
+    _unlinked = [];
+    {
+      // Index Guesty bookings for fast lookup: by check-in date, with
+      // an inner name-prefix match. Most item names start with the
+      // first-name + surname, so prefix matching is robust enough.
+      const byCheckIn = new Map();
+      for (const g of guestyList) {
+        const k = (g.checkIn || '').slice(0, 10);
+        if (!k) continue;
+        if (!byCheckIn.has(k)) byCheckIn.set(k, []);
+        byCheckIn.get(k).push(g);
+      }
+      const nameDateRe = /^(.+?)\s*[—–\-]\s*(\d{4}-\d{2}-\d{2})\s*$/;
+      for (const a of arrivalsList) {
+        if (a.bookRef && a.bookRef.trim()) continue; // has ref → not unlinked
+        if (a.arrivalDate < from || a.arrivalDate > to) continue; // window only
+        // Parse "Jose Nelio Santos Pinto - 2026-05-17" → ("Jose Nelio Santos Pinto", "2026-05-17")
+        const m = (a.name || '').match(nameDateRe);
+        const parsedName = m ? m[1].trim() : (a.name || '').trim();
+        const parsedDate = m ? m[2] : (a.arrivalDate || '');
+        // Match against Guesty: same check-in date AND parsedName is a
+        // case-insensitive substring of (or contains) Guesty's guestName.
+        const candidates = byCheckIn.get(parsedDate) || [];
+        const lo = parsedName.toLowerCase();
+        const matches = candidates.filter(g => {
+          const gn = (g.guestName || '').toLowerCase();
+          return gn && (gn.includes(lo) || lo.includes(gn));
+        });
+        _unlinked.push({
+          arrival: a,
+          parsedName,
+          parsedDate,
+          suggestion: matches[0] || null,
+          alternatives: matches.slice(1, 3),
+        });
+      }
+      _unlinked.sort((a, b) => (a.arrival.arrivalDate || '').localeCompare(b.arrival.arrivalDate || ''));
+    }
 
     // Visible counts: total Arrivals on board (helpful) and the in-window
     // subset (the historical context for orphan numbers).
@@ -661,6 +794,9 @@ async function runSync() {
 function renderResult(guestyCount, arrivalsCount) {
   document.getElementById('stats').innerHTML = `
     <div class="stat ${_missing.length ? 'bad' : 'ok'}"><div class="num">${_missing.length}</div><div class="lbl">${_missing.length === 1 ? 'Missing booking' : 'Missing bookings'}</div></div>
+    <div class="stat ${_modifications.length ? 'warn' : 'ok'}"><div class="num">${_modifications.length}</div><div class="lbl">${_modifications.length === 1 ? 'Modification' : 'Modifications'}</div></div>
+    <div class="stat ${_arrivalsDups.length ? 'bad' : 'ok'}"><div class="num">${_arrivalsDups.length}</div><div class="lbl">${_arrivalsDups.length === 1 ? 'Duplicate Arrival' : 'Duplicate Arrivals'}</div></div>
+    <div class="stat ${_unlinked.length ? 'warn' : 'ok'}"><div class="num">${_unlinked.length}</div><div class="lbl">${_unlinked.length === 1 ? 'Unlinked Arrival' : 'Unlinked Arrivals'}</div></div>
     <div class="stat ok"><div class="num">${_matched.length}</div><div class="lbl">In sync</div></div>
     <div class="stat ${_orphans.length ? 'warn' : 'ok'}"><div class="num">${_orphans.length}</div><div class="lbl">${_orphans.length === 1 ? 'Orphan on Arrivals' : 'Orphans on Arrivals'}</div></div>
     <div class="stat info"><div class="num">${guestyCount}</div><div class="lbl">Guesty total</div></div>
@@ -698,6 +834,100 @@ function renderResult(guestyCount, arrivalsCount) {
           <td class="muted">${g.numAdults} · ${g.numChildren}${g.numInfants?` (+${g.numInfants}i)`:''} · ${g.numPets}</td>
           <td class="muted" title="${escapeHtml(g.notes)}" style="max-width:240px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">${escapeHtml(g.notes || '—')}</td>
         </tr>`).join('')}
+        </tbody>
+      </table>
+    </section>`;
+  }
+
+  // Modifications — matched on booking ref but field values differ.
+  // Surfaces guest count + bed config drift that the watcher's narrow
+  // Branch A doesn't catch. Each row has a per-field Update button so
+  // you can apply changes selectively.
+  if (_modifications.length) {
+    _modifications.sort((a, b) => (a.guesty.checkIn || '').localeCompare(b.guesty.checkIn || ''));
+    html += `<section data-mods-section>
+      <h2 class="warn">✏️ Modifications — Guesty differs from Arrivals <span class="count">${_modifications.length}</span></h2>
+      <p class="desc">These bookings exist on both sides but guest counts or bed configs differ. Click <strong>Update</strong> to push Guesty's value to the Arrivals row. <strong>Update all</strong> applies every diff in one go.</p>
+      <div class="controls">
+        <button class="success" onclick="applyAllModifications()">✓ Update all (${_modifications.reduce((n,m) => n + m.diffs.length, 0)} field${_modifications.reduce((n,m) => n + m.diffs.length, 0)===1?'':'s'})</button>
+      </div>
+      <table>
+        <thead><tr><th>Property</th><th>Check-in</th><th>Guest</th><th>Booking ref</th><th>Field</th><th>Arrivals → Guesty</th><th></th></tr></thead>
+        <tbody>
+        ${_modifications.flatMap((m, mi) => m.diffs.map((d, di) => `<tr data-mod="${mi}.${di}">
+          <td><strong>${escapeHtml(m.guesty.propName || m.arrival.property || '—')}</strong></td>
+          <td>${fmtUK(m.guesty.checkIn)}</td>
+          <td>${escapeHtml(m.guesty.guestName || '—')}</td>
+          <td><code>${escapeHtml(m.guesty.bookRef)}</code></td>
+          <td>${escapeHtml(d.field)}</td>
+          <td><span class="muted">${escapeHtml(String(d.from || '∅')).slice(0,60)}</span> → <strong>${escapeHtml(String(d.to || '∅')).slice(0,60)}</strong></td>
+          <td><button class="del-btn" onclick="applyModification(${mi}, ${di}, this)" style="color:#1a5276; border-color:#cfe1ef">↪ Update</button></td>
+        </tr>`)).join('')}
+        </tbody>
+      </table>
+    </section>`;
+  }
+
+  // Duplicate Arrivals — same booking ref appears 2+ times on the board.
+  // Almost always Daily Upcoming Arrivals (now deactivated) racing the
+  // watcher or guesty-sync. We suggest the canonical keeper based on
+  // name format + how filled-in the row is; you confirm or override.
+  if (_arrivalsDups.length) {
+    html += `<section data-arrdups-section>
+      <h2 class="bad">📑 Duplicate Arrivals — same booking ref appears more than once <span class="count">${_arrivalsDups.length}</span></h2>
+      <p class="desc">Each block below is one Guesty booking with 2+ Arrival rows on Monday. The <span style="color:#1a5276; font-weight:700">⭐ suggested keeper</span> is the row with the cleanest item name and the most data filled in — usually the watcher's native row. Tap 🗑 on the duplicates to delete them. The keeper stays.</p>
+      <div class="controls">
+        <button class="success" onclick="deleteAllArrivalsDuplicates()">✓ Delete all non-keeper duplicates (${_arrivalsDups.reduce((n, g) => n + g.rows.length - 1, 0)} row${_arrivalsDups.reduce((n, g) => n + g.rows.length - 1, 0)===1?'':'s'})</button>
+      </div>
+      <table>
+        <thead><tr><th>Booking ref</th><th>Property</th><th>Check-in</th><th>Item name</th><th>Adults·Kids·Pets</th><th>Item ID</th><th></th></tr></thead>
+        <tbody>
+        ${_arrivalsDups.flatMap((g, gi) => g.rows.map((r, ri) => {
+          const isKeeper = r.id === g.keeperId;
+          const rowAttr = `data-arrdup="${gi}.${ri}" data-row-id="${r.id}"`;
+          const refCell = ri === 0 ? `<td rowspan="${g.rows.length}" style="vertical-align:top"><code>${escapeHtml(g.ref)}</code></td>` : '';
+          const propCell = ri === 0 ? `<td rowspan="${g.rows.length}" style="vertical-align:top"><strong>${escapeHtml(r.property || '—')}</strong></td>` : '';
+          const dateCell = ri === 0 ? `<td rowspan="${g.rows.length}" style="vertical-align:top">${fmtUK(r.arrivalDate)}</td>` : '';
+          const action = isKeeper
+            ? `<span style="color:#1a5276; font-weight:700; font-size:12px">⭐ keep</span>`
+            : `<button class="del-btn" onclick="deleteArrivalRow(${gi},${ri},this)">🗑 Delete</button>`;
+          return `<tr ${rowAttr}${isKeeper?' style="background:#eef5fb"':''}>
+            ${refCell}${propCell}${dateCell}
+            <td>${escapeHtml(r.name || '—')}</td>
+            <td class="muted">${r.adults}·${r.children}·${r.pets}${r.bedCfg ? ` · <em>${escapeHtml(r.bedCfg).slice(0,40)}</em>` : ''}</td>
+            <td><code>${r.id}</code></td>
+            <td>${action}</td>
+          </tr>`;
+        })).join('')}
+        </tbody>
+      </table>
+    </section>`;
+  }
+
+  // Unlinked Arrivals — rows with no booking ref. We try to auto-match
+  // each against Guesty by parsed guest name + check-in date. If found,
+  // one click sets the ref; if not, type it in manually.
+  if (_unlinked.length) {
+    html += `<section data-unlinked-section>
+      <h2 class="warn">🔗 Unlinked Arrivals — no booking ref <span class="count">${_unlinked.length}</span></h2>
+      <p class="desc">These Arrival rows have no booking ref at all, so they don't appear in any other section. Where we could find a likely match in Guesty by guest name + check-in date, you'll see a suggested ref — tap <strong>Set ref</strong>. Otherwise type the ref manually and tap Save.</p>
+      <table>
+        <thead><tr><th>Item name</th><th>Check-in</th><th>Property</th><th>Suggested ref (from Guesty)</th><th>Manual entry</th></tr></thead>
+        <tbody>
+        ${_unlinked.map((u, i) => {
+          const a = u.arrival;
+          const suggestion = u.suggestion
+            ? `<code>${escapeHtml(u.suggestion.bookRef)}</code> &nbsp; <button class="del-btn" style="color:#1a5276; border-color:#cfe1ef" onclick="applyBookingRef(${i}, ${JSON.stringify(u.suggestion.bookRef).replace(/"/g,'&quot;')}, this)">↪ Set ref</button>`
+            : `<span class="muted">no match found</span>`;
+          const manual = `<input type="text" id="unlinked_ref_${i}" placeholder="e.g. HMEMJ55ERT" style="font-family:ui-monospace,monospace;font-size:12px;padding:4px 6px;border:1px solid #cfd0c8;border-radius:5px;width:140px"> <button class="del-btn" style="color:#1a5276; border-color:#cfe1ef" onclick="applyBookingRefManual(${i}, this)">Save</button>`;
+          return `<tr data-unlinked="${i}" data-row-id="${a.id}">
+            <td>${escapeHtml(a.name || '—')}</td>
+            <td>${fmtUK(a.arrivalDate)}</td>
+            <td>${escapeHtml(a.property || '—')}</td>
+            <td>${suggestion}</td>
+            <td>${manual}</td>
+          </tr>`;
+        }).join('')}
         </tbody>
       </table>
     </section>`;
@@ -799,7 +1029,15 @@ function classifyDownstream(rows, liveArrivalIds) {
   // legacy entry, not a data-health issue per se).
   const byArrival = new Map();
   const orphans = [];
+  const staleNamed = [];
+  // changeover-radar.html (retired 2026-05-12) created rows with these
+  // name patterns: "Property · Date" and "Property · Full Clean · Date".
+  // Detect them so we can offer to delete the historical pollution.
+  const staleRe = /\s·\s(?:Full Clean\s·\s)?\d{4}-\d{2}-\d{2}\s*$/;
   for (const it of rows) {
+    if (staleRe.test(it.name || '')) {
+      staleNamed.push({ id: it.id, name: it.name });
+    }
     const cv = (it.column_values || [])[0];
     const linkedIds = cv?.linked_item_ids || [];
     if (!linkedIds.length) continue;
@@ -817,20 +1055,21 @@ function classifyDownstream(rows, liveArrivalIds) {
     if (dupRows.length > 1) duplicates.push({ arrivalId: arrId, rows: dupRows });
     else okCount++;
   }
-  return { total: rows.length, orphans, duplicates, ok: okCount };
+  return { total: rows.length, orphans, duplicates, staleNamed, ok: okCount };
 }
 
 function renderHealthSection(spec, health) {
   if (!health) return '';
   const d = health.duplicates.length;
   const o = health.orphans.length;
-  if (!d && !o) {
+  const s = (health.staleNamed || []).length;
+  if (!d && !o && !s) {
     return `<section>
       <h2 class="ok">${spec.emoji} ${escapeHtml(spec.label)} <span class="count">✓ no issues</span></h2>
       <p class="desc muted">${health.ok} unique Arrival → row mapping(s). Skipped ${health.total - health.ok - o} unlinked / aggregated row(s).</p>
     </section>`;
   }
-  let html = `<section data-health-section="${spec.key}"><h2 class="warn">${spec.emoji} ${escapeHtml(spec.label)} <span class="count">${d + o}</span></h2>`;
+  let html = `<section data-health-section="${spec.key}"><h2 class="warn">${spec.emoji} ${escapeHtml(spec.label)} <span class="count">${d + o + s}</span></h2>`;
   if (d) {
     // Flatten dup groups into one row per downstream item so each can be
     // deleted independently. Keep the Arrival id alongside so you can see
@@ -856,8 +1095,46 @@ function renderHealthSection(spec, health) {
     if (health.orphans.length > 200) html += `<tr><td colspan="4" class="muted">… and ${health.orphans.length - 200} more</td></tr>`;
     html += `</tbody></table>`;
   }
+  // Stale-named rows — changeover-radar legacy pollution. Rows whose item
+  // name matches "Property · Date" or "Property · Full Clean · Date".
+  // These should never exist in the Arrivals-canonical world; cleans
+  // board is for completion records only. Bulk delete is safe here
+  // because the creator (changeover-radar.html) has been retired.
+  if (s) {
+    html += `<p class="desc"><strong>${s}</strong> row${s === 1 ? '' : 's'} with legacy "Property · Date" naming format from the retired changeover-radar tool. These are pure planning artefacts with no place under the Arrivals-canonical rule. Delete them — they'll clean the rota display in one stroke.</p>
+      <div class="controls" style="margin-bottom:8px">
+        <button class="success" onclick="deleteAllStaleNamed('${spec.boardId}','${spec.key}')">✓ Delete all ${s} stale row${s===1?'':'s'}</button>
+      </div>
+      <table><thead><tr><th>Item name</th><th>Item ID</th><th></th></tr></thead><tbody>`;
+    for (const row of (health.staleNamed || []).slice(0, 200)) {
+      html += `<tr data-row-id="${row.id}"><td>${escapeHtml(row.name || '—')}</td><td><code>${row.id}</code></td><td><button class="del-btn" onclick="deleteDownstreamRow('${spec.boardId}','${spec.key}','${row.id}',this)">🗑 Delete</button></td></tr>`;
+    }
+    if ((health.staleNamed || []).length > 200) html += `<tr><td colspan="3" class="muted">… and ${(health.staleNamed || []).length - 200} more</td></tr>`;
+    html += `</tbody></table>`;
+  }
   html += `</section>`;
   return html;
+}
+
+// Bulk delete every stale-named row in a section. Walks the cached
+// staleNamed list and reuses deleteDownstreamRow under the hood so error
+// handling and count-decrement behave identically to single deletes.
+async function deleteAllStaleNamed(boardId, sectionKey) {
+  const health = _downstreamHealth[sectionKey];
+  if (!health || !(health.staleNamed || []).length) return;
+  const n = health.staleNamed.length;
+  if (!confirm(`Delete ${n} stale-named row${n===1?'':'s'} from this board?\n\nThis can't be undone. Arrivals are unaffected.`)) return;
+  const queue = [...health.staleNamed];
+  const origConfirm = window.confirm;
+  window.confirm = () => true;
+  try {
+    for (const row of queue) {
+      const btn = document.querySelector(`section[data-health-section="${sectionKey}"] tr[data-row-id="${row.id}"] button.del-btn`);
+      if (btn) await deleteDownstreamRow(boardId, sectionKey, row.id, btn);
+    }
+  } finally {
+    window.confirm = origConfirm;
+  }
 }
 
 // Delete an item from a downstream board. Used by the per-row 🗑 button
@@ -928,6 +1205,195 @@ async function triggerDataHealth() {
     document.getElementById('dataHealthLoading')?.remove();
     document.getElementById('content').insertAdjacentHTML('beforeend',
       `<section><h2 class="warn">⚠ Downstream health check failed</h2><p class="desc muted">${escapeHtml(e.message)}</p></section>`);
+  }
+}
+
+// Push a single diff from Guesty to the matching Arrivals row.
+// Called by the ↪ Update button on each modifications-table row.
+async function applyModification(modIdx, diffIdx, btn) {
+  const mod = _modifications[modIdx];
+  if (!mod) return;
+  const diff = mod.diffs[diffIdx];
+  if (!diff || !btn || btn.disabled) return;
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Updating…';
+  try {
+    // Numeric columns take a stringified number; long_text takes a plain
+    // string. Either way the change_multiple_column_values payload is
+    // JSON-encoded once and inlined into the mutation literal — same
+    // pattern used elsewhere in this file.
+    const cv = { [diff.col]: String(diff.to ?? '') };
+    await mq(`mutation { change_multiple_column_values(board_id:${ARRIVALS_BOARD}, item_id:${mod.arrival.id}, column_values:${JSON.stringify(JSON.stringify(cv))}){ id } }`);
+    // Update in-memory state so a re-render reflects reality and the
+    // section count tile stays honest.
+    if (diff.col === AR_ADULTS)   mod.arrival.adults   = diff.to;
+    if (diff.col === AR_CHILDREN) mod.arrival.children = diff.to;
+    if (diff.col === AR_PETS)     mod.arrival.pets     = diff.to;
+    if (diff.col === AR_BEDCFG)   mod.arrival.bedCfg   = diff.to;
+    diff.applied = true;
+    const tr = btn.closest('tr');
+    if (tr) {
+      tr.style.transition = 'opacity 0.35s, background 0.35s';
+      tr.style.background = '#d1f0dd';
+      setTimeout(() => { tr.style.opacity = '0.4'; }, 300);
+    }
+    const section = document.querySelector('section[data-mods-section]');
+    const countEl = section?.querySelector('h2 .count');
+    if (countEl) {
+      const remaining = _modifications.reduce((n, m) => n + m.diffs.filter(d => !d.applied).length, 0);
+      countEl.textContent = String(remaining);
+    }
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '⚠ Failed';
+    btn.title = e.message;
+    btn.style.background = '#fde8e8';
+    console.error('[modifications] apply', mod.arrival.id, diff, e);
+  }
+}
+
+// Set a booking ref on an unlinked Arrival row. Called by Set-ref
+// (uses the auto-matched suggestion) and Save (uses the manual input).
+async function applyBookingRef(unlinkedIdx, ref, btn) {
+  const u = _unlinked[unlinkedIdx];
+  if (!u || !btn || btn.disabled) return;
+  ref = String(ref || '').trim();
+  if (!ref) { alert('Booking ref is empty.'); return; }
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Saving…';
+  try {
+    const cv = { [AR_BOOKREF]: ref };
+    await mq(`mutation { change_multiple_column_values(board_id:${ARRIVALS_BOARD}, item_id:${u.arrival.id}, column_values:${JSON.stringify(JSON.stringify(cv))}){ id } }`);
+    u.arrival.bookRef = ref;
+    const tr = btn.closest('tr');
+    if (tr) {
+      tr.style.transition = 'opacity 0.35s, background 0.35s';
+      tr.style.background = '#d1f0dd';
+      setTimeout(() => { tr.style.opacity = '0.4'; }, 300);
+    }
+    const section = document.querySelector('section[data-unlinked-section]');
+    const countEl = section?.querySelector('h2 .count');
+    if (countEl) {
+      const n = parseInt(countEl.textContent, 10);
+      if (!isNaN(n) && n > 0) countEl.textContent = String(n - 1);
+    }
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '⚠ Failed';
+    btn.title = e.message;
+    btn.style.background = '#fde8e8';
+    console.error('[unlinked] applyBookingRef', u.arrival.id, ref, e);
+  }
+}
+
+// Manual entry path — reads the input box next to the button.
+function applyBookingRefManual(unlinkedIdx, btn) {
+  const input = document.getElementById('unlinked_ref_' + unlinkedIdx);
+  const ref = (input?.value || '').trim();
+  if (!ref) { alert('Type a booking ref first.'); return; }
+  applyBookingRef(unlinkedIdx, ref, btn);
+}
+
+// Delete a single duplicate Arrival row. Used by the 🗑 button in the
+// duplicates table. Confirms once per click. Downstream rows linked to
+// this Arrival become orphans, which the downstream-health section will
+// surface on the next sync run — that's deliberate so you can clean
+// them up after the parent Arrival is gone.
+async function deleteArrivalRow(groupIdx, rowIdx, btn) {
+  const group = _arrivalsDups[groupIdx];
+  if (!group) return;
+  const row = group.rows[rowIdx];
+  if (!row || !btn || btn.disabled) return;
+  if (row.id === group.keeperId) {
+    if (!confirm(`This row is the SUGGESTED KEEPER. Deleting it leaves the other duplicate(s) as the survivors. Continue?`)) return;
+  } else {
+    if (!confirm(`Delete the Arrival row ${row.id} (${row.name})?\n\nLinked Cleans / HT / Linen rows will become orphans — clean those up via the downstream health section.`)) return;
+  }
+  btn.disabled = true;
+  btn.textContent = 'Deleting…';
+  try {
+    await mq(`mutation { delete_item(item_id: ${row.id}) { id } }`);
+    const tr = btn.closest('tr');
+    if (tr) {
+      tr.style.transition = 'opacity 0.35s';
+      tr.style.opacity = '0.3';
+      setTimeout(() => tr.remove(), 350);
+    }
+    // Update in-memory state so the count tile + Delete-all button stay
+    // accurate. If a group drops to 1 row, the group is no longer a dup.
+    group.rows.splice(rowIdx, 1);
+    if (group.rows.length < 2) {
+      const idx = _arrivalsDups.indexOf(group);
+      if (idx >= 0) _arrivalsDups.splice(idx, 1);
+    }
+    const section = document.querySelector('section[data-arrdups-section]');
+    const countEl = section?.querySelector('h2 .count');
+    if (countEl) countEl.textContent = String(_arrivalsDups.length);
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '⚠ Failed — retry';
+    btn.title = e.message;
+    btn.style.background = '#fde8e8';
+    console.error('[arr-dup] delete', row.id, e);
+  }
+}
+
+// Bulk-delete every non-keeper row across all duplicate groups.
+// Sequential to avoid Monday rate-limit and to keep error surfaces sane.
+async function deleteAllArrivalsDuplicates() {
+  const total = _arrivalsDups.reduce((n, g) => n + g.rows.length - 1, 0);
+  if (!total) return;
+  if (!confirm(`Delete ${total} duplicate Arrival row(s)? Keepers stay. This can't be undone.\n\nLinked Cleans / HT / Linen rows will become orphans — clean those up via the downstream health section after.`)) return;
+  // Walk a snapshot so mutating _arrivalsDups during the loop doesn't
+  // skip any rows. We re-resolve the DOM button each iteration because
+  // earlier deletes may have removed siblings.
+  const queue = [];
+  for (let gi = 0; gi < _arrivalsDups.length; gi++) {
+    for (let ri = 0; ri < _arrivalsDups[gi].rows.length; ri++) {
+      const r = _arrivalsDups[gi].rows[ri];
+      if (r.id !== _arrivalsDups[gi].keeperId) queue.push({ id: r.id });
+    }
+  }
+  for (const job of queue) {
+    const tr = document.querySelector(`tr[data-row-id="${job.id}"]`);
+    const btn = tr?.querySelector('button.del-btn');
+    if (btn) {
+      // Reuse the single-delete path — handles confirmation skip, error
+      // display, count update, and in-memory state in one place.
+      // Bypass the per-row confirm by stubbing window.confirm just for
+      // this call. Original behaviour restored immediately after.
+      const origConfirm = window.confirm;
+      window.confirm = () => true;
+      try {
+        // Find the (groupIdx, rowIdx) for this row id at *this moment*.
+        let gi = -1, ri = -1;
+        outer: for (let g = 0; g < _arrivalsDups.length; g++) {
+          for (let r = 0; r < _arrivalsDups[g].rows.length; r++) {
+            if (_arrivalsDups[g].rows[r].id === job.id) { gi = g; ri = r; break outer; }
+          }
+        }
+        if (gi >= 0) await deleteArrivalRow(gi, ri, btn);
+      } finally {
+        window.confirm = origConfirm;
+      }
+    }
+  }
+}
+
+// Bulk-apply every outstanding diff. Sequential to keep error reporting
+// sane and to avoid hammering Monday with parallel mutations on a single
+// item id (which can race on Monday's side).
+async function applyAllModifications() {
+  if (!_modifications.length) return;
+  if (!confirm(`Apply ${_modifications.reduce((n,m) => n + m.diffs.length, 0)} updates to Arrivals?`)) return;
+  for (let mi = 0; mi < _modifications.length; mi++) {
+    for (let di = 0; di < _modifications[mi].diffs.length; di++) {
+      if (_modifications[mi].diffs[di].applied) continue;
+      const btn = document.querySelector(`tr[data-mod="${mi}.${di}"] button`);
+      if (btn) await applyModification(mi, di, btn);
+    }
   }
 }
 

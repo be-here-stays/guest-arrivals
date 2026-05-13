@@ -500,6 +500,7 @@
 ════════════════════════════════════ */
 const API_TOKEN      = window.MONDAY_API_TOKEN;
 const ARRIVALS_BOARD = 5094453064;
+const WORKSPACE_ID   = 3546278;
 const WAIVER_COL     = 'date_mm2jrjej';
 const PROP_COL       = 'text_mm2ahbrx';
 const ARRIVAL_COL    = 'date_mm2adtwg';
@@ -554,7 +555,7 @@ function loadCachedIds() {
 async function getOrCreateBookingsBoard() {
   if (bookingsBoardId && bookingsDataColId) return { boardId: bookingsBoardId, colId: bookingsDataColId };
   try {
-    const d = await mq(`mutation { create_board(board_name: "Paddle Board Bookings", board_kind: public) { id } }`);
+    const d = await mqCreateBoard('Paddle Board Bookings');
     bookingsBoardId = String(d.create_board.id);
     const c = await mq(`mutation { create_column(board_id: ${bookingsBoardId}, title: "data", column_type: text) { id } }`);
     bookingsDataColId = c.create_column.id;
@@ -647,10 +648,15 @@ async function mq(query) {
   return j.data;
 }
 
+function mqCreateBoard(name) {
+  const ws = WORKSPACE_ID ? `, workspace_id: ${WORKSPACE_ID}` : '';
+  return mq(`mutation { create_board(board_name: "${esc(name)}", board_kind: public${ws}) { id } }`);
+}
+
 async function getOrCreateHireBoard() {
   if (mondayBoardId) return mondayBoardId;
   try {
-    const d = await mq(`mutation { create_board(board_name: "Paddle Board Hires", board_kind: public) { id } }`);
+    const d = await mqCreateBoard('Paddle Board Hires');
     mondayBoardId = String(d.create_board.id);
     localStorage.setItem(LS_BOARD_ID, mondayBoardId);
     return mondayBoardId;
@@ -660,7 +666,7 @@ async function getOrCreateHireBoard() {
 async function getOrCreateTasksBoard() {
   if (tasksBoardId) return tasksBoardId;
   try {
-    const d = await mq(`mutation { create_board(board_name: "Paddle Board Tasks", board_kind: public) { id } }`);
+    const d = await mqCreateBoard('Paddle Board Tasks');
     tasksBoardId = String(d.create_board.id);
     localStorage.setItem(LS_TASKS_BOARD, tasksBoardId);
     return tasksBoardId;
@@ -690,17 +696,21 @@ async function createMondayTask(name, body) {
 }
 
 /* ── Status board: one item per physical board, stores config + live state ── */
+let _statusBoardPromise = null;
 async function getOrCreateStatusBoard() {
   if (statusBoardId && statusColId) return { boardId: statusBoardId, colId: statusColId };
-  try {
-    const d = await mq(`mutation { create_board(board_name: "Paddle Board Status", board_kind: public) { id } }`);
-    statusBoardId = String(d.create_board.id);
-    const c = await mq(`mutation { create_column(board_id: ${statusBoardId}, title: "data", column_type: text) { id } }`);
-    statusColId = c.create_column.id;
-    localStorage.setItem(LS_STATUS_BOARD, statusBoardId);
-    localStorage.setItem(LS_STATUS_COL, statusColId);
-    return { boardId: statusBoardId, colId: statusColId };
-  } catch(e) { console.error('Could not create status board:', e); return null; }
+  if (!_statusBoardPromise) {
+    _statusBoardPromise = (async () => {
+      const d = await mqCreateBoard('Paddle Board Status');
+      statusBoardId = String(d.create_board.id);
+      const c = await mq(`mutation { create_column(board_id: ${statusBoardId}, title: "data", column_type: text) { id } }`);
+      statusColId = c.create_column.id;
+      localStorage.setItem(LS_STATUS_BOARD, statusBoardId);
+      localStorage.setItem(LS_STATUS_COL, statusColId);
+      return { boardId: statusBoardId, colId: statusColId };
+    })();
+  }
+  return _statusBoardPromise;
 }
 
 async function fetchAllFromMonday() {
@@ -731,9 +741,16 @@ async function fetchAllFromMonday() {
     } catch(e) {}
   }
   if (boardsConfig.length === 0) {
-    for (const def of DEFAULT_BOARDS) {
-      await createBoardInMonday(def, { status: 'available', location: def.location, hire: null });
-    }
+    // Create all default boards in parallel (6 items simultaneously, not sequentially)
+    await Promise.all(DEFAULT_BOARDS.map(async def => {
+      const di = await mq(`mutation { create_item(board_id: ${info.boardId}, item_name: "${esc(def.name)}") { id } }`);
+      const itemId = di.create_item.id;
+      const payload = { id: def.id, name: def.name, location: def.location, status: 'available', hire: null };
+      await mq(`mutation { change_column_value(board_id: ${info.boardId}, item_id: ${itemId}, column_id: "${info.colId}", value: "${esc(JSON.stringify(payload))}") { id } }`);
+      boardsConfig.push({ id: def.id, name: def.name, location: def.location });
+      state[def.id] = { status: 'available', location: def.location, hire: null };
+      boardMondayIds[def.id] = itemId;
+    }));
   }
 }
 
@@ -1371,11 +1388,15 @@ async function submitBooking() {
 
   const dropName = `🚚 Drop-off ${boardName} → ${lodge} — ${fmtDate(startDate)}`;
   const dropBody = `Deliver ${boardName} to ${lodge} for ${g.name} on ${fmtDate(startDate)}.\\nBooking period: ${fmtDateRange(startDate, endDate)}\\n${notes ? 'Notes: ' + notes : ''}`;
-  const dropTaskId = await createMondayTask(dropName, dropBody);
-
   const pickName = `📦 Collect ${boardName} from ${lodge} — ${fmtDate(endDate)}`;
   const pickBody = `Collect ${boardName} from ${lodge} from ${g.name} on ${fmtDate(endDate)}.\\nBooking period: ${fmtDateRange(startDate, endDate)}\\n${notes ? 'Notes: ' + notes : ''}`;
-  const pickTaskId = await createMondayTask(pickName, pickBody);
+
+  // Create both tasks and the booking record in parallel
+  const [dropTaskId, pickTaskId] = await Promise.all([
+    createMondayTask(dropName, dropBody),
+    createMondayTask(pickName, pickBody),
+    getOrCreateBookingsBoard()  // warm up the bookings board concurrently
+  ]);
 
   const booking = {
     id: 'bk_' + Date.now(),

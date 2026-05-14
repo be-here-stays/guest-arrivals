@@ -1487,13 +1487,18 @@ function renderDayView() {
     const unplanned = derived.filter(d => {
       if (findPlannedClean(d)) return false;
       // Default placement = windowEnd (the new guest's check-in day).
-      // Early options = days in [windowStart, windowEnd) — bringing the
-      // clean forward to any day after the previous checkout but before
-      // the new guest arrives.
+      // Bringing forward to earlier days is a manual action (drag-drop
+      // onto an earlier column) — the rota deliberately does NOT pre-render
+      // a card on every vacant day, because that triples the visible
+      // workload for a long vacancy (e.g. Ascot 18→23 May would show
+      // 6 cards for one clean) and confuses the planner.
+      //
+      // The "Show early" toggle still surfaces the bring-forward options
+      // for planners who want to see them.
       const isDefaultCard = d.windowEnd === dayStr;
       const isEarlyCard = dayStr >= d.windowStart && dayStr < d.windowEnd && !d.sameDay;
       if (earlyOnly) return isEarlyCard;
-      return isDefaultCard || isEarlyCard;
+      return isDefaultCard;
     });
 
     const planned = (plannedByDay[dayStr] || []);
@@ -1613,15 +1618,18 @@ function renderLodgeView() {
         if (earlyOnly && !c.early) continue;
         mines.push(renderLodgeMini(c, false));
       }
-      // Unplanned suggestions
+      // Unplanned suggestions — match the day-view rule: default = windowEnd
+      // (check-in day) only. Bring-forward to earlier days is a manual
+      // drag. Showing the card on every vacant day inflates the workload
+      // (a 5-day vacancy would draw 5 cards for one clean).
       const dc = derived.filter(d => {
         if (d.property !== propName) return false;
         if (findPlannedClean(d)) return false;
         if (!derivedVisibleForRoleFilter(d)) return false;
-        const isEarlyCard = dayStr > d.windowStart && dayStr <= d.windowEnd && !d.sameDay;
-        const isDefaultCard = d.windowStart === dayStr;
+        const isDefaultCard = d.windowEnd === dayStr;
+        const isEarlyCard = dayStr >= d.windowStart && dayStr < d.windowEnd && !d.sameDay;
         if (earlyOnly) return isEarlyCard;
-        return isDefaultCard || isEarlyCard;
+        return isDefaultCard;
       });
       for (const d of dc) mines.push(renderLodgeMiniDerived(d, dayStr));
 
@@ -3256,8 +3264,16 @@ async function saveToMonday(opts = {}) {
    PERSIST / MISC
    ═══════════════════════════════════════════════════════════════════ */
 function persistLocal() {
+  // 2026-05-14 — cleans array no longer persisted. The previous design
+  // wrote the in-memory cleans on every edit so an accidental reload
+  // would restore your work. In practice the autosave (scheduleAutoSave
+  // below) flushes any dirty rows to Monday within ~2.5s, so the truth
+  // is always on Monday seconds after you make a change. Persisting the
+  // local snapshot caused the flicker on next page load: stale snapshot
+  // rendered first, then fetchCleans replaced it ~5-30s later. Now we
+  // only persist UI state (view date, mode, filters) and let the page
+  // load fresh from Monday every time.
   localStorage.setItem(STORE_KEY, JSON.stringify({
-    cleans,
     viewStart: localStr(viewStart),
     viewMode,
     roleFilter,
@@ -3271,16 +3287,9 @@ function persistLocal() {
 function restoreLocal() {
   try {
     const raw = JSON.parse(localStorage.getItem(STORE_KEY) || '{}');
-    if (Array.isArray(raw.cleans)) {
-      // Defensive: drop any rows flagged `new` (i.e. created in-memory but
-      // never persisted to Monday). These should NEVER survive a reload —
-      // if they're real Cleans rows they'll be re-fetched from Monday with
-      // mondayId set; if they're not, they're stale phantoms that would
-      // get auto-saved on the next autosave tick. Reload-fragility for
-      // in-flight drag-drop work is the right trade vs. resurrecting
-      // phantoms forever.
-      cleans = raw.cleans.filter(c => !(c && c.new));
-    }
+    // 2026-05-14 — cleans array no longer restored. See persistLocal()
+    // comment for the rationale. Tolerate old localStorage entries that
+    // still have raw.cleans (from before this change) — just ignore them.
     if (raw.viewStart) { viewStart = new Date(raw.viewStart + 'T12:00'); viewStart.setHours(0,0,0,0); }
     if (raw.viewMode) viewMode = raw.viewMode;
     if (raw.roleFilter) roleFilter = raw.roleFilter;

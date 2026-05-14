@@ -1251,7 +1251,14 @@ function derivedCleans() {
                  : (b.nextIn && b.nextIn === b.currOut) ? b.nextIn
                  : null;
     const sameDay = nextIn && nextIn === b.currOut;
-    const windowEndDate = (nextIn && nextIn > b.currOut) ? addDays(new Date(nextIn), -1) : null;
+    // Window semantics (clarified 2026-05-14 to match Barry's operational rule):
+    //   windowStart = previous booking's checkout day — the EARLIEST a
+    //                 clean can be done (property became vacant that day)
+    //   windowEnd   = next booking's check-in day — the DEFAULT landing
+    //                 day, the clean MUST be done by then so the new
+    //                 guest finds it clean
+    // Default placement is windowEnd (check-in day). The days in
+    // [windowStart, windowEnd) are "bring forward" early options.
     out.push({
       key: `${b.property}|${b.currOut}`,
       property: b.property,
@@ -1259,7 +1266,7 @@ function derivedCleans() {
       nextIn,
       sameDay,
       windowStart: b.currOut,
-      windowEnd: windowEndDate ? localStr(windowEndDate) : b.currOut,
+      windowEnd: nextIn || b.currOut,
       source: b.source,
       todayStatus: b.todayStatus,
       // The "next" booking is the one whose check-in we're cleaning for,
@@ -1479,8 +1486,12 @@ function renderDayView() {
 
     const unplanned = derived.filter(d => {
       if (findPlannedClean(d)) return false;
-      const isEarlyCard = dayStr > d.windowStart && dayStr <= d.windowEnd && !d.sameDay;
-      const isDefaultCard = d.windowStart === dayStr;
+      // Default placement = windowEnd (the new guest's check-in day).
+      // Early options = days in [windowStart, windowEnd) — bringing the
+      // clean forward to any day after the previous checkout but before
+      // the new guest arrives.
+      const isDefaultCard = d.windowEnd === dayStr;
+      const isEarlyCard = dayStr >= d.windowStart && dayStr < d.windowEnd && !d.sameDay;
       if (earlyOnly) return isEarlyCard;
       return isDefaultCard || isEarlyCard;
     });
@@ -1836,7 +1847,9 @@ function renderUnplannedCard(d, dayStr) {
   const prop = properties[d.property] || {};
   const isLocal = prop.local;
   const isSameDay = d.sameDay;
-  const isEarly = dayStr !== d.windowStart && !isSameDay;
+  // "Early" = the card is being shown on a day BEFORE the default
+  // check-in landing day, i.e. a bring-forward option.
+  const isEarly = dayStr !== d.windowEnd && !isSameDay;
   const cls = [
     'clean-card','unplanned',
     isSameDay ? 'same-day' : '',

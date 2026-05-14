@@ -2037,8 +2037,9 @@ function shiftCleanEarlier(cleanId) {
   c.day = newDay;
   c.start = isCheckout ? '10:00' : '09:00';
   c.dirty = true;
-  // Step the visible day with the card so the planner sees it land
-  viewStart = new Date(newDay + 'T00:00:00');
+  // 2026-05-14 — view no longer follows the card. Barry's rule: stay on
+  // the current page so the planner can do multiple moves without losing
+  // their place. The toast tells them where the card landed.
   toast(`Moved to ${newDay}${supersededMsg}`);
   render();
 }
@@ -2101,7 +2102,8 @@ function shiftCleanToCheckin(cleanId) {
     }
   }
 
-  viewStart = new Date(target + 'T00:00:00');
+  // 2026-05-14 — view no longer follows the card. Stay on the current
+  // page so the planner can do multiple moves without losing their place.
   toast(`Moved back to ${target}${extraToast}`);
   render();
 }

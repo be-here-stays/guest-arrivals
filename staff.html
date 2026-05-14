@@ -150,6 +150,21 @@
     .cc-with { font-size:12px; color:var(--sage); margin-bottom:4px; font-style:italic; }
     .cc-notes { font-size:13px; color:var(--dark); background:#fdf5e8; padding:8px 10px; border-radius:7px; margin:6px 0 8px; line-height:1.35; }
     .cc-linked { font-size:12px; color:var(--gold); background:#fdf5e8; padding:6px 9px; border-radius:6px; margin:6px 0; font-weight:600; }
+    /* Lock codes block — surfaced on cleaner cards, tap to copy. Sage tint
+       so it's distinct from the notes (cream) and linked (cream/gold) blocks. */
+    .cc-codes { font-size:12px; background:#eaede4; border-left:3px solid var(--sage,#646955);
+                border-radius:6px; margin:6px 0; padding:6px 9px; cursor:pointer;
+                transition:background 0.15s; user-select:none; }
+    .cc-codes:active { background:#dde3d4; }
+    .cc-codes.copied { background:#d1f0dd; border-left-color:#2d6a4f; }
+    .cc-codes-hdr { font-size:11px; font-weight:700; color:var(--sage,#646955);
+                    text-transform:uppercase; letter-spacing:0.4px;
+                    display:flex; align-items:center; justify-content:space-between; }
+    .cc-codes-copy { font-size:10px; font-weight:500; color:#888; text-transform:none;
+                     letter-spacing:0; font-style:italic; }
+    .cc-codes-body { font-family:ui-monospace, "SF Mono", Menlo, Consolas, monospace;
+                     font-size:12.5px; line-height:1.45; color:var(--dark);
+                     margin:4px 0 0; white-space:pre-wrap; word-break:break-word; }
     .cc-completed-line { font-size:12px; color:var(--green); font-weight:600; margin-top:6px; }
     .cc-actions { display:flex; gap:8px; margin-top:10px; }
     .cc-btn { flex:1; padding:11px; font-size:13px; font-weight:700; border-radius:8px; border:none; cursor:pointer; font-family:inherit; text-align:center; text-decoration:none; display:inline-flex; align-items:center; justify-content:center; gap:6px; }
@@ -509,10 +524,6 @@ const MAINT_COLS = {
   finish:   'hour_mm2vks4p'
 };
 
-// Issues board (used to close out an Ad-hoc's linked issue when the task is done)
-const ISSUES_BOARD_ID = 5095294474;
-const ISSUES_STATUS_COL = 'color_mm2s9cc9';
-
 // Properties without a hot tub — these get the changeover checklist minus the
 // "Hot tub serviced" item. Currently three on the Hot Tub Status board.
 const OUTSIDE_NO_HT = new Set(['Goose Landing', 'Serenity', 'Green Haven']);
@@ -591,6 +602,12 @@ let _propChecksCfg = null; // resolved board config from PropertyChecksSchema
 const PROP_CONFIG_BOARD = 5094466278;
 const PC_HEADER_TANK    = 'boolean_mm372xj3';
 const PC_SOFTENER       = 'boolean_mm37e6gy';
+// Lock Codes (added 2026-05-11) — long_text per property containing door
+// codes, gate codes, owners-cupboard codes. Surfaced on Full Clean job
+// cards so housekeepers can read codes on arrival without needing a
+// printed list. Edit via the Property Config board in Monday.
+const PC_LOCK_CODES     = 'long_text_mm388nv5';
+let _propLockCodes      = {}; // { [propertyName]: 'Main Gate: 9347\nDoor: 6704' }
 let shifts = [];
 let hotTubCleans = [];  // hot tub cleans assigned to this staff member
 let maintTasks = [];    // scheduled work from window/jet/PAT/ad-hoc boards
@@ -599,6 +616,31 @@ let currentDay = null;  // yyyy-mm-dd
 
 /* ─── Helpers ───────────────────────────────────────────────── */
 function escapeHtml(s) { return (s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;'); }
+
+// True if any of the assigned roles is a cleaner. Used to gate features
+// that only make sense for the person physically entering the property
+// (e.g. lock codes — surfaced on cleaner cards but not on checker-only ones).
+function isCleanerRole(roles) {
+  return Array.isArray(roles) && roles.some(r => /cleaner/i.test(r || ''));
+}
+
+// Copy a property's lock codes to the clipboard. Triggered by tapping the
+// codes block on a clean card. Brief visual confirmation via the card +
+// toast so the user knows it worked without leaving the page.
+async function copyCodes(el, propertyName) {
+  const text = _propLockCodes[propertyName] || '';
+  if (!text) return;
+  try {
+    await navigator.clipboard.writeText(text);
+    if (el) {
+      el.classList.add('copied');
+      setTimeout(() => el.classList.remove('copied'), 1200);
+    }
+    toast('🔐 Codes copied', 'ok');
+  } catch (e) {
+    toast('Could not copy — long-press to select', 'error');
+  }
+}
 function pj(v) { if (v == null || v === '') return null; try { return typeof v === 'string' ? JSON.parse(v) : v; } catch { return null; } }
 function todayISO() {
   const d = new Date();
@@ -835,13 +877,14 @@ async function loadPropertyChecks() {
         items_page(limit:200) {
           items {
             id name
-            column_values(ids:["${PC_HEADER_TANK}","${PC_SOFTENER}"]) { id value }
+            column_values(ids:["${PC_HEADER_TANK}","${PC_SOFTENER}","${PC_LOCK_CODES}"]) { id value text }
           }
         }
       }
     }`);
     const items = data?.boards?.[0]?.items_page?.items || [];
     _propFlags = {};
+    _propLockCodes = {};
     for (const it of items) {
       const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
       const hasHeader   = !!(pj(cv[PC_HEADER_TANK]?.value)?.checked);
@@ -853,6 +896,11 @@ async function loadPropertyChecks() {
           hasSoftener,
         };
       }
+      // Lock codes are independent of the maintenance flags — every
+      // property may have codes regardless of whether it has a header
+      // tank / softener.
+      const codes = (cv[PC_LOCK_CODES]?.text || '').trim();
+      if (codes) _propLockCodes[it.name] = codes;
     }
   } catch (e) {
     console.warn('loadPropertyChecks: property config fetch failed', e);
@@ -1685,7 +1733,7 @@ function renderDay() {
   // mismatch in seconds. Three columns on tablet, wraps to two then one
   // on narrow phones.
   parts.push(`<div style="display:grid; grid-template-columns:repeat(auto-fit, minmax(140px, 1fr)); gap:8px; margin-top:10px">
-    <a href="report-issue.html?from=staff&reporter=${encodeURIComponent(me.name)}" class="cc-btn secondary" style="text-align:center; padding:12px; font-weight:700; text-decoration:none; border-radius:10px; background:#a9434a; color:#fff">
+    <a href="create-task.html?from=staff&type=investigate&reporter=${encodeURIComponent(me.name)}" class="cc-btn secondary" style="text-align:center; padding:12px; font-weight:700; text-decoration:none; border-radius:10px; background:#a9434a; color:#fff">
       🚨 Report issue
     </a>
     <a href="report-stock.html?from=staff&reporter=${encodeURIComponent(me.name)}" class="cc-btn secondary" style="text-align:center; padding:12px; font-weight:700; text-decoration:none; border-radius:10px; background:#646955; color:#fff">
@@ -1766,6 +1814,16 @@ function renderCleanCard(c) {
 
   const notesBlock = c.notes ? `<div class="cc-notes">${escapeHtml(c.notes)}</div>` : '';
 
+  // Lock codes block (2026-05-11) — door / gate / owners-cupboard codes
+  // sourced from the Lock Codes column on Property Config. Tap to copy
+  // the full block to clipboard. Only surfaced on cleaner cards (the
+  // person who needs to physically enter the property); checker-only
+  // cards skip this since they're typically arriving after the cleaner.
+  const codesText = _propLockCodes[c.property] || '';
+  const codesBlock = (codesText && isCleanerRole(c.roles))
+    ? `<div class="cc-codes" onclick="copyCodes(this, ${JSON.stringify(c.property).replace(/"/g,'&quot;')})" title="Tap to copy"><div class="cc-codes-hdr">🔐 Codes <span class="cc-codes-copy">tap to copy</span></div><pre class="cc-codes-body">${escapeHtml(codesText)}</pre></div>`
+    : '';
+
   // Action: Mark complete → open changeover-form prefilled
   const formUrl = `changeover-form.html?clean_id=${encodeURIComponent(c.id)}&property=${encodeURIComponent(c.property)}&date=${encodeURIComponent(c.day)}&name=${encodeURIComponent(me.name)}&act=cleaned`;
   const isCleaner = c.roles.some(r => /cleaner/i.test(r));
@@ -1799,7 +1857,7 @@ function renderCleanCard(c) {
   }
   // Small "🚨" button — quick way to log a defect found while on this clean.
   // Pre-fills property + reporter so it's one tap from a logged issue.
-  const issueUrl = `report-issue.html?from=staff&property=${encodeURIComponent(c.property)}&reporter=${encodeURIComponent(me.name)}`;
+  const issueUrl = `create-task.html?from=staff&type=investigate&property=${encodeURIComponent(c.property)}&reporter=${encodeURIComponent(me.name)}`;
   // "🛏" linen issue — pre-fills the linked Arrivals row id and booking ref
   // so the linen team gets the booking shape (incl. expected bed config)
   // without the cleaner having to re-type anything.
@@ -1823,6 +1881,7 @@ function renderCleanCard(c) {
     ${withLine}
     ${linkedBlock}
     ${notesBlock}
+    ${codesBlock}
     ${completedLine}
     ${actionsBtns.length ? `<div class="cc-actions">${actionsBtns.join('')}</div>` : ''}
   </div>`;
@@ -2280,7 +2339,7 @@ function renderHotTubCleanCard(h) {
     : '';
 
   // Quick issue link — pre-fills the property + reporter so the form is one tap from logged.
-  const issueUrl = `report-issue.html?from=staff&property=${encodeURIComponent(h.property)}&reporter=${encodeURIComponent(me.name)}`;
+  const issueUrl = `create-task.html?from=staff&type=investigate&property=${encodeURIComponent(h.property)}&reporter=${encodeURIComponent(me.name)}`;
   const issueBtn = !cancelled
     ? `<a class="cc-btn secondary" href="${issueUrl}" title="Found something broken? Log it" style="background:#a9434a; color:#fff; flex:0 0 auto; min-width:0; padding-left:12px; padding-right:12px">🚨</a>`
     : '';
@@ -2526,7 +2585,7 @@ function renderMaintTaskCard(m, day) {
   day = day || todayISO();
   const src = MAINT_SOURCES.find(s => s.key === m.sourceKey);
   if (!src) return '';
-  const issueUrl = `report-issue.html?from=staff&property=${encodeURIComponent(m.property)}&reporter=${encodeURIComponent(me.name)}`;
+  const issueUrl = `create-task.html?from=staff&type=investigate&property=${encodeURIComponent(m.property)}&reporter=${encodeURIComponent(me.name)}`;
   const descBlock = m.description ? `<div class="cc-notes">${escapeHtml(m.description)}</div>` : '';
 
   // const dashboardUrl = ... (removed per request)

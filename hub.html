@@ -151,10 +151,6 @@
       <div class="stat-val" id="stSup"><span class="spin"></span></div>
       <div class="stat-lbl">Open supply requests</div>
     </a>
-    <a href="issues-inbox.html" class="stat-card danger" id="cardIssues">
-      <div class="stat-val" id="stIssues"><span class="spin"></span></div>
-      <div class="stat-lbl">Issues Triage</div>
-    </a>
     <a href="task-backlog.html" class="stat-card danger" id="cardBacklog">
       <div class="stat-val" id="stBacklog"><span class="spin"></span></div>
       <div class="stat-lbl">Maint Backlog</div>
@@ -340,18 +336,6 @@
   <div style="grid-column:1/-1">
     <div class="section-label">🔧 Maintenance</div>
     <div class="cards cards-3">
-      <a href="report-issue.html" class="tool-card featured">
-        <div class="card-icon">🚨</div>
-        <div class="card-name">Report an Issue</div>
-        <div class="card-desc">Log defects, snags, broken things found on site — property, location, urgency, photo. Picked up by the maintenance team.</div>
-        <span class="card-badge b-mobile">📱 Mobile</span>
-      </a>
-      <a href="issues-inbox.html" class="tool-card">
-        <div class="card-icon">📥</div>
-        <div class="card-name">Issues Inbox</div>
-        <div class="card-desc">Triage open issues — schedule a maintenance task with a date and assignee, or mark fixed on the spot. Sets the issue to In Progress until done.</div>
-        <span class="card-badge b-both">📱💻 Any</span>
-      </a>
       <a href="task-backlog.html" class="tool-card">
         <div class="card-icon">⏳</div>
         <div class="card-name">Maint Backlog</div>
@@ -508,7 +492,7 @@ startClock();
 window.addEventListener('pageshow', e => {
   if (e.persisted) {
     startClock();
-    ['stArr','stNext','stSup','stOut','stLow','stLinen','stBacklog','stIssues'].forEach(id => {
+    ['stArr','stNext','stSup','stOut','stLow','stLinen','stBacklog'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = '<span class="spin"></span>';
     });
@@ -673,17 +657,6 @@ async function loadStats() {
     document.getElementById('cardBacklog').className = totalBacklog > 5 ? 'stat-card danger' : (totalBacklog > 0 ? 'stat-card warn' : 'stat-card');
   } catch { document.getElementById('stBacklog').textContent = '—'; }
 
-  // Issues Triage (Status: Review/Triage or Not Fixed)
-  try {
-    const d = await mq(`{ boards(ids:[5095294474]) { items_page(limit:500) { items { column_values(ids:["color_mm2s9cc9"]) { text } } } } }`);
-    const items = d?.boards?.[0]?.items_page?.items || [];
-    const untriaged = items.filter(it => {
-      const status = it.column_values[0]?.text || '';
-      return !/fix|check/i.test(status);
-    }).length;
-    document.getElementById('stIssues').textContent = untriaged;
-    document.getElementById('cardIssues').className = untriaged > 0 ? 'stat-card danger' : 'stat-card';
-  } catch { document.getElementById('stIssues').textContent = '—'; }
 }
 
 loadStats();

@@ -122,6 +122,40 @@
     .bk-btn.activate { background:var(--dark); color:var(--cream); border-color:var(--dark); }
     .bk-btn.cancel-bk { color:var(--red); border-color:var(--red); }
     .bk-empty { text-align:center; padding:32px 16px; color:var(--sage-mid); font-size:13px; }
+    .bk-meta   { display:flex; gap:6px; flex-wrap:wrap; margin-top:6px; }
+    .bk-tag    { font-size:10px; font-weight:700; padding:2px 8px; border-radius:8px; }
+    .bk-tag.boards       { background:#f0eeea; color:var(--sage-mid); }
+    .bk-tag.dur          { background:var(--blue-bg); color:var(--blue); }
+    .bk-tag.waiver-ok    { background:var(--green-bg); color:var(--green); }
+    .bk-tag.waiver-warn  { background:var(--amber-bg); color:var(--amber); }
+    .board-card.reserved { border-left-color:var(--gold); }
+    .bc-badge.reserved   { background:#fdf5e8; color:var(--amber); }
+    .bc-booked-today { font-size:10px; color:var(--amber); font-weight:700; margin-bottom:6px; padding:3px 7px; background:var(--amber-bg); border-radius:6px; display:inline-block; }
+
+    /* Board count picker */
+    .count-row { display:flex; gap:6px; flex-wrap:wrap; margin-bottom:4px; }
+    .count-btn { min-width:44px; flex:1; padding:10px 4px; border:2px solid var(--border); border-radius:9px; background:var(--surface); font-family:inherit; font-size:15px; font-weight:700; color:var(--sage-mid); cursor:pointer; text-align:center; transition:all .15s; }
+    .count-btn.active { border-color:var(--dark); background:var(--dark); color:#fff; }
+    .count-btn:disabled { opacity:.3; cursor:not-allowed; border-style:dashed; }
+
+    /* Availability bar */
+    .avail-bar { padding:10px 12px; border-radius:9px; font-size:12px; font-weight:600; margin-bottom:12px; }
+    .avail-bar.ok   { background:var(--green-bg); color:var(--green); border:1px solid var(--green-bdr); }
+    .avail-bar.warn { background:var(--amber-bg); color:var(--amber); border:1px solid #d4a017; }
+    .avail-bar.full { background:var(--red-bg); color:var(--red); border:1.5px solid var(--red); }
+    .assign-preview { font-size:12px; color:var(--sage); margin-top:4px; font-style:italic; min-height:18px; }
+
+    /* Board-pick checkboxes (multi hand-out) */
+    .board-pick { display:flex; align-items:center; gap:10px; padding:10px 12px; border:1.5px solid var(--border); border-radius:9px; cursor:pointer; user-select:none; transition:all .15s; margin-bottom:7px; }
+    .board-pick.selected { border-color:var(--green-bdr); background:var(--green-bg); }
+    .board-pick input[type="checkbox"] { width:18px; height:18px; accent-color:var(--green); cursor:pointer; flex-shrink:0; }
+    .board-pick .bp-name { font-size:13px; font-weight:600; color:var(--dark); flex:1; }
+    .board-pick .bp-loc  { font-size:11px; color:var(--sage-mid); }
+
+    /* Pool row in week grid */
+    .wg-cell.pool-ok   { background:var(--green-bg); color:var(--green); font-weight:700; font-size:11px; }
+    .wg-cell.pool-warn { background:var(--amber-bg); color:var(--amber); font-weight:700; font-size:11px; }
+    .wg-cell.pool-full { background:var(--red-bg);   color:var(--red);   font-weight:700; font-size:11px; }
 
     /* ── Modal overlay ── */
     .modal-overlay { position:fixed; inset:0; background:rgba(39,47,46,.55); z-index:200; display:flex; align-items:flex-end; justify-content:center; }
@@ -413,41 +447,53 @@
 </div>
 
 <!-- ══════════════════════════════════════
-     BOOKING MODAL
+     BOOKING MODAL  (lodge → guest → count → duration → date)
 ══════════════════════════════════════ -->
 <div class="modal-overlay" id="bkModal" style="display:none" onclick="outsideClose(event,'bkModal')">
   <div class="modal-sheet">
     <div class="modal-handle"></div>
     <div class="modal-inner">
-      <div class="modal-title">New Booking</div>
-      <div class="modal-sub">Advance booking — generates drop-off &amp; collection tasks</div>
+      <div class="modal-title">New Board Hire Booking</div>
+      <div class="modal-sub">Advance booking — boards auto-assigned, tasks created for maintenance</div>
       <div id="bkMsg" class="msg"></div>
 
       <div class="fld">
-        <label>Board <span style="color:var(--red)">*</span></label>
-        <select id="bkBoard" onchange="checkBookingConflict()">
-          <option value="">Select board…</option>
+        <label>Lodge / Property <span style="color:var(--red)">*</span></label>
+        <select id="bkLodge" onchange="onBkLodgeChange()">
+          <option value="">Loading lodges…</option>
         </select>
       </div>
 
       <div class="fld">
-        <label>Guest / Booking <span style="color:var(--red)">*</span></label>
-        <select id="bkGuest" onchange="updateBkSubmit()">
-          <option value="">Loading guests…</option>
+        <label>Guest Booking <span style="color:var(--red)">*</span></label>
+        <input type="text" id="bkGuestSearch" placeholder="Type name to filter…" oninput="filterBkGuest()" style="margin-bottom:6px;display:none">
+        <select id="bkGuest" onchange="onBkGuestChange()" disabled size="1">
+          <option value="">Select lodge first…</option>
         </select>
+        <div class="waiver-result" id="bkWaiverResult"></div>
       </div>
 
-      <div class="fld-row">
-        <div class="fld">
-          <label>Start date <span style="color:var(--red)">*</span></label>
-          <input type="date" id="bkStart" onchange="onBkStartChange()">
-        </div>
-        <div class="fld">
-          <label>End date <span style="color:var(--red)">*</span></label>
-          <input type="date" id="bkEnd" onchange="checkBookingConflict()">
+      <div class="fld">
+        <label>Number of boards <span style="color:var(--red)">*</span></label>
+        <div class="count-row" id="bkCountRow"></div>
+        <div class="assign-preview" id="bkAssignPreview"></div>
+      </div>
+
+      <div class="fld">
+        <label>Hire duration</label>
+        <div class="dur-row">
+          <button class="dur-btn active" id="bkDur24" onclick="setBkDur(24,this)">24 hrs</button>
+          <button class="dur-btn"        id="bkDur48" onclick="setBkDur(48,this)">48 hrs</button>
         </div>
       </div>
 
+      <div class="fld">
+        <label>Hire start date <span style="color:var(--red)">*</span></label>
+        <input type="date" id="bkStart" onchange="onBkStartChange()">
+        <div id="bkReturnNote" class="msg" style="display:none;margin-top:8px;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-bdr)"></div>
+      </div>
+
+      <div class="avail-bar" id="bkAvailBar" style="display:none"></div>
       <div class="conflict-warn" id="conflictWarn"></div>
 
       <div class="fld">
@@ -457,6 +503,64 @@
 
       <button class="submit-btn" id="bkSubmit" onclick="submitBooking()" disabled>Create Booking + Tasks</button>
       <button class="btn-cancel" onclick="closeModal('bkModal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════
+     MULTI-BOARD HAND-OUT MODAL
+══════════════════════════════════════ -->
+<div class="modal-overlay" id="mbModal" style="display:none" onclick="outsideClose(event,'mbModal')">
+  <div class="modal-sheet">
+    <div class="modal-handle"></div>
+    <div class="modal-inner">
+      <div class="modal-title" id="mbTitle">Hand Out Boards</div>
+      <div class="modal-sub"   id="mbSub">Booking hand-out</div>
+      <div id="mbMsg" class="msg"></div>
+      <div class="hire-summary" id="mbSummary"></div>
+
+      <div class="fld">
+        <label>Staff handing over <span style="color:var(--red)">*</span></label>
+        <select id="mbStaff">
+          <option value="">Select…</option>
+          <option>Saul</option><option>Barry</option><option>Mike</option>
+          <option>Meg</option><option>Alan</option>
+        </select>
+      </div>
+
+      <div id="mbReturnNote" class="msg" style="display:block;background:var(--blue-bg);color:var(--blue);border:1px solid var(--blue-bdr)"></div>
+
+      <div class="divider"></div>
+      <div class="checklist-title">🏄 Pre-Hire Equipment Check — all must be ticked</div>
+
+      <label class="check-item" id="mb_ci_inflated">
+        <input type="checkbox" id="mb_ch_inflated" onchange="tickMbCheck(this,'mb_ci_inflated')">
+        <div class="ci-text"><div class="ci-label">All boards inflated</div><div class="ci-sub">Firm to touch, valves secure</div></div>
+      </label>
+      <label class="check-item" id="mb_ci_fin">
+        <input type="checkbox" id="mb_ch_fin" onchange="tickMbCheck(this,'mb_ci_fin')">
+        <div class="ci-text"><div class="ci-label">All fins attached</div><div class="ci-sub">Fitted and locked on each board</div></div>
+      </label>
+      <label class="check-item" id="mb_ci_cond">
+        <input type="checkbox" id="mb_ch_cond" onchange="tickMbCheck(this,'mb_ci_cond')">
+        <div class="ci-text"><div class="ci-label">Board conditions checked</div><div class="ci-sub">No damage, seams intact</div></div>
+      </label>
+      <label class="check-item" id="mb_ci_lj">
+        <input type="checkbox" id="mb_ch_lj" onchange="tickMbCheck(this,'mb_ci_lj')">
+        <div class="ci-text"><div class="ci-label">Life jackets present &amp; correct</div><div class="ci-sub">One per board, clips working, correct sizes</div></div>
+      </label>
+      <label class="check-item" id="mb_ci_oar">
+        <input type="checkbox" id="mb_ch_oar" onchange="tickMbCheck(this,'mb_ci_oar')">
+        <div class="ci-text"><div class="ci-label">Paddles / oars present</div><div class="ci-sub">One per board, correct length, clips intact</div></div>
+      </label>
+
+      <div class="fld" style="margin-top:14px">
+        <label>Notes (optional)</label>
+        <textarea id="mbNotes" placeholder="Any observations before handover…"></textarea>
+      </div>
+
+      <button class="submit-btn" id="mbSubmit" onclick="submitMultiHandOut()" disabled>Hand Out Boards</button>
+      <button class="btn-cancel" onclick="closeModal('mbModal')">Cancel</button>
     </div>
   </div>
 </div>
@@ -505,14 +609,14 @@ const WAIVER_COL     = 'date_mm2jrjej';
 const PROP_COL       = 'text_mm2ahbrx';
 const ARRIVAL_COL    = 'date_mm2adtwg';
 const GUEST_NAME_COL = 'text_mm2ah8s';
+const TOTAL_BOARDS   = 6;
 
-// localStorage is used ONLY to cache Monday board/column IDs (API pointers, not data)
-const LS_BOARD_ID       = 'pbMondayBoardId';
-const LS_TASKS_BOARD    = 'pbTasksBoardId';
-const LS_BOOKINGS_BOARD = 'pbBookingsBoardId';
-const LS_BOOKINGS_COL   = 'pbBookingsColId';
-const LS_STATUS_BOARD   = 'pbStatusBoardId';
-const LS_STATUS_COL     = 'pbStatusColId';
+const BOARD_NAMES = {
+  status:   'Paddle Board Status',
+  bookings: 'Paddle Board Bookings',
+  hires:    'Paddle Board Hires',
+  tasks:    'Paddle Board Tasks'
+};
 
 const DEFAULT_BOARDS = [
   { id:1, name:'Board 1', location:'WatersEdge' },
@@ -526,54 +630,88 @@ const DEFAULT_BOARDS = [
 /* ════════════════════════════════════
    STATE
 ════════════════════════════════════ */
-let boardsConfig = [];
-let state        = {};
-let bookings     = [];
+let boardsConfig   = [];
+let state          = {};
+let bookings       = [];
+let allGuests      = [];          // loaded once at init
+let boardIds       = {};          // { status, statusColId, bookings, bookingsColId, hires, tasks }
+let boardMondayIds = {};          // { [boardId]: mondayItemId }
+let currentTab     = 'live';
+
+// Single-board hand-out / return
 let activeBoard  = null;
 let hireDur      = 24;
 let returnIssues = [];
 let condition    = 'good';
-let guestList    = [];
-let mondayBoardId    = null;
-let tasksBoardId     = null;
-let bookingsBoardId  = null;
-let bookingsDataColId = null;
-let statusBoardId    = null;
-let statusColId      = null;
-let boardMondayIds   = {};   // { [boardId]: mondayItemId }
-let currentTab       = 'live';
 
-function loadCachedIds() {
-  mondayBoardId     = localStorage.getItem(LS_BOARD_ID) || null;
-  tasksBoardId      = localStorage.getItem(LS_TASKS_BOARD) || null;
-  bookingsBoardId   = localStorage.getItem(LS_BOOKINGS_BOARD) || null;
-  bookingsDataColId = localStorage.getItem(LS_BOOKINGS_COL) || null;
-  statusBoardId     = localStorage.getItem(LS_STATUS_BOARD) || null;
-  statusColId       = localStorage.getItem(LS_STATUS_COL) || null;
+// Booking modal
+let bkDuration   = 24;
+let bkCount      = 1;
+let bkGuestList  = [];            // guests filtered to selected lodge
+
+// Multi-board hand-out modal
+let mbBookingId  = null;
+
+/* ════════════════════════════════════
+   BOARD ID MANAGEMENT
+   Always searches Monday by name so all users share the same boards.
+   localStorage is used only as a perf cache, never for correctness.
+════════════════════════════════════ */
+async function lookupBoardIds() {
+  try {
+    const d = await mq(`{ boards(workspace_ids:[${WORKSPACE_ID}], limit:200) { id name } }`);
+    for (const b of d?.boards || []) {
+      if (b.name === BOARD_NAMES.status)   boardIds.status   = String(b.id);
+      if (b.name === BOARD_NAMES.bookings) boardIds.bookings = String(b.id);
+      if (b.name === BOARD_NAMES.hires)    boardIds.hires    = String(b.id);
+      if (b.name === BOARD_NAMES.tasks)    boardIds.tasks    = String(b.id);
+    }
+  } catch(e) { console.warn('Board lookup failed:', e); }
+}
+
+async function _ensureDataCol(boardIdKey, colIdKey) {
+  if (boardIds[colIdKey]) return;
+  const bId = boardIds[boardIdKey];
+  const d = await mq(`{ boards(ids:[${bId}]) { columns { id title } } }`);
+  const col = d?.boards?.[0]?.columns?.find(c => c.title === 'data');
+  if (col) {
+    boardIds[colIdKey] = col.id;
+  } else {
+    const c = await mq(`mutation { create_column(board_id: ${bId}, title: "data", column_type: text) { id } }`);
+    boardIds[colIdKey] = c.create_column.id;
+  }
+}
+
+async function getOrCreateStatusBoard() {
+  try {
+    if (!boardIds.status) {
+      const d = await mqCreateBoard(BOARD_NAMES.status);
+      boardIds.status = String(d.create_board.id);
+    }
+    await _ensureDataCol('status', 'statusColId');
+    return { boardId: boardIds.status, colId: boardIds.statusColId };
+  } catch(e) { console.error('getOrCreateStatusBoard failed:', e); return null; }
 }
 
 async function getOrCreateBookingsBoard() {
-  if (bookingsBoardId && bookingsDataColId) return { boardId: bookingsBoardId, colId: bookingsDataColId };
   try {
-    const d = await mqCreateBoard('Paddle Board Bookings');
-    bookingsBoardId = String(d.create_board.id);
-    const c = await mq(`mutation { create_column(board_id: ${bookingsBoardId}, title: "data", column_type: text) { id } }`);
-    bookingsDataColId = c.create_column.id;
-    localStorage.setItem(LS_BOOKINGS_BOARD, bookingsBoardId);
-    localStorage.setItem(LS_BOOKINGS_COL, bookingsDataColId);
-    return { boardId: bookingsBoardId, colId: bookingsDataColId };
-  } catch(e) { console.error('Could not create bookings board:', e); return null; }
+    if (!boardIds.bookings) {
+      const d = await mqCreateBoard(BOARD_NAMES.bookings);
+      boardIds.bookings = String(d.create_board.id);
+    }
+    await _ensureDataCol('bookings', 'bookingsColId');
+    return { boardId: boardIds.bookings, colId: boardIds.bookingsColId };
+  } catch(e) { console.error('getOrCreateBookingsBoard failed:', e); return null; }
 }
 
 async function fetchBookingsFromMonday() {
-  const info = await getOrCreateBookingsBoard();
-  if (!info) return;
+  if (!boardIds.bookings) return;
   const d = await mq(`{
-    boards(ids:[${info.boardId}]) {
+    boards(ids:[${boardIds.bookings}]) {
       items_page(limit:200) {
         items {
           id
-          column_values(ids:["${info.colId}"]) { text }
+          updates(limit:1) { id text_body }
         }
       }
     }
@@ -581,30 +719,43 @@ async function fetchBookingsFromMonday() {
   const items = d?.boards?.[0]?.items_page?.items || [];
   bookings = [];
   for (const item of items) {
-    const raw = item.column_values[0]?.text;
+    const raw = item.updates?.[0]?.text_body;
     if (!raw) continue;
     try {
       const bk = JSON.parse(raw);
       bk._mondayItemId = item.id;
+      bk._mondayUpdateId = item.updates[0].id;
+      // Backward compat: old bookings use boardId (single)
+      if (bk.boardId && !bk.boardIds) bk.boardIds = [bk.boardId];
+      if (!bk.boardCount) bk.boardCount = bk.boardIds?.length || 1;
       bookings.push(bk);
     } catch(e) {}
   }
 }
 
 async function createBookingInMonday(booking) {
-  const info = await getOrCreateBookingsBoard();
-  if (!info) return;
-  const cfg  = boardsConfig.find(b => b.id === booking.boardId);
-  const name = `${cfg?.name || 'Board ' + booking.boardId} · ${booking.guestName} · ${fmtDateRange(booking.startDate, booking.endDate)}`;
-  const d = await mq(`mutation { create_item(board_id: ${info.boardId}, item_name: "${esc(name)}") { id } }`);
+  if (!boardIds.bookings) {
+    const d = await mqCreateBoard(BOARD_NAMES.bookings);
+    boardIds.bookings = String(d.create_board.id);
+  }
+  const boardNames = (booking.boardIds || [])
+    .map(id => boardsConfig.find(c => c.id === id)?.name || id).join(', ');
+  const name = `${boardNames} · ${booking.guestName} · ${fmtDateRange(booking.startDate, booking.endDate)}`;
+  const d = await mq(`mutation { create_item(board_id: ${boardIds.bookings}, item_name: "${esc(name)}") { id } }`);
   const itemId = d.create_item.id;
   booking._mondayItemId = itemId;
-  await mq(`mutation { change_column_value(board_id: ${info.boardId}, item_id: ${itemId}, column_id: "${info.colId}", value: "${esc(JSON.stringify(booking))}") { id } }`);
+  const u = await mq(`mutation { create_update(item_id: ${itemId}, body: "${esc(JSON.stringify(booking))}") { id } }`);
+  booking._mondayUpdateId = u.create_update.id;
 }
 
 async function updateBookingInMonday(booking) {
-  if (!booking._mondayItemId || !bookingsBoardId || !bookingsDataColId) return;
-  await mq(`mutation { change_column_value(board_id: ${bookingsBoardId}, item_id: ${booking._mondayItemId}, column_id: "${bookingsDataColId}", value: "${esc(JSON.stringify(booking))}") { id } }`);
+  if (!booking._mondayItemId) return;
+  // Delete the old update then write fresh — Monday has no public edit-update mutation
+  if (booking._mondayUpdateId) {
+    try { await mq(`mutation { delete_update(id: ${booking._mondayUpdateId}) { id } }`); } catch(e) {}
+  }
+  const u = await mq(`mutation { create_update(item_id: ${booking._mondayItemId}, body: "${esc(JSON.stringify(booking))}") { id } }`);
+  booking._mondayUpdateId = u.create_update.id;
 }
 
 function checkOverdue() {
@@ -654,23 +805,21 @@ function mqCreateBoard(name) {
 }
 
 async function getOrCreateHireBoard() {
-  if (mondayBoardId) return mondayBoardId;
-  try {
-    const d = await mqCreateBoard('Paddle Board Hires');
-    mondayBoardId = String(d.create_board.id);
-    localStorage.setItem(LS_BOARD_ID, mondayBoardId);
-    return mondayBoardId;
-  } catch(e) { console.error('Could not create hire board:', e); return null; }
+  if (!boardIds.hires) {
+    const d = await mqCreateBoard(BOARD_NAMES.hires);
+    boardIds.hires = String(d.create_board.id);
+  }
+  return boardIds.hires;
 }
 
 async function getOrCreateTasksBoard() {
-  if (tasksBoardId) return tasksBoardId;
   try {
-    const d = await mqCreateBoard('Paddle Board Tasks');
-    tasksBoardId = String(d.create_board.id);
-    localStorage.setItem(LS_TASKS_BOARD, tasksBoardId);
-    return tasksBoardId;
-  } catch(e) { console.warn('Could not create tasks board:', e); return null; }
+    if (!boardIds.tasks) {
+      const d = await mqCreateBoard(BOARD_NAMES.tasks);
+      boardIds.tasks = String(d.create_board.id);
+    }
+    return boardIds.tasks;
+  } catch(e) { console.error('getOrCreateTasksBoard failed:', e); return null; }
 }
 
 async function logToMonday(boardId, itemName, updateText) {
@@ -684,7 +833,7 @@ async function logToMonday(boardId, itemName, updateText) {
 }
 
 async function appendMondayUpdate(itemId, text) {
-  if (!itemId || !mondayBoardId) return;
+  if (!itemId) return;
   try {
     await mq(`mutation { create_update(item_id: ${itemId}, body: "${esc(text)}") { id } }`);
   } catch(e) { console.warn('Monday update failed:', e.message); }
@@ -695,23 +844,6 @@ async function createMondayTask(name, body) {
   return bId ? await logToMonday(bId, name, body) : null;
 }
 
-/* ── Status board: one item per physical board, stores config + live state ── */
-let _statusBoardPromise = null;
-async function getOrCreateStatusBoard() {
-  if (statusBoardId && statusColId) return { boardId: statusBoardId, colId: statusColId };
-  if (!_statusBoardPromise) {
-    _statusBoardPromise = (async () => {
-      const d = await mqCreateBoard('Paddle Board Status');
-      statusBoardId = String(d.create_board.id);
-      const c = await mq(`mutation { create_column(board_id: ${statusBoardId}, title: "data", column_type: text) { id } }`);
-      statusColId = c.create_column.id;
-      localStorage.setItem(LS_STATUS_BOARD, statusBoardId);
-      localStorage.setItem(LS_STATUS_COL, statusColId);
-      return { boardId: statusBoardId, colId: statusColId };
-    })();
-  }
-  return _statusBoardPromise;
-}
 
 async function fetchAllFromMonday() {
   const info = await getOrCreateStatusBoard();
@@ -784,67 +916,80 @@ async function deleteBoardFromMonday(boardId) {
 }
 
 /* ════════════════════════════════════
-   LOAD GUESTS FROM MONDAY
+   GUEST LOADING
 ════════════════════════════════════ */
-async function loadGuestsInto(selectId, daysAhead = 30) {
-  const sel = document.getElementById(selectId);
-  if (!sel) return;
-  sel.innerHTML = '<option value="">Loading…</option>';
+async function loadAllGuests(daysAhead = 180) {
   try {
-    const d = await mq(`{
-      boards(ids:[${ARRIVALS_BOARD}]) {
-        items_page(limit:200) {
-          items {
-            id name
-            column_values(ids:["${PROP_COL}","${ARRIVAL_COL}","${WAIVER_COL}","${GUEST_NAME_COL}"]) { id text }
-          }
-        }
-      }
-    }`);
-    const items = d?.boards?.[0]?.items_page?.items || [];
-    const today = new Date(); today.setHours(0,0,0,0);
-    const cutoffFuture = new Date(today); cutoffFuture.setDate(cutoffFuture.getDate() + daysAhead);
-    const cutoffPast   = new Date(today); cutoffPast.setDate(cutoffPast.getDate() - 14);
+    // Page 1: query under boards to get items + cursor
+    const cols = `["${PROP_COL}","${ARRIVAL_COL}","${WAIVER_COL}","${GUEST_NAME_COL}"]`;
+    const itemFields = `id name column_values(ids:${cols}) { id text }`;
+    const first = await mq(`{ boards(ids:[${ARRIVALS_BOARD}]) { items_page(limit:500) { cursor items { ${itemFields} } } } }`);
+    const firstPage = first?.boards?.[0]?.items_page;
+    let allItems = firstPage?.items || [];
+    let cursor   = firstPage?.cursor || null;
 
-    guestList = [];
+    // Subsequent pages: Monday requires next_items_page at root level
+    while (cursor && allItems.length < 3000) {
+      const next = await mq(`{ next_items_page(limit:500, cursor:"${cursor}") { cursor items { ${itemFields} } } }`);
+      const page = next?.next_items_page;
+      allItems = allItems.concat(page?.items || []);
+      cursor   = page?.cursor || null;
+    }
+
+    const items = allItems;
+    const today = new Date(); today.setHours(0,0,0,0);
+    const cutFuture = new Date(today); cutFuture.setDate(cutFuture.getDate() + daysAhead);
+    // Look back 60 days to cover guests currently in residence mid-stay
+    const cutPast = new Date(today); cutPast.setDate(cutPast.getDate() - 60);
+    allGuests = [];
     for (const item of items) {
       const cv = {};
       for (const c of item.column_values) cv[c.id] = c.text || '';
       const arrStr = cv[ARRIVAL_COL];
-      if (arrStr) {
-        const arr = new Date(arrStr);
-        if (arr < cutoffPast || arr > cutoffFuture) continue;
+      // Normalize to a Date object for reliable comparison regardless of Monday's text format
+      const arrDate = arrStr ? new Date(arrStr) : null;
+      if (arrDate && !isNaN(arrDate)) {
+        if (arrDate < cutPast || arrDate > cutFuture) continue;
       }
-      guestList.push({
+      const property = cv[PROP_COL]?.trim() || '';
+      allGuests.push({
         id: item.id, name: item.name,
-        property:    cv[PROP_COL] || item.name,
+        property,
         hasWaiver:   !!(cv[WAIVER_COL] && cv[WAIVER_COL].trim()),
-        arrivalDate: cv[ARRIVAL_COL] || '',
+        // Store as YYYY-MM-DD so comparisons are consistent
+        arrivalDate: arrDate && !isNaN(arrDate) ? toDateStr(arrDate) : '',
         bookingRef:  cv[GUEST_NAME_COL] || ''
       });
     }
-
-    sel.innerHTML = guestList.length
-      ? '<option value="">Select guest / booking…</option>'
-      : '<option value="">— No bookings in window —</option>';
-    guestList.forEach((g, idx) => {
-      const o = document.createElement('option');
-      o.value = idx;
-      o.textContent = `${g.name}${g.property ? ' · ' + g.property : ''}`;
-      sel.appendChild(o);
-    });
-  } catch(e) {
-    sel.innerHTML = '<option value="">Error: ' + e.message.slice(0,40) + '</option>';
-  }
+    // Sort chronologically so dropdowns are in date order
+    allGuests.sort((a, b) => (a.arrivalDate || '9999').localeCompare(b.arrivalDate || '9999'));
+  } catch(e) { console.warn('loadAllGuests failed:', e); }
 }
 
-function loadGuests() { loadGuestsInto('hoGuest', 30); }
+function getLodges() {
+  return [...new Set(allGuests.map(g => g.property).filter(Boolean))].sort();
+}
+
+// Populate a <select> from allGuests, optionally filtered to a lodge
+function loadGuestsInto(selectId, locationFilter = null) {
+  const sel = document.getElementById(selectId);
+  if (!sel) return;
+  const list = locationFilter
+    ? allGuests.filter(g => g.property === locationFilter)
+    : allGuests;
+  sel.innerHTML = list.length
+    ? '<option value="">Select guest / booking…</option>' + list.map(g => {
+        const idx = allGuests.indexOf(g);
+        return `<option value="${idx}">${g.name}${g.property ? ' · ' + g.property : ''}</option>`;
+      }).join('')
+    : '<option value="">— No bookings found —</option>';
+}
 
 function onGuestSelect() {
   const idx = document.getElementById('hoGuest').value;
   const res = document.getElementById('waiverResult');
   if (idx === '') { res.className = 'waiver-result'; updateHoSubmit(); return; }
-  const g = guestList[parseInt(idx)];
+  const g = allGuests[parseInt(idx)];
   if (!g) { res.className = 'waiver-result'; updateHoSubmit(); return; }
   res.className = g.hasWaiver ? 'waiver-result ok' : 'waiver-result warn';
   res.textContent = g.hasWaiver ? '✓ Waiver on file — signed' : '⚠ No waiver found — confirm with management before proceeding';
@@ -909,9 +1054,12 @@ function renderLive() {
       else if (status === 'overdue') over++;
       else out++;
 
-      // Find soonest upcoming booking for this board
+      // Find soonest upcoming booking that includes this board
       const upcoming = bookings
-        .filter(bk => bk.boardId === cfg.id && bk.status === 'upcoming' && bk.endDate >= todayStr)
+        .filter(bk =>
+          (bk.boardIds || (bk.boardId ? [bk.boardId] : [])).includes(cfg.id) &&
+          bk.status === 'upcoming' && bk.endDate >= todayStr
+        )
         .sort((a, b) => a.startDate.localeCompare(b.startDate))[0];
 
       const badgeText = { available:'Available', out:'Out on hire', overdue:'Overdue', maintenance:'Maintenance' }[status] || status;
@@ -925,7 +1073,11 @@ function renderLive() {
 
       if (upcoming) {
         const isToday = upcoming.startDate <= todayStr && upcoming.endDate >= todayStr;
-        inner += `<div class="bc-booked-soon">${isToday ? '📅 Booked today' : '📅 Booked ' + fmtDateShort(upcoming.startDate)}</div>`;
+        if (isToday) {
+          inner += `<div class="bc-booked-today">📅 Booked today · ${upcoming.guestName}</div>`;
+        } else {
+          inner += `<div class="bc-booked-soon">📅 Booked ${fmtDateShort(upcoming.startDate)} · ${upcoming.guestName}</div>`;
+        }
       }
 
       if ((status === 'out' || status === 'overdue') && b.hire) {
@@ -938,8 +1090,14 @@ function renderLive() {
           <div class="bc-dur">Hire: ${b.hire.duration || 24}h · Out: ${fmtHandedOut(b.hire.handedOut)}</div>
           <button class="bc-btn ${btnCls}" onclick="openReturnModal(${cfg.id})">Record Return</button>`;
       } else if (status === 'available') {
-        inner += `<button class="bc-btn handout" onclick="openHandOutModal(${cfg.id})">Hand Out</button>`;
-        inner += `<button class="bc-btn book"    onclick="openBookModal(${cfg.id})">Book Ahead</button>`;
+        const todayBk = upcoming && upcoming.startDate === todayStr ? upcoming : null;
+        if (todayBk) {
+          inner += `<button class="bc-btn handout" onclick="openBookingHandOut('${todayBk.id}')">Hand Out (Booking)</button>`;
+          inner += `<button class="bc-btn book"    onclick="openHandOutModal(${cfg.id})">Ad-hoc Hand Out</button>`;
+        } else {
+          inner += `<button class="bc-btn handout" onclick="openHandOutModal(${cfg.id})">Hand Out</button>`;
+          inner += `<button class="bc-btn book"    onclick="openBookModal()">Book Ahead</button>`;
+        }
       } else if (status === 'maintenance') {
         inner += `<div class="bc-dur" style="color:var(--sage-mid);margin-bottom:8px">In maintenance</div>`;
       }
@@ -983,21 +1141,36 @@ function renderWeekGrid() {
   });
   html += `</div>`;
 
-  // Rows
+  // Pool availability row
+  html += `<div class="wg-row" style="${colTemplate}">`;
+  html += `<div class="wg-cell board-lbl" style="font-size:9px">POOL</div>`;
+  days.forEach(d => {
+    const dStr    = toDateStr(d);
+    const booked  = bookings
+      .filter(bk => (bk.status === 'upcoming' || bk.status === 'active') && bk.startDate <= dStr && bk.endDate >= dStr)
+      .reduce((sum, bk) => sum + (bk.boardCount || bk.boardIds?.length || 1), 0);
+    const free    = (boardsConfig.length || TOTAL_BOARDS) - booked;
+    const cls     = free === 0 ? 'pool-full' : free <= 2 ? 'pool-warn' : 'pool-ok';
+    html += `<div class="wg-cell ${cls}">${free}</div>`;
+  });
+  html += `</div>`;
+
+  // Individual board rows
   for (const cfg of boardsConfig) {
     html += `<div class="wg-row" style="${colTemplate}">`;
     html += `<div class="wg-cell board-lbl">${cfg.name}</div>`;
     days.forEach(d => {
       const dStr = toDateStr(d);
       const isBooked = bookings.some(bk =>
-        bk.boardId === cfg.id && bk.status === 'upcoming' &&
+        (bk.boardIds || (bk.boardId ? [bk.boardId] : [])).includes(cfg.id) &&
+        (bk.status === 'upcoming' || bk.status === 'active') &&
         bk.startDate <= dStr && bk.endDate >= dStr
       );
       const b = state[cfg.id];
       const isHiredNow = (b?.status === 'out' || b?.status === 'overdue') && dStr === todayStr;
-      if (isBooked)    html += `<div class="wg-cell booked"></div>`;
+      if (isBooked)        html += `<div class="wg-cell booked"></div>`;
       else if (isHiredNow) html += `<div class="wg-cell hired"></div>`;
-      else             html += `<div class="wg-cell"></div>`;
+      else                 html += `<div class="wg-cell"></div>`;
     });
     html += `</div>`;
   }
@@ -1014,7 +1187,7 @@ function renderUpcoming() {
 
   html += `<div class="section-action">
     <div class="section-lbl" style="flex:1;margin-bottom:0">Upcoming Bookings</div>
-    <button class="add-btn" onclick="openBookModal(null)">+ New Booking</button>
+    <button class="add-btn" onclick="openBookModal()">+ New Booking</button>
   </div>`;
 
   const relevant = bookings
@@ -1025,22 +1198,30 @@ function renderUpcoming() {
     html += `<div class="bk-empty">No upcoming bookings — use + New Booking to add one</div>`;
   } else {
     for (const bk of relevant) {
-      const cfg     = boardsConfig.find(b => b.id === bk.boardId);
-      const isToday = bk.startDate <= todayStr && bk.endDate >= todayStr;
-      const boardLabel = cfg ? `${cfg.name} · ${cfg.location}` : `Board ${bk.boardId}`;
-      const canActivate = isToday && (state[bk.boardId]?.status === 'available');
+      const ids        = bk.boardIds || (bk.boardId ? [bk.boardId] : []);
+      const isToday    = bk.startDate <= todayStr && bk.endDate >= todayStr;
+      const boardNames = ids.map(id => boardsConfig.find(c => c.id === id)?.name || `Board ${id}`).join(', ') || '—';
+      const allFree    = ids.every(id => state[id]?.status === 'available');
+      const canHO      = isToday && allFree && ids.length > 0;
+      const waiverTag  = bk.waiverOk
+        ? `<span class="bk-tag waiver-ok">✓ Waiver</span>`
+        : `<span class="bk-tag waiver-warn">⚠ No waiver</span>`;
       html += `<div class="booking-card${isToday ? ' today' : ''}">
         <div class="bk-head">
-          <div class="bk-board">${boardLabel}</div>
+          <div class="bk-board">${bk.property || '—'}</div>
           <div class="bk-badge${isToday ? ' today' : ''}">${isToday ? 'Active today' : 'Upcoming'}</div>
         </div>
         <div class="bk-guest">${bk.guestName}</div>
-        <div class="bk-lodge">${bk.property || ''}</div>
         <div class="bk-dates">📅 ${fmtDateRange(bk.startDate, bk.endDate)}</div>
-        ${bk.notes ? `<div class="bk-dates" style="margin-top:2px">📝 ${bk.notes}</div>` : ''}
+        <div class="bk-meta">
+          <span class="bk-tag boards">🏄 ${bk.boardCount || ids.length} board${(bk.boardCount || ids.length) > 1 ? 's' : ''} · ${boardNames}</span>
+          <span class="bk-tag dur">${bk.duration || 24}h</span>
+          ${waiverTag}
+        </div>
+        ${bk.notes ? `<div class="bk-dates" style="margin-top:4px">📝 ${bk.notes}</div>` : ''}
         <div class="bk-actions">
-          ${canActivate ? `<button class="bk-btn activate" onclick="openHandOutModal(${bk.boardId})">Hand Out Now</button>` : ''}
-          <button class="bk-btn cancel-bk" onclick="cancelBooking('${bk.id}')">Cancel Booking</button>
+          ${canHO ? `<button class="bk-btn activate" onclick="openBookingHandOut('${bk.id}')">Hand Out ${bk.boardCount || ids.length} Board${(bk.boardCount || ids.length) > 1 ? 's' : ''}</button>` : ''}
+          <button class="bk-btn cancel-bk" onclick="cancelBooking('${bk.id}')">Cancel</button>
         </div>
       </div>`;
     }
@@ -1104,7 +1285,11 @@ function openHandOutModal(boardNum) {
 
   updateReturnNote();
   updateHoSubmit();
-  loadGuests();
+  if (allGuests.length === 0) {
+    loadAllGuests().then(() => loadGuestsInto('hoGuest', cfg?.location));
+  } else {
+    loadGuestsInto('hoGuest', cfg?.location);
+  }
   document.getElementById('hoModal').style.display = 'flex';
 }
 
@@ -1140,7 +1325,7 @@ async function submitHandOut() {
   const notes    = document.getElementById('hoNotes').value.trim();
   if (guestIdx === '' || !staff) return;
 
-  const g = guestList[parseInt(guestIdx)];
+  const g = allGuests[parseInt(guestIdx)];
   document.getElementById('hoSubmit').disabled = true;
   showMsgEl('hoMsg', 'Logging to Monday…', 'loading');
 
@@ -1292,130 +1477,432 @@ async function submitReturn() {
 }
 
 /* ════════════════════════════════════
-   BOOKING MODAL
+   BOOKING MODAL  (lodge → guest → count → duration → date)
 ════════════════════════════════════ */
-function openBookModal(preselectedBoardId) {
-  const sel = document.getElementById('bkBoard');
-  sel.innerHTML = boardsConfig.map(cfg =>
-    `<option value="${cfg.id}"${cfg.id === preselectedBoardId ? ' selected' : ''}>${cfg.name} (${cfg.location})</option>`
-  ).join('');
 
-  document.getElementById('bkGuest').innerHTML = '<option value="">Loading…</option>';
-  document.getElementById('bkStart').value = '';
-  document.getElementById('bkEnd').value   = '';
-  document.getElementById('bkNotes').value = '';
+function addDays(dateStr, n) {
+  if (!dateStr) return '';
+  const d = new Date(dateStr + 'T12:00:00');
+  d.setDate(d.getDate() + n);
+  return toDateStr(d);
+}
+
+function calcBkEndDate() {
+  const start = document.getElementById('bkStart').value;
+  return start ? addDays(start, bkDuration === 48 ? 1 : 0) : '';
+}
+
+// Returns boardsConfig entries that are free for the given date range
+function getAvailableBoards(startDate, endDate, excludeBookingId = null) {
+  const reserved = new Set();
+  for (const bk of bookings) {
+    if (bk.status !== 'upcoming' && bk.status !== 'active') continue;
+    if (bk.id === excludeBookingId) continue;
+    if (bk.startDate > endDate || bk.endDate < startDate) continue;
+    const ids = bk.boardIds || (bk.boardId ? [bk.boardId] : []);
+    ids.forEach(id => reserved.add(id));
+  }
+  return boardsConfig.filter(cfg =>
+    !reserved.has(cfg.id) && state[cfg.id]?.status !== 'maintenance'
+  );
+}
+
+function autoAssignBoards(count, startDate, endDate) {
+  const avail = getAvailableBoards(startDate, endDate);
+  if (avail.length < count) return null;
+  return avail.slice(0, count).map(cfg => cfg.id);
+}
+
+function renderCountButtons(maxAllowed) {
+  const total = boardsConfig.length || TOTAL_BOARDS;
+  const row   = document.getElementById('bkCountRow');
+  if (!row) return;
+  row.innerHTML = '';
+  for (let i = 1; i <= total; i++) {
+    const btn = document.createElement('button');
+    btn.type = 'button';
+    btn.textContent = i;
+    btn.className = 'count-btn' + (i === bkCount ? ' active' : '');
+    if (maxAllowed !== null && i > maxAllowed) {
+      btn.disabled = true;
+      btn.title = `Only ${maxAllowed} board${maxAllowed !== 1 ? 's' : ''} available`;
+    } else {
+      btn.onclick = () => setBkCount(i);
+    }
+    row.appendChild(btn);
+  }
+}
+
+function updateBkAvailability() {
+  const start  = document.getElementById('bkStart').value;
+  const barEl  = document.getElementById('bkAvailBar');
+  const prevEl = document.getElementById('bkAssignPreview');
+  if (!start) {
+    barEl.style.display = 'none';
+    if (prevEl) prevEl.textContent = '';
+    renderCountButtons(null);
+    return;
+  }
+  const end    = calcBkEndDate();
+  const avail  = getAvailableBoards(start, end);
+  const total  = boardsConfig.length || TOTAL_BOARDS;
+
+  barEl.style.display = 'block';
+  if (avail.length === 0) {
+    barEl.className = 'avail-bar full';
+    barEl.textContent = '✕ No boards available on these dates';
+  } else if (avail.length <= 2) {
+    barEl.className = 'avail-bar warn';
+    barEl.textContent = `⚠ Only ${avail.length} of ${total} boards available on these dates`;
+  } else {
+    barEl.className = 'avail-bar ok';
+    barEl.textContent = `✓ ${avail.length} of ${total} boards available on these dates`;
+  }
+
+  renderCountButtons(avail.length);
+
+  if (prevEl) {
+    if (bkCount > 0 && avail.length >= bkCount) {
+      prevEl.textContent = 'Will assign: ' + avail.slice(0, bkCount).map(c => c.name).join(', ');
+    } else if (bkCount > avail.length) {
+      prevEl.textContent = '';
+    }
+  }
+}
+
+function openBookModal() {
+  bkDuration = 24;
+  bkCount    = 1;
+  bkGuestList = [];
+
   document.getElementById('bkMsg').className = 'msg';
+  document.getElementById('bkStart').value   = '';
+  document.getElementById('bkNotes').value   = '';
+  document.getElementById('bkStart').min     = toDateStr(new Date());
+  document.getElementById('bkAvailBar').style.display  = 'none';
+  document.getElementById('bkReturnNote').style.display = 'none';
+  document.getElementById('bkWaiverResult').className   = 'waiver-result';
   document.getElementById('conflictWarn').classList.remove('show');
   document.getElementById('bkSubmit').disabled = true;
+  document.getElementById('bkDur24').className = 'dur-btn active';
+  document.getElementById('bkDur48').className = 'dur-btn';
+  renderCountButtons(null);
+  document.getElementById('bkAssignPreview').textContent = '';
 
-  const todayStr = toDateStr(new Date());
-  document.getElementById('bkStart').min = todayStr;
-  document.getElementById('bkEnd').min   = todayStr;
+  // Populate lodges from allGuests
+  const lodgeSel = document.getElementById('bkLodge');
+  const lodges = getLodges();
+  lodgeSel.innerHTML = lodges.length
+    ? '<option value="">Select lodge…</option>' + lodges.map(l => `<option value="${esc(l)}">${l}</option>`).join('')
+    : '<option value="">— No upcoming bookings found —</option>';
+
+  document.getElementById('bkGuest').innerHTML = '<option value="">Select lodge first…</option>';
+  document.getElementById('bkGuest').disabled  = true;
+  const srch = document.getElementById('bkGuestSearch');
+  if (srch) { srch.style.display = 'none'; srch.value = ''; }
 
   document.getElementById('bkModal').style.display = 'flex';
-  loadGuestsInto('bkGuest', 90);
 }
 
-function onBkStartChange() {
-  const start = document.getElementById('bkStart').value;
-  if (start) document.getElementById('bkEnd').min = start;
-  checkBookingConflict();
-}
+function onBkLodgeChange() {
+  const lodge   = document.getElementById('bkLodge').value;
+  const gSel    = document.getElementById('bkGuest');
+  const waiver  = document.getElementById('bkWaiverResult');
+  waiver.className = 'waiver-result';
+  bkCount      = 1;
+  document.getElementById('bkAssignPreview').textContent = '';
 
-function checkBookingConflict() {
-  const boardId   = parseInt(document.getElementById('bkBoard').value);
-  const startDate = document.getElementById('bkStart').value;
-  const endDate   = document.getElementById('bkEnd').value;
-  const warnEl    = document.getElementById('conflictWarn');
-
-  if (!boardId || !startDate || !endDate) { warnEl.classList.remove('show'); updateBkSubmit(); return; }
-
-  // Check against existing bookings
-  const conflict = bookings.find(bk =>
-    bk.boardId === boardId && bk.status === 'upcoming' &&
-    bk.startDate <= endDate && bk.endDate >= startDate
-  );
-  if (conflict) {
-    warnEl.textContent = `⚠ Already booked: ${conflict.guestName} · ${fmtDateRange(conflict.startDate, conflict.endDate)}`;
-    warnEl.classList.add('show');
-    updateBkSubmit(); return;
+  if (!lodge) {
+    gSel.innerHTML = '<option value="">Select lodge first…</option>';
+    gSel.disabled  = true;
+    renderCountButtons(null);
+    updateBkSubmit();
+    return;
   }
 
-  // Check live hire overlapping today
-  const todayStr = toDateStr(new Date());
-  const b = state[boardId];
-  if (b && (b.status === 'out' || b.status === 'overdue') && startDate <= todayStr && endDate >= todayStr) {
-    warnEl.textContent = `⚠ Board is currently out on hire — it may not be back in time`;
-    warnEl.classList.add('show');
-    updateBkSubmit(); return;
+  // bkGuestList = ALL recent/upcoming guests — not filtered by lodge.
+  // Many bookings in Monday don't have the property column filled yet,
+  // so filtering by property would hide them. Instead we use optgroups:
+  // lodge-matched bookings appear first, all others below.
+  const cutoff = new Date(); cutoff.setDate(cutoff.getDate() - 7); cutoff.setHours(0,0,0,0);
+  bkGuestList = allGuests.filter(g => {
+    if (!g.arrivalDate) return true;
+    const d = new Date(g.arrivalDate);
+    return isNaN(d) || d >= cutoff;
+  });
+
+  const todayStr     = toDateStr(new Date());
+  const lodgeGuests  = bkGuestList.filter(g => g.property === lodge);
+  const otherGuests  = bkGuestList.filter(g => g.property !== lodge);
+
+  function makeOpt(g) {
+    const idx  = bkGuestList.indexOf(g);
+    const inRes = g.arrivalDate && g.arrivalDate <= todayStr;
+    const lbl  = g.arrivalDate
+      ? (inRes ? '★ in residence · arrived ' : 'arrives ') + fmtDateShort(g.arrivalDate)
+      : '';
+    const propLbl = g.property && g.property !== lodge ? ' [' + g.property + ']' : '';
+    const opt = document.createElement('option');
+    opt.value       = idx;
+    opt.textContent = g.name + (lbl ? ' · ' + lbl : '') + propLbl;
+    return opt;
   }
 
-  warnEl.classList.remove('show');
+  gSel.disabled = false;
+  gSel.innerHTML = '<option value="">Select booking…</option>';
+
+  if (lodgeGuests.length > 0) {
+    const grp = document.createElement('optgroup');
+    grp.label = lodge + ' bookings';
+    lodgeGuests.forEach(g => grp.appendChild(makeOpt(g)));
+    gSel.appendChild(grp);
+  }
+
+  if (otherGuests.length > 0) {
+    const grp = document.createElement('optgroup');
+    grp.label = lodgeGuests.length > 0 ? 'All other bookings' : 'All bookings (type to filter)';
+    otherGuests.forEach(g => grp.appendChild(makeOpt(g)));
+    gSel.appendChild(grp);
+  }
+
+  if (bkGuestList.length === 0) {
+    gSel.innerHTML = '<option value="">— No upcoming bookings found —</option>';
+    gSel.disabled  = true;
+  }
+
+  // Show filter input so user can search by typing
+  const searchEl = document.getElementById('bkGuestSearch');
+  if (searchEl) { searchEl.style.display = 'block'; searchEl.value = ''; }
+
+  renderCountButtons(null);
   updateBkSubmit();
 }
 
+function filterBkGuest() {
+  const q    = (document.getElementById('bkGuestSearch')?.value || '').toLowerCase().trim();
+  const gSel = document.getElementById('bkGuest');
+  for (const opt of gSel.options) {
+    if (!opt.value) { opt.hidden = false; continue; }  // keep placeholder
+    opt.hidden = q.length > 0 && !opt.textContent.toLowerCase().includes(q);
+  }
+  // Deselect if current selection is now hidden
+  const sel = gSel.options[gSel.selectedIndex];
+  if (sel && sel.hidden) { gSel.value = ''; onBkGuestChange(); }
+}
+
+function onBkGuestChange() {
+  const idx    = document.getElementById('bkGuest').value;
+  const waiver = document.getElementById('bkWaiverResult');
+  if (idx === '') { waiver.className = 'waiver-result'; updateBkSubmit(); return; }
+  const g = bkGuestList[parseInt(idx)];
+  if (!g) { waiver.className = 'waiver-result'; updateBkSubmit(); return; }
+
+  waiver.className   = g.hasWaiver ? 'waiver-result ok' : 'waiver-result warn';
+  waiver.textContent = g.hasWaiver
+    ? '✓ Waiver on file — signed'
+    : '⚠ No waiver found — chase before hire starts';
+
+  // Default start date to guest arrival date
+  if (g.arrivalDate && !document.getElementById('bkStart').value) {
+    document.getElementById('bkStart').value = g.arrivalDate;
+    onBkStartChange();
+  }
+  updateBkSubmit();
+}
+
+function setBkDur(d, btn) {
+  bkDuration = d;
+  document.getElementById('bkDur24').className = 'dur-btn' + (d === 24 ? ' active' : '');
+  document.getElementById('bkDur48').className = 'dur-btn' + (d === 48 ? ' active' : '');
+  updateBkDatesDisplay();
+  updateBkAvailability();
+  updateBkSubmit();
+}
+
+function setBkCount(n) {
+  bkCount = n;
+  renderCountButtons(null);  // re-render with new active
+  updateBkAvailability();
+  updateBkSubmit();
+}
+
+function onBkStartChange() {
+  updateBkDatesDisplay();
+  updateBkAvailability();
+  updateBkSubmit();
+}
+
+function updateBkDatesDisplay() {
+  const start  = document.getElementById('bkStart').value;
+  const noteEl = document.getElementById('bkReturnNote');
+  if (!start) { noteEl.style.display = 'none'; return; }
+  const end = calcBkEndDate();
+  noteEl.textContent   = `Hire period: ${fmtDate(start)}${end !== start ? ' – ' + fmtDate(end) : ' (24 hrs)'}`;
+  noteEl.style.display = 'block';
+}
+
 function updateBkSubmit() {
-  const boardId   = document.getElementById('bkBoard').value;
-  const guestIdx  = document.getElementById('bkGuest').value;
-  const startDate = document.getElementById('bkStart').value;
-  const endDate   = document.getElementById('bkEnd').value;
-  const hasConflict = document.getElementById('conflictWarn').classList.contains('show');
-  document.getElementById('bkSubmit').disabled = !(boardId && guestIdx !== '' && startDate && endDate && !hasConflict);
+  const lodge    = document.getElementById('bkLodge').value;
+  const guestIdx = document.getElementById('bkGuest').value;
+  const start    = document.getElementById('bkStart').value;
+  const conflict = document.getElementById('conflictWarn').classList.contains('show');
+  const avail    = start ? getAvailableBoards(start, calcBkEndDate()) : [];
+  document.getElementById('bkSubmit').disabled =
+    !(lodge && guestIdx !== '' && start && bkCount >= 1 && avail.length >= bkCount && !conflict);
 }
 
 async function submitBooking() {
-  const boardId   = parseInt(document.getElementById('bkBoard').value);
   const guestIdx  = document.getElementById('bkGuest').value;
   const startDate = document.getElementById('bkStart').value;
-  const endDate   = document.getElementById('bkEnd').value;
   const notes     = document.getElementById('bkNotes').value.trim();
 
-  if (!boardId || guestIdx === '' || !startDate || !endDate) {
+  if (!document.getElementById('bkLodge').value || guestIdx === '' || !startDate || bkCount < 1) {
     showMsgEl('bkMsg', 'Please fill in all required fields', 'error'); return;
   }
-  if (startDate > endDate) {
-    showMsgEl('bkMsg', 'End date must be on or after start date', 'error'); return;
+
+  const endDate    = calcBkEndDate();
+  const assignedIds = autoAssignBoards(bkCount, startDate, endDate);
+  if (!assignedIds) {
+    showMsgEl('bkMsg', 'Not enough boards available on those dates', 'error'); return;
   }
 
-  const g   = guestList[parseInt(guestIdx)];
-  const cfg = boardsConfig.find(b => b.id === boardId);
+  const g          = bkGuestList[parseInt(guestIdx)];
+  const lodge      = g.property || document.getElementById('bkLodge').value;
+  const boardNames = assignedIds.map(id => boardsConfig.find(c => c.id === id)?.name || `Board ${id}`).join(', ');
+  const boardLabel = bkCount === 1 ? boardNames : `${bkCount} boards (${boardNames})`;
 
   document.getElementById('bkSubmit').disabled = true;
   showMsgEl('bkMsg', 'Creating booking and Monday tasks…', 'loading');
 
-  const lodge     = g.property || cfg?.location || 'lodge';
-  const boardName = cfg?.name || `Board ${boardId}`;
+  try {
+    const dropName = `🚚 Drop-off ${boardLabel} → ${lodge} — ${fmtDate(startDate)}`;
+    const dropBody = `Deliver ${boardLabel} to ${lodge} for ${g.name} on ${fmtDate(startDate)}.\\nHire: ${bkDuration}h · ${fmtDateRange(startDate, endDate)}\\nWaiver: ${g.hasWaiver ? 'On file' : 'NOT YET SIGNED — chase before hand-out'}\\n${notes ? 'Notes: ' + notes : ''}`;
+    const pickName = `📦 Collect ${boardLabel} from ${lodge} — ${fmtDate(endDate)}`;
+    const pickBody = `Collect ${boardLabel} from ${lodge} (${g.name}) on ${fmtDate(endDate)}.\\nHire period: ${fmtDateRange(startDate, endDate)}\\n${notes ? 'Notes: ' + notes : ''}`;
 
-  const dropName = `🚚 Drop-off ${boardName} → ${lodge} — ${fmtDate(startDate)}`;
-  const dropBody = `Deliver ${boardName} to ${lodge} for ${g.name} on ${fmtDate(startDate)}.\\nBooking period: ${fmtDateRange(startDate, endDate)}\\n${notes ? 'Notes: ' + notes : ''}`;
-  const pickName = `📦 Collect ${boardName} from ${lodge} — ${fmtDate(endDate)}`;
-  const pickBody = `Collect ${boardName} from ${lodge} from ${g.name} on ${fmtDate(endDate)}.\\nBooking period: ${fmtDateRange(startDate, endDate)}\\n${notes ? 'Notes: ' + notes : ''}`;
+    const [dropTaskId, pickTaskId] = await Promise.all([
+      createMondayTask(dropName, dropBody),
+      createMondayTask(pickName, pickBody)
+    ]);
 
-  // Create both tasks and the booking record in parallel
-  const [dropTaskId, pickTaskId] = await Promise.all([
-    createMondayTask(dropName, dropBody),
-    createMondayTask(pickName, pickBody),
-    getOrCreateBookingsBoard()  // warm up the bookings board concurrently
-  ]);
+    const booking = {
+      id: 'bk_' + Date.now(),
+      boardIds: assignedIds, boardCount: bkCount, duration: bkDuration,
+      guestMondayId: g.id, guestName: g.name,
+      property: lodge, startDate, endDate, notes,
+      waiverOk: g.hasWaiver, status: 'upcoming',
+      mondayDropTaskId: dropTaskId, mondayPickupTaskId: pickTaskId,
+      createdAt: new Date().toISOString()
+    };
 
-  const booking = {
-    id: 'bk_' + Date.now(),
-    boardId, guestMondayId: g.id, guestName: g.name,
-    property: g.property, startDate, endDate, notes,
-    status: 'upcoming',
-    mondayDropTaskId: dropTaskId,
-    mondayPickupTaskId: pickTaskId,
-    createdAt: new Date().toISOString()
-  };
+    await createBookingInMonday(booking);
+    bookings.push(booking);
 
-  await createBookingInMonday(booking);
-  bookings.push(booking);
+    showMsgEl('bkMsg', `✓ Booking created — ${boardLabel} assigned · drop-off and collection tasks added to Monday`, 'success');
+    setTimeout(() => {
+      closeModal('bkModal');
+      renderLive();
+      if (currentTab === 'upcoming') renderUpcoming();
+      showToast(`Booking created for ${g.name}`, 'ok');
+    }, 1800);
+  } catch(e) {
+    console.error('submitBooking failed:', e);
+    showMsgEl('bkMsg', 'Failed to save: ' + (e.message || 'Unknown error — check console'), 'error');
+    document.getElementById('bkSubmit').disabled = false;
+  }
+}
 
-  showMsgEl('bkMsg', `✓ Booking created — drop-off and collection tasks added to Monday`, 'success');
+/* ════════════════════════════════════
+   MULTI-BOARD HAND-OUT MODAL
+════════════════════════════════════ */
+function openBookingHandOut(bookingId) {
+  const bk  = bookings.find(b => b.id === bookingId);
+  if (!bk) return;
+  mbBookingId = bookingId;
+
+  const boardNames = (bk.boardIds || []).map(id => boardsConfig.find(c => c.id === id)?.name || `Board ${id}`).join(', ');
+  document.getElementById('mbTitle').textContent = `Hand Out — ${bk.boardCount || bk.boardIds?.length || 1} Board${(bk.boardCount || 1) > 1 ? 's' : ''}`;
+  document.getElementById('mbSub').textContent   = `${bk.property} · ${bk.guestName}`;
+  document.getElementById('mbMsg').className     = 'msg';
+  document.getElementById('mbStaff').value       = '';
+  document.getElementById('mbNotes').value       = '';
+
+  // Booking summary card
+  const due = new Date(Date.now() + (bk.duration || 24) * 3600000);
+  document.getElementById('mbSummary').innerHTML = `
+    <div class="hs-board">${boardNames}</div>
+    <div class="hs-guest">${bk.guestName}</div>
+    <div class="hs-meta">${bk.property} · ${bk.duration || 24}h hire · ${fmtDateRange(bk.startDate, bk.endDate)}</div>`;
+
+  document.getElementById('mbReturnNote').textContent =
+    `Due back: ${due.toLocaleDateString('en-GB',{weekday:'long',day:'numeric',month:'short'})} at ${due.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}`;
+
+  // Reset checklist
+  ['mb_ch_inflated','mb_ch_fin','mb_ch_cond','mb_ch_lj','mb_ch_oar'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) { el.checked = false; el.closest('.check-item')?.classList.remove('ticked'); }
+  });
+
+  updateMbSubmit();
+  document.getElementById('mbModal').style.display = 'flex';
+}
+
+function tickMbCheck(cb, wrapperId) {
+  document.getElementById(wrapperId)?.classList.toggle('ticked', cb.checked);
+  updateMbSubmit();
+}
+
+function updateMbSubmit() {
+  const allTicked = ['mb_ch_inflated','mb_ch_fin','mb_ch_cond','mb_ch_lj','mb_ch_oar']
+    .every(id => document.getElementById(id)?.checked);
+  const hasStaff  = document.getElementById('mbStaff').value !== '';
+  document.getElementById('mbSubmit').disabled = !(allTicked && hasStaff);
+}
+
+async function submitMultiHandOut() {
+  const bk    = bookings.find(b => b.id === mbBookingId);
+  if (!bk) return;
+  const staff = document.getElementById('mbStaff').value;
+  const notes = document.getElementById('mbNotes').value.trim();
+  if (!staff) return;
+
+  document.getElementById('mbSubmit').disabled = true;
+  showMsgEl('mbMsg', 'Logging to Monday…', 'loading');
+
+  const now      = new Date();
+  const dueBack  = new Date(now.getTime() + (bk.duration || 24) * 3600000);
+  const boardIds = bk.boardIds || (bk.boardId ? [bk.boardId] : []);
+  const hireBoard = await getOrCreateHireBoard();
+  const boardNames = boardIds.map(id => boardsConfig.find(c => c.id === id)?.name || `Board ${id}`).join(', ');
+
+  const itemName   = `${boardNames} · ${bk.guestName} · ${now.toLocaleDateString('en-GB')}`;
+  const updateText = `🏄 HAND OUT — ${boardNames}\\nGuest: ${bk.guestName}\\nLodge: ${bk.property}\\nHanded out: ${now.toLocaleString('en-GB')}\\nDue back: ${dueBack.toLocaleString('en-GB')}\\nDuration: ${bk.duration || 24}h\\nStaff: ${staff}\\nWaiver on file: ${bk.waiverOk ? 'Yes' : 'NOT CONFIRMED'}\\nEquipment check: All items confirmed\\n${notes ? 'Notes: ' + notes : ''}`;
+  const mondayItemId = await logToMonday(hireBoard, itemName, updateText);
+
+  // Mark each physical board as 'out'
+  for (const boardId of boardIds) {
+    state[boardId].status   = 'out';
+    state[boardId].location = bk.property || state[boardId]?.location;
+    state[boardId].hire     = {
+      guestName: bk.guestName, guestMondayId: bk.guestMondayId,
+      property: bk.property, handedOut: now.toISOString(),
+      dueBack: dueBack.toISOString(), duration: bk.duration || 24,
+      staff, waiverOk: bk.waiverOk,
+      mondayItemId: mondayItemId || null, bookingId: bk.id, notes
+    };
+    await updateBoardInMonday(boardId);
+  }
+
+  bk.status = 'active';
+  await updateBookingInMonday(bk);
+
+  const label = boardIds.length === 1 ? boardNames : `${boardIds.length} boards`;
+  showMsgEl('mbMsg', `✓ ${label} handed out to ${bk.guestName} — due back ${dueBack.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})} ${dueBack.toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})}`, 'success');
   setTimeout(() => {
-    closeModal('bkModal');
+    closeModal('mbModal');
     renderLive();
-    showToast(`Booking created for ${g.name}`, 'ok');
+    if (currentTab === 'upcoming') renderUpcoming();
+    showToast(`${label} out · ${bk.guestName}`, 'ok');
   }, 1800);
 }
 
@@ -1423,9 +1910,12 @@ async function cancelBooking(bookingId) {
   const bk = bookings.find(b => b.id === bookingId);
   if (!bk) return;
   if (!confirm(`Cancel booking for ${bk.guestName} (${fmtDateRange(bk.startDate, bk.endDate)})?`)) return;
-  bk.status = 'cancelled';
+  // Remove from local array immediately
+  bookings = bookings.filter(b => b.id !== bookingId);
   try {
-    await updateBookingInMonday(bk);
+    if (bk._mondayItemId) {
+      await mq(`mutation { delete_item(item_id: ${bk._mondayItemId}) { id } }`);
+    }
     showToast('Booking cancelled', 'warn');
   } catch(e) {
     showToast('Cancelled locally — Monday sync failed', 'warn');
@@ -1559,32 +2049,41 @@ function showToast(text, type = '') {
    INIT
 ════════════════════════════════════ */
 document.addEventListener('DOMContentLoaded', async () => {
-  loadCachedIds();
   boardsConfig = [];
   state        = {};
   bookings     = [];
+  allGuests    = [];
 
   document.getElementById('liveSection').innerHTML =
     '<div style="padding:40px;text-align:center;color:var(--sage-mid);font-size:13px">Loading from Monday…</div>';
 
-  try {
-    await Promise.all([ fetchAllFromMonday(), fetchBookingsFromMonday() ]);
-  } catch(e) {
-    console.warn('Monday load failed:', e);
-    if (boardsConfig.length === 0) {
-      boardsConfig = DEFAULT_BOARDS.map(b => ({...b}));
-      for (const cfg of boardsConfig) state[cfg.id] = { status:'available', location:cfg.location, hire:null };
-    }
+  // Discover Monday board IDs by name (shared across all users — no localStorage dependency)
+  await lookupBoardIds();
+
+  // Board fetches can fail independently — allSettled prevents one failure from blocking others
+  await Promise.allSettled([
+    fetchAllFromMonday(),
+    fetchBookingsFromMonday()
+  ]);
+
+  if (boardsConfig.length === 0) {
+    boardsConfig = DEFAULT_BOARDS.map(b => ({...b}));
+    for (const cfg of boardsConfig) state[cfg.id] = { status:'available', location:cfg.location, hire:null };
   }
+
+  // Always load guests separately so allGuests is always populated regardless of board errors
+  await loadAllGuests();
 
   renderLive();
 
   setInterval(async () => {
-    try {
-      await Promise.all([ fetchAllFromMonday(), fetchBookingsFromMonday() ]);
-      renderLive();
-      if (currentTab === 'upcoming') renderUpcoming();
-    } catch(e) {}
+    await Promise.allSettled([
+      fetchAllFromMonday(),
+      fetchBookingsFromMonday()
+    ]);
+    await loadAllGuests();
+    renderLive();
+    if (currentTab === 'upcoming') renderUpcoming();
   }, 300000);
 });
 </script>

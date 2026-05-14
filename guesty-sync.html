@@ -155,9 +155,14 @@ const AR_BEDCFG   = 'text_mm2ab56m';
 // the in-page dedup logic in hot-tub-rota.html and laundry-rota.html
 // already use; this just surfaces them in one screen.
 const DOWNSTREAM_BOARDS = [
-  { key: 'ht',     label: 'Hot Tub Cleans',  emoji: '🛁', boardId: '5095259581', arrivalCol: 'board_relation_mm2rjw3' },
-  { key: 'cleans', label: 'Cleans / Checks', emoji: '🏠', boardId: '5095134636', arrivalCol: 'board_relation_mm31mkyp' },
-  { key: 'linen',  label: 'Linen Bags',      emoji: '🛏', boardId: '5095654933', arrivalCol: 'board_relation_mm2y42yx' },
+  // dateCol = the row's primary scheduled-date column. Used by the
+  // date-mismatch detector to flag rows whose date doesn't match the
+  // linked Arrival's check-in. Linen Bags has no such concept (bags
+  // are packed in advance; the relevant date is baggedAt etc.) so it's
+  // omitted from that check.
+  { key: 'ht',     label: 'Hot Tub Cleans',  emoji: '🛁', boardId: '5095259581', arrivalCol: 'board_relation_mm2rjw3',  dateCol: 'date4' },
+  { key: 'cleans', label: 'Cleans / Checks', emoji: '🏠', boardId: '5095134636', arrivalCol: 'board_relation_mm31mkyp', dateCol: 'date_mm2qkr9b' },
+  { key: 'linen',  label: 'Linen Bags',      emoji: '🛏', boardId: '5095654933', arrivalCol: 'board_relation_mm2y42yx', dateCol: null },
 ];
 let _downstreamHealth = {}; // { ht: {total, duplicates, orphans, ok}, cleans: ..., linen: ... }
 
@@ -998,7 +1003,11 @@ function renderResult(guestyCount, arrivalsCount) {
    Both render as additional sections appended below the existing Guesty
    sync output, so nothing in the main flow has to change. Failures here
    never block the Guesty sync result. */
-async function loadBoardDownstream(boardId, arrivalCol) {
+async function loadBoardDownstream(boardId, arrivalCol, dateCol) {
+  // Pull arrival-link column AND the date column (when one is configured)
+  // so the classifier can compare row.date to the linked Arrival's
+  // check-in. Without the date column, mismatch detection isn't possible.
+  const colIds = dateCol ? `"${arrivalCol}","${dateCol}"` : `"${arrivalCol}"`;
   let cursor = null, all = [], pages = 0;
   do {
     const cp = cursor ? `, cursor: "${cursor}"` : '';
@@ -1006,7 +1015,7 @@ async function loadBoardDownstream(boardId, arrivalCol) {
       cursor
       items {
         id name
-        column_values(ids:["${arrivalCol}"]) {
+        column_values(ids:[${colIds}]) {
           id text
           ... on BoardRelationValue { linked_item_ids }
         }
@@ -1023,13 +1032,14 @@ async function loadBoardDownstream(boardId, arrivalCol) {
   return all;
 }
 
-function classifyDownstream(rows, liveArrivalIds) {
+function classifyDownstream(rows, liveArrivalIds, arrivalCheckinById, dateCol) {
   // Build arrival-id → [rows] map; rows with no link are skipped from the
   // duplicate check but not flagged (an unlinked row is a manual / pre-link
   // legacy entry, not a data-health issue per se).
   const byArrival = new Map();
   const orphans = [];
   const staleNamed = [];
+  const dateMismatches = [];
   // changeover-radar.html (retired 2026-05-12) created rows with these
   // name patterns: "Property · Date" and "Property · Full Clean · Date".
   // Detect them so we can offer to delete the historical pollution.
@@ -1038,13 +1048,33 @@ function classifyDownstream(rows, liveArrivalIds) {
     if (staleRe.test(it.name || '')) {
       staleNamed.push({ id: it.id, name: it.name });
     }
-    const cv = (it.column_values || [])[0];
-    const linkedIds = cv?.linked_item_ids || [];
+    // Extract values from column_values. With the new dateCol fetch the
+    // array may contain 1-2 entries in any order — look them up by id.
+    let linkedIds = [];
+    let rowDate = '';
+    for (const c of (it.column_values || [])) {
+      if (c.linked_item_ids && c.linked_item_ids.length) linkedIds = c.linked_item_ids;
+      if (dateCol && c.id === dateCol) rowDate = (c.text || '').slice(0, 10);
+    }
     if (!linkedIds.length) continue;
     const arrId = String(linkedIds[0]);
     if (!liveArrivalIds.has(arrId)) {
       orphans.push({ id: it.id, name: it.name, arrivalId: arrId });
       continue;
+    }
+    // Date-mismatch check — only when the spec gave us a dateCol and the
+    // arrival has a known check-in date.
+    if (dateCol && rowDate && arrivalCheckinById.has(arrId)) {
+      const arrCheckIn = arrivalCheckinById.get(arrId);
+      if (arrCheckIn && rowDate !== arrCheckIn) {
+        dateMismatches.push({
+          id: it.id,
+          name: it.name,
+          arrivalId: arrId,
+          rowDate,
+          arrCheckIn,
+        });
+      }
     }
     if (!byArrival.has(arrId)) byArrival.set(arrId, []);
     byArrival.get(arrId).push({ id: it.id, name: it.name });
@@ -1055,7 +1085,7 @@ function classifyDownstream(rows, liveArrivalIds) {
     if (dupRows.length > 1) duplicates.push({ arrivalId: arrId, rows: dupRows });
     else okCount++;
   }
-  return { total: rows.length, orphans, duplicates, staleNamed, ok: okCount };
+  return { total: rows.length, orphans, duplicates, staleNamed, dateMismatches, ok: okCount };
 }
 
 function renderHealthSection(spec, health) {
@@ -1063,13 +1093,14 @@ function renderHealthSection(spec, health) {
   const d = health.duplicates.length;
   const o = health.orphans.length;
   const s = (health.staleNamed || []).length;
-  if (!d && !o && !s) {
+  const m = (health.dateMismatches || []).length;
+  if (!d && !o && !s && !m) {
     return `<section>
       <h2 class="ok">${spec.emoji} ${escapeHtml(spec.label)} <span class="count">✓ no issues</span></h2>
       <p class="desc muted">${health.ok} unique Arrival → row mapping(s). Skipped ${health.total - health.ok - o} unlinked / aggregated row(s).</p>
     </section>`;
   }
-  let html = `<section data-health-section="${spec.key}"><h2 class="warn">${spec.emoji} ${escapeHtml(spec.label)} <span class="count">${d + o + s}</span></h2>`;
+  let html = `<section data-health-section="${spec.key}"><h2 class="warn">${spec.emoji} ${escapeHtml(spec.label)} <span class="count">${d + o + s + m}</span></h2>`;
   if (d) {
     // Flatten dup groups into one row per downstream item so each can be
     // deleted independently. Keep the Arrival id alongside so you can see
@@ -1112,8 +1143,79 @@ function renderHealthSection(spec, health) {
     if ((health.staleNamed || []).length > 200) html += `<tr><td colspan="3" class="muted">… and ${(health.staleNamed || []).length - 200} more</td></tr>`;
     html += `</tbody></table>`;
   }
+  // Date mismatches — the row's date column doesn't match its linked
+  // Arrival's check-in. Means somebody created the row on the wrong day
+  // (legacy buggy default placement, manual drag onto wrong column, etc.).
+  // Two actions per row: Fix date (sets row.date = arrival.checkin) or
+  // Delete (drop the row; the rota will re-derive on the right day).
+  // (m already declared above for the no-issues gate; reuse it.)
+  if (m) {
+    html += `<p class="desc"><strong>${m}</strong> row${m === 1 ? '' : 's'} whose date doesn't match the linked Arrival's check-in. Almost always a leftover from an earlier buggy placement — Fix sets the row's date to match the Arrival; Delete drops the row and lets the rota re-emit it on the right day.</p>
+      <div class="controls" style="margin-bottom:8px">
+        <button class="success" onclick="fixAllDateMismatches('${spec.boardId}','${spec.key}','${spec.dateCol||''}')">↪ Fix all dates (${m})</button>
+      </div>
+      <table><thead><tr><th>Row name</th><th>Item ID</th><th>Row date → Arrival check-in</th><th></th></tr></thead><tbody>`;
+    for (const mm of (health.dateMismatches || []).slice(0, 200)) {
+      html += `<tr data-row-id="${mm.id}"><td>${escapeHtml(mm.name || '—')}</td><td><code>${mm.id}</code></td><td><span class="muted">${escapeHtml(mm.rowDate)}</span> → <strong>${escapeHtml(mm.arrCheckIn)}</strong></td><td>
+        <button class="del-btn" style="color:#1a5276; border-color:#cfe1ef" onclick="fixDateMismatch('${spec.boardId}','${spec.key}','${spec.dateCol||''}','${mm.id}','${mm.arrCheckIn}',this)">↪ Fix date</button>
+        <button class="del-btn" onclick="deleteDownstreamRow('${spec.boardId}','${spec.key}','${mm.id}',this)" style="margin-left:4px">🗑 Delete</button>
+      </td></tr>`;
+    }
+    if ((health.dateMismatches || []).length > 200) html += `<tr><td colspan="4" class="muted">… and ${(health.dateMismatches || []).length - 200} more</td></tr>`;
+    html += `</tbody></table>`;
+  }
   html += `</section>`;
   return html;
+}
+
+// Set a row's date column to the supplied value. Used by Fix-date buttons
+// in the date-mismatch table. On success the row fades green and the
+// mismatch count decrements.
+async function fixDateMismatch(boardId, sectionKey, dateCol, itemId, newDate, btn) {
+  if (!btn || btn.disabled || !dateCol) return;
+  btn.disabled = true;
+  const orig = btn.textContent;
+  btn.textContent = 'Fixing…';
+  try {
+    const cv = { [dateCol]: { date: newDate } };
+    await mq(`mutation { change_multiple_column_values(board_id:${boardId}, item_id:${itemId}, column_values:${JSON.stringify(JSON.stringify(cv))}){ id } }`);
+    const tr = btn.closest('tr');
+    if (tr) {
+      tr.style.transition = 'opacity 0.35s, background 0.35s';
+      tr.style.background = '#d1f0dd';
+      setTimeout(() => { tr.style.opacity = '0.4'; }, 300);
+    }
+    // Update in-memory health state + count.
+    const health = _downstreamHealth[sectionKey];
+    if (health) {
+      health.dateMismatches = (health.dateMismatches || []).filter(d => d.id !== itemId);
+      const section = document.querySelector(`section[data-health-section="${sectionKey}"]`);
+      const countEl = section?.querySelector('h2 .count');
+      if (countEl) {
+        const n = parseInt(countEl.textContent, 10);
+        if (!isNaN(n) && n > 0) countEl.textContent = String(n - 1);
+      }
+    }
+  } catch (e) {
+    btn.disabled = false;
+    btn.textContent = '⚠ Failed';
+    btn.title = e.message;
+    btn.style.background = '#fde8e8';
+    console.error('[date-mismatch] fix', itemId, newDate, e);
+  }
+}
+
+// Bulk-fix every date mismatch in a section.
+async function fixAllDateMismatches(boardId, sectionKey, dateCol) {
+  const health = _downstreamHealth[sectionKey];
+  if (!health || !(health.dateMismatches || []).length) return;
+  const n = health.dateMismatches.length;
+  if (!confirm(`Update ${n} row date${n===1?'':'s'} to match their linked Arrival's check-in?\n\nThis is safe — Arrivals is the source of truth. Each row's date column will be set to the Arrival's check-in date.`)) return;
+  const queue = [...health.dateMismatches];
+  for (const mm of queue) {
+    const btn = document.querySelector(`section[data-health-section="${sectionKey}"] tr[data-row-id="${mm.id}"] button.del-btn`);
+    if (btn) await fixDateMismatch(boardId, sectionKey, dateCol, mm.id, mm.arrCheckIn, btn);
+  }
 }
 
 // Bulk delete every stale-named row in a section. Walks the cached
@@ -1181,6 +1283,11 @@ async function triggerDataHealth() {
   // system". A downstream row pointing outside this set is, by definition,
   // pointing at something that nothing else in the app can see → orphan.
   const liveArrivalIds = new Set((window._arrivals || []).map(a => String(a.id)));
+  // Map arrival id → check-in date, used by the date-mismatch detector
+  // to verify each downstream row points to the right day.
+  const arrivalCheckinById = new Map(
+    (window._arrivals || []).map(a => [String(a.id), (a.arrivalDate || '').slice(0, 10)])
+  );
   if (!liveArrivalIds.size) {
     console.warn('[data-health] No live arrivals loaded — skipping downstream health checks.');
     return;
@@ -1190,11 +1297,11 @@ async function triggerDataHealth() {
   document.getElementById('content').insertAdjacentHTML('beforeend', placeholder);
   try {
     const results = await Promise.all(
-      DOWNSTREAM_BOARDS.map(spec => loadBoardDownstream(spec.boardId, spec.arrivalCol))
+      DOWNSTREAM_BOARDS.map(spec => loadBoardDownstream(spec.boardId, spec.arrivalCol, spec.dateCol))
     );
     let html = '';
     DOWNSTREAM_BOARDS.forEach((spec, i) => {
-      const health = classifyDownstream(results[i], liveArrivalIds);
+      const health = classifyDownstream(results[i], liveArrivalIds, arrivalCheckinById, spec.dateCol);
       _downstreamHealth[spec.key] = health;
       html += renderHealthSection(spec, health);
     });

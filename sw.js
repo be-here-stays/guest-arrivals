@@ -2,7 +2,7 @@
 // Caches app shell for fast loading and offline UI.
 // Monday.com API calls are always fetched from the network.
 
-const CACHE    = 'be-here-v50';
+const CACHE    = 'be-here-v51';
 const PRECACHE = [
   '/guest-arrivals/hub.html',
   '/guest-arrivals/index.html',
@@ -50,7 +50,18 @@ self.addEventListener('activate', e => {
   );
 });
 
-// Fetch: network-first for API, cache-first for app shell
+// Fetch strategy:
+//   • Monday API + fonts            → always network
+//   • HTML pages (navigation)       → network-first, cache fallback
+//   • Static assets (JS, icons …)   → cache-first
+//
+// 2026-05-14 — Switched HTML from cache-first to network-first. The old
+// strategy was freezing hub.html (and other pages) at the version cached
+// during the SW install, so menu items added later (Guesty sync, Staff
+// Records, Linen Inbox, PIN Admin, Leave Inbox, the Linen Low/Out KPI…)
+// only appeared after a hard refresh, then vanished again on the next
+// soft navigation. Network-first means the freshest HTML wins every
+// time the network is up; offline still falls back to the cached copy.
 self.addEventListener('fetch', e => {
   const url = e.request.url;
 
@@ -61,6 +72,27 @@ self.addEventListener('fetch', e => {
     return;
   }
 
+  // Network-first for HTML so menu/page updates land immediately.
+  // Detect HTML by request mode (top-level navigation) OR destination
+  // ('document') OR the URL ending in .html. Falls back to cache when
+  // offline so the app keeps loading.
+  const isHtml = e.request.mode === 'navigate'
+    || e.request.destination === 'document'
+    || /\.html(\?|$)/i.test(url);
+  if (isHtml) {
+    e.respondWith(
+      fetch(e.request).then(response => {
+        if (response && response.status === 200 && response.type !== 'opaque') {
+          const clone = response.clone();
+          caches.open(CACHE).then(cache => cache.put(e.request, clone));
+        }
+        return response;
+      }).catch(() => caches.match(e.request))
+    );
+    return;
+  }
+
+  // Cache-first for static assets (JS, icons, manifest, etc.)
   e.respondWith(
     caches.match(e.request).then(cached => {
       if (cached) return cached;

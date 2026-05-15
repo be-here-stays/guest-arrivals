@@ -141,6 +141,7 @@
   .badge-guests  { background:var(--green-bg); color:var(--green); }
   .badge-noguest { background:var(--amber-bg); color:var(--amber); }
   .badge-dirty   { background:var(--amber); color:#fff; }
+  .badge-linked  { background:#e8eef7; color:var(--blue); }
 
   /* ── Pill expanded panel ───────────────────────────────── */
   .pill-expand { display:none; border-top:1px solid var(--border); background:#fbfaf6; padding:12px 14px; }
@@ -230,6 +231,31 @@
   }
   .edit-field .edit-lbl[data-tip]:hover::after { opacity:1; }
 
+  /* Completion modal — captures labour/materials when closing a billable task */
+  .modal-veil { position:fixed; inset:0; background:rgba(39,47,46,.55); z-index:300; display:none; align-items:flex-start; justify-content:center; padding:8vh 16px 16px; overflow-y:auto; }
+  .modal-veil.show { display:flex; }
+  .modal-card { background:#fff; border-radius:14px; box-shadow:0 12px 40px rgba(0,0,0,.25); width:100%; max-width:480px; padding:18px; }
+  .modal-title { font-size:16px; font-weight:700; margin-bottom:4px; }
+  .modal-sub   { font-size:12px; color:var(--sage-mid); margin-bottom:14px; }
+  .modal-grid  { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-bottom:10px; }
+  .modal-grid .span2 { grid-column:span 2; }
+  .modal-row { display:flex; flex-direction:column; gap:4px; }
+  .modal-row label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--sage-mid); }
+  .modal-row input, .modal-row textarea {
+    font-family:inherit; font-size:13px; padding:8px 10px; border:1.5px solid var(--border);
+    border-radius:7px; background:#fff; color:var(--dark); width:100%;
+  }
+  .modal-row input:focus, .modal-row textarea:focus { outline:none; border-color:var(--dark); }
+  .modal-row .prefix { display:flex; align-items:center; gap:5px; }
+  .modal-row .prefix span { font-weight:600; color:var(--sage); font-size:13px; }
+  .modal-row .prefix input { flex:1; }
+  .modal-row textarea { resize:vertical; min-height:54px; font-size:12.5px; }
+  .modal-summary {
+    margin-top:8px; padding:9px 11px; border-radius:8px; background:var(--green-bg);
+    color:var(--green); font-size:12px; font-weight:700; display:flex; justify-content:space-between;
+  }
+  .modal-actions { display:flex; gap:6px; margin-top:14px; justify-content:flex-end; }
+
   /* Saving indicator on pill */
   .pill.saving::after { content:'Saving…'; position:absolute; }
   .pill { position:relative; }
@@ -314,20 +340,74 @@
 
 <div id="toast" class="toast"></div>
 
+<!-- Completion modal — labour & materials capture for billable tasks -->
+<div id="completionVeil" class="modal-veil" onclick="if(event.target===this)cancelCompletion()">
+  <div class="modal-card">
+    <div class="modal-title">Log time &amp; cost</div>
+    <div class="modal-sub" id="completionSub">This task is billable to the owner. Log the actuals before closing.</div>
+
+    <div class="modal-grid">
+      <div class="modal-row">
+        <label>Hours worked</label>
+        <input type="number" id="modHours" min="0" step="0.25" placeholder="e.g. 2.5" oninput="recalcLabour()">
+      </div>
+      <div class="modal-row">
+        <label>Hourly rate</label>
+        <div class="prefix"><span>£</span><input type="number" id="modRate" min="0" step="0.50" placeholder="0.00" oninput="recalcLabour()"></div>
+      </div>
+      <div class="modal-row span2">
+        <label>Labour cost (auto — editable)</label>
+        <div class="prefix"><span>£</span><input type="number" id="modLabour" min="0" step="0.01" placeholder="0.00"></div>
+      </div>
+      <div class="modal-row span2">
+        <label>Materials used (optional)</label>
+        <textarea id="modMatNotes" placeholder="e.g. Hansgrohe shower head £24.99 · Pack of M6 bolts £4.50"></textarea>
+      </div>
+      <div class="modal-row span2">
+        <label>Materials total</label>
+        <div class="prefix"><span>£</span><input type="number" id="modMatCost" min="0" step="0.01" placeholder="0.00" oninput="recalcGrand()"></div>
+      </div>
+    </div>
+
+    <div class="modal-summary">
+      <span>Total billable</span>
+      <span id="modGrand">£0.00</span>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="cancelCompletion()">Cancel</button>
+      <button class="btn btn-close"  id="modSaveBtn" onclick="submitCompletion()">Save &amp; close task</button>
+    </div>
+  </div>
+</div>
+
 <!-- Runtime-decoded API tokens -->
 <script src="secrets.js"></script>
 
 <script>
-const TOKEN       = window.MONDAY_API_TOKEN;
-const ADHOC_BOARD = 5095296374;
-const STAFF_BOARD = 5095127554;
+const TOKEN          = window.MONDAY_API_TOKEN;
+const ADHOC_BOARD    = 5095296374;
+const STAFF_BOARD    = 5095127554;
+const ARRIVALS_BOARD = 5094453064;
+const ARR_PROP    = 'text_mm2ahbrx';
+const ARR_IN      = 'date_mm2adtwg';
+const ARR_OUT     = 'date_mm31c5jt';
+const OCCUPANCY_DAYS_AHEAD = 90;
 
 const COLS = {
   sched:    'date_mm2stp44',    assignee:  'dropdown_mm2szsp5', status:    'color_mm2sf7a8',
   desc:     'long_text_mm2s5dwj', prop:    'text_mm2shvja',     linked:    'text_mm2sqa3f',
   dueTo:    'date_mm2vw7qh',    access:    'dropdown_mm2vpbet',
   billable: 'checkbox_mm2vpxq7', matCost:  'numeric_mm2vks4c', labour:    'numeric_mm2vks4l',
-  priority: 'color_mm2sy0cn',   requester:'text_mm3ck8dq'
+  priority: 'color_mm2sy0cn',   requester:'text_mm3ck8dq',
+  source:   'text_mm3chd09'      // Source register link: 'type:boardId:itemId'
+};
+
+// Register board config — used to sync 'last done' date back when a task is completed.
+const REGISTER_CFG = {
+  window: { boardId: 1987064628, lastDateCol: 'date4', schedCol: 'date_mm2sn17y', assignCol: 'dropdown_mm2se9z7', statusCol: 'status', doneLabel: 'Clean'   },
+  jet:    { boardId: 5092955038, lastDateCol: 'date4', schedCol: 'date_mm2s2qpv', assignCol: 'dropdown_mm2shyxp', statusCol: 'status', doneLabel: 'Clean'   },
+  pat:    { boardId: 5092954987, lastDateCol: 'date4', schedCol: 'date_mm2srjzv', assignCol: 'dropdown_mm2sxqvv', statusCol: 'status', doneLabel: 'In Date' },
 };
 const ST_ROLE   = 'color_mm2psadz';
 const ST_STATUS = 'color_mm2psvh2';
@@ -339,6 +419,7 @@ const ACCESS_LABELS = ['No Guests','Guests OK'];
 
 let tasks       = [];
 let staff       = [];
+let occupancy   = {};   // propertyNameLower -> [{checkIn, checkOut}]
 let groupBy     = localStorage.getItem('tb_group')  || 'staff';
 let sortBy      = localStorage.getItem('tb_sort')   || 'priority';
 let filter      = localStorage.getItem('tb_filter') || 'all';
@@ -441,11 +522,88 @@ const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replac
 // ── Boot ─────────────────────────────────────────────────────
 async function boot() {
   try {
-    await Promise.all([loadStaff(), loadTasks()]);
+    await Promise.all([loadStaff(), loadTasks(), loadOccupancy()]);
     render();
   } catch (e) {
     document.getElementById('board').innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
   }
+}
+
+// ── Occupancy (Guest Arrivals → block 'No Guests' assignments) ─────────
+async function loadOccupancy() {
+  try {
+    const today = todayISO();
+    const horizon = new Date();
+    horizon.setDate(horizon.getDate() + OCCUPANCY_DAYS_AHEAD);
+    const horizonISO = horizon.toISOString().split('T')[0];
+
+    const d = await mq(`{
+      boards(ids:[${ARRIVALS_BOARD}]) {
+        items_page(limit:500, query_params: { rules:[
+          { column_id:"${ARR_IN}", compare_value:["${horizonISO}"], operator:lower_than_or_equal }
+        ]}) {
+          items { id name column_values(ids:["${ARR_PROP}","${ARR_IN}","${ARR_OUT}"]) { id text value } }
+        }
+      }
+    }`);
+    const items = d?.boards?.[0]?.items_page?.items || [];
+    occupancy = {};
+    for (const it of items) {
+      const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+      const prop = (cv[ARR_PROP]?.text || '').trim().toLowerCase();
+      const inD  = pj(cv[ARR_IN]?.value)?.date  || null;
+      const outD = pj(cv[ARR_OUT]?.value)?.date || null;
+      if (!prop || !inD) continue;
+      // If checkout missing, assume 1-day stay (rare; safer fallback)
+      const co = outD || inD;
+      // Filter: skip stays entirely in the past
+      if (co < today) continue;
+      if (!occupancy[prop]) occupancy[prop] = [];
+      occupancy[prop].push({ checkIn:inD, checkOut:co });
+    }
+  } catch (e) {
+    // Occupancy is optional — log but don't break the page
+    console.warn('Occupancy load failed:', e);
+    occupancy = {};
+  }
+}
+
+function isPropertyOccupied(propertyName, dateISO) {
+  if (!propertyName || !dateISO) return false;
+  const key = propertyName.trim().toLowerCase();
+  const stays = occupancy[key] || [];
+  // Only blocks MID-STAY days. Check-in and check-out days are treated as free —
+  // most maintenance is short (~1 hr) and same-day changeover work (jet wash,
+  // window clean) happens in the 10am-3pm window between guests leaving and
+  // arriving. Larger jobs that need multiple days are handled by closing the
+  // lodge in Guesty manually, which isn't reflected here.
+  return stays.some(s => dateISO > s.checkIn && dateISO < s.checkOut);
+}
+
+function findNextFreeDate(propertyName, fromDateISO) {
+  if (!propertyName) return null;
+  const key = propertyName.trim().toLowerCase();
+  const stays = (occupancy[key] || []).slice().sort((a,b) => a.checkIn.localeCompare(b.checkIn));
+  let d = fromDateISO;
+  for (let i = 0; i < 365; i++) {
+    if (!isPropertyOccupied(propertyName, d)) return d;
+    // Step to next day
+    const dt = new Date(d); dt.setDate(dt.getDate() + 1);
+    d = dt.toISOString().split('T')[0];
+  }
+  return null;
+}
+
+// Returns null when OK, or an error message when blocked.
+function checkGuestConflict(task, dateISO) {
+  if (!task) return null;
+  const date = dateISO || task.date;
+  if (!date) return null;
+  if (task.access !== 'No Guests') return null;
+  if (!isPropertyOccupied(task.property, date)) return null;
+  const next = findNextFreeDate(task.property, date);
+  const nextStr = next ? ` — next free day: ${fmtDate(next)}` : '';
+  return `Cannot assign — guests at ${task.property} on ${fmtDate(date)}. Task is flagged "No Guests".${nextStr}`;
 }
 
 async function loadStaff() {
@@ -486,6 +644,7 @@ async function loadTasks() {
       status, access: cv[COLS.access]?.text || 'No Guests',
       returned, overdue, priority:prio,
       requester: cv[COLS.requester]?.text || '',
+      source:    cv[COLS.source]?.text || '',
       isBillable: cv[COLS.billable]?.text==='v',
       matCost:  parseFloat(cv[COLS.matCost]?.text)  || 0,
       labourCost: parseFloat(cv[COLS.labour]?.text) || 0,
@@ -687,6 +846,8 @@ function pillHtml(t) {
   const prioBadge = `<span class="badge badge-${prio}">${esc(t.priority||'Medium')}</span>`;
   const dirtyBadge = isDirty ? `<span class="badge badge-dirty">unsaved</span>` : '';
   const rtqBadge   = t.returned ? `<span class="badge badge-rtq">↩ Returned</span>` : '';
+  const linked     = parseSourceLink(t.source);
+  const linkBadge  = linked ? `<span class="badge badge-linked" title="Syncs to ${linked.type.toUpperCase()} register on completion">🔗 ${linked.type.toUpperCase()}</span>` : '';
 
   const dateStr = t.date
     ? (t.dueTo && t.dueTo !== t.date ? `${fmtDate(t.date)} → ${fmtDate(t.dueTo)}` : fmtDate(t.date))
@@ -707,6 +868,7 @@ function pillHtml(t) {
         <span class="pill-meta">
           <span class="pill-date ${dateCls}">📅 ${dateStr}</span>
           ${prioBadge}
+          ${linkBadge}
           ${rtqBadge}
           ${dirtyBadge}
           ${assignStr}
@@ -943,6 +1105,30 @@ function onFieldChange(taskId, field, value) {
   const t = tasks.find(x=>x.id===taskId); if (!t) return;
   const k = fieldKey(field);
   if (t[k] === value || (t[k]||'') === (value||'')) return; // no change
+
+  // Guest-presence guard: if user is moving the scheduled date and the task
+  // is assigned + No Guests + that day is occupied, block.
+  if (field === 'sched' && value && t.assignees.length) {
+    const conflict = checkGuestConflict(t, value);
+    if (conflict) {
+      showToast(conflict, 'err');
+      // Revert the input
+      const input = document.querySelector(`#pill-${taskId} input[type="date"]`);
+      if (input) input.value = t.date || '';
+      return;
+    }
+  }
+  // Same guard if user is changing 'access' to 'No Guests' on an already-assigned conflicting task
+  if (field === 'access' && value === 'No Guests' && t.assignees.length && t.date) {
+    if (isPropertyOccupied(t.property, t.date)) {
+      showToast(`Cannot set "No Guests" — there's a guest at ${t.property} on ${fmtDate(t.date)} and the task is assigned. Move the scheduled date first or unassign.`, 'err');
+      const sel = document.querySelector(`#pill-${taskId} select.edit-sel`);
+      // Revert by re-rendering
+      renderDirtyState(taskId);
+      return;
+    }
+  }
+
   markDirty(taskId, field, value);
   // Write through to local task so re-render shows the in-flight edit
   t[k] = value;
@@ -1040,6 +1226,9 @@ function assignStaff(taskId, name) {
   const t = tasks.find(x=>x.id===taskId); if (!t) return;
   if (t.assignees.includes(name)) { showToast(`${name} already assigned`,'err'); return; }
   if (t.assignees.length >= 2) { showToast('Max 2 assignees — remove one first','err'); return; }
+  // Guest-presence guard — refuse to assign a No-Guests task onto an occupied day
+  const conflict = checkGuestConflict(t, t.date);
+  if (conflict) { showToast(conflict, 'err'); return; }
   const next = [...t.assignees, name];
   markDirty(taskId, 'assignees', next);
   // Apply locally so visual updates immediately
@@ -1111,11 +1300,55 @@ function buildChangeSummary(taskId) {
   return lines.join('\n');
 }
 
+// Build a locked description block when assignees changed. Returns null if N/A.
+function buildAssignmentBlock(taskId) {
+  const d = dirty.get(taskId); if (!d) return null;
+  if (!('assignees' in d.changes)) return null;
+  const before = d.prev.assignees || [];
+  const after  = d.changes.assignees || [];
+  const added   = after.filter(n => !before.includes(n));
+  const removed = before.filter(n => !after.includes(n));
+  if (!added.length && !removed.length) return null;
+
+  let line;
+  if (added.length && removed.length) {
+    line = `Reassigned: ${removed.join(', ')} → ${added.join(', ')}`;
+  } else if (added.length && !before.length) {
+    line = `Assigned to: ${added.join(', ')}`;
+  } else if (added.length) {
+    line = `Added assignee: ${added.join(', ')}`;
+  } else {
+    line = `Unassigned: ${removed.join(', ')}`;
+  }
+  const author = getUserName() || 'System';
+  return `[${nowStamp()} — ${author}] ${line}`;
+}
+
 async function saveOne(taskId) {
   const t = tasks.find(x=>x.id===taskId); if (!t) return;
+
+  // Final guest-conflict check at save time (in case occupancy changed under us
+  // or the user staged a conflicting state with autosave off)
+  if (t.assignees.length && t.date) {
+    const conflict = checkGuestConflict(t, t.date);
+    if (conflict) {
+      // Drop the staged assignee change so saves can proceed; user must re-do explicitly
+      showToast(conflict, 'err');
+      return;
+    }
+  }
+
   const cv = buildColumnValues(taskId);
   if (!cv) return;
   const summary = buildChangeSummary(taskId);
+
+  // Reassignment audit block — append to description as a locked block
+  const assignBlock = buildAssignmentBlock(taskId);
+  if (assignBlock) {
+    const newDesc = (t.description ? t.description.trim() + '\n\n' : '') + assignBlock;
+    cv[COLS.desc] = newDesc;
+    t.description = newDesc; // local for re-render
+  }
   const pill = document.getElementById('pill-'+taskId);
   pill?.classList.add('saving');
   try {
@@ -1165,25 +1398,181 @@ async function saveAllPending() {
 
 // ── Close task ───────────────────────────────────────────────
 async function closeTask(taskId) {
-  if (!confirm('Mark this task as completed and remove it from the backlog?')) return;
   const t = tasks.find(x=>x.id===taskId);
+  if (!t) return;
+  if (t.isBillable) {
+    openCompletionModal(taskId);
+    return;
+  }
+  await closeTaskCore(taskId, null);
+}
+
+let pendingCompletionTaskId = null;
+
+function openCompletionModal(taskId) {
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  pendingCompletionTaskId = taskId;
+  // Pre-fill with anything already on the task
+  document.getElementById('modHours').value  = '';
+  document.getElementById('modRate').value   = '';
+  document.getElementById('modLabour').value = t.labourCost ? t.labourCost.toFixed(2) : '';
+  document.getElementById('modMatCost').value= t.matCost   ? t.matCost.toFixed(2)   : '';
+  document.getElementById('modMatNotes').value = '';
+  document.getElementById('completionSub').textContent =
+    `Closing "${t.property}". This task is billable — log labour and materials before it goes to the owner.`;
+  recalcGrand();
+  document.getElementById('completionVeil').classList.add('show');
+  setTimeout(() => document.getElementById('modHours').focus(), 50);
+}
+
+function cancelCompletion() {
+  pendingCompletionTaskId = null;
+  document.getElementById('completionVeil').classList.remove('show');
+}
+
+function recalcLabour() {
+  const hrs  = parseFloat(document.getElementById('modHours').value) || 0;
+  const rate = parseFloat(document.getElementById('modRate').value)  || 0;
+  if (hrs > 0 && rate > 0) {
+    document.getElementById('modLabour').value = (hrs * rate).toFixed(2);
+  }
+  recalcGrand();
+}
+
+function recalcGrand() {
+  const lab = parseFloat(document.getElementById('modLabour').value)  || 0;
+  const mat = parseFloat(document.getElementById('modMatCost').value) || 0;
+  document.getElementById('modGrand').textContent = '£' + (lab + mat).toFixed(2);
+}
+
+async function submitCompletion() {
+  const taskId = pendingCompletionTaskId; if (!taskId) return;
+  const hrs    = parseFloat(document.getElementById('modHours').value)   || 0;
+  const rate   = parseFloat(document.getElementById('modRate').value)    || 0;
+  const labour = parseFloat(document.getElementById('modLabour').value)  || 0;
+  const matCost= parseFloat(document.getElementById('modMatCost').value) || 0;
+  const matNotes = document.getElementById('modMatNotes').value.trim();
+
+  const extras = { hours:hrs, rate, labour, matCost, matNotes };
+  const btn = document.getElementById('modSaveBtn');
+  btn.disabled = true;
+  try {
+    await closeTaskCore(taskId, extras);
+    cancelCompletion();
+  } catch (e) {
+    showToast('Close failed: ' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// Core close logic — shared by billable (post-modal) and non-billable (direct) flows.
+// `extras` is null for non-billable; otherwise { hours, rate, labour, matCost, matNotes }.
+async function closeTaskCore(taskId, extras) {
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  const hasRegister = parseSourceLink(t.source);
+
+  // Build confirmation message (skipped for billable since the modal IS the confirmation)
+  if (!extras) {
+    const confirmMsg = hasRegister
+      ? `Mark this task as completed?\n\nThis will also update the ${hasRegister.type.toUpperCase()} register row for ${t.property}:\n• Last-done date → today\n• Status → ${REGISTER_CFG[hasRegister.type].doneLabel}\n• Scheduled date & assignee cleared`
+      : 'Mark this task as completed and remove it from the backlog?';
+    if (!confirm(confirmMsg)) return;
+  }
+
   const pill = document.getElementById('pill-'+taskId);
   pill?.classList.add('saving');
+
+  // Build the description note (timestamped block) and any audit-summary lines
+  const author = getUserName() || 'System';
+  const stamp  = `${nowStamp()} — ${author}`;
+  let noteLines = ['Task completed'];
+  let auditLines = ['**Change:**', `• Status: ${t.status} → Completed`];
+
+  if (extras) {
+    if (extras.hours > 0) {
+      const rateNote = extras.rate > 0 ? ` × £${extras.rate.toFixed(2)}/hr` : '';
+      noteLines.push(`Time: ${extras.hours} hrs${rateNote}`);
+      auditLines.push(`• Time: ${extras.hours} hrs${rateNote}`);
+    }
+    if (extras.labour > 0) {
+      noteLines.push(`Labour: £${extras.labour.toFixed(2)}`);
+      auditLines.push(`• Labour: £${extras.labour.toFixed(2)}`);
+    }
+    if (extras.matNotes) {
+      noteLines.push(`Materials: ${extras.matNotes}`);
+    }
+    if (extras.matCost > 0) {
+      noteLines.push(`Materials total: £${extras.matCost.toFixed(2)}`);
+      auditLines.push(`• Materials: £${extras.matCost.toFixed(2)}` + (extras.matNotes ? ` (${extras.matNotes})` : ''));
+    }
+    if ((extras.labour + extras.matCost) > 0) {
+      auditLines.push(`• Total billable: £${(extras.labour + extras.matCost).toFixed(2)}`);
+    }
+  }
+
+  const completionBlock = `[${stamp}] ${noteLines.join('\n')}`;
+  const newDesc = (t.description ? t.description.trim() + '\n\n' : '') + completionBlock;
+
+  // Build column values: status, optionally labour/materials/description
+  const cv = { [COLS.status]: { label:'Completed' }, [COLS.desc]: newDesc };
+  if (extras) {
+    if (extras.labour  > 0) cv[COLS.labour]  = extras.labour;
+    if (extras.matCost > 0) cv[COLS.matCost] = extras.matCost;
+  }
+
   try {
-    const cv = { [COLS.status]: { label:'Completed' } };
-    await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
-      { b: ADHOC_BOARD, i: taskId, v: JSON.stringify(cv) });
-    postUpdate(taskId, '**Change:**\n• Status: '+t.status+' → Completed').catch(()=>{});
+    await mq(
+      `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+      { b: ADHOC_BOARD, i: taskId, v: JSON.stringify(cv) }
+    );
+
+    // Sync linked register row if there is one
+    let regNote = '';
+    if (hasRegister) {
+      try {
+        await syncRegisterOnComplete(hasRegister);
+        auditLines.push(`• ${hasRegister.type.toUpperCase()} register updated for ${t.property}`);
+        regNote = ` & register updated`;
+      } catch (regErr) {
+        auditLines.push(`• ⚠ Register sync failed: ${regErr.message}`);
+      }
+    }
+    postUpdate(taskId, auditLines.join('\n')).catch(()=>{});
+
     tasks = tasks.filter(x => x.id !== taskId);
     dirty.delete(taskId);
-    showToast('Task closed','ok');
+    showToast(`Task closed${regNote}`, 'ok');
     render();
     updateSavePendingBtn();
   } catch (e) {
-    showToast('Close failed: '+e.message,'err');
+    throw e;
   } finally {
     pill?.classList.remove('saving');
   }
+}
+
+function parseSourceLink(src) {
+  if (!src) return null;
+  const parts = String(src).split(':');
+  if (parts.length !== 3) return null;
+  const [type, boardId, itemId] = parts;
+  if (!REGISTER_CFG[type]) return null;
+  return { type, boardId, itemId };
+}
+
+async function syncRegisterOnComplete(parsed) {
+  const cfg = REGISTER_CFG[parsed.type];
+  const cv = {
+    [cfg.lastDateCol]: { date: todayISO() },
+    [cfg.schedCol]:    null,
+    [cfg.assignCol]:   { labels: [] },
+    [cfg.statusCol]:   { label: cfg.doneLabel },
+  };
+  await mq(
+    `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+    { b: Number(parsed.boardId), i: parsed.itemId, v: JSON.stringify(cv) }
+  );
 }
 
 function showToast(m, type='') {

@@ -267,7 +267,7 @@
     <!-- Billable — hidden for investigate -->
     <div id="billableRow" class="field" style="display:flex; justify-content:space-between; align-items:center; padding:10px 0; border-top:1px dashed var(--border); border-bottom:1px dashed var(--border); margin:10px 0">
       <label class="lbl" style="margin:0">Billable to owner?</label>
-      <input type="checkbox" id="billable" style="width:20px; height:20px; accent-color:var(--dark)" checked onchange="onBillableChange()">
+      <input type="checkbox" id="billable" style="width:20px; height:20px; accent-color:var(--dark)" onchange="onBillableChange()">
     </div>
 
     <!-- Description -->
@@ -366,6 +366,7 @@ const AH_STATUS   = 'color_mm2sf7a8';  const AH_DUE     = 'date_mm2vw7qh';
 const AH_GUEST    = 'dropdown_mm2vpbet'; const AH_PRIO  = 'color_mm2sy0cn';
 const AH_BILLABLE = 'checkbox_mm2vpxq7'; const AH_LABOUR= 'numeric_mm2vks4l';
 const AH_MAT_COST = 'numeric_mm2vks4c';
+const AH_SOURCE   = 'text_mm3chd09';   // Source register link: 'type:boardId:itemId'
 
 const TYPE_CONFIG = {
   investigate:{ label:'Investigate', hint:'Something needs looking at. Goes straight to the maintenance backlog — unassigned, ready for triage.' },
@@ -522,25 +523,19 @@ document.querySelectorAll('.sub-chip').forEach(b => b.addEventListener('click', 
   moveType = b.dataset.move;
 }));
 
-// ── Billable: make time + materials required ─────────────────
+// ── Billable: just a flag at scheduling; actuals logged at completion ────
 function onBillableChange() {
   if (activeType === 'investigate') return;
   const isBillable = document.getElementById('billable').checked;
   const timeOptNote = document.getElementById('timeOptNote');
   const matOptNote  = document.getElementById('matOptNote');
-  const timeLbl     = document.getElementById('timeLbl');
-  const matLbl      = document.getElementById('matLbl');
-  if (isBillable) {
-    timeOptNote.textContent = '(required when billable)';
-    timeOptNote.style.color = 'var(--red)';
-    matOptNote.textContent  = '(required when billable)';
-    matOptNote.style.color  = 'var(--red)';
-  } else {
-    timeOptNote.textContent = '(optional — fill in on completion)';
-    timeOptNote.style.color = '';
-    matOptNote.textContent  = '(optional — fill in on completion)';
-    matOptNote.style.color  = '';
-  }
+  // Wording stays the same regardless — time/materials are always 'fill in on completion'.
+  // When billable is on, we add an emphasis tag so the user remembers it'll be needed for invoicing.
+  const tag = isBillable ? ' — needed for invoicing' : '';
+  timeOptNote.textContent = '(fill in on completion' + tag + ')';
+  matOptNote.textContent  = '(fill in on completion' + tag + ')';
+  timeOptNote.style.color = '';
+  matOptNote.style.color  = '';
   // Clear any existing highlights when toggling
   clearReqHighlight('labourCost');
   document.getElementById('labourReq').classList.remove('show');
@@ -692,26 +687,9 @@ async function submit() {
 
   const labels = [p1, p2].filter(Boolean).filter((v,i,a) => a.indexOf(v) === i);
 
-  // Billable validation
-  if (billable) {
-    const labourVal = document.getElementById('labourCost').value;
-    const matRows   = document.getElementById('materialsList').querySelectorAll('.mat-row');
-    let hasError = false;
-    if (labourVal === '' || labourVal === null) {
-      document.getElementById('labourCost').classList.add('required-highlight');
-      document.getElementById('labourReq').classList.add('show');
-      hasError = true;
-    }
-    if (matRows.length === 0) {
-      document.getElementById('matReq').classList.add('show');
-      hasError = true;
-    }
-    if (hasError) {
-      showErr('This task is billable — please log labour cost and materials (enter £0 if none used).');
-      document.getElementById('timeField').scrollIntoView({ behavior:'smooth', block:'center' });
-      return;
-    }
-  }
+  // Note: time / labour / materials are intentionally NOT required at scheduling —
+  // they're captured at completion (on the backlog or via the audit form). The
+  // 'billable' checkbox is just a flag here; actuals are logged later.
 
   const hrs        = getHours();
   const labourCost = parseFloat(document.getElementById('labourCost').value) || 0;
@@ -740,15 +718,22 @@ async function submit() {
       const found = (data?.boards?.[0]?.items_page?.items||[])
         .find(it => (it.name||'').trim().toLowerCase() === property.trim().toLowerCase());
       if (!found) {
+        // Property missing on the register board — fall through to plain ad-hoc with no source link
         await createAdhoc(property, `${cfg.label} — ${notes}`.replace(/—\s*$/, ''), date, labels, null,
           { due, prio, guest, billable, labourCost, matTotal, timeNote, matNote });
         showSuccess(`${cfg.label} scheduled (saved as ad-hoc — property not found on source board).`);
         return;
       }
+      // 1. Update the register row (scheduled date, assignee, priority, billable)
       const cv = { [cfg.schedCol]:{ date }, [cfg.assignCol]:{ labels }, [cfg.billCol]:{ checked:billable }, [cfg.prioCol]:{ label:prio } };
       await gql(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
         { b:cfg.boardId, i:found.id, v:JSON.stringify(cv) });
-      showSuccess(`${cfg.label} scheduled at ${property} for ${date}.`);
+      // 2. ALSO create a tracking task on the Ad-hoc backlog with source-register link
+      const sourceLink = `${activeType}:${cfg.boardId}:${found.id}`;
+      const taskDesc   = notes ? `${cfg.label} — ${notes}` : cfg.label;
+      await createAdhoc(property, taskDesc, date, labels, cfg.label,
+        { due, prio, guest, billable, labourCost, matTotal, timeNote, matNote, source: sourceLink });
+      showSuccess(`${cfg.label} scheduled at ${property} for ${date}. Register updated and task on backlog.`);
 
     } else if (activeType === 'paddle') {
       const count = document.getElementById('paddleCount').value;
@@ -789,6 +774,7 @@ async function createAdhoc(property, description, date, labels, namePrefix, extr
     if ('billable' in extras)      cv[AH_BILLABLE] = { checked: extras.billable };
     if (extras.labourCost != null) cv[AH_LABOUR]   = extras.labourCost;
     if (extras.matTotal   != null) cv[AH_MAT_COST] = extras.matTotal;
+    if (extras.source)             cv[AH_SOURCE]   = extras.source;
   }
   await gql(`mutation($b:ID!,$n:String!,$v:JSON!){ create_item(board_id:$b,item_name:$n,column_values:$v,create_labels_if_missing:true){ id } }`,
     { b: ADHOC_BOARD, n: taskName, v: JSON.stringify(cv) });

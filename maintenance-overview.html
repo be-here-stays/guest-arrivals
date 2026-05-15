@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#272F2E">
+<title>Maintenance Overview — Be Here</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg:#D5D0C4; --dark:#272F2E; --sage:#646955; --sage-mid:#989782;
+    --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
+    --red:#8B2020; --red-bg:#fdf0ec; --amber:#a86c00; --amber-bg:#fdf5e8;
+    --green:#2d6a4f; --green-bg:#edf7f2; --blue:#1a5276; --blue-bg:#eaf4fb;
+    --grey:#9aa19f; --grey-bg:#eef0ee;
+  }
+  * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
+  body { font-family:'Instrument Sans',-apple-system,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; }
+
+  header { background:var(--dark); color:#fff; padding:14px 18px; padding-top:max(14px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:120; }
+  header h1 { font-size:17px; font-weight:700; }
+  header .sub { font-size:11px; opacity:0.65; margin-top:1px; }
+  .hdr-back { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; white-space:nowrap; }
+  .hdr-right { display:flex; align-items:center; gap:10px; }
+  .reload-btn { background:rgba(255,255,255,.1); color:#fff; border:1px solid rgba(255,255,255,.25); border-radius:6px; padding:5px 10px; font-size:11px; font-weight:600; cursor:pointer; font-family:inherit; }
+  .reload-btn:hover { background:rgba(255,255,255,.2); }
+
+  /* KPI tiles */
+  .kpi-row { display:grid; grid-template-columns:repeat(auto-fit, minmax(180px, 1fr)); gap:10px; padding:14px; max-width:1200px; margin:0 auto; }
+  .kpi { background:var(--surface); border-radius:12px; padding:12px 14px; box-shadow:0 1px 3px rgba(0,0,0,.05); border-left:4px solid var(--border); }
+  .kpi.danger  { border-left-color:var(--red); }
+  .kpi.warn    { border-left-color:var(--amber); }
+  .kpi.ok      { border-left-color:var(--green); }
+  .kpi-cat { font-size:11px; font-weight:700; text-transform:uppercase; color:var(--sage-mid); letter-spacing:.4px; margin-bottom:4px; display:flex; align-items:center; gap:6px; }
+  .kpi-num { font-size:28px; font-weight:700; line-height:1; }
+  .kpi-num.red { color:var(--red); }
+  .kpi-num.amb { color:var(--amber); }
+  .kpi-num.grn { color:var(--green); }
+  .kpi-meta { font-size:11px; color:var(--sage); margin-top:5px; }
+
+  /* Toolbar */
+  .toolbar { background:var(--surface); border-bottom:1px solid var(--border); padding:9px 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; position:sticky; top:54px; z-index:100; }
+  .ctrl-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--sage-mid); white-space:nowrap; }
+  .ctrl-group { display:flex; gap:3px; }
+  .ctrl-btn { padding:5px 10px; border:1.5px solid var(--border); border-radius:18px; background:var(--surface); font-family:inherit; font-size:11px; font-weight:600; color:var(--sage); cursor:pointer; transition:all .15s; white-space:nowrap; }
+  .ctrl-btn:hover { border-color:var(--dark); color:var(--dark); }
+  .ctrl-btn.active { background:var(--dark); color:var(--cream); border-color:var(--dark); }
+  .ctrl-divider { width:1px; background:var(--border); margin:0 4px; align-self:stretch; }
+
+  /* Grid */
+  .container { max-width:1200px; margin:0 auto; padding:14px; }
+  .grid-wrap { background:var(--surface); border-radius:12px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  table.grid { width:100%; border-collapse:collapse; }
+  table.grid th, table.grid td { padding:9px 12px; text-align:left; border-bottom:1px solid var(--border); }
+  table.grid th { background:#f3f1eb; font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--sage); position:sticky; top:120px; z-index:5; }
+  table.grid td.prop-cell { font-weight:600; font-size:13px; min-width:140px; }
+  table.grid td.cell { min-width:130px; padding:6px 10px; }
+  table.grid tr:hover td { background:#fafaf6; }
+
+  .light {
+    display:inline-flex; align-items:center; gap:7px;
+    padding:5px 9px; border-radius:7px; font-size:12px; font-weight:600;
+    cursor:pointer; transition:transform .1s; min-width:110px;
+  }
+  .light:hover { transform:translateY(-1px); box-shadow:0 2px 5px rgba(0,0,0,.08); }
+  .dot { width:9px; height:9px; border-radius:50%; flex-shrink:0; }
+  .light.green  { background:var(--green-bg); color:var(--green); }
+  .light.green  .dot { background:var(--green); }
+  .light.amber  { background:var(--amber-bg); color:var(--amber); }
+  .light.amber  .dot { background:var(--amber); }
+  .light.red    { background:var(--red-bg);   color:var(--red);   }
+  .light.red    .dot { background:var(--red); }
+  .light.grey   { background:var(--grey-bg);  color:var(--sage-mid); cursor:default; }
+  .light.grey   .dot { background:var(--grey); }
+  .light.grey:hover { transform:none; box-shadow:none; }
+  .light.never  { background:var(--red-bg); color:var(--red); }
+  .light.never  .dot { background:var(--red); }
+  .light .age { font-weight:400; font-size:11px; opacity:0.85; }
+
+  .schedule-link { color:var(--blue); font-size:11px; text-decoration:none; margin-left:6px; font-weight:700; opacity:0; transition:opacity .15s; }
+  .light:hover .schedule-link { opacity:1; }
+
+  .empty { padding:30px; text-align:center; color:var(--sage-mid); font-style:italic; font-size:13px; }
+  .loading { text-align:center; padding:40px; color:var(--sage); }
+  .spin { display:inline-block; width:22px; height:22px; border:3px solid rgba(100,105,85,.15); border-top-color:var(--sage); border-radius:50%; animation:spin .8s linear infinite; }
+  @keyframes spin { to { transform:rotate(360deg); } }
+
+  /* Mobile: collapse table to per-property cards */
+  @media (max-width:680px) {
+    table.grid thead { display:none; }
+    table.grid, table.grid tbody, table.grid tr { display:block; }
+    table.grid tr { padding:10px 12px; border-bottom:1px solid var(--border); }
+    table.grid td { display:flex; justify-content:space-between; align-items:center; padding:6px 0; border:0; }
+    table.grid td.prop-cell { font-size:14px; padding:4px 0 8px; border-bottom:1px solid var(--border); margin-bottom:6px; }
+    table.grid td.cell::before {
+      content:attr(data-label);
+      font-size:10px; text-transform:uppercase; font-weight:700; color:var(--sage-mid); letter-spacing:.5px;
+    }
+    .light { min-width:0; }
+  }
+
+  .legend { display:flex; gap:14px; padding:8px 14px; font-size:11px; color:var(--sage); align-items:center; justify-content:center; flex-wrap:wrap; }
+  .legend-item { display:inline-flex; align-items:center; gap:5px; }
+  .legend-item .dot { width:8px; height:8px; }
+
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--dark); color:var(--cream); padding:10px 22px; border-radius:20px; font-size:13px; font-weight:600; opacity:0; transition:opacity .3s; z-index:200; pointer-events:none; }
+  .toast.show { opacity:1; }
+  .toast.err { background:var(--red); }
+</style>
+</head>
+<body>
+
+<header>
+  <div>
+    <h1>Maintenance Overview</h1>
+    <div class="sub">Urgency across Windows · Decking · PAT</div>
+  </div>
+  <a href="hub.html" class="hdr-back">‹ Hub</a>
+</header>
+
+<div class="kpi-row" id="kpiRow">
+  <div class="kpi"><div class="kpi-cat">Loading…</div></div>
+</div>
+
+<div class="toolbar">
+  <span class="ctrl-label">Show</span>
+  <div class="ctrl-group">
+    <button class="ctrl-btn active" data-show="all"      onclick="setShow('all')">All</button>
+    <button class="ctrl-btn"        data-show="overdue"  onclick="setShow('overdue')">Overdue only</button>
+    <button class="ctrl-btn"        data-show="due-soon" onclick="setShow('due-soon')">Due soon (amber+)</button>
+  </div>
+  <div class="ctrl-divider"></div>
+  <span class="ctrl-label">Sort</span>
+  <div class="ctrl-group">
+    <button class="ctrl-btn active" data-sort="urgency" onclick="setSort('urgency')">Most overdue</button>
+    <button class="ctrl-btn"        data-sort="name"    onclick="setSort('name')">A → Z</button>
+  </div>
+  <div class="ctrl-divider"></div>
+  <div class="legend">
+    <span class="legend-item"><span class="dot" style="background:var(--green)"></span> In date</span>
+    <span class="legend-item"><span class="dot" style="background:var(--amber)"></span> Due soon</span>
+    <span class="legend-item"><span class="dot" style="background:var(--red)"></span> Overdue</span>
+    <span class="legend-item"><span class="dot" style="background:var(--grey)"></span> Not in use</span>
+  </div>
+  <button class="ctrl-btn" onclick="boot()" style="margin-left:auto">↻ Refresh</button>
+</div>
+
+<div class="container">
+  <div class="grid-wrap">
+    <div id="gridBody">
+      <div class="loading"><div class="spin"></div></div>
+    </div>
+  </div>
+</div>
+
+<div id="toast" class="toast"></div>
+
+<script src="secrets.js"></script>
+<script>
+const TOKEN   = window.MONDAY_API_TOKEN;
+const URL_API = 'https://api.monday.com/v2';
+
+// Three registers — one row per property, with last-done date + status.
+const REGISTERS = [
+  { key:'window', label:'Windows',   boardId:1987064628, dateCol:'date4', statusCol:'status',
+    thresholds:{ green:6*7,  amber:10*7 }, // days
+    unitLabel:'wks' },
+  { key:'jet',    label:'Jet wash',  boardId:5092955038, dateCol:'date4', statusCol:'status',
+    thresholds:{ green:12*7, amber:20*7 },
+    unitLabel:'wks' },
+  { key:'pat',    label:'PAT test',  boardId:5092954987, dateCol:'date4', statusCol:'status',
+    thresholds:{ green:11*30, amber:12*30 },
+    unitLabel:'mo'  },
+];
+
+let registryData = {};   // key -> { propsByName: {name: {id, date, status}}}
+let allProperties = [];  // [ {name, perCat:{key:{state,age,prop,...}}} ]
+let show = localStorage.getItem('mo_show') || 'all';
+let sort = localStorage.getItem('mo_sort') || 'urgency';
+
+const todayISO = () => new Date().toISOString().split('T')[0];
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const pj = v => { try { return JSON.parse(v); } catch { return null; } };
+
+async function mq(query) {
+  // Note: secrets.js installs a fetch override that rewrites api.monday.com to a
+  // Cloudflare Worker, which attaches the real token server-side. We send a
+  // placeholder Authorization header here; the Worker replaces it.
+  const r = await fetch(URL_API, {
+    method:'POST',
+    headers:{'Content-Type':'application/json',Authorization:TOKEN || '','API-Version':'2024-04'},
+    body: JSON.stringify({ query })
+  });
+  if (!r.ok) throw new Error(`HTTP ${r.status} ${r.statusText}`);
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
+function daysBetween(iso) {
+  if (!iso) return null;
+  const d = new Date(iso); d.setHours(0,0,0,0);
+  const today = new Date(); today.setHours(0,0,0,0);
+  return Math.round((today - d) / 86400000);
+}
+
+function classifyCell(reg, row) {
+  const status = (row.status || '').trim();
+  if (/not in use/i.test(status)) return { state:'grey', age:null, label:'Not in use' };
+  const days = daysBetween(row.date);
+  if (days === null) {
+    // No date — go off status if available
+    if (/^schedule$/i.test(status)) return { state:'amber', age:null, label:'Scheduled' };
+    if (/dirty|overdue/i.test(status)) return { state:'red', age:null, label:status || 'Overdue' };
+    return { state:'never', age:null, label:'Never done' };
+  }
+  // Override on status overdue/dirty regardless of recency
+  if (/dirty|overdue/i.test(status)) return { state:'red', age:days, label:status };
+
+  let state;
+  if (days <= reg.thresholds.green)      state = 'green';
+  else if (days <= reg.thresholds.amber) state = 'amber';
+  else                                   state = 'red';
+  return { state, age:days, label: ageLabel(days, reg.unitLabel) };
+}
+
+function ageLabel(days, unit) {
+  if (unit === 'mo') {
+    const m = Math.round(days/30);
+    return m <= 0 ? 'today' : `${m} mo ago`;
+  }
+  const w = Math.round(days/7);
+  if (w <= 0) return 'today';
+  if (w === 1) return '1 wk ago';
+  return `${w} wks ago`;
+}
+
+async function boot() {
+  document.getElementById('gridBody').innerHTML = '<div class="loading"><div class="spin"></div></div>';
+  document.getElementById('kpiRow').innerHTML = '<div class="kpi"><div class="kpi-cat">Loading…</div></div>';
+
+  try {
+    // Load all three registers in parallel
+    const results = await Promise.all(REGISTERS.map(reg =>
+      mq(`{ boards(ids:[${reg.boardId}]) { items_page(limit:500) { items { id name column_values(ids:["${reg.dateCol}","${reg.statusCol}"]) { id text value } } } } }`)
+        .then(d => {
+          const items = d?.boards?.[0]?.items_page?.items || [];
+          const propsByName = {};
+          for (const it of items) {
+            const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+            const date = pj(cv[reg.dateCol]?.value)?.date || null;
+            const status = cv[reg.statusCol]?.text || '';
+            propsByName[it.name.trim()] = { id:it.id, date, status };
+          }
+          return [reg.key, propsByName];
+        })
+    ));
+    registryData = Object.fromEntries(results);
+
+    // Union of property names across all registers
+    const names = new Set();
+    for (const [, dict] of Object.entries(registryData)) {
+      for (const n of Object.keys(dict)) names.add(n);
+    }
+
+    allProperties = [...names].sort().map(name => {
+      const perCat = {};
+      for (const reg of REGISTERS) {
+        const row = registryData[reg.key][name];
+        if (!row) { perCat[reg.key] = { state:'missing', age:null, label:'Not on register' }; continue; }
+        perCat[reg.key] = { ...classifyCell(reg, row), itemId:row.id, propName:name };
+      }
+      return { name, perCat };
+    });
+
+    renderKpis();
+    renderGrid();
+  } catch (e) {
+    document.getElementById('gridBody').innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
+    document.getElementById('kpiRow').innerHTML = '';
+  }
+}
+
+function setShow(s) { show = s; localStorage.setItem('mo_show', s); document.querySelectorAll('[data-show]').forEach(b=>b.classList.toggle('active', b.dataset.show===s)); renderGrid(); }
+function setSort(s) { sort = s; localStorage.setItem('mo_sort', s); document.querySelectorAll('[data-sort]').forEach(b=>b.classList.toggle('active', b.dataset.sort===s)); renderGrid(); }
+
+function renderKpis() {
+  const html = REGISTERS.map(reg => {
+    const cells = allProperties.map(p => p.perCat[reg.key]).filter(c => c && c.state !== 'missing' && c.state !== 'grey');
+    const red = cells.filter(c => c.state === 'red' || c.state === 'never').length;
+    const amb = cells.filter(c => c.state === 'amber').length;
+    const grn = cells.filter(c => c.state === 'green').length;
+    const tone = red ? 'danger' : amb ? 'warn' : 'ok';
+    return `
+      <div class="kpi ${tone}">
+        <div class="kpi-cat">${esc(reg.label)}</div>
+        <div class="kpi-num ${red ? 'red' : amb ? 'amb' : 'grn'}">${red}</div>
+        <div class="kpi-meta">${red} overdue · ${amb} due soon · ${grn} in date</div>
+      </div>`;
+  }).join('');
+  document.getElementById('kpiRow').innerHTML = html;
+}
+
+function scoreRow(p) {
+  // Higher score = more urgent. Red=3, amber=2, green=1, grey/missing=0
+  const w = { red:3, never:3, amber:2, green:1, grey:0, missing:0 };
+  let s = 0;
+  for (const reg of REGISTERS) {
+    const c = p.perCat[reg.key];
+    s += (w[c.state] || 0) * 10;
+    if (c.age != null && (c.state === 'red' || c.state === 'amber')) s += Math.min(c.age, 999) / 100; // tie-break on age
+  }
+  return s;
+}
+
+function renderGrid() {
+  const body = document.getElementById('gridBody');
+  let rows = allProperties;
+  if (show === 'overdue') {
+    rows = rows.filter(p => REGISTERS.some(r => ['red','never'].includes(p.perCat[r.key]?.state)));
+  } else if (show === 'due-soon') {
+    rows = rows.filter(p => REGISTERS.some(r => ['amber','red','never'].includes(p.perCat[r.key]?.state)));
+  }
+  if (sort === 'urgency') {
+    rows.sort((a,b) => scoreRow(b) - scoreRow(a) || a.name.localeCompare(b.name));
+  } else {
+    rows.sort((a,b) => a.name.localeCompare(b.name));
+  }
+
+  if (!rows.length) {
+    body.innerHTML = '<div class="empty">Nothing matches this filter.</div>';
+    return;
+  }
+
+  const headerCols = REGISTERS.map(r => `<th>${esc(r.label)}</th>`).join('');
+
+  const bodyRows = rows.map(p => {
+    const cells = REGISTERS.map(reg => {
+      const c = p.perCat[reg.key];
+      if (!c || c.state === 'missing') {
+        return `<td class="cell" data-label="${esc(reg.label)}"><span class="light grey"><span class="dot"></span>—</span></td>`;
+      }
+      const state = c.state === 'never' ? 'never' : c.state;
+      const canSchedule = state !== 'green' && state !== 'grey';
+      const link = canSchedule
+        ? ` <a class="schedule-link" href="create-task.html?type=${reg.key}&property=${encodeURIComponent(p.name)}" title="Schedule a ${reg.label.toLowerCase()} for ${esc(p.name)}">schedule →</a>`
+        : '';
+      return `
+        <td class="cell" data-label="${esc(reg.label)}">
+          <span class="light ${state}">
+            <span class="dot"></span>
+            <span>${esc(c.label)}</span>
+            ${c.age != null && state !== 'grey' ? `<span class="age">${esc(ageLabel(c.age, reg.unitLabel))}</span>` : ''}
+          </span>${link}
+        </td>`;
+    }).join('');
+    return `<tr><td class="prop-cell">${esc(p.name)}</td>${cells}</tr>`;
+  }).join('');
+
+  body.innerHTML = `
+    <table class="grid">
+      <thead><tr><th>Property</th>${headerCols}</tr></thead>
+      <tbody>${bodyRows}</tbody>
+    </table>`;
+}
+
+// Restore UI state
+document.querySelectorAll('[data-show]').forEach(b => b.classList.toggle('active', b.dataset.show===show));
+document.querySelectorAll('[data-sort]').forEach(b => b.classList.toggle('active', b.dataset.sort===sort));
+
+boot();
+</script>
+</body>
+</html>

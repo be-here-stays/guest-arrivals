@@ -72,6 +72,7 @@
   .badge { display:inline-block; font-size:9px; font-weight:700; padding:2px 6px; border-radius:4px; white-space:nowrap; text-transform:uppercase; letter-spacing:.3px; }
   .badge-model    { background:var(--blue-bg);  color:var(--blue); }
   .badge-model.full { background:#f4e8fb; color:#9d50dd; }
+  .badge-model.hw   { background:#f5e8d0; color:#7a4a10; }
   .badge-ok       { background:var(--green-bg); color:var(--green); }
   .badge-low      { background:var(--amber-bg); color:var(--amber); }
   .badge-critical { background:var(--red-bg);   color:var(--red); }
@@ -80,6 +81,8 @@
   .badge-retired  { background:var(--grey-bg);  color:var(--sage-mid); }
   .badge-overdue  { background:var(--red-bg);   color:var(--red); }
   .badge-battery  { background:#f3f1ea; color:var(--dark); font-size:10px; }
+  .badge-online   { background:var(--green-bg); color:var(--green); }
+  .badge-offline  { background:var(--red-bg);   color:var(--red); }
 
   .row-data { font-size:11px; color:var(--sage); display:flex; gap:7px; align-items:center; }
   .row-data .age { font-weight:400; color:var(--sage-mid); }
@@ -191,6 +194,31 @@
     <div class="modal-actions">
       <button class="btn btn-cancel" onclick="closeModal('reading')">Cancel</button>
       <button class="btn btn-primary" id="readingSaveBtn" onclick="submitReading()">Save reading</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Modal: Check online (hardwired models) ───────────────────── -->
+<div class="veil" id="onlineVeil" onclick="if(event.target===this)closeModal('online')">
+  <div class="modal-card">
+    <div class="modal-title">Check connectivity</div>
+    <div class="modal-sub" id="onlineSub">Open the Ring app and confirm whether this hardwired doorbell is showing as online.</div>
+    <div class="modal-row">
+      <label>Status</label>
+      <div class="radio-pair">
+        <input type="radio" name="onlineState" id="onlineYes" value="Online" checked>
+        <label for="onlineYes">✅ Online</label>
+        <input type="radio" name="onlineState" id="onlineNo"  value="Offline">
+        <label for="onlineNo">⚠ Offline</label>
+      </div>
+    </div>
+    <div class="modal-row">
+      <label>Note (optional)</label>
+      <textarea id="onlineNote" placeholder="e.g. 'Reconnected after router restart' or 'Doorbell unresponsive — battery icon flashing'"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal('online')">Cancel</button>
+      <button class="btn btn-primary" id="onlineSaveBtn" onclick="submitOnlineCheck()">Save</button>
     </div>
   </div>
 </div>
@@ -320,6 +348,18 @@ const RB_REMOVED     = 'date_mm3cry1c';
 const RB_CYCLES      = 'numeric_mm3c54e3';
 const RB_NOTES       = 'long_text_mm3csfmk';
 
+// Ad-hoc Maintenance — for creating 'Replace Ring battery' tasks
+const ADHOC_BOARD    = 5095296374;
+const AH_PROP        = 'text_mm2shvja';
+const AH_DESC        = 'long_text_mm2s5dwj';
+const AH_SCHED       = 'date_mm2stp44';
+const AH_STATUS      = 'color_mm2sf7a8';
+const AH_DUE         = 'date_mm2vw7qh';
+const AH_GUEST       = 'dropdown_mm2vpbet';
+const AH_PRIO        = 'color_mm2sy0cn';
+const AH_REQUESTER   = 'text_mm3ck8dq';
+const AH_SOURCE      = 'text_mm3chd09';
+
 const WEEKLY_DAYS    = 7;
 const LOW_PCT        = 30;
 const CRITICAL_PCT   = 15;
@@ -337,7 +377,7 @@ let activeId   = null;       // currently expanded row id
 const FILTERS_DEVICES = [
   { k:'all',      l:'All' },
   { k:'overdue',  l:'Overdue check' },
-  { k:'low',      l:'Low + Critical' },
+  { k:'low',      l:'Needs attention' },
   { k:'charging', l:'On charge' },
 ];
 const FILTERS_BATT = [
@@ -486,10 +526,12 @@ async function ensureDeviceRows() {
 
 // ── KPIs ───────────────────────────────────────────────────────────
 function renderKpis() {
-  const overdue = devices.filter(d => isOverdue(d)).length;
-  const low     = devices.filter(d => d.status === 'Low' || d.status === 'Critical').length;
-  const onCharge= devices.filter(d => d.status === 'On charge').length;
-  const suspect = batteries.filter(b => isSuspectBattery(b)).length;
+  const overdue  = devices.filter(d => isOverdue(d)).length;
+  const lowCrit  = devices.filter(d => ['Low','Critical'].includes(d.status)).length;
+  const offline  = devices.filter(d => d.status === 'Offline').length;
+  const onCharge = devices.filter(d => d.status === 'On charge').length;
+  const suspect  = batteries.filter(b => isSuspectBattery(b)).length;
+  const needsAttention = lowCrit + offline;
 
   document.getElementById('kpiRow').innerHTML = `
     <div class="kpi ${overdue ? 'danger':'ok'}">
@@ -497,10 +539,10 @@ function renderKpis() {
       <div class="kpi-num ${overdue ? 'red':'grn'}">${overdue}</div>
       <div class="kpi-meta">Of ${devices.length} active devices</div>
     </div>
-    <div class="kpi ${low ? 'warn':'ok'}">
-      <div class="kpi-cat">Low / Critical</div>
-      <div class="kpi-num ${low ? 'amb':'grn'}">${low}</div>
-      <div class="kpi-meta">Need a swap soon</div>
+    <div class="kpi ${needsAttention ? 'warn':'ok'}">
+      <div class="kpi-cat">Needs attention</div>
+      <div class="kpi-num ${needsAttention ? 'amb':'grn'}">${needsAttention}</div>
+      <div class="kpi-meta">${lowCrit} low/critical · ${offline} offline</div>
     </div>
     <div class="kpi info">
       <div class="kpi-cat">On charge</div>
@@ -561,7 +603,7 @@ function renderList() {
 function renderDevices() {
   let list = devices.slice();
   if (filter === 'overdue')  list = list.filter(isOverdue);
-  else if (filter === 'low') list = list.filter(d => d.status === 'Low' || d.status === 'Critical');
+  else if (filter === 'low') list = list.filter(d => ['Low','Critical','Offline'].includes(d.status));
   else if (filter === 'charging') list = list.filter(d => d.status === 'On charge');
 
   list.sort((a,b) => {
@@ -586,36 +628,42 @@ function renderDevices() {
 
 function urgencyScore(d) {
   let s = 0;
-  if (d.status === 'Critical') s += 1000;
-  else if (d.status === 'Low') s += 500;
+  if (d.status === 'Offline')       s += 1200;
+  else if (d.status === 'Critical') s += 1000;
+  else if (d.status === 'Low')      s += 500;
   if (isOverdue(d)) s += 300;
   const days = daysBetween(d.lastReadD);
   if (days != null) s += Math.min(days, 365);
   return s;
 }
 
+function isHardwired(d) { return /hardwired/i.test(d.model || ''); }
+
 function deviceRowHtml(d) {
+  const hw = isHardwired(d);
   const days = daysBetween(d.lastReadD);
-  const ageStr = days == null ? 'never read' : (days === 0 ? 'today' : days === 1 ? '1d ago' : `${days}d ago`);
+  const ageStr = days == null ? (hw ? 'never checked' : 'never read') : (days === 0 ? 'today' : days === 1 ? '1d ago' : `${days}d ago`);
   const ageCls = (days == null || days > WEEKLY_DAYS) ? 'overdue' : '';
-  const cls = d.status === 'On charge' ? 'charging'
-            : d.status === 'Critical' ? 'critical'
-            : d.status === 'Low' ? 'low'
+  const cls = d.status === 'Offline'   ? 'critical'
+            : d.status === 'On charge' ? 'charging'
+            : d.status === 'Critical'  ? 'critical'
+            : d.status === 'Low'       ? 'low'
             : isOverdue(d) ? 'overdue' : 'ok';
   const statusBadge = `<span class="badge badge-${d.status.toLowerCase().replace(/\s+/g,'')}">${esc(d.status)}</span>`;
-  const overdueBadge = isOverdue(d) && d.status !== 'On charge' ? `<span class="badge badge-overdue">⏰ Overdue</span>` : '';
-  const modelClass = d.model === 'Full unit charge' ? 'badge-model full' : 'badge-model';
+  const overdueBadge = isOverdue(d) && d.status !== 'On charge' ? `<span class="badge badge-overdue">⏰ Overdue check</span>` : '';
+  const modelClass = hw ? 'badge-model hw' : d.model === 'Full unit charge' ? 'badge-model full' : 'badge-model';
+  const modelIcon  = hw ? '⚡ hardwired' : d.model === 'Full unit charge' ? '🔌 full charge' : '🔋 swap';
   const isExpanded = activeId === d.id;
   return `
     <div class="row ${cls}${isExpanded?' expanded':''}" onclick="toggleRow('${d.id}')">
       <span class="row-prop">${esc(d.name)}</span>
       <span class="row-meta">
-        <span class="${modelClass} badge">${d.model === 'Full unit charge' ? '🔌 full charge' : '🔋 swap'}</span>
+        <span class="${modelClass} badge">${modelIcon}</span>
         ${statusBadge}
         ${overdueBadge}
-        ${d.battery ? `<span class="badge badge-battery">#${esc(d.battery)}</span>` : '<span class="badge badge-battery" style="opacity:.6">— no battery</span>'}
+        ${hw ? '' : (d.battery ? `<span class="badge badge-battery">#${esc(d.battery)}</span>` : '<span class="badge badge-battery" style="opacity:.6">— no battery</span>')}
         <span class="row-data">
-          ${d.lastReadP != null ? `<strong>${d.lastReadP}%</strong>` : '<strong>—</strong>'}
+          ${hw ? '' : (d.lastReadP != null ? `<strong>${d.lastReadP}%</strong>` : '<strong>—</strong>')}
           <span class="age ${ageCls}">${ageStr}</span>
         </span>
       </span>
@@ -624,34 +672,56 @@ function deviceRowHtml(d) {
 }
 
 function deviceExpandHtml(d) {
-  const lastSwapStr = d.lastSwap ? `${fmtDate(d.lastSwap)} <small>(${daysBetween(d.lastSwap)}d ago)</small>` : '—';
-  const lastReadStr = d.lastReadD ? `${fmtDate(d.lastReadD)} <small>(${daysBetween(d.lastReadD)}d ago)</small>` : '—';
-  const onChargeActions = d.status === 'On charge'
-    ? `<button class="btn btn-primary" onclick="event.stopPropagation();openReturnUnit('${d.id}')">↩ Return to wall</button>`
-    : '';
-  const swapBtn = d.model === 'Battery swap'
-    ? `<button class="btn btn-swap" onclick="event.stopPropagation();openSwap('${d.id}')">🔄 Swap battery</button>`
-    : '';
-  const unitBtn = d.model === 'Full unit charge' && d.status !== 'On charge'
-    ? `<button class="btn btn-charge" onclick="event.stopPropagation();openTakeUnit('${d.id}')">🔌 Take for charge</button>`
-    : '';
-  const readingBtn = d.status !== 'On charge'
-    ? `<button class="btn btn-primary" onclick="event.stopPropagation();openReading('${d.id}')">📊 Log reading</button>`
-    : '';
+  const hw = isHardwired(d);
+  const lastSwapStr  = d.lastSwap  ? `${fmtDate(d.lastSwap)} <small>(${daysBetween(d.lastSwap)}d ago)</small>`  : '—';
+  const lastReadStr  = d.lastReadD ? `${fmtDate(d.lastReadD)} <small>(${daysBetween(d.lastReadD)}d ago)</small>` : '—';
 
-  return `
-    <div class="expand-grid">
+  // Per-model action buttons
+  let actions = '';
+  if (hw) {
+    actions = `
+      <button class="btn btn-primary" onclick="event.stopPropagation();openOnlineCheck('${d.id}')">📡 Check online</button>
+      <button class="btn btn-cancel"  onclick="event.stopPropagation();manualCreateTask('${d.id}')">📋 Create task</button>`;
+  } else if (d.model === 'Full unit charge') {
+    const onChargeActions = d.status === 'On charge'
+      ? `<button class="btn btn-primary" onclick="event.stopPropagation();openReturnUnit('${d.id}')">↩ Return to wall</button>`
+      : '';
+    const takeBtn = d.status !== 'On charge'
+      ? `<button class="btn btn-charge" onclick="event.stopPropagation();openTakeUnit('${d.id}')">🔌 Take for charge</button>`
+      : '';
+    const readingBtn = d.status !== 'On charge'
+      ? `<button class="btn btn-primary" onclick="event.stopPropagation();openReading('${d.id}')">📊 Log reading</button>`
+      : '';
+    const taskBtn = d.status !== 'On charge'
+      ? `<button class="btn btn-cancel" onclick="event.stopPropagation();manualCreateTask('${d.id}')">📋 Create replace task</button>`
+      : '';
+    actions = `${readingBtn} ${takeBtn} ${onChargeActions} ${taskBtn}`;
+  } else {
+    // Battery swap
+    actions = `
+      <button class="btn btn-primary" onclick="event.stopPropagation();openReading('${d.id}')">📊 Log reading</button>
+      <button class="btn btn-swap"    onclick="event.stopPropagation();openSwap('${d.id}')">🔄 Swap battery</button>
+      <button class="btn btn-cancel"  onclick="event.stopPropagation();manualCreateTask('${d.id}')">📋 Create replace task</button>`;
+  }
+
+  // Stat cells differ for hardwired
+  let statCells;
+  if (hw) {
+    statCells = `
+      <div class="stat-cell"><div class="stat-lbl">Connectivity</div><div class="stat-val">${esc(d.status)}</div></div>
+      <div class="stat-cell"><div class="stat-lbl">Last check</div><div class="stat-val">${lastReadStr}</div></div>
+      <div class="stat-cell"><div class="stat-lbl">Model</div><div class="stat-val">${esc(d.model)}</div></div>`;
+  } else {
+    statCells = `
       <div class="stat-cell"><div class="stat-lbl">Installed battery</div><div class="stat-val">${d.battery ? '#'+esc(d.battery) : '—'}</div></div>
       <div class="stat-cell"><div class="stat-lbl">Last swap</div><div class="stat-val">${lastSwapStr}</div></div>
       <div class="stat-cell"><div class="stat-lbl">Last reading</div><div class="stat-val">${d.lastReadP != null ? d.lastReadP+'% on ' : ''}${lastReadStr}</div></div>
-      <div class="stat-cell"><div class="stat-lbl">Model</div><div class="stat-val">${esc(d.model)}</div></div>
-    </div>
-    <div class="action-row">
-      ${readingBtn}
-      ${swapBtn}
-      ${unitBtn}
-      ${onChargeActions}
-    </div>
+      <div class="stat-cell"><div class="stat-lbl">Model</div><div class="stat-val">${esc(d.model)}</div></div>`;
+  }
+
+  return `
+    <div class="expand-grid">${statCells}</div>
+    <div class="action-row">${actions}</div>
     <div class="notes-block">${esc(d.notes)}</div>`;
 }
 
@@ -776,8 +846,21 @@ function openAddBattery() {
   document.getElementById('addBattVeil').classList.add('show');
   setTimeout(() => document.getElementById('newBattNum').focus(), 50);
 }
+function openOnlineCheck(deviceId) {
+  pendingDeviceId = deviceId;
+  const d = devices.find(x => x.id === deviceId);
+  document.getElementById('onlineSub').textContent = `${d.name} — hardwired Ring. Confirm whether it's showing as online in the Ring app.`;
+  document.getElementById('onlineYes').checked = (d.status !== 'Offline');
+  document.getElementById('onlineNo').checked  = (d.status === 'Offline');
+  document.getElementById('onlineNote').value  = '';
+  document.getElementById('onlineVeil').classList.add('show');
+}
+
 function closeModal(which) {
-  document.getElementById(({reading:'readingVeil',swap:'swapVeil',unit:'unitVeil',return:'returnVeil',addBatt:'addBattVeil'})[which]).classList.remove('show');
+  document.getElementById(({
+    reading:'readingVeil',swap:'swapVeil',unit:'unitVeil',
+    return:'returnVeil',addBatt:'addBattVeil',online:'onlineVeil'
+  })[which]).classList.remove('show');
   if (which !== 'addBatt') pendingDeviceId = null;
 }
 
@@ -819,6 +902,49 @@ async function submitReading() {
     closeModal('reading');
     renderKpis(); renderList();
     showToast(`Reading saved · ${status}`, 'ok');
+    // If Low or Critical, prompt to create a backlog task
+    maybeCreateTaskOnLowReading(d, status, pct);
+  } catch (e) {
+    showToast('Save failed: '+e.message,'err');
+  } finally { btn.disabled = false; }
+}
+
+// ── Modal submit: Online check (hardwired) ────────────────────────
+async function submitOnlineCheck() {
+  const id = pendingDeviceId; if (!id) return;
+  const d = devices.find(x => x.id === id); if (!d) return;
+  const state = (document.querySelector('input[name="onlineState"]:checked') || {}).value || 'Online';
+  const note  = document.getElementById('onlineNote').value.trim();
+  const author = getUserName(); if (!author) { showToast('Need a name','err'); return; }
+  const btn = document.getElementById('onlineSaveBtn'); btn.disabled = true;
+  try {
+    const goingOffline = state === 'Offline' && d.status !== 'Offline';
+    const entry = `[${nowStamp()} — ${author}] Connectivity check: ${state}${note ? ` · ${note}` : ''}`;
+    const newNotes = (d.notes ? d.notes.trim() + '\n\n' : '') + entry;
+    const cv = {
+      [RD_STATUS]:       { label: state },
+      [RD_LAST_READ_D]:  { date: todayISO() },
+      [RD_NOTES]:        newNotes,
+    };
+    await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+      { b: RD_BOARD, i: id, v: JSON.stringify(cv) });
+    d.status = state; d.lastReadD = todayISO(); d.notes = newNotes;
+    closeModal('online');
+    renderKpis(); renderList();
+    showToast(`Saved · ${state}`,'ok');
+    // If just went offline, offer to raise a task
+    if (goingOffline) {
+      const existing = await findOpenReplaceTaskFor(d);
+      if (!existing) {
+        const yes = confirm(`${d.name} is showing OFFLINE. Create a 'Check Ring connectivity' task on the maintenance backlog?`);
+        if (yes) {
+          try {
+            await createBatteryReplaceTask(d, 'Critical', `Ring offline — check Wi-Fi connection, power supply, or device fault.${note ? '\nReporter note: '+note : ''}`);
+            showToast('Connectivity task created','ok');
+          } catch (e) { showToast('Could not create task: '+e.message,'err'); }
+        }
+      }
+    }
   } catch (e) {
     showToast('Save failed: '+e.message,'err');
   } finally { btn.disabled = false; }
@@ -910,9 +1036,130 @@ async function submitSwap() {
     closeModal('swap');
     renderKpis(); renderList();
     showToast(`Swapped to #${newBattery.name}`,'ok');
+    // Auto-close any open Replace-battery task linked to this device
+    closeReplaceTaskAfterSwap(d, newBattery.name).then(closedId => {
+      if (closedId) showToast(`Linked backlog task auto-closed`,'ok');
+    }).catch(()=>{});
   } catch (e) {
     showToast('Swap failed: '+e.message,'err');
   } finally { btn.disabled = false; }
+}
+
+// ── Replace-battery tasks on the Ad-hoc Maintenance backlog ────────
+function sourceLinkFor(device) {
+  return `ring:${RD_BOARD}:${device.id}`;
+}
+
+async function findOpenReplaceTaskFor(device) {
+  // Look up the Ad-hoc board for any open (non-Completed/Cancelled) task linked to this device.
+  try {
+    const d = await mq(`{
+      boards(ids:[${ADHOC_BOARD}]) {
+        items_page(limit:50, query_params:{ rules:[
+          { column_id:"${AH_SOURCE}", compare_value:"${sourceLinkFor(device)}", operator:contains_text }
+        ]}) {
+          items { id name column_values(ids:["${AH_STATUS}"]) { text } }
+        }
+      }
+    }`);
+    const items = d?.boards?.[0]?.items_page?.items || [];
+    return items.find(it => {
+      const status = (it.column_values?.[0]?.text || '').toLowerCase();
+      return !/completed|cancelled/.test(status);
+    }) || null;
+  } catch (e) {
+    console.warn('findOpenReplaceTaskFor failed:', e);
+    return null;
+  }
+}
+
+async function createBatteryReplaceTask(device, urgency, reasonText) {
+  const author = getUserName() || 'Ring monitor';
+  const today = todayISO();
+  const dueOffsetDays = urgency === 'Critical' ? 1 : urgency === 'Urgent' ? 0 : 3;
+  const dueDate = new Date(); dueDate.setDate(dueDate.getDate() + dueOffsetDays);
+  const dueISO = dueDate.toISOString().split('T')[0];
+
+  const priority = urgency === 'Critical' ? 'Urgent' : urgency === 'Low' ? 'High' : 'Medium';
+  const modelLabel = device.model || 'Battery swap';
+  const taskName = `${device.name} · Replace Ring battery${urgency ? ' ('+urgency+')' : ''}`;
+  const desc = `${reasonText}\n\nCurrent battery #${device.battery || '—'} · model: ${modelLabel}\nUse the Ring Batteries page to do the swap — that closes this task automatically.\n\nReported by: ${author} at ${nowStamp()}`;
+
+  const cv = {
+    [AH_PROP]:      device.name,
+    [AH_DESC]:      desc,
+    [AH_SCHED]:     { date: today },
+    [AH_DUE]:       { date: dueISO },
+    [AH_STATUS]:    { label: 'Scheduled' },
+    [AH_PRIO]:      { label: priority },
+    [AH_GUEST]:     { labels: ['Guests OK'] }, // doorbell battery swap is quick — fine with guests in
+    [AH_REQUESTER]: author,
+    [AH_SOURCE]:    sourceLinkFor(device),
+  };
+  const data = await mq(
+    `mutation($b:ID!,$n:String!,$v:JSON!){ create_item(board_id:$b,item_name:$n,column_values:$v,create_labels_if_missing:true){ id } }`,
+    { b: ADHOC_BOARD, n: taskName, v: JSON.stringify(cv) }
+  );
+  return data?.create_item?.id || null;
+}
+
+async function closeReplaceTaskAfterSwap(device, newBatteryNum) {
+  const existing = await findOpenReplaceTaskFor(device);
+  if (!existing) return null;
+  try {
+    const author = getUserName() || 'Ring monitor';
+    const closeNote = `\n\n[${nowStamp()} — ${author}] Auto-closed by Ring battery swap: now fitted #${newBatteryNum}.`;
+    // Append closure note onto whatever description is on the task
+    const desc = (await mq(`{ items(ids:[${existing.id}]) { column_values(ids:["${AH_DESC}"]) { text value } } }`))
+      ?.items?.[0]?.column_values?.[0];
+    const prev = pj(desc?.value)?.text || desc?.text || '';
+    const newDesc = (prev ? prev.trim() : '') + closeNote;
+    await mq(
+      `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+      { b: ADHOC_BOARD, i: existing.id, v: JSON.stringify({ [AH_STATUS]:{ label:'Completed' }, [AH_DESC]: newDesc }) }
+    );
+    return existing.id;
+  } catch (e) {
+    console.warn('closeReplaceTaskAfterSwap failed:', e);
+    return null;
+  }
+}
+
+async function maybeCreateTaskOnLowReading(device, status, pct) {
+  if (status !== 'Low' && status !== 'Critical') return;
+  // Skip if one already exists
+  const existing = await findOpenReplaceTaskFor(device);
+  if (existing) {
+    showToast(`Battery task already open for ${device.name}`, 'ok');
+    return;
+  }
+  const yes = confirm(`${device.name} reading is ${pct}% (${status}). Create a 'Replace Ring battery' task on the maintenance backlog?`);
+  if (!yes) return;
+  try {
+    const id = await createBatteryReplaceTask(device, status, `Reading ${pct}% — flagged ${status}.`);
+    if (id) showToast(`Task created · ${status} priority`, 'ok');
+  } catch (e) {
+    showToast('Could not create task: ' + e.message, 'err');
+  }
+}
+
+async function manualCreateTask(deviceId) {
+  const d = devices.find(x => x.id === deviceId); if (!d) return;
+  const existing = await findOpenReplaceTaskFor(d);
+  if (existing) {
+    showToast(`Task already exists: ${existing.name}`, 'ok');
+    return;
+  }
+  const urgency = (prompt(`Create a Replace battery task for ${d.name}. Urgency? (Low / High / Urgent — default High)`, 'High') || '').trim();
+  const validUrg = ['Low','High','Urgent'].includes(urgency) ? urgency : 'High';
+  // Map page urgency to the internal status used for due-date offset
+  const internal = validUrg === 'Urgent' ? 'Critical' : validUrg === 'High' ? 'Low' : 'Low';
+  try {
+    const id = await createBatteryReplaceTask(d, internal, `Manually requested replacement.${d.lastReadP != null ? ' Last reading: ' + d.lastReadP + '%' : ''}`);
+    if (id) showToast(`Task created · ${validUrg} priority`, 'ok');
+  } catch (e) {
+    showToast('Could not create task: '+e.message,'err');
+  }
 }
 
 async function createBatteryRow(num, state, note) {

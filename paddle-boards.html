@@ -615,8 +615,18 @@ const BOARD_NAMES = {
   status:   'Paddle Board Status',
   bookings: 'Paddle Board Bookings',
   hires:    'Paddle Board Hires',
-  tasks:    'Paddle Board Tasks'
 };
+
+// Ad-hoc task backlog — shared with create-task.html
+const ADHOC_BOARD  = 5095296374;
+const AH_PROP      = 'text_mm2shvja';
+const AH_DESC      = 'long_text_mm2s5dwj';
+const AH_SCHED     = 'date_mm2stp44';
+const AH_STATUS    = 'color_mm2sf7a8';
+const AH_DUE       = 'date_mm2vw7qh';
+const AH_GUEST     = 'dropdown_mm2vpbet';
+const AH_PRIO      = 'color_mm2sy0cn';
+const AH_BILLABLE  = 'checkbox_mm2vpxq7';
 
 const DEFAULT_BOARDS = [
   { id:1, name:'Board 1', location:'WatersEdge' },
@@ -664,7 +674,6 @@ async function lookupBoardIds() {
       if (b.name === BOARD_NAMES.status)   boardIds.status   = String(b.id);
       if (b.name === BOARD_NAMES.bookings) boardIds.bookings = String(b.id);
       if (b.name === BOARD_NAMES.hires)    boardIds.hires    = String(b.id);
-      if (b.name === BOARD_NAMES.tasks)    boardIds.tasks    = String(b.id);
     }
   } catch(e) { console.warn('Board lookup failed:', e); }
 }
@@ -799,6 +808,17 @@ async function mq(query) {
   return j.data;
 }
 
+async function mqv(query, variables) {
+  const r = await fetch('https://api.monday.com/v2', {
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':API_TOKEN,'API-Version':'2024-01'},
+    body:JSON.stringify({ query, variables })
+  });
+  const j = await r.json();
+  if (j.errors) throw new Error(j.errors[0].message);
+  return j.data;
+}
+
 function mqCreateBoard(name) {
   const ws = WORKSPACE_ID ? `, workspace_id: ${WORKSPACE_ID}` : '';
   return mq(`mutation { create_board(board_name: "${esc(name)}", board_kind: public${ws}) { id } }`);
@@ -810,16 +830,6 @@ async function getOrCreateHireBoard() {
     boardIds.hires = String(d.create_board.id);
   }
   return boardIds.hires;
-}
-
-async function getOrCreateTasksBoard() {
-  try {
-    if (!boardIds.tasks) {
-      const d = await mqCreateBoard(BOARD_NAMES.tasks);
-      boardIds.tasks = String(d.create_board.id);
-    }
-    return boardIds.tasks;
-  } catch(e) { console.error('getOrCreateTasksBoard failed:', e); return null; }
 }
 
 async function logToMonday(boardId, itemName, updateText) {
@@ -839,9 +849,25 @@ async function appendMondayUpdate(itemId, text) {
   } catch(e) { console.warn('Monday update failed:', e.message); }
 }
 
-async function createMondayTask(name, body) {
-  const bId = await getOrCreateTasksBoard();
-  return bId ? await logToMonday(bId, name, body) : null;
+// Creates a paddleboard task in the shared ad-hoc task backlog (same board as create-task.html)
+async function createPaddleTask(taskName, property, description, startDate, dueDate) {
+  try {
+    const cv = {
+      [AH_PROP]:     property,
+      [AH_DESC]:     description,
+      [AH_SCHED]:    { date: startDate },
+      [AH_STATUS]:   { label: 'Scheduled' },
+      [AH_PRIO]:     { label: 'Medium' },
+      [AH_BILLABLE]: { checked: true },
+      [AH_GUEST]:    { labels: ['No Guests'] },
+    };
+    if (dueDate) cv[AH_DUE] = { date: dueDate };
+    const q = `mutation($b:ID!,$n:String!,$v:JSON!){
+      create_item(board_id:$b, item_name:$n, column_values:$v, create_labels_if_missing:true){ id }
+    }`;
+    const d = await mqv(q, { b: ADHOC_BOARD, n: taskName, v: JSON.stringify(cv) });
+    return d?.create_item?.id || null;
+  } catch(e) { console.warn('createPaddleTask failed:', e.message); return null; }
 }
 
 
@@ -1775,14 +1801,15 @@ async function submitBooking() {
   showMsgEl('bkMsg', 'Creating booking and Monday tasks…', 'loading');
 
   try {
-    const dropName = `🚚 Drop-off ${boardLabel} → ${lodge} — ${fmtDate(startDate)}`;
-    const dropBody = `Deliver ${boardLabel} to ${lodge} for ${g.name} on ${fmtDate(startDate)}.\\nHire: ${bkDuration}h · ${fmtDateRange(startDate, endDate)}\\nWaiver: ${g.hasWaiver ? 'On file' : 'NOT YET SIGNED — chase before hand-out'}\\n${notes ? 'Notes: ' + notes : ''}`;
-    const pickName = `📦 Collect ${boardLabel} from ${lodge} — ${fmtDate(endDate)}`;
-    const pickBody = `Collect ${boardLabel} from ${lodge} (${g.name}) on ${fmtDate(endDate)}.\\nHire period: ${fmtDateRange(startDate, endDate)}\\n${notes ? 'Notes: ' + notes : ''}`;
+    const boardCount  = `${bkCount} board${bkCount > 1 ? 's' : ''}`;
+    const dropName    = `Paddleboards drop-off · ${lodge}`;
+    const dropDesc    = `Paddleboard drop-off — ${boardCount} (${boardNames}) for ${g.name} · ${fmtDateRange(startDate, endDate)}${notes ? ' · ' + notes : ''}\nWaiver: ${g.hasWaiver ? 'On file' : 'NOT YET SIGNED — chase before hand-out'}`;
+    const pickName    = `Paddleboards collection · ${lodge}`;
+    const pickDesc    = `Paddleboard collection — ${boardCount} (${boardNames}) from ${g.name} · ${fmtDateRange(startDate, endDate)}${notes ? ' · ' + notes : ''}`;
 
     const [dropTaskId, pickTaskId] = await Promise.all([
-      createMondayTask(dropName, dropBody),
-      createMondayTask(pickName, pickBody)
+      createPaddleTask(dropName, lodge, dropDesc, startDate, startDate),
+      createPaddleTask(pickName, lodge, pickDesc, endDate,   endDate)
     ]);
 
     const booking = {

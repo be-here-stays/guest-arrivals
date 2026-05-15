@@ -2223,8 +2223,13 @@ function updateSaveBtn() {
   // Discard button is visible whenever there are pending changes
   if (discard) discard.style.display = dirty > 0 ? '' : 'none';
 
-  // Schedule auto-save when something new is dirty (count rose) AND not paused
-  if (dirty > _lastDirtyCount && !_saveInFlight && !_autoSavePaused) scheduleAutoSave();
+  // Schedule auto-save when something new is dirty (count rose) AND not paused.
+  // 2026-05-14 — Don't gate on !_saveInFlight here. The race fix in saveAll()
+  // preserves in-flight edits across fetchCleans, but we still want to mark
+  // the timer for the post-save kick. scheduleAutoSave() resets the timer
+  // safely and the timer callback itself re-defers if a save is still in
+  // flight (see scheduleAutoSave's _saveInFlight branch).
+  if (dirty > _lastDirtyCount && !_autoSavePaused) scheduleAutoSave();
   _lastDirtyCount = dirty;
 
   if (_saveInFlight) {
@@ -2643,19 +2648,49 @@ async function saveAll() {
   btn.classList.add('saving'); btn.textContent = '☁ Saving…';
   let savedAny = false;
   try {
+    // Snapshot what we're about to save. ID-based capture so we can tell
+    // "this was part of THIS save run" vs "this landed in cleans[] AFTER we
+    // started" — the latter must survive the fetchCleans wipe below.
     const toCreate = cleans.filter(c => c.isNew && !c.deleted);
     const toUpdate = cleans.filter(c => c.dirty && !c.isNew && !c.deleted && c.mondayId);
     const toDelete = cleans.filter(c => c.deleted && c.mondayId);
-    savedAny = (toCreate.length + toUpdate.length + toDelete.length) > 0;
+    const savingIds = new Set([...toCreate, ...toUpdate, ...toDelete].map(c => c.id));
+    savedAny = savingIds.size > 0;
 
     for (const c of toCreate) await createMonday(c);
     for (const c of toUpdate) await updateMonday(c);
     for (const c of toDelete) await deleteMonday(c);
 
+    // 2026-05-14 — RACE FIX: Barry could drop staff onto cards during the
+    // awaits above. Those drops added new dirty/isNew rows to cleans[] but
+    // they were NOT in savingIds, so they didn't get written. The old code
+    // then ran `await fetchCleans()` which REPLACED cleans[] entirely with
+    // the Monday truth — silently discarding the in-flight drops. Barry's
+    // workaround was "wait a couple of seconds between drags". The fix:
+    // before fetchCleans, snapshot any in-flight edits that arrived after
+    // we started, then merge them back after the fetch and reschedule a
+    // save so they actually land.
+    const inFlightEdits = cleans.filter(c =>
+      !savingIds.has(c.id) && (c.isNew || c.dirty || c.deleted)
+    );
+
     cleans = cleans.filter(c => !c.deleted);
     await fetchCleans();
+    if (inFlightEdits.length) {
+      // Re-attach the in-flight rows; they'll get picked up by the next
+      // autosave because updateSaveBtn() sees dirty > _lastDirtyCount.
+      for (const c of inFlightEdits) cleans.push(c);
+      console.log(`[hot-tub-rota] Preserved ${inFlightEdits.length} in-flight edit(s) across save`);
+    }
     _saveInFlight = false;
     render();
+    if (inFlightEdits.length) {
+      // Force a follow-up save for the rows we just preserved. Without this,
+      // updateSaveBtn won't schedule (dirty count didn't *rise* across the
+      // boundary) and the rows sit unsaved until Barry edits again.
+      _lastDirtyCount = 0;
+      scheduleAutoSave();
+    }
     if (savedAny) toast('Saved', 1200);
   } catch (e) {
     console.error(e);

@@ -149,11 +149,15 @@ const AR_BEDCFG   = 'text_mm2ab56m';
 // === Phase 6: downstream board health ====================================
 // Each downstream board has a board_relation column linking back to the
 // canonical Arrival. The unified diagnostic below walks all three boards
-// and flags any Arrival that has multiple downstream rows pointing at it
-// (duplicates) or any downstream row whose link target isn't in the live
-// Arrivals set (orphan — Arrival was archived or deleted). Same definitions
-// the in-page dedup logic in hot-tub-rota.html and laundry-rota.html
-// already use; this just surfaces them in one screen.
+// and flags duplicates (same Arrival linked from 2+ rows), legacy-named
+// rows from the retired changeover-radar, and date mismatches where the
+// row's scheduled date doesn't match the linked Arrival's check-in.
+//
+// NOTE: rows whose linked Arrival sits in an Archive/Cancelled group are
+// NOT flagged. The rota workflows deliberately maintain links into
+// archived bookings (mid-stay cleans, recurring service, etc.) — those
+// rows are real, assigned operational work, not stale data, and must
+// never be deleted from this page.
 const DOWNSTREAM_BOARDS = [
   // dateCol = the row's primary scheduled-date column. Used by the
   // date-mismatch detector to flag rows whose date doesn't match the
@@ -164,7 +168,7 @@ const DOWNSTREAM_BOARDS = [
   { key: 'cleans', label: 'Cleans / Checks', emoji: '🏠', boardId: '5095134636', arrivalCol: 'board_relation_mm31mkyp', dateCol: 'date_mm2qkr9b' },
   { key: 'linen',  label: 'Linen Bags',      emoji: '🛏', boardId: '5095654933', arrivalCol: 'board_relation_mm2y42yx', dateCol: null },
 ];
-let _downstreamHealth = {}; // { ht: {total, duplicates, orphans, ok}, cleans: ..., linen: ... }
+let _downstreamHealth = {}; // { ht: {total, duplicates, staleNamed, dateMismatches, ok}, cleans: ..., linen: ... }
 
 // localStorage key for cached Guesty credentials. Stored client-side only;
 // never leaves your browser. If you want to wipe them, click "Forget creds".
@@ -993,16 +997,20 @@ function renderResult(guestyCount, arrivalsCount) {
    Walks Hot Tub Cleans, Cleans/Checks and Linen Bags, classifying each
    row against the live Arrivals set the existing recon already built.
 
-   Two failure modes per board:
+   Failure modes per board:
    - Duplicate: same Arrival linked from 2+ downstream rows (same kind of
      drift that produced "Firefly twice" / "Epsom twice" on the rotas).
-   - Orphan: downstream row's linked Arrival isn't in the live set
-     (Arrival archived or deleted while a downstream row still points at
-     it — usually a cancellation that wasn't tidied).
+   - Legacy-named row: leftover artefact from the retired changeover-radar
+     tool, recognised by its "Property · Date" name pattern.
+   - Date mismatch: row's scheduled date doesn't match the linked
+     Arrival's check-in (only on boards with a meaningful date column).
 
-   Both render as additional sections appended below the existing Guesty
-   sync output, so nothing in the main flow has to change. Failures here
-   never block the Guesty sync result. */
+   Archived/cancelled-linked rows are NOT a failure mode — see the Phase 6
+   header note above. Rota workflows deliberately keep those links and
+   the rows are real assigned work.
+
+   Sections render below the existing Guesty sync output; nothing in the
+   main flow has to change. Failures here never block the Guesty sync. */
 async function loadBoardDownstream(boardId, arrivalCol, dateCol) {
   // Pull arrival-link column AND the date column (when one is configured)
   // so the classifier can compare row.date to the linked Arrival's
@@ -1036,8 +1044,13 @@ function classifyDownstream(rows, liveArrivalIds, arrivalCheckinById, dateCol) {
   // Build arrival-id → [rows] map; rows with no link are skipped from the
   // duplicate check but not flagged (an unlinked row is a manual / pre-link
   // legacy entry, not a data-health issue per se).
+  //
+  // Rows whose linked Arrival is NOT in the live set (i.e. its group is
+  // named Archive / Cancelled) are also silently skipped from duplicate
+  // detection — rota workflows legitimately keep links into archived
+  // bookings (mid-stay cleans, etc.) and we do not treat those as orphans
+  // or surface them on this page. Deleting them would gut the live rota.
   const byArrival = new Map();
-  const orphans = [];
   const staleNamed = [];
   const dateMismatches = [];
   // changeover-radar.html (retired 2026-05-12) created rows with these
@@ -1058,10 +1071,11 @@ function classifyDownstream(rows, liveArrivalIds, arrivalCheckinById, dateCol) {
     }
     if (!linkedIds.length) continue;
     const arrId = String(linkedIds[0]);
-    if (!liveArrivalIds.has(arrId)) {
-      orphans.push({ id: it.id, name: it.name, arrivalId: arrId });
-      continue;
-    }
+    // Linked Arrival not currently in a live group → skip silently.
+    // Was previously flagged as "orphan" with a Delete button; removed
+    // because rota-generated rows pointing at archived bookings are real
+    // operational work, not stale data.
+    if (!liveArrivalIds.has(arrId)) continue;
     // Date-mismatch check — only when the spec gave us a dateCol and the
     // arrival has a known check-in date.
     if (dateCol && rowDate && arrivalCheckinById.has(arrId)) {
@@ -1085,22 +1099,21 @@ function classifyDownstream(rows, liveArrivalIds, arrivalCheckinById, dateCol) {
     if (dupRows.length > 1) duplicates.push({ arrivalId: arrId, rows: dupRows });
     else okCount++;
   }
-  return { total: rows.length, orphans, duplicates, staleNamed, dateMismatches, ok: okCount };
+  return { total: rows.length, duplicates, staleNamed, dateMismatches, ok: okCount };
 }
 
 function renderHealthSection(spec, health) {
   if (!health) return '';
   const d = health.duplicates.length;
-  const o = health.orphans.length;
   const s = (health.staleNamed || []).length;
   const m = (health.dateMismatches || []).length;
-  if (!d && !o && !s && !m) {
+  if (!d && !s && !m) {
     return `<section>
       <h2 class="ok">${spec.emoji} ${escapeHtml(spec.label)} <span class="count">✓ no issues</span></h2>
-      <p class="desc muted">${health.ok} unique Arrival → row mapping(s). Skipped ${health.total - health.ok - o} unlinked / aggregated row(s).</p>
+      <p class="desc muted">${health.ok} unique Arrival → row mapping(s). Skipped ${Math.max(0, health.total - health.ok)} unlinked / archived-link / aggregated row(s).</p>
     </section>`;
   }
-  let html = `<section data-health-section="${spec.key}"><h2 class="warn">${spec.emoji} ${escapeHtml(spec.label)} <span class="count">${d + o + s + m}</span></h2>`;
+  let html = `<section data-health-section="${spec.key}"><h2 class="warn">${spec.emoji} ${escapeHtml(spec.label)} <span class="count">${d + s + m}</span></h2>`;
   if (d) {
     // Flatten dup groups into one row per downstream item so each can be
     // deleted independently. Keep the Arrival id alongside so you can see
@@ -1115,15 +1128,6 @@ function renderHealthSection(spec, health) {
       html += `<tr data-row-id="${row.id}"><td><code>${row.arrivalId}</code></td><td>${escapeHtml(row.name || '—')}</td><td><code>${row.id}</code></td><td><button class="del-btn" onclick="deleteDownstreamRow('${spec.boardId}','${spec.key}','${row.id}',this)">🗑 Delete</button></td></tr>`;
     }
     if (flatDups.length > 200) html += `<tr><td colspan="4" class="muted">… and ${flatDups.length - 200} more</td></tr>`;
-    html += `</tbody></table>`;
-  }
-  if (o) {
-    html += `<p class="desc"><strong>${o}</strong> orphan row${o === 1 ? '' : 's'} — linked Arrival is archived or deleted. Usually a cancellation that wasn't tidied downstream.</p>
-      <table><thead><tr><th>Row name</th><th>Item ID</th><th>Was linked to Arrival</th><th></th></tr></thead><tbody>`;
-    for (const orp of health.orphans.slice(0, 200)) {
-      html += `<tr data-row-id="${orp.id}"><td>${escapeHtml(orp.name || '—')}</td><td><code>${orp.id}</code></td><td><code>${orp.arrivalId}</code></td><td><button class="del-btn" onclick="deleteDownstreamRow('${spec.boardId}','${spec.key}','${orp.id}',this)">🗑 Delete</button></td></tr>`;
-    }
-    if (health.orphans.length > 200) html += `<tr><td colspan="4" class="muted">… and ${health.orphans.length - 200} more</td></tr>`;
     html += `</tbody></table>`;
   }
   // Stale-named rows — changeover-radar legacy pollution. Rows whose item
@@ -1240,8 +1244,9 @@ async function deleteAllStaleNamed(boardId, sectionKey) {
 }
 
 // Delete an item from a downstream board. Used by the per-row 🗑 button
-// in the duplicate + orphan tables. Confirms once per click. On success
-// the row fades out and the section's count is decremented. Failures
+// in the duplicate / legacy-named / date-mismatch tables. Confirms once
+// per click. On success the row fades out and the section's count is
+// decremented. Failures
 // surface inline next to the button so you can see what went wrong
 // without leaving the page.
 async function deleteDownstreamRow(boardId, sectionKey, itemId, btn) {
@@ -1280,8 +1285,10 @@ async function triggerDataHealth() {
   // Build the live Arrivals id set from the recon we already did.
   // _arrivals is populated by loadArrivals + filterLive — exactly the
   // canonical "Arrivals that are live and visible to the rest of the
-  // system". A downstream row pointing outside this set is, by definition,
-  // pointing at something that nothing else in the app can see → orphan.
+  // system". A downstream row pointing outside this set is silently
+  // skipped from dup/date-mismatch detection — those rows are legitimate
+  // rota-generated work (mid-stay cleans, etc.) and must not be flagged
+  // or deleted from this page.
   const liveArrivalIds = new Set((window._arrivals || []).map(a => String(a.id)));
   // Map arrival id → check-in date, used by the date-mismatch detector
   // to verify each downstream row points to the right day.
@@ -1404,10 +1411,12 @@ function applyBookingRefManual(unlinkedIdx, btn) {
 }
 
 // Delete a single duplicate Arrival row. Used by the 🗑 button in the
-// duplicates table. Confirms once per click. Downstream rows linked to
-// this Arrival become orphans, which the downstream-health section will
-// surface on the next sync run — that's deliberate so you can clean
-// them up after the parent Arrival is gone.
+// duplicates table. Confirms once per click. Downstream rows (Cleans /
+// HT / Linen) linked to this Arrival will keep pointing at the deleted
+// row — the downstream-health section no longer flags these as orphans
+// because rota workflows legitimately keep links into archived
+// bookings. Any operational cleanup of the linked rows must be done
+// directly on Monday.
 async function deleteArrivalRow(groupIdx, rowIdx, btn) {
   const group = _arrivalsDups[groupIdx];
   if (!group) return;
@@ -1416,7 +1425,7 @@ async function deleteArrivalRow(groupIdx, rowIdx, btn) {
   if (row.id === group.keeperId) {
     if (!confirm(`This row is the SUGGESTED KEEPER. Deleting it leaves the other duplicate(s) as the survivors. Continue?`)) return;
   } else {
-    if (!confirm(`Delete the Arrival row ${row.id} (${row.name})?\n\nLinked Cleans / HT / Linen rows will become orphans — clean those up via the downstream health section.`)) return;
+    if (!confirm(`Delete the Arrival row ${row.id} (${row.name})?\n\nNote: linked Cleans / HT / Linen rows will keep pointing at this Arrival. They remain on their boards and on the rota screens. Tidy any affected rows directly on Monday if needed.`)) return;
   }
   btn.disabled = true;
   btn.textContent = 'Deleting…';
@@ -1452,7 +1461,7 @@ async function deleteArrivalRow(groupIdx, rowIdx, btn) {
 async function deleteAllArrivalsDuplicates() {
   const total = _arrivalsDups.reduce((n, g) => n + g.rows.length - 1, 0);
   if (!total) return;
-  if (!confirm(`Delete ${total} duplicate Arrival row(s)? Keepers stay. This can't be undone.\n\nLinked Cleans / HT / Linen rows will become orphans — clean those up via the downstream health section after.`)) return;
+  if (!confirm(`Delete ${total} duplicate Arrival row(s)? Keepers stay. This can't be undone.\n\nNote: linked Cleans / HT / Linen rows will keep pointing at the deleted Arrivals. They remain on their boards and on the rota screens. Tidy any affected rows directly on Monday if needed.`)) return;
   // Walk a snapshot so mutating _arrivalsDups during the loop doesn't
   // skip any rows. We re-resolve the DOM button each iteration because
   // earlier deletes may have removed siblings.

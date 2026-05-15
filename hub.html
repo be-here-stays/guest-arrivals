@@ -167,6 +167,10 @@
       <div class="stat-val" id="stLinen"><span class="spin"></span></div>
       <div class="stat-lbl">Linen low/out</div>
     </a>
+    <a href="ring-batteries.html?filter=overdue" class="stat-card warn" id="cardRing">
+      <div class="stat-val" id="stRing"><span class="spin"></span></div>
+      <div class="stat-lbl">Ring batteries due</div>
+    </a>
   </div>
 </div>
 
@@ -342,6 +346,18 @@
         <div class="card-desc">Monitor overdue, unassigned, or rescheduled maintenance tasks across all boards.</div>
         <span class="card-badge b-desktop">💻 Desktop</span>
       </a>
+      <a href="maintenance-overview.html" class="tool-card">
+        <div class="card-icon">🚦</div>
+        <div class="card-name">Maint Overview</div>
+        <div class="card-desc">Traffic-light view of Windows, Decking and PAT urgency across every lodge. One-tap schedule from any red cell.</div>
+        <span class="card-badge b-desktop">💻 Desktop</span>
+      </a>
+      <a href="ring-batteries.html" class="tool-card">
+        <div class="card-icon">🔔</div>
+        <div class="card-name">Ring Batteries</div>
+        <div class="card-desc">Weekly battery check + cycle tracking for every Ring doorbell. Swap batteries from the pool, log readings, spot batteries getting changed too often.</div>
+        <span class="card-badge b-both">📱💻 Any</span>
+      </a>
       <a href="create-task.html" class="tool-card featured">
         <div class="card-icon">➕</div>
         <div class="card-name">Create a Task</div>
@@ -492,7 +508,7 @@ startClock();
 window.addEventListener('pageshow', e => {
   if (e.persisted) {
     startClock();
-    ['stArr','stNext','stSup','stOut','stLow','stLinen','stBacklog'].forEach(id => {
+    ['stArr','stNext','stSup','stOut','stLow','stLinen','stBacklog','stRing'].forEach(id => {
       const el = document.getElementById(id);
       if (el) el.innerHTML = '<span class="spin"></span>';
     });
@@ -657,6 +673,28 @@ async function loadStats() {
     document.getElementById('cardBacklog').className = totalBacklog > 5 ? 'stat-card danger' : (totalBacklog > 0 ? 'stat-card warn' : 'stat-card');
   } catch { document.getElementById('stBacklog').textContent = '—'; }
 
+  // Ring batteries overdue check (>7 days since last reading)
+  try {
+    const ringEl = document.getElementById('stRing');
+    if (ringEl) {
+      const d = await mq(`{ boards(ids:[5096545628]) { items_page(limit:500) { items { column_values(ids:["date_mm3crwbw","color_mm3cdj31"]) { id text value } } } } }`);
+      const items = d?.boards?.[0]?.items_page?.items || [];
+      const today = new Date(); today.setHours(0,0,0,0);
+      let overdue = 0;
+      for (const it of items) {
+        const cv = Object.fromEntries(it.column_values.map(c => [c.id, c]));
+        const status = cv['color_mm3cdj31']?.text || '';
+        if (/on charge/i.test(status)) continue;
+        const lastRead = (() => { try { return JSON.parse(cv['date_mm3crwbw']?.value || 'null')?.date; } catch { return null; } })();
+        if (!lastRead) { overdue++; continue; }
+        const d = new Date(lastRead); d.setHours(0,0,0,0);
+        const days = Math.round((today - d) / 86400000);
+        if (days > 7) overdue++;
+      }
+      ringEl.textContent = overdue;
+      document.getElementById('cardRing').className = overdue > 5 ? 'stat-card danger' : (overdue > 0 ? 'stat-card warn' : 'stat-card');
+    }
+  } catch { const el = document.getElementById('stRing'); if (el) el.textContent = '—'; }
 }
 
 loadStats();

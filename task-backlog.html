@@ -4,7 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#272F2E">
-<title>Maintenance Workload — Be Here</title>
+<title>Task Backlog — Be Here</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
@@ -14,79 +14,240 @@
     --gold:#AF926A; --cream:#F3E3C3; --surface:#fff; --border:#e0ddd6;
     --red:#8B2020; --red-bg:#fdf0ec; --amber:#a86c00; --amber-bg:#fdf5e8;
     --green:#2d6a4f; --green-bg:#edf7f2; --blue:#1a5276; --blue-bg:#eaf4fb;
+    --grey:#9aa19f; --grey-bg:#eef0ee;
   }
   * { box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent; }
-  body { font-family:'Instrument Sans',-apple-system,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; padding-bottom:80px; }
+  body { font-family:'Instrument Sans',-apple-system,sans-serif; background:var(--bg); color:var(--dark); min-height:100vh; }
 
-  header { background:var(--dark); color:#fff; padding:18px 20px; padding-top:max(18px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:100; }
-  header h1 { font-size:18px; font-weight:700; }
-  header .sub { font-size:12px; opacity:0.65; margin-top:2px; }
-  .hdr-back { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; }
+  /* ── Header ───────────────────────────────────────────── */
+  header { background:var(--dark); color:#fff; padding:14px 18px; padding-top:max(14px,env(safe-area-inset-top)); display:flex; align-items:center; justify-content:space-between; position:sticky; top:0; z-index:120; }
+  header h1 { font-size:17px; font-weight:700; }
+  header .sub { font-size:11px; opacity:0.65; margin-top:1px; }
+  .hdr-back { color:rgba(255,255,255,0.65); text-decoration:none; font-size:13px; font-weight:600; padding:6px 0; white-space:nowrap; }
 
-  .summary-bar { background:var(--cream); padding:12px 20px; display:flex; gap:12px; border-bottom:1px solid var(--border); position:sticky; top:64px; z-index:90; }
-  .stat { background:#fff; border-radius:10px; padding:10px 14px; flex:1; border:1px solid var(--border); text-align:center; }
-  .stat-val { font-size:24px; font-weight:700; display:block; }
-  .stat-lbl { font-size:10px; font-weight:700; text-transform:uppercase; color:var(--sage-mid); letter-spacing:0.5px; }
+  /* ── Summary stats ────────────────────────────────────── */
+  .summary-bar { background:var(--cream); padding:8px 14px; display:flex; gap:8px; border-bottom:1px solid var(--border); position:sticky; top:54px; z-index:110; overflow-x:auto; }
+  .stat { background:#fff; border-radius:9px; padding:6px 10px; flex:1; min-width:64px; border:1px solid var(--border); text-align:center; }
+  .stat-val { font-size:18px; font-weight:700; display:block; line-height:1.1; }
+  .stat-lbl { font-size:9px; font-weight:700; text-transform:uppercase; color:var(--sage-mid); letter-spacing:0.4px; }
   .stat.danger .stat-val { color:var(--red); }
-  .stat.warn .stat-val { color:var(--amber); }
+  .stat.warn   .stat-val { color:var(--amber); }
+  .stat.ok     .stat-val { color:var(--green); }
 
-  .container { max-width:800px; margin:0 auto; padding:20px 16px; }
-  .section-label { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.8px; color:var(--sage-mid); margin:24px 0 10px; display:flex; align-items:center; gap:10px; }
-  .section-label::after { content:''; flex:1; height:1px; background:var(--border); }
+  /* ── Toolbar ──────────────────────────────────────────── */
+  .toolbar { background:var(--surface); border-bottom:1px solid var(--border); padding:9px 14px; display:flex; gap:8px; align-items:center; flex-wrap:wrap; position:sticky; top:96px; z-index:100; }
+  .ctrl-label { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--sage-mid); white-space:nowrap; }
+  .ctrl-group { display:flex; gap:3px; }
+  .ctrl-btn { padding:5px 10px; border:1.5px solid var(--border); border-radius:18px; background:var(--surface); font-family:inherit; font-size:11px; font-weight:600; color:var(--sage); cursor:pointer; transition:all .15s; white-space:nowrap; }
+  .ctrl-btn:hover { border-color:var(--dark); color:var(--dark); }
+  .ctrl-btn.active { background:var(--dark); color:var(--cream); border-color:var(--dark); }
+  .ctrl-divider { width:1px; background:var(--border); margin:0 4px; align-self:stretch; }
 
-  /* Workload List */
-  .workload-list { display:flex; flex-direction:column; gap:12px; }
-  .staff-group { background:#fff; border-radius:14px; border:1px solid var(--border); overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,0.05); }
-  .staff-hdr { padding:14px 16px; display:flex; align-items:center; cursor:pointer; user-select:none; }
-  .staff-hdr:hover { background:#fafafa; }
-  .staff-name { flex:1; font-weight:700; font-size:15px; }
-  .staff-count { background:var(--bg); color:var(--dark); font-size:11px; font-weight:700; padding:3px 9px; border-radius:10px; }
-  .staff-group.has-work .staff-count { background:var(--dark); color:var(--cream); }
-  .staff-content { display:none; border-top:1px solid var(--border); background:#f9f8f4; padding:12px; }
-  .staff-group.open .staff-content { display:flex; flex-direction:column; gap:8px; }
+  .autosave { display:flex; align-items:center; gap:6px; }
+  .switch { position:relative; width:34px; height:20px; background:var(--border); border-radius:10px; cursor:pointer; transition:background .15s; flex-shrink:0; }
+  .switch.on { background:var(--green); }
+  .switch::after { content:''; position:absolute; top:2px; left:2px; width:16px; height:16px; background:#fff; border-radius:50%; transition:left .15s; }
+  .switch.on::after { left:16px; }
+  .autosave-lbl { font-size:11px; font-weight:600; color:var(--sage); }
 
-  /* Task Cards */
-  .card { background:#fff; border-radius:10px; padding:12px; border:1px solid var(--border); display:flex; flex-direction:column; gap:8px; box-shadow:0 1px 2px rgba(0,0,0,0.04); }
-  .card.unassigned { border-left:4px solid var(--amber); }
-  .card.overdue { border-left:4px solid var(--red); }
-  .card-top { display:flex; justify-content:space-between; gap:10px; }
-  .card-title { font-size:14px; font-weight:700; }
-  .badge-ln { font-size:9px; font-weight:700; background:var(--gold); color:white; padding:2px 6px; border-radius:4px; text-transform:uppercase; }
-  .card-meta { font-size:11px; color:var(--sage); display:flex; gap:8px; }
-  .card-desc { font-size:12px; color:var(--dark); line-height:1.4; border-top:1px dashed var(--border); padding-top:6px; margin-top:2px; }
-  
-  /* Update Row */
-  .update-row { border-top:1.5px solid #eee; padding-top:10px; margin-top:4px; display:flex; flex-direction:column; gap:8px; }
-  .assign-row { display:flex; gap:6px; }
-  .sel-assign { flex:1; font-family:inherit; font-size:12px; padding:6px; border-radius:6px; border:1.5px solid var(--border); background:#fff; }
-  .note-input { width:100%; border:1.5px solid var(--border); border-radius:6px; padding:6px 10px; font-family:inherit; font-size:12px; height:34px; resize:none; }
-  .btn-save { padding:8px 14px; background:var(--dark); color:var(--cream); border:none; border-radius:6px; font-size:12px; font-weight:700; cursor:pointer; }
-  .btn-save:disabled { opacity:0.5; }
+  .save-pending { padding:6px 14px; background:var(--amber); color:#fff; border:0; border-radius:18px; font-family:inherit; font-size:12px; font-weight:700; cursor:pointer; display:none; }
+  .save-pending.show { display:inline-block; }
+  .save-pending:disabled { opacity:.5; cursor:wait; }
 
-  .empty { text-align:center; padding:30px; font-size:13px; color:var(--sage-mid); font-style:italic; }
-  .loading { text-align:center; padding:60px; color:var(--sage); }
+  /* ── Layout ───────────────────────────────────────────── */
+  .layout { display:grid; grid-template-columns:220px 1fr; gap:14px; padding:14px; max-width:1400px; margin:0 auto; }
+  @media (max-width:760px) {
+    .layout { grid-template-columns:1fr; padding:10px; gap:10px; }
+    .staff-sidebar { position:sticky; top:140px; }
+    .staff-list { display:flex; gap:6px; overflow-x:auto; padding:6px 2px; }
+    .staff-chip { flex-shrink:0; }
+  }
+
+  /* ── Staff sidebar ────────────────────────────────────── */
+  .staff-sidebar { background:var(--surface); border-radius:12px; padding:14px 12px; box-shadow:0 1px 3px rgba(0,0,0,.05); align-self:start; position:sticky; top:148px; max-height:calc(100vh - 160px); overflow-y:auto; }
+  .staff-sidebar h2 { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.6px; color:var(--sage-mid); margin-bottom:10px; }
+  .staff-hint { font-size:10px; color:var(--sage-mid); line-height:1.4; margin-bottom:10px; padding:6px 8px; background:var(--bg); border-radius:6px; }
+  .staff-list { display:flex; flex-direction:column; gap:6px; }
+  .staff-chip {
+    display:flex; align-items:center; gap:8px;
+    padding:8px 10px; background:#fff; border:1.5px solid var(--border); border-radius:8px;
+    font-size:12px; font-weight:600; color:var(--dark); cursor:grab;
+    transition:all .15s; user-select:none;
+  }
+  .staff-chip:hover { border-color:var(--sage); background:#fafaf6; transform:translateX(2px); }
+  .staff-chip:active, .staff-chip.dragging { cursor:grabbing; opacity:0.6; }
+  .staff-avatar { width:24px; height:24px; border-radius:50%; background:var(--sage); color:#fff; font-size:10px; font-weight:700; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+  .staff-count { margin-left:auto; font-size:10px; font-weight:700; color:var(--sage-mid); background:var(--bg); padding:1px 6px; border-radius:8px; }
+
+  /* ── Board / groups ───────────────────────────────────── */
+  .board { display:flex; flex-direction:column; gap:12px; min-width:0; }
+  .group { background:var(--surface); border-radius:12px; padding:10px 12px; box-shadow:0 1px 3px rgba(0,0,0,.05); }
+  .group-header { display:flex; align-items:center; gap:10px; padding:6px 4px 8px; border-bottom:1px solid var(--border); margin-bottom:8px; cursor:pointer; user-select:none; }
+  .group-header .gh-caret { font-size:10px; color:var(--sage-mid); transition:transform .15s; }
+  .group.collapsed .gh-caret { transform:rotate(-90deg); }
+  .group.collapsed .pills { display:none; }
+  .group-title { font-size:13px; font-weight:700; color:var(--dark); }
+  .group-count { font-size:10px; font-weight:700; color:var(--sage-mid); background:var(--bg); padding:2px 7px; border-radius:10px; }
+  .group-meta { margin-left:auto; font-size:10px; color:var(--sage-mid); }
+
+  .pills { display:flex; flex-direction:column; gap:5px; }
+  .empty { text-align:center; padding:18px; font-size:12px; color:var(--sage-mid); font-style:italic; }
+
+  /* ── Pill (compact) ────────────────────────────────────── */
+  .pill {
+    background:#fff; border:1px solid var(--border); border-left:4px solid var(--grey);
+    border-radius:8px; overflow:hidden; transition:box-shadow .15s, transform .1s;
+  }
+  .pill.in-date  { border-left-color:var(--green); }
+  .pill.overdue  { border-left-color:var(--red); }
+  .pill.nodate   { border-left-color:var(--grey); }
+  .pill.rtq      { border-left-color:var(--red); border-color:var(--red); background:#fffaf9; }
+  .pill.drag-over { box-shadow:0 0 0 3px var(--sage); transform:scale(1.01); }
+
+  /* RTQ section header */
+  .rtq-banner {
+    background:var(--red); color:#fff; padding:9px 14px; border-radius:10px 10px 0 0;
+    font-size:12px; font-weight:700; letter-spacing:.3px;
+    display:flex; align-items:center; gap:8px;
+  }
+  .rtq-banner-count { background:rgba(255,255,255,.2); padding:2px 9px; border-radius:10px; font-size:11px; }
+  .group.section-rtq { border:1.5px solid var(--red); padding:0; overflow:hidden; }
+  .group.section-rtq .group-header { padding:8px 12px; border-bottom:0; background:#fffaf9; margin-bottom:0; }
+  .group.section-rtq .pills { padding:8px 12px 10px; }
+
+  .pill-summary {
+    display:flex; align-items:center; gap:10px;
+    padding:7px 12px; cursor:pointer; min-height:36px;
+  }
+  .pill-summary:hover { background:#fafaf6; }
+  .pill-prop { font-size:13px; font-weight:700; flex:1; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+  .pill-headline { font-size:11px; color:var(--sage); font-weight:500; }
+  .pill-meta { display:flex; align-items:center; gap:6px; flex-shrink:0; }
+  .pill-date { font-size:11px; color:var(--sage); font-weight:600; white-space:nowrap; }
+  .pill-date.overdue { color:var(--red); }
+  .pill-date.green { color:var(--green); }
+  .pill-assign { font-size:10px; font-weight:600; padding:2px 7px; border-radius:10px; background:var(--bg); color:var(--sage); white-space:nowrap; }
+  .pill-assign.unassigned { background:var(--amber-bg); color:var(--amber); }
+
+  .badge { display:inline-block; font-size:9px; font-weight:700; padding:1px 5px; border-radius:3px; white-space:nowrap; text-transform:uppercase; letter-spacing:.3px; }
+  .badge-urgent  { background:var(--red-bg);   color:var(--red); }
+  .badge-high    { background:var(--amber-bg); color:var(--amber); }
+  .badge-medium  { background:var(--blue-bg);  color:var(--blue); }
+  .badge-low     { background:#f0f0ec;          color:var(--sage); }
+  .badge-overdue { background:var(--red-bg);   color:var(--red); }
+  .badge-rtq     { background:var(--red-bg);   color:var(--red); }
+  .badge-issue   { background:#f5e8d0; color:#7a4a10; }
+  .badge-bill    { background:var(--blue-bg);  color:var(--blue); }
+  .badge-guests  { background:var(--green-bg); color:var(--green); }
+  .badge-noguest { background:var(--amber-bg); color:var(--amber); }
+  .badge-dirty   { background:var(--amber); color:#fff; }
+
+  /* ── Pill expanded panel ───────────────────────────────── */
+  .pill-expand { display:none; border-top:1px solid var(--border); background:#fbfaf6; padding:12px 14px; }
+  .pill.expanded .pill-expand { display:block; }
+  .pill.expanded .pill-summary { background:#f6f4ed; border-bottom:1px solid var(--border); }
+
+  .edit-grid { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+  @media (max-width:560px) { .edit-grid { grid-template-columns:1fr; } }
+  .edit-field { display:flex; flex-direction:column; gap:4px; }
+  .edit-field.span2 { grid-column:span 2; }
+  @media (max-width:560px) { .edit-field.span2 { grid-column:span 1; } }
+  .edit-lbl { font-size:10px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--sage-mid); }
+  .edit-input, .edit-sel, .edit-date {
+    font-family:inherit; font-size:13px; padding:7px 9px; border:1.5px solid var(--border);
+    border-radius:7px; background:#fff; color:var(--dark); width:100%;
+  }
+  .edit-input:focus, .edit-sel:focus, .edit-date:focus { outline:none; border-color:var(--dark); }
+  textarea.edit-input { resize:vertical; min-height:60px; font-size:13px; line-height:1.4; }
+
+  .assignees-row { display:flex; flex-wrap:wrap; gap:6px; min-height:30px; padding:5px; border:1.5px dashed var(--border); border-radius:7px; background:#fff; align-items:center; }
+  .assignees-row.empty-state { color:var(--sage-mid); font-size:11px; font-style:italic; padding:8px; }
+  .assignee-chip { display:inline-flex; align-items:center; gap:5px; padding:3px 8px; background:var(--sage); color:#fff; border-radius:12px; font-size:11px; font-weight:600; }
+  .assignee-chip button { background:transparent; border:0; color:#fff; opacity:.7; font-size:14px; cursor:pointer; padding:0 0 0 2px; line-height:1; font-family:inherit; }
+  .assignee-chip button:hover { opacity:1; }
+
+  .edit-actions { display:flex; gap:6px; margin-top:10px; flex-wrap:wrap; align-items:center; }
+  .btn { padding:8px 14px; border:0; border-radius:7px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; transition:opacity .15s; }
+  .btn:hover { opacity:.88; }
+  .btn:disabled { opacity:.45; cursor:not-allowed; }
+  .btn-primary { background:var(--dark);  color:var(--cream); }
+  .btn-close   { background:var(--green); color:#fff; }
+  .btn-rtq     { background:var(--red);   color:#fff; }
+  .btn-cancel  { background:#fff;          color:var(--sage); border:1.5px solid var(--border); }
+  .btn-link    { background:transparent;   color:var(--blue); padding:6px; }
+
+  /* Description as read-only blocks */
+  .desc-blocks { display:flex; flex-direction:column; gap:6px; }
+  .desc-block { background:#fff; border:1px solid var(--border); border-radius:7px; padding:9px 11px; font-size:12.5px; line-height:1.5; color:var(--dark); white-space:pre-wrap; word-wrap:break-word; }
+  .desc-block.original { background:#f3f1ea; border-color:#dcd8cc; }
+  .desc-block.original::before { content:'Original issue'; display:block; font-size:9px; font-weight:700; letter-spacing:.5px; color:var(--sage-mid); text-transform:uppercase; margin-bottom:4px; }
+  .desc-block.note { border-left:3px solid var(--blue); }
+  .desc-block .desc-stamp { font-size:10px; font-weight:700; color:var(--blue); margin-bottom:3px; }
+  .desc-block .desc-stamp.rtq-stamp { color:var(--red); }
+  .desc-block.locked-hint { background:transparent; border:1px dashed var(--border); color:var(--sage-mid); font-style:italic; font-size:11px; text-align:center; padding:8px; }
+
+  /* You-are indicator in toolbar */
+  .who-am-i { font-size:11px; color:var(--sage-mid); display:flex; align-items:center; gap:4px; }
+  .who-am-i strong { color:var(--dark); font-weight:700; }
+  .who-am-i a { color:var(--blue); text-decoration:none; font-size:10px; cursor:pointer; }
+  .who-am-i a:hover { text-decoration:underline; }
+
+  /* ── Audit trail ───────────────────────────────────────── */
+  .audit-section { margin-top:14px; padding-top:12px; border-top:1px dashed var(--border); }
+  .audit-title { font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:.5px; color:var(--sage-mid); margin-bottom:8px; display:flex; align-items:center; gap:8px; }
+  .audit-thread { display:flex; flex-direction:column; gap:7px; max-height:240px; overflow-y:auto; padding-right:4px; margin-bottom:10px; }
+  .audit-item { background:#fff; border:1px solid var(--border); border-radius:7px; padding:8px 10px; }
+  .audit-head { display:flex; align-items:center; gap:8px; margin-bottom:3px; font-size:10px; color:var(--sage-mid); }
+  .audit-author { font-weight:700; color:var(--dark); font-size:11px; }
+  .audit-body { font-size:12px; color:var(--dark); line-height:1.45; white-space:pre-wrap; word-wrap:break-word; }
+  .audit-system { background:var(--blue-bg); border-color:var(--blue); }
+  .audit-system .audit-body { color:var(--blue); font-style:italic; }
+
+  .add-note-row { display:flex; gap:6px; }
+  .add-note-row textarea { flex:1; min-height:36px; font-size:12px; padding:7px 9px; border:1.5px solid var(--border); border-radius:7px; resize:vertical; font-family:inherit; }
+  .add-note-btn { padding:7px 12px; background:var(--blue); color:#fff; border:0; border-radius:7px; font-size:12px; font-weight:700; cursor:pointer; font-family:inherit; align-self:flex-start; }
+  .add-note-btn:disabled { opacity:.5; cursor:wait; }
+  .audit-loading { padding:14px; text-align:center; font-size:11px; color:var(--sage-mid); font-style:italic; }
+
+  /* ── Loading / toast ───────────────────────────────────── */
+  .loading { text-align:center; padding:40px; color:var(--sage); }
   .spin { display:inline-block; width:22px; height:22px; border:3px solid rgba(100,105,85,.15); border-top-color:var(--sage); border-radius:50%; animation:spin .8s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
 
-  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--dark); color:var(--cream); padding:10px 20px; border-radius:20px; font-size:13px; font-weight:600; opacity:0; transition:opacity .3s; z-index:200; pointer-events:none; }
+  .toast { position:fixed; bottom:20px; left:50%; transform:translateX(-50%); background:var(--dark); color:var(--cream); padding:10px 22px; border-radius:20px; font-size:13px; font-weight:600; opacity:0; transition:opacity .3s; z-index:200; pointer-events:none; white-space:nowrap; max-width:90vw; }
   .toast.show { opacity:1; }
+  .toast.ok  { background:var(--green); }
+  .toast.err { background:var(--red); }
+
+  /* Tooltip on description */
+  .edit-field .edit-lbl[data-tip] { position:relative; cursor:help; }
+  .edit-field .edit-lbl[data-tip]::after {
+    content:attr(data-tip); position:absolute; bottom:100%; left:0; margin-bottom:6px;
+    background:var(--dark); color:var(--cream); padding:6px 9px; border-radius:6px;
+    font-size:10px; font-weight:400; letter-spacing:0; text-transform:none; line-height:1.4;
+    white-space:normal; width:240px; opacity:0; pointer-events:none; transition:opacity .15s;
+    z-index:10; box-shadow:0 4px 14px rgba(0,0,0,.18);
+  }
+  .edit-field .edit-lbl[data-tip]:hover::after { opacity:1; }
+
+  /* Saving indicator on pill */
+  .pill.saving::after { content:'Saving…'; position:absolute; }
+  .pill { position:relative; }
+  .pill-saving-spin { position:absolute; top:7px; right:10px; width:12px; height:12px; border:2px solid rgba(100,105,85,.2); border-top-color:var(--sage); border-radius:50%; animation:spin .8s linear infinite; display:none; }
+  .pill.saving .pill-saving-spin { display:block; }
 </style>
 </head>
 <body>
 
 <header>
   <div>
-    <h1>Management · Workload</h1>
+    <h1>Task Backlog</h1>
     <div class="sub">Ad-hoc Maintenance Operations</div>
   </div>
   <a href="hub.html" class="hdr-back">‹ Hub</a>
 </header>
 
 <div class="summary-bar">
-  <div class="stat danger" id="stRtq" style="display:none">
-    <span class="stat-val" id="stRtqVal">0</span>
-    <span class="stat-lbl">⏰ Returned</span>
-  </div>
   <div class="stat warn">
     <span class="stat-val" id="stUn">0</span>
     <span class="stat-lbl">Unassigned</span>
@@ -95,271 +256,954 @@
     <span class="stat-val" id="stOv">0</span>
     <span class="stat-lbl">Overdue</span>
   </div>
+  <div class="stat ok">
+    <span class="stat-val" id="stIn">0</span>
+    <span class="stat-lbl">In Date</span>
+  </div>
   <div class="stat">
     <span class="stat-val" id="stAc">0</span>
-    <span class="stat-lbl">Total Active</span>
+    <span class="stat-lbl">Total</span>
   </div>
 </div>
 
-<div class="container">
-  <div id="rtqSection" style="display:none">
-    <div class="section-label" style="color:var(--red)">⏰ Returned to Queue — Date Window Expired</div>
-    <div id="rtqList" class="workload-list"></div>
+<div class="toolbar">
+  <span class="ctrl-label">Group</span>
+  <div class="ctrl-group">
+    <button class="ctrl-btn active" data-group="staff" onclick="setGroup('staff')">Staff</button>
+    <button class="ctrl-btn"        data-group="lodge" onclick="setGroup('lodge')">Lodge</button>
+    <button class="ctrl-btn"        data-group="date"  onclick="setGroup('date')">Date</button>
   </div>
+  <div class="ctrl-divider"></div>
+  <span class="ctrl-label">Filter</span>
+  <div class="ctrl-group">
+    <button class="ctrl-btn active" data-filter="all"        onclick="setFilter('all')">All</button>
+    <button class="ctrl-btn"        data-filter="unassigned" onclick="setFilter('unassigned')">Unassigned</button>
+    <button class="ctrl-btn"        data-filter="overdue"    onclick="setFilter('overdue')">Overdue</button>
+  </div>
+  <div class="ctrl-divider"></div>
+  <span class="ctrl-label">Sort</span>
+  <div class="ctrl-group">
+    <button class="ctrl-btn active" data-sort="priority" onclick="setSort('priority')">Priority</button>
+    <button class="ctrl-btn"        data-sort="date"     onclick="setSort('date')">Date</button>
+  </div>
+  <div class="ctrl-divider"></div>
+  <div class="autosave">
+    <span class="autosave-lbl">Autosave</span>
+    <div class="switch on" id="autosaveSwitch" onclick="toggleAutosave()"></div>
+  </div>
+  <button class="save-pending" id="savePending" onclick="saveAllPending()">Save 0 changes</button>
+  <div class="who-am-i" style="margin-left:auto">
+    Signed in as <strong id="whoAmI">—</strong>
+    <a onclick="changeUserName()">change</a>
+  </div>
+</div>
 
-  <div id="triageSection">
-    <div class="section-label">Backlog & Triage</div>
-    <div id="triageList" class="triage-list"></div>
-  </div>
+<div class="layout">
+  <aside class="staff-sidebar">
+    <h2>Maintenance team</h2>
+    <div class="staff-hint">Drag a person onto any pill to assign them. Drop again to add a partner.</div>
+    <div class="staff-list" id="staffList">
+      <div class="loading"><div class="spin"></div></div>
+    </div>
+  </aside>
 
-  <div id="workloadSection">
-    <div class="section-label">Staff Workload</div>
-    <div id="workloadList" class="workload-list"></div>
-  </div>
+  <main class="board" id="board">
+    <div class="loading"><div class="spin"></div></div>
+  </main>
 </div>
 
 <div id="toast" class="toast"></div>
 
+<!-- Runtime-decoded API tokens -->
+<script src="secrets.js"></script>
+
 <script>
-const TOKEN = 'eyJhbGciOiJIUzI1NiJ9.eyJ0aWQiOjY0NjkyOTc2MCwiYWFpIjoxMSwidWlkIjoxMDIyMzcwODYsImlhZCI6IjIwMjYtMDQtMTdUMTA6NTQ6MzcuMDAwWiIsInBlciI6Im1lOndyaXRlIiwiYWN0aWQiOjE0MTkxNjYwLCJyZ24iOiJldWMxIn0.22emTc6IL6ShMMn6jzWAH-50xVzI6zBA-y2Yn7EAxAE';
+const TOKEN       = window.MONDAY_API_TOKEN;
 const ADHOC_BOARD = 5095296374;
 const STAFF_BOARD = 5095127554;
 
 const COLS = {
-  sched: 'date_mm2stp44', assignee: 'dropdown_mm2szsp5', status: 'color_mm2sf7a8',
-  desc: 'long_text_mm2s5dwj', prop: 'text_mm2shvja', linked: 'text_mm2sqa3f',
-  dueTo: 'date_mm2vw7qh', access: 'dropdown_mm2vpbet',
-  billable: 'checkbox_mm2vpxq7', matCost: 'numeric_mm2vks4c', labour: 'numeric_mm2vks4l',
-  priority: 'color_mm2sy0cn'
+  sched:    'date_mm2stp44',    assignee:  'dropdown_mm2szsp5', status:    'color_mm2sf7a8',
+  desc:     'long_text_mm2s5dwj', prop:    'text_mm2shvja',     linked:    'text_mm2sqa3f',
+  dueTo:    'date_mm2vw7qh',    access:    'dropdown_mm2vpbet',
+  billable: 'checkbox_mm2vpxq7', matCost:  'numeric_mm2vks4c', labour:    'numeric_mm2vks4l',
+  priority: 'color_mm2sy0cn',   requester:'text_mm3ck8dq'
 };
-
-const ST_ROLE = 'color_mm2psadz';
+const ST_ROLE   = 'color_mm2psadz';
 const ST_STATUS = 'color_mm2psvh2';
 
-let tasks = [];
-let staff = [];
+const PRIO_ORDER  = { urgent:0, high:1, medium:2, low:3 };
+const PRIO_LABELS = ['Urgent','High','Medium','Low'];
+const STATUS_LABELS = ['Scheduled','In Progress','Completed','Cancelled'];
+const ACCESS_LABELS = ['No Guests','Guests OK'];
 
+let tasks       = [];
+let staff       = [];
+let groupBy     = localStorage.getItem('tb_group')  || 'staff';
+let sortBy      = localStorage.getItem('tb_sort')   || 'priority';
+let filter      = localStorage.getItem('tb_filter') || 'all';
+let autosave    = localStorage.getItem('tb_autosave') !== 'off';
+let collapsed   = new Set(JSON.parse(localStorage.getItem('tb_collapsed') || '[]'));
+let userName    = localStorage.getItem('tb_userName') || '';
+let dirty       = new Map();   // taskId -> {cv: {…}, prev: {…}, updates: [strings] }
+let auditCache  = new Map();   // taskId -> array of update objects
+let saveTimers  = new Map();   // per-task debounce
+const SAVE_DEBOUNCE_MS = 400;
+
+// ── User identity ────────────────────────────────────────────
+function getUserName(forcePrompt=false) {
+  if (forcePrompt || !userName) {
+    const n = (prompt('Your name (used to sign notes you add):', userName || '') || '').trim();
+    if (n) { userName = n; localStorage.setItem('tb_userName', n); updateWhoAmI(); }
+  }
+  return userName;
+}
+function changeUserName() { getUserName(true); }
+function updateWhoAmI() {
+  const el = document.getElementById('whoAmI');
+  if (el) el.textContent = userName || '— click change';
+}
+
+// ── Description parsing ──────────────────────────────────────
+// Notes are appended as separate paragraphs starting with [stamp ...].
+// Parse description into ordered blocks: original (head, may be empty)
+// followed by one block per timestamped note. None are user-editable.
+function parseDescription(desc) {
+  if (!desc) return [];
+  const text = String(desc).trim();
+  // Split on double-newline boundaries (paragraphs)
+  const paras = text.split(/\n{2,}/);
+  const blocks = [];
+  for (const p of paras) {
+    if (!p.trim()) continue;
+    const m = p.match(/^\[([^\]]+)\]\s*([\s\S]*)$/);
+    if (m) {
+      const isRtq = /returned to queue/i.test(m[2]) || /returned to queue/i.test(m[1]);
+      blocks.push({ type:'note', stamp:m[1].trim(), body:m[2].trim(), rtq:isRtq });
+    } else if (blocks.length === 0) {
+      blocks.push({ type:'original', body:p.trim() });
+    } else {
+      // Continuation of the previous block (lines without the [stamp] prefix)
+      const prev = blocks[blocks.length-1];
+      prev.body = (prev.body + '\n\n' + p.trim()).trim();
+    }
+  }
+  return blocks;
+}
+
+function descBlocksHtml(desc) {
+  const blocks = parseDescription(desc);
+  if (!blocks.length) {
+    return '<div class="desc-block locked-hint">No description yet — add a note below to start the activity log.</div>';
+  }
+  return blocks.map(b => {
+    if (b.type === 'original') {
+      return `<div class="desc-block original">${esc(b.body)}</div>`;
+    }
+    const stampCls = b.rtq ? 'rtq-stamp' : '';
+    return `<div class="desc-block note">
+      <div class="desc-stamp ${stampCls}">${esc(b.stamp)}</div>
+      ${esc(b.body)}
+    </div>`;
+  }).join('');
+}
+
+function nowStamp() {
+  return new Date().toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+}
+
+// ── API helpers ───────────────────────────────────────────────
 async function mq(query, variables) {
   const r = await fetch('https://api.monday.com/v2', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', 'Authorization': TOKEN, 'API-Version': '2024-01' },
+    method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':TOKEN,'API-Version':'2024-01'},
     body: JSON.stringify({ query, variables })
   });
   const j = await r.json();
   if (j.errors) throw new Error(j.errors[0].message);
   return j.data;
 }
-
-const pj = (v) => { try { return JSON.parse(v); } catch { return null; } };
+const pj = v => { try { return JSON.parse(v); } catch { return null; } };
 const todayISO = () => new Date().toISOString().split('T')[0];
+const fmtDate = d => {
+  if (!d) return 'No date';
+  const [,mo,dy] = d.split('-');
+  return `${parseInt(dy)} ${['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(mo)]}`;
+};
+const fmtDT = iso => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  return d.toLocaleString('en-GB',{ day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
+};
+const initials = name => name.split(/\s+/).map(w => w[0]||'').join('').slice(0,2).toUpperCase();
+const esc = s => String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
 
-function showToast(m) {
-  const t = document.getElementById('toast');
-  t.textContent = m; t.classList.add('show');
-  setTimeout(() => t.classList.remove('show'), 2500);
-}
-
+// ── Boot ─────────────────────────────────────────────────────
 async function boot() {
-  document.getElementById('triageList').innerHTML = '<div class="loading"><div class="spin"></div></div>';
-  document.getElementById('workloadList').innerHTML = '<div class="loading"><div class="spin"></div></div>';
   try {
-    const [st, ta] = await Promise.all([loadStaff(), loadTasks()]);
+    await Promise.all([loadStaff(), loadTasks()]);
     render();
-  } catch (e) { alert('Error: ' + e.message); }
+  } catch (e) {
+    document.getElementById('board').innerHTML = `<div class="empty">Error: ${esc(e.message)}</div>`;
+  }
 }
 
 async function loadStaff() {
   const d = await mq(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:100){ items{ id name column_values(ids:["${ST_ROLE}","${ST_STATUS}"]){ id text } } } } }`);
-  const items = d?.boards?.[0]?.items_page?.items || [];
-  staff = items
+  staff = (d?.boards?.[0]?.items_page?.items || [])
     .filter(it => {
-      const role = it.column_values.find(c => c.id === ST_ROLE)?.text || '';
-      const status = it.column_values.find(c => c.id === ST_STATUS)?.text || '';
+      const role   = it.column_values.find(c=>c.id===ST_ROLE)?.text || '';
+      const status = it.column_values.find(c=>c.id===ST_STATUS)?.text || '';
       return /maintenance/i.test(role) && !/left|inactive/i.test(status);
     })
-    .map(it => ({ id: it.id, name: it.name }))
+    .map(it => ({ id:it.id, name:it.name }))
     .sort((a,b) => a.name.localeCompare(b.name));
 }
 
 async function loadTasks() {
-  const colList = Object.values(COLS).map(c => `"${c}"`).join(',');
+  const colList = Object.values(COLS).map(c=>`"${c}"`).join(',');
   const d = await mq(`{ boards(ids:[${ADHOC_BOARD}]){ items_page(limit:500){ items{ id name column_values(ids:[${colList}]){ id text value } } } } }`);
-  const raw = d?.boards?.[0]?.items_page?.items || [];
-  
-  tasks = raw.map(r => {
-    const cv = Object.fromEntries(r.column_values.map(c => [c.id, c]));
-    const sched  = pj(cv[COLS.sched]?.value)?.date || null;
-    const dueTo  = pj(cv[COLS.dueTo]?.value)?.date  || null;
-    const status = cv[COLS.status]?.text || 'Scheduled';
-    const desc   = pj(cv[COLS.desc]?.value)?.text || cv[COLS.desc]?.text || '';
-    const prop   = cv[COLS.prop]?.text || r.name;
-    const assignee = cv[COLS.assignee]?.text || '';
-    const linkedId = cv[COLS.linked]?.text || '';
-    const access   = cv[COLS.access]?.text || 'No Guests';
-    const today = todayISO();
-    const returned = /returned.to.queue/i.test(status);
-    const overdue  = sched && (dueTo || sched) < today && !(/completed|fixed|done|returned/i.test(status));
-    const isBillable = cv[COLS.billable]?.text === 'v';
-    const matCost = parseFloat(cv[COLS.matCost]?.text) || 0;
-    const labourCost = parseFloat(cv[COLS.labour]?.text) || 0;
-    const priority = cv[COLS.priority]?.text || 'Medium';
-
+  tasks = (d?.boards?.[0]?.items_page?.items || []).map(r => {
+    const cv      = Object.fromEntries(r.column_values.map(c=>[c.id,c]));
+    const sched   = pj(cv[COLS.sched]?.value)?.date  || null;
+    const dueTo   = pj(cv[COLS.dueTo]?.value)?.date  || null;
+    const status  = cv[COLS.status]?.text  || 'Scheduled';
+    const desc    = pj(cv[COLS.desc]?.value)?.text || cv[COLS.desc]?.text || '';
+    const prop    = cv[COLS.prop]?.text    || r.name;
+    const assignee= cv[COLS.assignee]?.text || '';
+    const today   = todayISO();
+    const returned= /returned.to.queue/i.test(status);
+    const cmpDate = dueTo || sched;
+    const overdue = cmpDate && cmpDate < today && !(/completed|fixed|done|cancelled|returned/i.test(status));
+    const prio    = (cv[COLS.priority]?.text || 'Medium').trim();
+    // headline: derive from item name (everything after the first '·')
+    let headline = '';
+    const dotIdx = r.name.indexOf('·');
+    if (dotIdx >= 0) headline = r.name.slice(dotIdx+1).trim();
     return {
-      id: r.id, name: r.name, property: prop, description: desc,
-      date: sched, dueTo, assignees: assignee.split(',').map(s=>s.trim()).filter(Boolean),
-      status, linked: linkedId, access,
-      returned, overdue, isBillable, matCost, labourCost, priority,
-      done: /completed|fixed|done/i.test(status)
+      id:r.id, name:r.name, headline, property:prop, description:desc,
+      date:sched, dueTo, assignees:assignee.split(',').map(s=>s.trim()).filter(Boolean),
+      status, access: cv[COLS.access]?.text || 'No Guests',
+      returned, overdue, priority:prio,
+      requester: cv[COLS.requester]?.text || '',
+      isBillable: cv[COLS.billable]?.text==='v',
+      matCost:  parseFloat(cv[COLS.matCost]?.text)  || 0,
+      labourCost: parseFloat(cv[COLS.labour]?.text) || 0,
+      linked:   cv[COLS.linked]?.text || '',
+      done: /completed|fixed|done/i.test(status) && !/in.progress/i.test(status)
     };
   }).filter(t => !t.done);
 }
 
-function render() {
-  const unassigned = tasks.filter(t => !t.assignees.length && !t.returned);
-  const overdue    = tasks.filter(t => t.overdue && !t.returned);
-  const returned   = tasks.filter(t => t.returned);
-  const active     = tasks.filter(t => !t.returned);
+// ── Controls ─────────────────────────────────────────────────
+function setGroup(g) {
+  groupBy = g; localStorage.setItem('tb_group', g);
+  document.querySelectorAll('[data-group]').forEach(b => b.classList.toggle('active', b.dataset.group===g));
+  render();
+}
+function setFilter(f) {
+  filter = f; localStorage.setItem('tb_filter', f);
+  document.querySelectorAll('[data-filter]').forEach(b => b.classList.toggle('active', b.dataset.filter===f));
+  render();
+}
+function setSort(s) {
+  sortBy = s; localStorage.setItem('tb_sort', s);
+  document.querySelectorAll('[data-sort]').forEach(b => b.classList.toggle('active', b.dataset.sort===s));
+  render();
+}
+function toggleAutosave() {
+  autosave = !autosave;
+  localStorage.setItem('tb_autosave', autosave ? 'on' : 'off');
+  document.getElementById('autosaveSwitch').classList.toggle('on', autosave);
+  document.querySelector('.autosave-lbl').textContent = autosave ? 'Autosave' : 'Autosave off';
+  if (autosave && dirty.size) {
+    saveAllPending();
+  }
+}
+function persistCollapsed() { localStorage.setItem('tb_collapsed', JSON.stringify([...collapsed])); }
 
-  document.getElementById('stUn').textContent  = unassigned.length;
-  document.getElementById('stOv').textContent  = overdue.length;
-  document.getElementById('stAc').textContent  = active.length;
-  const rtqStatEl = document.getElementById('stRtq');
-  const rtqValEl  = document.getElementById('stRtqVal');
-  rtqValEl.textContent = returned.length;
-  rtqStatEl.style.display = returned.length ? '' : 'none';
+// ── Sorting / Grouping ───────────────────────────────────────
+function sortTasks(list) {
+  return [...list].sort((a,b) => {
+    if (sortBy === 'priority') {
+      const pa = PRIO_ORDER[(a.priority||'medium').toLowerCase()] ?? 2;
+      const pb = PRIO_ORDER[(b.priority||'medium').toLowerCase()] ?? 2;
+      if (pa !== pb) return pa - pb;
+      return (a.date||'9999').localeCompare(b.date||'9999');
+    }
+    const da = a.date || '9999-99-99', db = b.date || '9999-99-99';
+    if (da !== db) return da.localeCompare(db);
+    const pa = PRIO_ORDER[(a.priority||'medium').toLowerCase()] ?? 2;
+    const pb = PRIO_ORDER[(b.priority||'medium').toLowerCase()] ?? 2;
+    return pa - pb;
+  });
+}
 
-  // Returned-to-Queue section (expired date windows)
-  const rtqSection = document.getElementById('rtqSection');
-  const rtqList    = document.getElementById('rtqList');
-  if (returned.length) {
-    rtqSection.style.display = '';
-    rtqList.innerHTML = returned.map(t => renderTaskCard(t, true)).join('');
+function groupTasks(list) {
+  const groups = new Map();
+  const today = todayISO();
+  for (const t of list) {
+    let keys = [];
+    if (groupBy === 'staff') {
+      keys = t.assignees.length ? t.assignees.slice() : ['Unassigned'];
+    } else if (groupBy === 'lodge') {
+      keys = [t.property || 'Unknown lodge'];
+    } else {
+      const d = t.dueTo || t.date;
+      if (!d) keys = ['No date'];
+      else if (d < today) keys = ['Overdue'];
+      else if (d === today) keys = ['Today'];
+      else {
+        const dt = new Date(d), now = new Date(today);
+        const days = Math.round((dt-now)/86400000);
+        if (days <= 7) keys = ['This week'];
+        else if (days <= 14) keys = ['Next week'];
+        else keys = ['Later'];
+      }
+    }
+    for (const key of keys) {
+      if (!groups.has(key)) groups.set(key, []);
+      groups.get(key).push(t);
+    }
+  }
+  // Order groups
+  let order;
+  if (groupBy === 'staff') {
+    order = ['Unassigned', ...staff.map(s => s.name).sort()];
+    // Add any name in groups not in staff list
+    for (const k of groups.keys()) if (!order.includes(k)) order.push(k);
+  } else if (groupBy === 'lodge') {
+    order = [...groups.keys()].sort();
   } else {
-    rtqSection.style.display = 'none';
+    order = ['Overdue','Today','This week','Next week','Later','No date'];
+  }
+  const result = [];
+  for (const k of order) {
+    if (groups.has(k)) result.push([k, sortTasks(groups.get(k))]);
+  }
+  return result;
+}
+
+// ── Render ───────────────────────────────────────────────────
+function render() {
+  const today  = todayISO();
+  const all    = tasks;
+  const returned = all.filter(t => t.returned);
+  const active   = all.filter(t => !t.returned);
+
+  const unCount  = active.filter(t=>!t.assignees.length).length;
+  const ovCount  = active.filter(t=>t.overdue).length;
+  const inCount  = active.filter(t=>!t.overdue && (t.dueTo||t.date)).length;
+  document.getElementById('stUn').textContent = unCount + returned.length; // returned ARE unassigned
+  document.getElementById('stOv').textContent = ovCount;
+  document.getElementById('stIn').textContent = inCount;
+  document.getElementById('stAc').textContent = all.length;
+
+  // Staff sidebar
+  const staffList = document.getElementById('staffList');
+  staffList.innerHTML = staff.map(s => {
+    const count = active.filter(t => t.assignees.includes(s.name)).length;
+    return `<div class="staff-chip" draggable="true" data-name="${esc(s.name)}"
+              ondragstart="onStaffDragStart(event,'${esc(s.name)}')" ondragend="onStaffDragEnd(event)">
+              <div class="staff-avatar">${initials(s.name)}</div>
+              <span>${esc(s.name)}</span>
+              <span class="staff-count">${count}</span>
+            </div>`;
+  }).join('');
+
+  // Filtered list
+  let shown = active;
+  if (filter === 'unassigned') shown = active.filter(t=>!t.assignees.length);
+  else if (filter === 'overdue') shown = active.filter(t=>t.overdue);
+
+  const grouped = groupTasks(shown);
+  const board = document.getElementById('board');
+
+  // RTQ section (always shown at top when there are returned tasks, regardless of filter)
+  let rtqHtml = '';
+  if (returned.length) {
+    const rtqCollapsed = collapsed.has('__RTQ__') ? ' collapsed' : '';
+    rtqHtml = `
+      <section class="group section-rtq${rtqCollapsed}" data-group="__RTQ__">
+        <div class="rtq-banner">
+          ↩ Returned to queue — need re-triage
+          <span class="rtq-banner-count">${returned.length}</span>
+        </div>
+        <div class="group-header" onclick="toggleGroup('__RTQ__')">
+          <span class="gh-caret">▾</span>
+          <span class="group-title">${returned.length} unassigned · awaiting attention</span>
+          <span class="group-count">${returned.length}</span>
+        </div>
+        <div class="pills">${sortTasks(returned).map(pillHtml).join('')}</div>
+      </section>`;
   }
 
-  // Triage section (unassigned or overdue active tasks)
-  const triageList  = document.getElementById('triageList');
-  const triageItems = active.filter(t => !t.assignees.length);
-  triageItems.sort((a,b) => (a.date || '9999').localeCompare(b.date || '9999'));
-  triageList.innerHTML = triageItems.length ? triageItems.map(t=>renderTaskCard(t)).join('') : '<div class="empty">Backlog is clear.</div>';
+  if (!grouped.length && !rtqHtml) {
+    board.innerHTML = '<div class="empty">No tasks match this filter.</div>';
+    return;
+  }
 
-  // Staff workload
-  const workloadList = document.getElementById('workloadList');
-  workloadList.innerHTML = staff.map(s => {
-    const sTasks = active.filter(t => t.assignees.includes(s.name));
-    const isOpen = document.getElementById(`group-${s.name}`)?.classList.contains('open');
+  const mainHtml = grouped.map(([key, list]) => {
+    const collapsedClass = collapsed.has(key) ? ' collapsed' : '';
+    const meta = groupBy === 'staff'
+      ? `${list.filter(t=>t.overdue).length} overdue · ${list.length} total`
+      : groupBy === 'lodge'
+        ? `${list.length} task${list.length===1?'':'s'}`
+        : `${list.length} task${list.length===1?'':'s'}`;
     return `
-      <div id="group-${s.name}" class="staff-group ${sTasks.length?'has-work':''} ${isOpen?'open':''}">
-        <div class="staff-hdr" onclick="this.parentElement.classList.toggle('open')">
-          <span class="staff-name">👤 ${s.name}</span>
-          <span class="staff-count">${sTasks.length} jobs</span>
+      <section class="group${collapsedClass}" data-group="${esc(key)}">
+        <div class="group-header" onclick="toggleGroup('${esc(key).replace(/'/g,"\\'")}')">
+          <span class="gh-caret">▾</span>
+          <span class="group-title">${esc(key)}</span>
+          <span class="group-count">${list.length}</span>
+          <span class="group-meta">${meta}</span>
         </div>
-        <div class="staff-content">
-          ${sTasks.length ? sTasks.map(t=>renderTaskCard(t)).join('') : '<div class="empty">No active jobs.</div>'}
-        </div>
-      </div>
-    `;
+        <div class="pills">${list.map(pillHtml).join('')}</div>
+      </section>`;
   }).join('');
+
+  board.innerHTML = rtqHtml + mainHtml;
 }
 
-function renderTaskCard(t, isRtq) {
-  const fmt = d => { if (!d) return '?'; const [,mo,dy] = d.split('-'); return `${parseInt(dy)} ${['','Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'][parseInt(mo)]}`; };
-  const windowBadge = t.dueTo && t.dueTo !== t.date
-    ? `<span style="font-size:10px;background:#eaf4fb;color:#1a5276;font-weight:700;padding:2px 6px;border-radius:4px">📅 ${fmt(t.date)}–${fmt(t.dueTo)}</span>`
-    : '';
-  // Priority badge
-  const prio = (t.priority || 'Medium').toLowerCase();
-  const prioColor = prio === 'urgent' ? '#8B2020' : prio === 'high' ? '#a86c00' : '#1a5276';
-  const prioBadge = `<span style="font-size:9px;background:${prioColor}22;color:${prioColor};border:1px solid ${prioColor};padding:1px 5px;border-radius:4px;font-weight:700">${t.priority || 'Medium'}</span>`;
+function toggleGroup(key) {
+  if (collapsed.has(key)) collapsed.delete(key); else collapsed.add(key);
+  persistCollapsed();
+  render();
+}
 
-  const accessBadge = t.access === 'Guests OK'
-    ? `<span style="font-size:10px;background:#edf7f2;color:#2d6a4f;font-weight:700;padding:2px 6px;border-radius:4px">👥 Guests OK</span>`
-    : `<span style="font-size:10px;background:#fdf5e8;color:#a86c00;font-weight:700;padding:2px 6px;border-radius:4px">⛔ No Guests</span>`;
-  const rtqBadge = isRtq ? `<span style="font-size:10px;background:#fdf0ec;color:#8B2020;font-weight:700;padding:2px 6px;border-radius:4px">⏰ Returned to Queue</span>` : '';
+// ── Pill html ────────────────────────────────────────────────
+function pillHtml(t) {
+  const today = todayISO();
+  const cmp = t.dueTo || t.date;
+  let cls;
+  if (t.returned) cls = 'rtq';
+  else if (!cmp) cls = 'nodate';
+  else if (t.overdue) cls = 'overdue';
+  else cls = 'in-date';
+  const dateCls = !cmp ? '' : (t.overdue ? 'overdue' : 'green');
+  const isDirty = dirty.has(t.id);
 
-  const ass1 = t.assignees[0] || '';
-  const ass2 = t.assignees[1] || '';
+  const prio = (t.priority||'Medium').toLowerCase();
+  const prioBadge = `<span class="badge badge-${prio}">${esc(t.priority||'Medium')}</span>`;
+  const dirtyBadge = isDirty ? `<span class="badge badge-dirty">unsaved</span>` : '';
+  const rtqBadge   = t.returned ? `<span class="badge badge-rtq">↩ Returned</span>` : '';
+
+  const dateStr = t.date
+    ? (t.dueTo && t.dueTo !== t.date ? `${fmtDate(t.date)} → ${fmtDate(t.dueTo)}` : fmtDate(t.date))
+    : 'No date';
+
+  const assignStr = t.assignees.length
+    ? `<span class="pill-assign">${esc(t.assignees.join(' + '))}</span>`
+    : `<span class="pill-assign unassigned">⚠ Unassigned</span>`;
+
+  const headline = t.headline ? `<span class="pill-headline">${esc(t.headline.slice(0,90))}</span>` : '';
 
   return `
-    <div class="card ${!t.assignees.length&&!isRtq?'unassigned':(t.overdue&&!isRtq?'overdue':'')} ${isRtq?'overdue':''}">
-      <div class="card-top">
-        <div class="card-title">${t.property}</div>
-        <div style="display:flex; gap:4px; flex-wrap:wrap; align-items:center">
+    <div class="pill ${cls}" id="pill-${t.id}" data-task-id="${t.id}"
+         ondragover="onPillDragOver(event)" ondragleave="onPillDragLeave(event)" ondrop="onPillDrop(event,'${t.id}')">
+      <div class="pill-saving-spin"></div>
+      <div class="pill-summary" onclick="togglePill('${t.id}')">
+        <span class="pill-prop">${esc(t.property)}${headline ? ' — ' : ''}${headline}</span>
+        <span class="pill-meta">
+          <span class="pill-date ${dateCls}">📅 ${dateStr}</span>
           ${prioBadge}
           ${rtqBadge}
-          ${windowBadge}
-          ${accessBadge}
-          ${t.isBillable ? '<span style="font-size:9px;background:#1a5276;color:white;padding:2px 6px;border-radius:4px;font-weight:700">CHARGEABLE</span>' : ''}
-          ${t.linked ? '<span class="badge-ln">🚨 Issue</span>' : ''}
+          ${dirtyBadge}
+          ${assignStr}
+        </span>
+      </div>
+      <div class="pill-expand">${expandPanelHtml(t)}</div>
+    </div>`;
+}
+
+function expandPanelHtml(t) {
+  const statusOpts = STATUS_LABELS.map(s => `<option value="${s}" ${s===t.status?'selected':''}>${s}</option>`).join('');
+  const prioOpts   = PRIO_LABELS.map(p => `<option value="${p}" ${p===t.priority?'selected':''}>${p}</option>`).join('');
+  const accessOpts = ACCESS_LABELS.map(a => `<option value="${a}" ${a===t.access?'selected':''}>${a}</option>`).join('');
+  const assignees  = (t.assignees||[]).map(n => `
+    <span class="assignee-chip">${esc(n)}<button type="button" onclick="removeAssignee('${t.id}','${esc(n).replace(/'/g,"\\'")}')" title="Remove">×</button></span>`).join('');
+
+  return `
+    <div class="edit-grid">
+      <div class="edit-field">
+        <label class="edit-lbl">Scheduled</label>
+        <input type="date" class="edit-date" value="${t.date||''}" onchange="onFieldChange('${t.id}','sched',this.value)">
+      </div>
+      <div class="edit-field">
+        <label class="edit-lbl">Due by</label>
+        <input type="date" class="edit-date" value="${t.dueTo||''}" onchange="onFieldChange('${t.id}','dueTo',this.value)">
+      </div>
+      <div class="edit-field">
+        <label class="edit-lbl">Status</label>
+        <select class="edit-sel" onchange="onFieldChange('${t.id}','status',this.value)">${statusOpts}</select>
+      </div>
+      <div class="edit-field">
+        <label class="edit-lbl">Priority</label>
+        <select class="edit-sel" onchange="onFieldChange('${t.id}','priority',this.value)">${prioOpts}</select>
+      </div>
+      <div class="edit-field">
+        <label class="edit-lbl">Guest access</label>
+        <select class="edit-sel" onchange="onFieldChange('${t.id}','access',this.value)">${accessOpts}</select>
+      </div>
+      <div class="edit-field">
+        <label class="edit-lbl">Requested by</label>
+        <input type="text" class="edit-input" value="${esc(t.requester||'')}" placeholder="Name of person who reported the issue" onchange="onFieldChange('${t.id}','requester',this.value)">
+      </div>
+      <div class="edit-field span2">
+        <label class="edit-lbl">Assignees <span style="text-transform:none;font-weight:400;color:var(--sage-mid)">— drag from sidebar to add</span></label>
+        <div class="assignees-row ${assignees ? '' : 'empty-state'}" id="ass-${t.id}"
+             ondragover="onPillDragOver(event)" ondragleave="onPillDragLeave(event)" ondrop="onPillDrop(event,'${t.id}')">
+          ${assignees || 'Drag a name here from the left'}
         </div>
       </div>
-      <div class="card-meta">
-        <span>📅 ${t.date ? fmt(t.date) : 'Unscheduled'}${t.dueTo ? ' → ' + fmt(t.dueTo) : ''}</span>
-        <span>🏷️ ${t.status}</span>
-        ${t.assignees.length ? `<span>👤 ${t.assignees.join(', ')}</span>` : ''}
-      </div>
-      ${t.description ? `<div class="card-desc">${t.description.replace(/\n/g,'<br>')}</div>` : ''}
-      
-      ${(t.matCost || t.labourCost) ? `
-      <div style="background:#f4f7f6; padding:8px; border-radius:6px; margin-top:4px; font-size:11px">
-        <div style="display:flex; justify-content:space-between"><span>Labour:</span> <strong>£${t.labourCost.toFixed(2)}</strong></div>
-        <div style="display:flex; justify-content:space-between"><span>Materials:</span> <strong>£${t.matCost.toFixed(2)}</strong></div>
-        <div style="display:flex; justify-content:space-between; border-top:1px solid #ccc; margin-top:4px; padding-top:4px; font-weight:700"><span>Total:</span> <span>£${(t.labourCost + t.matCost).toFixed(2)}</span></div>
-      </div>
-      ` : ''}
-      <div class="update-row">
-        <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px">
-          <select class="sel-assign" id="sel-${t.id}">
-            <option value="">— Primary —</option>
-            ${staff.map(s => `<option value="${s.name}" ${ass1===s.name?'selected':''}>${s.name}</option>`).join('')}
-          </select>
-          <select class="sel-assign" id="sel2-${t.id}">
-            <option value="">— Partner —</option>
-            ${staff.map(s => `<option value="${s.name}" ${ass2===s.name?'selected':''}>${s.name}</option>`).join('')}
-          </select>
-        </div>
-        <div class="assign-row" style="margin-top:4px">
-          <input type="text" id="note-${t.id}" class="note-input" placeholder="Add a note or reason for reassignment...">
-          <button class="btn-save" onclick="saveTask('${t.id}')">Update</button>
-        </div>
+      <div class="edit-field span2">
+        <label class="edit-lbl" data-tip="The original description and each note below are LOCKED to preserve the audit trail. To add new info, use the 'Add note' box at the bottom — your note will be timestamped, signed and appended permanently.">Description &amp; history (read-only) ⓘ</label>
+        <div class="desc-blocks">${descBlocksHtml(t.description)}</div>
       </div>
     </div>
-  `;
+
+    <div class="edit-actions">
+      ${autosave ? '' : `<button class="btn btn-primary" onclick="saveOne('${t.id}')">Save changes</button>`}
+      <button class="btn btn-close" onclick="closeTask('${t.id}')">Mark complete</button>
+      <button class="btn btn-rtq" onclick="returnToQueue('${t.id}')">↩ Return to queue</button>
+      <button class="btn btn-cancel" onclick="togglePill('${t.id}')">Close panel</button>
+    </div>
+
+    <div class="audit-section">
+      <div class="audit-title">Activity & audit trail <span style="font-weight:400;color:var(--sage-mid);text-transform:none">— Monday updates</span></div>
+      <div class="audit-thread" id="audit-${t.id}">
+        <div class="audit-loading">Loading activity…</div>
+      </div>
+      <div class="add-note-row">
+        <textarea id="note-${t.id}" placeholder="Add a note — visible on the item in Monday…"></textarea>
+        <button class="add-note-btn" onclick="postNote('${t.id}')">Add note</button>
+      </div>
+    </div>`;
 }
 
-async function saveTask(taskId) {
-  const sel1 = document.getElementById(`sel-${taskId}`), sel2 = document.getElementById(`sel2-${taskId}`), noteEl = document.getElementById(`note-${taskId}`);
-  const p1 = sel1.value, p2 = sel2.value, noteText = noteEl.value.trim();
-  const btn = sel2.closest('.update-row').querySelector('.btn-save');
-  
-  if (p1 && p2 && p1 === p2) return alert('Cannot assign the same person twice.');
+// ── Expand / collapse pill ──────────────────────────────────
+function togglePill(id) {
+  const pill = document.getElementById('pill-'+id);
+  if (!pill) return;
+  const opening = !pill.classList.contains('expanded');
+  pill.classList.toggle('expanded');
+  if (opening) loadUpdates(id);
+}
 
-  btn.disabled = true; btn.textContent = '...';
+// ── Audit trail: load / post ────────────────────────────────
+async function loadUpdates(taskId) {
+  const target = document.getElementById('audit-'+taskId);
+  if (!target) return;
+  if (auditCache.has(taskId)) {
+    target.innerHTML = renderAudit(auditCache.get(taskId));
+    return;
+  }
   try {
-    const t = tasks.find(x => x.id === taskId);
-    let newNotes = t.description;
-    if (noteText) {
-      const stamp = new Date().toLocaleString('en-GB', { day:'numeric', month:'short', hour:'2-digit', minute:'2-digit' });
-      const audit = `[${stamp}] ${noteText}`;
-      newNotes = newNotes ? (newNotes + '\n\n' + audit) : audit;
-    }
-
-    const labels = [];
-    if (p1) labels.push(p1);
-    if (p2) labels.push(p2);
-
-    const cv = { [COLS.assignee]: { labels }, [COLS.desc]: newNotes };
-    await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b, item_id:$i, column_values:$v, create_labels_if_missing:true){ id } }`, { b: ADHOC_BOARD, i: taskId, v: JSON.stringify(cv) });
-    
-    t.assignees = labels;
-    t.description = newNotes;
-    noteEl.value = '';
-    showToast('Task updated');
-    render();
-  } catch (e) { alert('Failed: ' + e.message); btn.disabled = false; btn.textContent = 'Update'; }
+    const d = await mq(`{ items(ids:[${taskId}]){ updates(limit:50){ id body text_body created_at creator{ id name } } } }`);
+    const ups = d?.items?.[0]?.updates || [];
+    auditCache.set(taskId, ups);
+    target.innerHTML = renderAudit(ups);
+  } catch (e) {
+    target.innerHTML = `<div class="audit-loading">Could not load activity: ${esc(e.message)}</div>`;
+  }
 }
 
+function renderAudit(ups) {
+  if (!ups.length) return '<div class="audit-loading">No activity yet — changes you make here will appear here as the audit trail.</div>';
+  return ups
+    .slice()
+    .sort((a,b) => (a.created_at||'').localeCompare(b.created_at||''))
+    .map(u => {
+      const body = u.text_body || u.body || '';
+      const isSystem = /^\[system\]/i.test(body) || /^\*\*Change:/i.test(body);
+      const cls = isSystem ? ' audit-system' : '';
+      return `
+        <div class="audit-item${cls}">
+          <div class="audit-head">
+            <span class="audit-author">${esc(u.creator?.name || 'Unknown')}</span>
+            <span>·</span>
+            <span>${fmtDT(u.created_at)}</span>
+          </div>
+          <div class="audit-body">${esc(body)}</div>
+        </div>`;
+    }).join('');
+}
+
+async function postUpdate(taskId, body) {
+  const data = await mq(`mutation($id:ID!,$b:String!){ create_update(item_id:$id, body:$b){ id body text_body created_at creator{ id name } } }`,
+    { id: taskId, b: body });
+  const update = data?.create_update;
+  if (update) {
+    const arr = auditCache.get(taskId) || [];
+    arr.push(update);
+    auditCache.set(taskId, arr);
+    const target = document.getElementById('audit-'+taskId);
+    if (target) target.innerHTML = renderAudit(arr);
+  }
+}
+
+async function postNote(taskId) {
+  const ta = document.getElementById('note-'+taskId);
+  const text = (ta?.value || '').trim();
+  if (!text) { showToast('Type a note first','err'); return; }
+
+  const author = getUserName();
+  if (!author) { showToast('Need a name to sign the note','err'); return; }
+
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  const btn = ta.parentElement.querySelector('.add-note-btn');
+  btn.disabled = true;
+
+  const stamp = `${nowStamp()} — ${author}`;
+  const formatted = `[${stamp}] ${text}`;
+  const newDesc = (t.description ? t.description.trim() + '\n\n' : '') + formatted;
+
+  try {
+    // 1. Post to Monday Updates (for the in-app activity log)
+    const updatePromise = postUpdate(taskId, `**Note from ${author}:**\n${text}`);
+    // 2. Append to description column (the locked audit log on the item)
+    const cv = { [COLS.desc]: newDesc };
+    const descPromise = mq(
+      `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v){ id } }`,
+      { b: ADHOC_BOARD, i: taskId, v: JSON.stringify(cv) }
+    );
+    await Promise.all([updatePromise, descPromise]);
+
+    t.description = newDesc;
+    ta.value = '';
+    // Re-render the desc blocks in-place without collapsing the pill
+    const target = document.querySelector(`#pill-${taskId} .desc-blocks`);
+    if (target) target.innerHTML = descBlocksHtml(newDesc);
+    showToast('Note added','ok');
+  } catch (e) {
+    showToast('Could not post note: '+e.message,'err');
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+// ── Return to Queue ──────────────────────────────────────────
+async function returnToQueue(taskId) {
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  const reason = (prompt('Why is this being returned to the queue?\n(This will unassign everyone and flag the task for re-triage.)') || '').trim();
+  if (reason === '' || reason === null) {
+    showToast('Return cancelled — a reason is required','err');
+    return;
+  }
+  const author = getUserName();
+  if (!author) { showToast('Need a name to sign the return','err'); return; }
+
+  const pill = document.getElementById('pill-'+taskId);
+  pill?.classList.add('saving');
+
+  const prevAssignees = [...t.assignees];
+  const prevStatus    = t.status;
+  const stamp = `${nowStamp()} — ${author}`;
+  const noteBody = `Returned to queue: ${reason}`;
+  const formatted = `[${stamp}] ${noteBody}`;
+  const newDesc = (t.description ? t.description.trim() + '\n\n' : '') + formatted;
+
+  try {
+    const cv = {
+      [COLS.assignee]: { labels: [] },
+      [COLS.status]:   { label: 'Returned to queue' },
+      [COLS.desc]:     newDesc,
+    };
+    await mq(
+      `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+      { b: ADHOC_BOARD, i: taskId, v: JSON.stringify(cv) }
+    );
+    // Post structured audit entry to Monday Updates as well
+    postUpdate(taskId,
+      `**Returned to queue by ${author}**\n` +
+      `• Reason: ${reason}\n` +
+      `• Previous status: ${prevStatus}\n` +
+      `• Previous assignees: ${prevAssignees.join(', ') || '—'}`
+    ).catch(()=>{});
+
+    // Update local state
+    t.assignees   = [];
+    t.status      = 'Returned to queue';
+    t.description = newDesc;
+    t.returned    = true;
+    // Drop any in-flight dirty edits for this task — RTQ supersedes them
+    dirty.delete(taskId);
+    showToast('Returned to queue','ok');
+    render();
+    updateSavePendingBtn();
+  } catch (e) {
+    showToast('Return failed: '+e.message,'err');
+  } finally {
+    pill?.classList.remove('saving');
+  }
+}
+
+// ── Edit-field changes (collect into dirty, save according to autosave) ─
+function onFieldChange(taskId, field, value) {
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  const k = fieldKey(field);
+  if (t[k] === value || (t[k]||'') === (value||'')) return; // no change
+  markDirty(taskId, field, value);
+  // Write through to local task so re-render shows the in-flight edit
+  t[k] = value;
+  // Recompute overdue flag if dates changed
+  if (field === 'sched' || field === 'dueTo' || field === 'status') {
+    const cmp = t.dueTo || t.date;
+    t.overdue = cmp && cmp < todayISO() && !(/completed|fixed|done|cancelled|returned/i.test(t.status));
+  }
+  if (autosave) scheduleSave(taskId);
+  else { renderDirtyState(taskId); updateSavePendingBtn(); }
+}
+
+function fieldKey(f) {
+  return { sched:'date', dueTo:'dueTo', status:'status', priority:'priority',
+           access:'access', requester:'requester', desc:'description', assignees:'assignees' }[f] || f;
+}
+
+function markDirty(taskId, field, value) {
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  if (!dirty.has(taskId)) dirty.set(taskId, { changes:{}, prev:{}, summary:[] });
+  const d = dirty.get(taskId);
+  const k = fieldKey(field);
+  if (!(k in d.prev)) d.prev[k] = JSON.parse(JSON.stringify(t[k]));
+  d.changes[field] = value;
+  d.summary.push(`${field}: ${JSON.stringify(value)}`);
+}
+
+function renderDirtyState(taskId) {
+  // re-render only this pill so we don't lose drag handlers
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  const pill = document.getElementById('pill-'+taskId);
+  if (!pill) return;
+  const wasExpanded = pill.classList.contains('expanded');
+  pill.outerHTML = pillHtml(t);
+  const newPill = document.getElementById('pill-'+taskId);
+  if (newPill && wasExpanded) {
+    newPill.classList.add('expanded');
+    loadUpdates(taskId);
+  }
+}
+
+function updateSavePendingBtn() {
+  const btn = document.getElementById('savePending');
+  if (dirty.size && !autosave) {
+    btn.classList.add('show');
+    btn.textContent = `Save ${dirty.size} change${dirty.size===1?'':'s'}`;
+  } else {
+    btn.classList.remove('show');
+  }
+}
+
+function scheduleSave(taskId) {
+  if (saveTimers.has(taskId)) clearTimeout(saveTimers.get(taskId));
+  saveTimers.set(taskId, setTimeout(() => {
+    saveTimers.delete(taskId);
+    saveOne(taskId);
+  }, SAVE_DEBOUNCE_MS));
+}
+
+// ── Drag & drop ──────────────────────────────────────────────
+let dragStaff = null;
+function onStaffDragStart(e, name) {
+  dragStaff = name;
+  e.dataTransfer.setData('text/plain', name);
+  e.dataTransfer.effectAllowed = 'copy';
+  e.target.classList.add('dragging');
+}
+function onStaffDragEnd(e) {
+  dragStaff = null;
+  e.target.classList.remove('dragging');
+  document.querySelectorAll('.pill.drag-over').forEach(p=>p.classList.remove('drag-over'));
+}
+function onPillDragOver(e) {
+  if (!dragStaff && !e.dataTransfer.types.includes('text/plain')) return;
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'copy';
+  let pill = e.target.closest('.pill'); if (!pill) return;
+  pill.classList.add('drag-over');
+}
+function onPillDragLeave(e) {
+  let pill = e.target.closest('.pill'); if (!pill) return;
+  // only remove if leaving the pill entirely
+  if (!pill.contains(e.relatedTarget)) pill.classList.remove('drag-over');
+}
+function onPillDrop(e, taskId) {
+  e.preventDefault();
+  const name = e.dataTransfer.getData('text/plain') || dragStaff;
+  const pill = document.getElementById('pill-'+taskId);
+  pill?.classList.remove('drag-over');
+  if (!name) return;
+  assignStaff(taskId, name);
+}
+
+function assignStaff(taskId, name) {
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  if (t.assignees.includes(name)) { showToast(`${name} already assigned`,'err'); return; }
+  if (t.assignees.length >= 2) { showToast('Max 2 assignees — remove one first','err'); return; }
+  const next = [...t.assignees, name];
+  markDirty(taskId, 'assignees', next);
+  // Apply locally so visual updates immediately
+  t.assignees = next;
+  renderDirtyState(taskId);
+  // Also refresh staff counts in sidebar
+  updateSidebarCounts();
+  if (autosave) scheduleSave(taskId);
+  else updateSavePendingBtn();
+}
+
+function removeAssignee(taskId, name) {
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  const next = t.assignees.filter(n => n !== name);
+  markDirty(taskId, 'assignees', next);
+  t.assignees = next;
+  renderDirtyState(taskId);
+  updateSidebarCounts();
+  if (autosave) scheduleSave(taskId);
+  else updateSavePendingBtn();
+}
+
+function updateSidebarCounts() {
+  document.querySelectorAll('.staff-chip').forEach(chip => {
+    const name = chip.dataset.name;
+    const count = tasks.filter(t => t.assignees.includes(name)).length;
+    const c = chip.querySelector('.staff-count');
+    if (c) c.textContent = count;
+  });
+}
+
+// ── Save changes ─────────────────────────────────────────────
+function buildColumnValues(taskId) {
+  const t = tasks.find(x=>x.id===taskId);
+  const d = dirty.get(taskId); if (!d) return null;
+  const cv = {};
+  const c = d.changes;
+  if ('sched' in c)     cv[COLS.sched]    = c.sched ? { date:c.sched } : null;
+  if ('dueTo' in c)     cv[COLS.dueTo]    = c.dueTo ? { date:c.dueTo } : null;
+  if ('status' in c)    cv[COLS.status]   = { label:c.status };
+  if ('priority' in c)  cv[COLS.priority] = { label:c.priority };
+  if ('access' in c)    cv[COLS.access]   = { labels:[c.access] };
+  if ('requester' in c) cv[COLS.requester]= c.requester || '';
+  if ('desc' in c)      cv[COLS.desc]     = c.desc || '';
+  if ('assignees' in c) cv[COLS.assignee] = { labels:c.assignees };
+  return cv;
+}
+
+function buildChangeSummary(taskId) {
+  const t = tasks.find(x=>x.id===taskId);
+  const d = dirty.get(taskId); if (!d) return '';
+  const lines = ['**Change:**'];
+  const c = d.changes, p = d.prev;
+  const fmt = v => (Array.isArray(v) ? (v.join(', ') || '—') : (v || '—'));
+  if ('sched' in c)     lines.push(`• Scheduled date: ${fmt(p.date)} → ${fmt(c.sched)}`);
+  if ('dueTo' in c)     lines.push(`• Due date: ${fmt(p.dueTo)} → ${fmt(c.dueTo)}`);
+  if ('status' in c)    lines.push(`• Status: ${fmt(p.status)} → ${fmt(c.status)}`);
+  if ('priority' in c)  lines.push(`• Priority: ${fmt(p.priority)} → ${fmt(c.priority)}`);
+  if ('access' in c)    lines.push(`• Guest access: ${fmt(p.access)} → ${fmt(c.access)}`);
+  if ('requester' in c) lines.push(`• Requested by: ${fmt(p.requester)} → ${fmt(c.requester)}`);
+  if ('desc' in c)      lines.push(`• Description edited`);
+  if ('assignees' in c) {
+    const before = p.assignees || [], after = c.assignees;
+    const added   = after.filter(n => !before.includes(n));
+    const removed = before.filter(n => !after.includes(n));
+    if (added.length)   lines.push(`• Assigned: ${added.join(', ')}`);
+    if (removed.length) lines.push(`• Unassigned: ${removed.join(', ')}`);
+  }
+  return lines.join('\n');
+}
+
+async function saveOne(taskId) {
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  const cv = buildColumnValues(taskId);
+  if (!cv) return;
+  const summary = buildChangeSummary(taskId);
+  const pill = document.getElementById('pill-'+taskId);
+  pill?.classList.add('saving');
+  try {
+    await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+      { b: ADHOC_BOARD, i: taskId, v: JSON.stringify(cv) });
+
+    // Apply changes to local task copy
+    const c = dirty.get(taskId).changes;
+    if ('sched' in c)     t.date = c.sched || null;
+    if ('dueTo' in c)     t.dueTo = c.dueTo || null;
+    if ('status' in c)    t.status = c.status;
+    if ('priority' in c)  t.priority = c.priority;
+    if ('access' in c)    t.access = c.access;
+    if ('requester' in c) t.requester = c.requester;
+    if ('desc' in c)      t.description = c.desc;
+    if ('assignees' in c) t.assignees = c.assignees;
+    const today = todayISO();
+    const cmp = t.dueTo || t.date;
+    t.overdue = cmp && cmp < today && !(/completed|fixed|done|cancelled|returned/i.test(t.status));
+
+    dirty.delete(taskId);
+    // Post audit update (don't block)
+    if (summary) postUpdate(taskId, summary).catch(()=>{});
+    showToast('Saved','ok');
+    renderDirtyState(taskId);
+    render(); // also re-render groups in case grouping changed
+    updateSavePendingBtn();
+  } catch (e) {
+    showToast('Save failed: '+e.message,'err');
+  } finally {
+    pill?.classList.remove('saving');
+  }
+}
+
+async function saveAllPending() {
+  const ids = [...dirty.keys()];
+  const btn = document.getElementById('savePending');
+  btn.disabled = true;
+  let okCount = 0, failCount = 0;
+  for (const id of ids) {
+    try { await saveOne(id); okCount++; } catch { failCount++; }
+  }
+  btn.disabled = false;
+  if (failCount === 0) showToast(`Saved ${okCount} change${okCount===1?'':'s'}`,'ok');
+  else showToast(`${okCount} saved, ${failCount} failed`,'err');
+}
+
+// ── Close task ───────────────────────────────────────────────
+async function closeTask(taskId) {
+  if (!confirm('Mark this task as completed and remove it from the backlog?')) return;
+  const t = tasks.find(x=>x.id===taskId);
+  const pill = document.getElementById('pill-'+taskId);
+  pill?.classList.add('saving');
+  try {
+    const cv = { [COLS.status]: { label:'Completed' } };
+    await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+      { b: ADHOC_BOARD, i: taskId, v: JSON.stringify(cv) });
+    postUpdate(taskId, '**Change:**\n• Status: '+t.status+' → Completed').catch(()=>{});
+    tasks = tasks.filter(x => x.id !== taskId);
+    dirty.delete(taskId);
+    showToast('Task closed','ok');
+    render();
+    updateSavePendingBtn();
+  } catch (e) {
+    showToast('Close failed: '+e.message,'err');
+  } finally {
+    pill?.classList.remove('saving');
+  }
+}
+
+function showToast(m, type='') {
+  const t = document.getElementById('toast');
+  t.textContent = m;
+  t.className = 'toast show' + (type?' '+type:'');
+  setTimeout(() => { t.className = 'toast'; }, 2500);
+}
+
+// Restore UI state from localStorage
+function restoreState() {
+  document.querySelectorAll('[data-group]').forEach(b => b.classList.toggle('active', b.dataset.group===groupBy));
+  document.querySelectorAll('[data-filter]').forEach(b => b.classList.toggle('active', b.dataset.filter===filter));
+  document.querySelectorAll('[data-sort]').forEach(b => b.classList.toggle('active', b.dataset.sort===sortBy));
+  document.getElementById('autosaveSwitch').classList.toggle('on', autosave);
+  document.querySelector('.autosave-lbl').textContent = autosave ? 'Autosave' : 'Autosave off';
+  updateWhoAmI();
+}
+
+restoreState();
 boot();
 </script>
 </body>

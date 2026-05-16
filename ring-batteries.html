@@ -56,19 +56,30 @@
   .spin { display:inline-block; width:22px; height:22px; border:3px solid rgba(100,105,85,.15); border-top-color:var(--sage); border-radius:50%; animation:spin .8s linear infinite; }
   @keyframes spin { to { transform:rotate(360deg); } }
 
-  /* Device / battery rows */
-  .row { display:flex; align-items:center; gap:10px; padding:9px 14px; border-bottom:1px solid var(--border); cursor:pointer; transition:background .1s; border-left:4px solid var(--grey); }
-  .row:hover { background:#fafaf6; }
+  /* Device / battery pills — grid so multiple fit per row */
+  .pill-list { display:grid; grid-template-columns:repeat(auto-fill, minmax(280px, 1fr)); gap:8px; padding:10px 12px; }
+  .row { background:#fff; border:1px solid var(--border); border-left:5px solid var(--grey); border-radius:10px; overflow:hidden; box-shadow:0 1px 3px rgba(0,0,0,.04); transition:box-shadow .15s, transform .1s; }
+  .row-summary { padding:9px 12px; cursor:pointer; }
+  .row:hover { box-shadow:0 2px 8px rgba(0,0,0,.08); transform:translateY(-1px); }
+  .row.expanded { grid-column:1 / -1; background:#f6f4ed; transform:none; box-shadow:0 2px 12px rgba(0,0,0,.10); }
+  .row.expanded .row-summary { cursor:default; border-bottom:1px solid var(--border); background:#f6f4ed; }
   .row.ok       { border-left-color:var(--green); }
-  .row.low      { border-left-color:var(--amber); }
-  .row.critical { border-left-color:var(--red); }
-  .row.overdue  { border-left-color:var(--red); background:#fffaf9; }
-  .row.charging { border-left-color:var(--blue); }
-  .row.retired  { border-left-color:var(--grey); opacity:0.65; }
-  .row.expanded { background:#f6f4ed; cursor:default; }
+  .row.low      { border-left-color:var(--amber); background:#fffaf2; }
+  .row.critical { border-left-color:var(--red);   background:#fff5f3; }
+  .row.overdue  { border-left-color:var(--red);   background:#fff5f3; }
+  .row.charging { border-left-color:var(--blue);  background:#f3f8fc; }
+  .row.retired  { border-left-color:var(--grey);  opacity:0.6; }
 
-  .row-prop { flex:1; min-width:0; font-size:14px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
-  .row-meta { display:flex; gap:6px; align-items:center; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
+  .row-head { display:flex; align-items:center; gap:6px; justify-content:space-between; margin-bottom:5px; min-width:0; }
+  .row-prop { font-size:13.5px; font-weight:700; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1; }
+  .row-meta { display:flex; gap:4px; align-items:center; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
+  .row-foot { display:flex; gap:6px; align-items:center; flex-wrap:wrap; font-size:11px; color:var(--sage); }
+  .row-foot .pct { font-size:13px; font-weight:700; color:var(--dark); }
+  .row-foot .pct.warn { color:var(--amber); }
+  .row-foot .pct.bad  { color:var(--red); }
+  .row-foot .pct.good { color:var(--green); }
+  .row-foot .sep { color:var(--sage-mid); opacity:0.45; }
+  .row-foot .age.overdue { color:var(--red); font-weight:600; }
   .badge { display:inline-block; font-size:9px; font-weight:700; padding:2px 6px; border-radius:4px; white-space:nowrap; text-transform:uppercase; letter-spacing:.3px; }
   .badge-model    { background:var(--blue-bg);  color:var(--blue); }
   .badge-model.full { background:#f4e8fb; color:#9d50dd; }
@@ -88,9 +99,9 @@
   .row-data .age { font-weight:400; color:var(--sage-mid); }
   .row-data .age.overdue { color:var(--red); font-weight:600; }
 
-  /* Expanded panel */
-  .row-expand { display:none; padding:14px; background:#fbfaf6; border-bottom:1px solid var(--border); border-left:4px solid var(--border); }
-  .row.expanded + .row-expand { display:block; }
+  /* Expanded panel — sits inside .row so the row can span full grid width */
+  .row-expand { display:none; padding:14px; background:#fbfaf6; }
+  .row.expanded .row-expand { display:block; }
   .expand-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(160px, 1fr)); gap:12px; margin-bottom:14px; }
   .stat-cell { background:#fff; border:1px solid var(--border); border-radius:7px; padding:8px 10px; }
   .stat-cell .stat-lbl { font-size:9px; font-weight:700; text-transform:uppercase; color:var(--sage-mid); letter-spacing:.5px; margin-bottom:2px; }
@@ -500,13 +511,18 @@ async function loadBatteries() {
   });
 }
 
-// Auto-create a Ring Devices row for any Has-Ring property that doesn't have one
+// Auto-create a Ring Devices row for any Has-Ring property that doesn't have one,
+// AND sync model from Property Config down to any existing rows whose model
+// has drifted (e.g. user just changed Property Config from Battery swap → Hardwired).
 async function ensureDeviceRows() {
-  const haveByName = new Set(devices.map(d => d.name.trim().toLowerCase()));
-  const missing = properties.filter(p => p.hasRing && !haveByName.has(p.name.trim().toLowerCase()));
-  for (const p of missing) {
+  const haveByName = new Map(devices.map(d => [d.name.trim().toLowerCase(), d]));
+  const propsByName = new Map(properties.filter(p => p.hasRing).map(p => [p.name.trim().toLowerCase(), p]));
+
+  // 1) Create missing device rows
+  for (const [key, p] of propsByName) {
+    if (haveByName.has(key)) continue;
     try {
-      const cv = { [RD_MODEL]: { label: p.model }, [RD_STATUS]: { label: 'OK' } };
+      const cv = { [RD_MODEL]: { label: p.model }, [RD_STATUS]: { label: defaultStatusForModel(p.model) } };
       const data = await mq(
         `mutation($b:ID!,$n:String!,$v:JSON!){ create_item(board_id:$b,item_name:$n,column_values:$v,create_labels_if_missing:true){ id } }`,
         { b: RD_BOARD, n: p.name, v: JSON.stringify(cv) }
@@ -515,13 +531,45 @@ async function ensureDeviceRows() {
       if (newId) {
         devices.push({
           id: newId, name: p.name, model: p.model, battery: '', lastSwap: null,
-          lastReadD: null, lastReadP: null, status: 'OK', notes: '',
+          lastReadD: null, lastReadP: null, status: defaultStatusForModel(p.model), notes: '',
         });
       }
     } catch (e) {
       console.warn('Failed to create Ring Devices row for', p.name, e);
     }
   }
+
+  // 2) Push model changes from Property Config down to existing rows
+  for (const d of devices) {
+    const p = propsByName.get(d.name.trim().toLowerCase());
+    if (!p) continue;
+    if (p.model && p.model !== d.model) {
+      try {
+        await mq(
+          `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+          { b: RD_BOARD, i: d.id, v: JSON.stringify({ [RD_MODEL]: { label: p.model } }) }
+        );
+        console.log(`Model synced for ${d.name}: ${d.model} → ${p.model}`);
+        d.model = p.model;
+        // Migrate status to a sensible default when switching model families
+        if (/hardwired/i.test(p.model) && ['Low','Critical','On charge'].includes(d.status)) {
+          await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+            { b: RD_BOARD, i: d.id, v: JSON.stringify({ [RD_STATUS]: { label: 'Online' } }) });
+          d.status = 'Online';
+        } else if (!/hardwired/i.test(p.model) && ['Online','Offline'].includes(d.status)) {
+          await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+            { b: RD_BOARD, i: d.id, v: JSON.stringify({ [RD_STATUS]: { label: 'OK' } }) });
+          d.status = 'OK';
+        }
+      } catch (e) {
+        console.warn(`Failed to sync model for ${d.name}:`, e);
+      }
+    }
+  }
+}
+
+function defaultStatusForModel(model) {
+  return /hardwired/i.test(model || '') ? 'Online' : 'OK';
 }
 
 // ── KPIs ───────────────────────────────────────────────────────────
@@ -623,7 +671,7 @@ function renderDevices() {
     return;
   }
 
-  document.getElementById('listBody').innerHTML = list.map(deviceRowHtml).join('');
+  document.getElementById('listBody').innerHTML = '<div class="pill-list">' + list.map(deviceRowHtml).join('') + '</div>';
 }
 
 function urgencyScore(d) {
@@ -654,21 +702,40 @@ function deviceRowHtml(d) {
   const modelClass = hw ? 'badge-model hw' : d.model === 'Full unit charge' ? 'badge-model full' : 'badge-model';
   const modelIcon  = hw ? '⚡ hardwired' : d.model === 'Full unit charge' ? '🔌 full charge' : '🔋 swap';
   const isExpanded = activeId === d.id;
+
+  // Reading display (battery models only)
+  let readingHtml = '';
+  if (!hw) {
+    const pct = d.lastReadP;
+    const pctCls = pct == null ? '' : pct < CRITICAL_PCT ? 'bad' : pct < LOW_PCT ? 'warn' : 'good';
+    readingHtml = pct != null
+      ? `<span class="pct ${pctCls}">${pct}%</span><span class="sep">·</span>`
+      : `<span class="pct">—</span><span class="sep">·</span>`;
+  }
+  const batteryChip = hw ? '' : (d.battery
+    ? `<span class="badge badge-battery">🔋 #${esc(d.battery)}</span>`
+    : `<span class="badge badge-battery" style="opacity:.6">— no battery</span>`);
+
   return `
-    <div class="row ${cls}${isExpanded?' expanded':''}" onclick="toggleRow('${d.id}')">
-      <span class="row-prop">${esc(d.name)}</span>
-      <span class="row-meta">
-        <span class="${modelClass} badge">${modelIcon}</span>
-        ${statusBadge}
-        ${overdueBadge}
-        ${hw ? '' : (d.battery ? `<span class="badge badge-battery">#${esc(d.battery)}</span>` : '<span class="badge badge-battery" style="opacity:.6">— no battery</span>')}
-        <span class="row-data">
-          ${hw ? '' : (d.lastReadP != null ? `<strong>${d.lastReadP}%</strong>` : '<strong>—</strong>')}
-          <span class="age ${ageCls}">${ageStr}</span>
-        </span>
-      </span>
-    </div>
-    ${isExpanded ? `<div class="row-expand" style="display:block">${deviceExpandHtml(d)}</div>` : ''}`;
+    <div class="row ${cls}${isExpanded?' expanded':''}">
+      <div class="row-summary" onclick="toggleRow('${d.id}')">
+        <div class="row-head">
+          <span class="row-prop">${esc(d.name)}</span>
+          <span class="row-meta">
+            <span class="${modelClass} badge">${modelIcon}</span>
+            ${statusBadge}
+          </span>
+        </div>
+        <div class="row-foot">
+          ${readingHtml}
+          ${batteryChip}
+          ${batteryChip ? '<span class="sep">·</span>' : ''}
+          <span>${hw ? 'Last check' : 'Last reading'}: <span class="age ${ageCls}">${ageStr}</span></span>
+          ${overdueBadge ? '<span class="sep">·</span>' + overdueBadge : ''}
+        </div>
+      </div>
+      <div class="row-expand">${isExpanded ? deviceExpandHtml(d) : ''}</div>
+    </div>`;
 }
 
 function deviceExpandHtml(d) {
@@ -676,32 +743,18 @@ function deviceExpandHtml(d) {
   const lastSwapStr  = d.lastSwap  ? `${fmtDate(d.lastSwap)} <small>(${daysBetween(d.lastSwap)}d ago)</small>`  : '—';
   const lastReadStr  = d.lastReadD ? `${fmtDate(d.lastReadD)} <small>(${daysBetween(d.lastReadD)}d ago)</small>` : '—';
 
-  // Per-model action buttons
+  // Per-model actions — monitoring + task creation only.
+  // Battery swap / Take for charge / Return to wall now happen via task completion on the backlog.
   let actions = '';
   if (hw) {
     actions = `
       <button class="btn btn-primary" onclick="event.stopPropagation();openOnlineCheck('${d.id}')">📡 Check online</button>
       <button class="btn btn-cancel"  onclick="event.stopPropagation();manualCreateTask('${d.id}')">📋 Create task</button>`;
-  } else if (d.model === 'Full unit charge') {
-    const onChargeActions = d.status === 'On charge'
-      ? `<button class="btn btn-primary" onclick="event.stopPropagation();openReturnUnit('${d.id}')">↩ Return to wall</button>`
-      : '';
-    const takeBtn = d.status !== 'On charge'
-      ? `<button class="btn btn-charge" onclick="event.stopPropagation();openTakeUnit('${d.id}')">🔌 Take for charge</button>`
-      : '';
-    const readingBtn = d.status !== 'On charge'
-      ? `<button class="btn btn-primary" onclick="event.stopPropagation();openReading('${d.id}')">📊 Log reading</button>`
-      : '';
-    const taskBtn = d.status !== 'On charge'
-      ? `<button class="btn btn-cancel" onclick="event.stopPropagation();manualCreateTask('${d.id}')">📋 Create replace task</button>`
-      : '';
-    actions = `${readingBtn} ${takeBtn} ${onChargeActions} ${taskBtn}`;
   } else {
-    // Battery swap
+    const taskBtnLabel = d.model === 'Full unit charge' ? '📋 Create charge task' : '📋 Create swap task';
     actions = `
       <button class="btn btn-primary" onclick="event.stopPropagation();openReading('${d.id}')">📊 Log reading</button>
-      <button class="btn btn-swap"    onclick="event.stopPropagation();openSwap('${d.id}')">🔄 Swap battery</button>
-      <button class="btn btn-cancel"  onclick="event.stopPropagation();manualCreateTask('${d.id}')">📋 Create replace task</button>`;
+      <button class="btn btn-cancel"  onclick="event.stopPropagation();manualCreateTask('${d.id}')">${taskBtnLabel}</button>`;
   }
 
   // Stat cells differ for hardwired
@@ -741,7 +794,7 @@ function renderBatteries() {
     document.getElementById('listBody').innerHTML = addBtn + '<div class="empty">No batteries in this view. Use + Add battery to populate the pool.</div>';
     return;
   }
-  document.getElementById('listBody').innerHTML = addBtn + list.map(batteryRowHtml).join('');
+  document.getElementById('listBody').innerHTML = addBtn + '<div class="pill-list">' + list.map(batteryRowHtml).join('') + '</div>';
 }
 
 function batteryRowHtml(b) {
@@ -755,19 +808,25 @@ function batteryRowHtml(b) {
   const lastStr = lastEvent ? `${fmtDate(lastEvent)} (${daysBetween(lastEvent)}d ago)` : '—';
   const isExpanded = activeId === 'b-'+b.id;
   return `
-    <div class="row ${cls}${isExpanded?' expanded':''}" onclick="toggleRow('b-${b.id}')">
-      <span class="row-prop">Battery #${esc(b.name)}</span>
-      <span class="row-meta">
-        ${stateBadge}
-        ${suspectBadge}
-        ${b.currentDevice ? `<span class="badge badge-battery">→ ${esc(b.currentDevice)}</span>` : ''}
-        <span class="row-data">
-          <strong>${b.cycles} cycles</strong>
-          <span class="age">${lastStr}</span>
-        </span>
-      </span>
-    </div>
-    ${isExpanded ? `<div class="row-expand" style="display:block">${batteryExpandHtml(b)}</div>` : ''}`;
+    <div class="row ${cls}${isExpanded?' expanded':''}">
+      <div class="row-summary" onclick="toggleRow('b-${b.id}')">
+        <div class="row-head">
+          <span class="row-prop">Battery #${esc(b.name)}</span>
+          <span class="row-meta">
+            ${stateBadge}
+            ${suspectBadge}
+          </span>
+        </div>
+        <div class="row-foot">
+          <span class="pct">${b.cycles}</span><span class="sep">·</span>
+          <span>${b.cycles === 1 ? 'cycle' : 'cycles'}</span>
+          ${b.currentDevice ? `<span class="sep">·</span><span>→ ${esc(b.currentDevice)}</span>` : ''}
+          <span class="sep">·</span>
+          <span>Last: ${lastStr}</span>
+        </div>
+      </div>
+      <div class="row-expand">${isExpanded ? batteryExpandHtml(b) : ''}</div>
+    </div>`;
 }
 
 function batteryExpandHtml(b) {

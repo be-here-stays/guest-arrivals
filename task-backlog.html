@@ -340,6 +340,37 @@
 
 <div id="toast" class="toast"></div>
 
+<!-- Completion modal — Full-unit-charge Ring (no battery swap, just confirm) -->
+<div id="ringChargeVeil" class="modal-veil" onclick="if(event.target===this)cancelRingCharge()">
+  <div class="modal-card">
+    <div class="modal-title">Mark unit back on wall</div>
+    <div class="modal-sub" id="ringChargeSub">Full-unit-charge Ring. Confirm it's back on the wall and the battery % after charging.</div>
+
+    <div class="modal-grid">
+      <div class="modal-row">
+        <label>Battery % after charge</label>
+        <div style="display:flex; align-items:center; gap:5px">
+          <input type="number" id="rcPct" min="0" max="100" step="1" value="100" style="width:100px">
+          <span style="font-weight:600;color:var(--sage)">%</span>
+        </div>
+      </div>
+      <div class="modal-row">
+        <label>Issues found? (optional)</label>
+        <input type="text" id="rcIssue" placeholder="e.g. 'flickering LED — monitor'">
+      </div>
+      <div class="modal-row span2">
+        <label>Note (optional)</label>
+        <textarea id="rcNote" placeholder="Any other context worth keeping"></textarea>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="cancelRingCharge()">Cancel</button>
+      <button class="btn btn-close" id="rcSaveBtn" onclick="submitRingCharge()">Save &amp; close task</button>
+    </div>
+  </div>
+</div>
+
 <!-- Completion modal — Hardwired Ring connectivity resolution -->
 <div id="ringResolveVeil" class="modal-veil" onclick="if(event.target===this)cancelRingResolve()">
   <div class="modal-card">
@@ -1508,6 +1539,8 @@ async function closeTask(taskId) {
       const model = data?.items?.[0]?.column_values?.[0]?.text || 'Battery swap';
       if (/hardwired/i.test(model)) {
         await openRingResolve(taskId, linked);
+      } else if (/full unit charge/i.test(model)) {
+        await openRingCharge(taskId, linked);
       } else {
         await openRingSwap(taskId, linked);
       }
@@ -1523,6 +1556,87 @@ async function closeTask(taskId) {
     return;
   }
   await closeTaskCore(taskId, null);
+}
+
+// ── Ring charge modal: full-unit-charge task completion ───────────
+let pendingChargeTaskId = null;
+let pendingChargeDeviceId = null;
+
+async function openRingCharge(taskId, linked) {
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  pendingChargeTaskId = taskId;
+  pendingChargeDeviceId = linked.itemId;
+  document.getElementById('ringChargeSub').textContent =
+    `${t.property} — confirm the Ring is back on the wall after charging. The device will go to OK status.`;
+  document.getElementById('rcPct').value = 100;
+  document.getElementById('rcIssue').value = '';
+  document.getElementById('rcNote').value = '';
+  document.getElementById('ringChargeVeil').classList.add('show');
+  setTimeout(() => document.getElementById('rcPct').focus(), 50);
+}
+
+function cancelRingCharge() {
+  pendingChargeTaskId = null;
+  pendingChargeDeviceId = null;
+  document.getElementById('ringChargeVeil').classList.remove('show');
+}
+
+async function submitRingCharge() {
+  const taskId   = pendingChargeTaskId;   if (!taskId) return;
+  const deviceId = pendingChargeDeviceId; if (!deviceId) return;
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  const pct = parseFloat(document.getElementById('rcPct').value);
+  if (isNaN(pct) || pct < 0 || pct > 100) { showToast('Enter a number 0–100','err'); return; }
+  const issue  = document.getElementById('rcIssue').value.trim();
+  const note   = document.getElementById('rcNote').value.trim();
+  const author = getUserName(); if (!author) { showToast('Need a name','err'); return; }
+  const btn = document.getElementById('rcSaveBtn'); btn.disabled = true;
+  try {
+    const today = todayISO();
+    const stamp = `${nowStamp()} — ${author}`;
+
+    // 1) Update Ring Devices row
+    const devNotesLookup = await mq(`{ items(ids:[${deviceId}]) { column_values(ids:["${RD_NOTES_C}"]) { id text value } } }`);
+    const prevNotes = pj(devNotesLookup?.items?.[0]?.column_values?.[0]?.value)?.text || devNotesLookup?.items?.[0]?.column_values?.[0]?.text || '';
+    const entry = `[${stamp}] Returned to wall after charge · ${pct}%` + (issue ? ` · Issue noted: ${issue}` : '') + (note ? ` · ${note}` : '');
+    const devNotes = (prevNotes ? prevNotes.trim() + '\n\n' : '') + entry;
+    const devStatus = pct < CRITICAL_PCT ? 'Critical' : pct < LOW_PCT ? 'Low' : 'OK';
+    await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`, {
+      b: RD_BOARD, i: deviceId,
+      v: JSON.stringify({
+        [RD_STAT_C]:   { label: devStatus },
+        [RD_LAST_RD]:  { date: today },
+        [RD_LAST_RP]:  pct,
+        [RD_LAST_SW]:  { date: today },
+        [RD_NOTES_C]:  devNotes,
+      })
+    });
+
+    // 2) Mark the task Completed with a completion block
+    const completionLines = ['Full-unit charge completed', `Battery % after charge: ${pct}%`];
+    if (issue) completionLines.push(`Issue: ${issue}`);
+    if (note)  completionLines.push(`Note: ${note}`);
+    const completionBlock = `[${stamp}] ${completionLines.join('\n')}`;
+    const newTaskDesc = (t.description ? t.description.trim() + '\n\n' : '') + completionBlock;
+    await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+      { b: ADHOC_BOARD, i: taskId, v: JSON.stringify({ [COLS.status]:{ label:'Completed' }, [COLS.desc]: newTaskDesc }) });
+
+    postUpdate(taskId,
+      `**Change:**\n• Status: ${t.status} → Completed\n• Battery % after charge: ${pct}%\n` +
+      (issue ? `• Issue: ${issue}\n` : '') +
+      (note ? `• Note: ${note}\n` : '') +
+      `• Ring Devices register updated for ${t.property}`
+    ).catch(()=>{});
+
+    tasks = tasks.filter(x => x.id !== taskId);
+    dirty.delete(taskId);
+    cancelRingCharge();
+    showToast(`Task closed · ${pct}% recorded`,'ok');
+    render();
+    updateSavePendingBtn();
+  } catch (e) {
+    showToast('Save failed: '+e.message,'err');
+  } finally { btn.disabled = false; }
 }
 
 // ── Ring resolve modal: hardwired connectivity ─────────────────────

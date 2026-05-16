@@ -340,6 +340,82 @@
 
 <div id="toast" class="toast"></div>
 
+<!-- Completion modal — Hardwired Ring connectivity resolution -->
+<div id="ringResolveVeil" class="modal-veil" onclick="if(event.target===this)cancelRingResolve()">
+  <div class="modal-card">
+    <div class="modal-title">Resolve connectivity issue</div>
+    <div class="modal-sub" id="ringResolveSub">This is a hardwired Ring — no battery to swap. Record what you found and whether it's back online.</div>
+
+    <div class="modal-grid">
+      <div class="modal-row span2">
+        <label>Status now</label>
+        <div style="display:flex; gap:14px; padding:6px 4px; font-size:13px; font-weight:600">
+          <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer">
+            <input type="radio" name="rrStatus" value="Online" checked> ✅ Back online (healthy)
+          </label>
+          <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer">
+            <input type="radio" name="rrStatus" value="Offline"> ⚠ Still offline
+          </label>
+        </div>
+      </div>
+      <div class="modal-row span2">
+        <label>What was the cause / fix?</label>
+        <textarea id="rrFix" placeholder="e.g. 'Router restarted — back on Wi-Fi within 2 mins' or 'Suspect failed PSU — ordered replacement, doorbell still down'"></textarea>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="cancelRingResolve()">Cancel</button>
+      <button class="btn btn-close"  id="rrSaveBtn" onclick="submitRingResolve()">Save &amp; close task</button>
+    </div>
+  </div>
+</div>
+
+<!-- Completion modal — Ring battery swap capture -->
+<div id="ringSwapVeil" class="modal-veil" onclick="if(event.target===this)cancelRingSwap()">
+  <div class="modal-card">
+    <div class="modal-title">Battery swap — close this task</div>
+    <div class="modal-sub" id="ringSwapSub">Record the battery you fitted so the cycle count and pool stay accurate.</div>
+
+    <div class="modal-grid">
+      <div class="modal-row span2">
+        <label>Currently fitted</label>
+        <input type="text" id="rsCurrent" readonly>
+      </div>
+      <div class="modal-row span2">
+        <label>New battery (from charged pool)</label>
+        <select id="rsNewBattery">
+          <option value="">— pick a charged battery —</option>
+        </select>
+      </div>
+      <div class="modal-row span2">
+        <label>Or — type a battery number (creates one if not known)</label>
+        <input type="text" id="rsNewBatteryManual" placeholder="e.g. 14">
+      </div>
+      <div class="modal-row span2" id="rsOldFateWrap" style="display:none">
+        <label>What happens to the removed battery?</label>
+        <div style="display:flex; gap:14px; padding:6px 4px; font-size:13px; font-weight:600">
+          <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer">
+            <input type="radio" name="rsOldFate" value="Charging" checked> ⚡ Send to charge
+          </label>
+          <label style="display:inline-flex; align-items:center; gap:6px; cursor:pointer">
+            <input type="radio" name="rsOldFate" value="Retired"> 🗑 Retire (worn out)
+          </label>
+        </div>
+      </div>
+      <div class="modal-row span2">
+        <label>Note (optional)</label>
+        <textarea id="rsNote" placeholder="e.g. 'Old battery #7 felt warm, retired it'"></textarea>
+      </div>
+    </div>
+
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="cancelRingSwap()">Cancel</button>
+      <button class="btn btn-close" id="rsSaveBtn" onclick="submitRingSwap()">Swap &amp; close task</button>
+    </div>
+  </div>
+</div>
+
 <!-- Completion modal — labour & materials capture for billable tasks -->
 <div id="completionVeil" class="modal-veil" onclick="if(event.target===this)cancelCompletion()">
   <div class="modal-card">
@@ -394,6 +470,26 @@ const ARR_IN      = 'date_mm2adtwg';
 const ARR_OUT     = 'date_mm31c5jt';
 const OCCUPANCY_DAYS_AHEAD = 90;
 
+// Ring Devices board — needed when closing a Ring battery task on the backlog
+const RD_BOARD    = 5096545628;
+const RD_MODEL_C  = 'color_mm3c57c1';
+const RD_BATTERY  = 'text_mm3c5s41';
+const RD_LAST_SW  = 'date_mm3c8b0y';
+const RD_LAST_RD  = 'date_mm3crwbw';
+const RD_LAST_RP  = 'numeric_mm3crw9p';
+const RD_STAT_C   = 'color_mm3cdj31';
+const RD_NOTES_C  = 'long_text_mm3ck9ms';
+
+// Ring Batteries board — the physical battery pool
+const RB_BOARD    = 5096545630;
+const RB_STATE_C  = 'color_mm3c5dsa';
+const RB_CURR_C   = 'text_mm3cbf53';
+const RB_FIRST_C  = 'date_mm3c7qaa';
+const RB_FIT_C    = 'date_mm3c36sp';
+const RB_REM_C    = 'date_mm3cry1c';
+const RB_CYC_C    = 'numeric_mm3c54e3';
+const RB_NOTES_C  = 'long_text_mm3csfmk';
+
 const COLS = {
   sched:    'date_mm2stp44',    assignee:  'dropdown_mm2szsp5', status:    'color_mm2sf7a8',
   desc:     'long_text_mm2s5dwj', prop:    'text_mm2shvja',     linked:    'text_mm2sqa3f',
@@ -404,10 +500,14 @@ const COLS = {
 };
 
 // Register board config — used to sync 'last done' date back when a task is completed.
+// 'ring' has no auto-sync — the real completion is doing a battery swap on
+// ring-batteries.html, which closes the task itself. The entry exists so the
+// linked badge shows on the pill and closeTask can guide the user.
 const REGISTER_CFG = {
   window: { boardId: 1987064628, lastDateCol: 'date4', schedCol: 'date_mm2sn17y', assignCol: 'dropdown_mm2se9z7', statusCol: 'status', doneLabel: 'Clean'   },
   jet:    { boardId: 5092955038, lastDateCol: 'date4', schedCol: 'date_mm2s2qpv', assignCol: 'dropdown_mm2shyxp', statusCol: 'status', doneLabel: 'Clean'   },
   pat:    { boardId: 5092954987, lastDateCol: 'date4', schedCol: 'date_mm2srjzv', assignCol: 'dropdown_mm2sxqvv', statusCol: 'status', doneLabel: 'In Date' },
+  ring:   { boardId: 5096545628, swapPage: 'ring-batteries.html', noAutoSync: true },
 };
 const ST_ROLE   = 'color_mm2psadz';
 const ST_STATUS = 'color_mm2psvh2';
@@ -1400,11 +1500,309 @@ async function saveAllPending() {
 async function closeTask(taskId) {
   const t = tasks.find(x=>x.id===taskId);
   if (!t) return;
+  const linked = parseSourceLink(t.source);
+  if (linked && linked.type === 'ring') {
+    // Check device model to choose the right completion path
+    try {
+      const data = await mq(`{ items(ids:[${linked.itemId}]) { id name column_values(ids:["${RD_MODEL_C}"]) { id text } } }`);
+      const model = data?.items?.[0]?.column_values?.[0]?.text || 'Battery swap';
+      if (/hardwired/i.test(model)) {
+        await openRingResolve(taskId, linked);
+      } else {
+        await openRingSwap(taskId, linked);
+      }
+    } catch (e) {
+      // Fall back to swap modal if the lookup fails — better than blocking the user
+      console.warn('Ring model lookup failed:', e);
+      await openRingSwap(taskId, linked);
+    }
+    return;
+  }
   if (t.isBillable) {
     openCompletionModal(taskId);
     return;
   }
   await closeTaskCore(taskId, null);
+}
+
+// ── Ring resolve modal: hardwired connectivity ─────────────────────
+let pendingResolveTaskId = null;
+let pendingResolveDeviceId = null;
+
+async function openRingResolve(taskId, linked) {
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  pendingResolveTaskId = taskId;
+  pendingResolveDeviceId = linked.itemId;
+  document.getElementById('ringResolveSub').textContent =
+    `${t.property} — hardwired Ring. Online = healthy, Offline = still dropped from the network. Record what you found.`;
+  document.querySelector('input[name="rrStatus"][value="Online"]').checked = true;
+  document.getElementById('rrFix').value = '';
+  document.getElementById('ringResolveVeil').classList.add('show');
+  setTimeout(() => document.getElementById('rrFix').focus(), 50);
+}
+
+function cancelRingResolve() {
+  pendingResolveTaskId = null;
+  pendingResolveDeviceId = null;
+  document.getElementById('ringResolveVeil').classList.remove('show');
+}
+
+async function submitRingResolve() {
+  const taskId   = pendingResolveTaskId;   if (!taskId) return;
+  const deviceId = pendingResolveDeviceId; if (!deviceId) return;
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+
+  const newStatus = (document.querySelector('input[name="rrStatus"]:checked') || {}).value || 'Online';
+  const fix       = document.getElementById('rrFix').value.trim();
+  const author    = getUserName(); if (!author) { showToast('Need a name to sign actions','err'); return; }
+  const btn = document.getElementById('rrSaveBtn'); btn.disabled = true;
+
+  try {
+    const today = todayISO();
+    const stamp = `${nowStamp()} — ${author}`;
+    const fixLine = fix ? ` — ${fix}` : '';
+
+    // 1) Update Ring Devices row — status + last check date + notes
+    const devNotesLookup = await mq(`{ items(ids:[${deviceId}]) { column_values(ids:["${RD_NOTES_C}"]) { id text value } } }`);
+    const prevNotes = pj(devNotesLookup?.items?.[0]?.column_values?.[0]?.value)?.text || devNotesLookup?.items?.[0]?.column_values?.[0]?.text || '';
+    const devNotes  = (prevNotes ? prevNotes.trim() + '\n\n' : '') + `[${stamp}] Connectivity resolved → ${newStatus}${fixLine}`;
+    await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`, {
+      b: RD_BOARD, i: deviceId,
+      v: JSON.stringify({
+        [RD_STAT_C]:   { label: newStatus },
+        [RD_LAST_RD]:  { date: today },
+        [RD_NOTES_C]:  devNotes,
+      })
+    });
+
+    // 2) Mark the task Completed with a structured block on the description
+    const completionLines = ['Connectivity issue resolved', `Status now: ${newStatus}`];
+    if (fix) completionLines.push(`Cause / fix: ${fix}`);
+    const completionBlock = `[${stamp}] ${completionLines.join('\n')}`;
+    const newTaskDesc = (t.description ? t.description.trim() + '\n\n' : '') + completionBlock;
+    await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+      { b: ADHOC_BOARD, i: taskId, v: JSON.stringify({ [COLS.status]:{ label:'Completed' }, [COLS.desc]: newTaskDesc }) });
+
+    // 3) Post a Monday Update with the summary
+    postUpdate(taskId,
+      `**Change:**\n` +
+      `• Status: ${t.status} → Completed\n` +
+      `• Ring connectivity: ${newStatus}\n` +
+      (fix ? `• Cause / fix: ${fix}\n` : '') +
+      `• Ring Devices register updated for ${t.property}`
+    ).catch(()=>{});
+
+    // Warn if user is closing a task while the Ring is still offline
+    if (newStatus === 'Offline') {
+      showToast(`Task closed but ${t.property} still offline — flagged on Ring Devices`, 'err');
+    } else {
+      showToast(`Task closed · back online`,'ok');
+    }
+
+    tasks = tasks.filter(x => x.id !== taskId);
+    dirty.delete(taskId);
+    cancelRingResolve();
+    render();
+    updateSavePendingBtn();
+  } catch (e) {
+    showToast('Save failed: '+e.message,'err');
+  } finally { btn.disabled = false; }
+}
+
+// ── Ring swap modal: open / cancel / submit ────────────────────────
+let pendingRingTaskId = null;
+let pendingRingDevice = null;       // { id, name, model, battery, ... } loaded from Ring Devices
+let pendingRingPool   = [];         // list of charged batteries pulled live
+
+async function openRingSwap(taskId, linked) {
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  pendingRingTaskId = taskId;
+  document.getElementById('rsNewBattery').innerHTML = '<option value="">— loading charged pool —</option>';
+  document.getElementById('rsNewBatteryManual').value = '';
+  document.getElementById('rsNote').value = '';
+  document.getElementById('rsCurrent').value = 'loading…';
+  document.getElementById('rsOldFateWrap').style.display = 'none';
+  document.getElementById('ringSwapSub').textContent =
+    `${t.property} — record the battery you fitted so the cycle count and pool stay accurate.`;
+  document.getElementById('ringSwapVeil').classList.add('show');
+
+  // Fetch the live device row + charged-pool batteries in parallel
+  try {
+    const [devData, poolData] = await Promise.all([
+      mq(`{ items(ids:[${linked.itemId}]) { id name column_values(ids:["${RD_BATTERY}"]) { id text value } } }`),
+      mq(`{ boards(ids:[${RB_BOARD}]) { items_page(limit:200, query_params:{ rules:[
+              { column_id:"${RB_STATE_C}", compare_value:["Charged"], operator:any_of }
+            ]}) { items { id name column_values(ids:["${RB_CYC_C}"]) { id text value } } } } }`),
+    ]);
+    const dev = devData?.items?.[0];
+    pendingRingDevice = dev ? {
+      id: dev.id, name: dev.name,
+      battery: dev.column_values?.find(c=>c.id===RD_BATTERY)?.text || '',
+    } : { id: linked.itemId, name: t.property, battery: '' };
+    pendingRingPool = (poolData?.boards?.[0]?.items_page?.items || [])
+      .map(it => ({
+        id: it.id, name: it.name,
+        cycles: parseFloat(it.column_values?.find(c=>c.id===RB_CYC_C)?.text) || 0,
+      }))
+      .sort((a,b) => a.name.localeCompare(b.name, undefined, { numeric:true }));
+
+    document.getElementById('rsCurrent').value = pendingRingDevice.battery
+      ? `#${pendingRingDevice.battery}` : 'none fitted (first install)';
+    document.getElementById('rsOldFateWrap').style.display = pendingRingDevice.battery ? '' : 'none';
+    const sel = document.getElementById('rsNewBattery');
+    sel.innerHTML = '<option value="">— pick a charged battery —</option>' +
+      pendingRingPool.map(b => `<option value="${b.id}">#${esc(b.name)} (cycles: ${b.cycles})</option>`).join('');
+  } catch (e) {
+    showToast('Could not load Ring data: '+e.message, 'err');
+    cancelRingSwap();
+  }
+}
+
+function cancelRingSwap() {
+  pendingRingTaskId = null;
+  pendingRingDevice = null;
+  pendingRingPool = [];
+  document.getElementById('ringSwapVeil').classList.remove('show');
+}
+
+async function submitRingSwap() {
+  const taskId = pendingRingTaskId; if (!taskId) return;
+  const t = tasks.find(x=>x.id===taskId); if (!t) return;
+  const dev = pendingRingDevice;
+  const fromPoolId = document.getElementById('rsNewBattery').value;
+  const manualNum  = document.getElementById('rsNewBatteryManual').value.trim();
+  const note       = document.getElementById('rsNote').value.trim();
+  const oldFate    = (document.querySelector('input[name="rsOldFate"]:checked') || {}).value || 'Charging';
+
+  if (!fromPoolId && !manualNum) { showToast('Pick a charged battery or enter a number','err'); return; }
+  const author = getUserName(); if (!author) { showToast('Need a name to sign actions','err'); return; }
+  const btn = document.getElementById('rsSaveBtn'); btn.disabled = true;
+
+  try {
+    // Resolve the new battery — pick from pool, or look up existing manual, or create
+    let newBattery;
+    if (fromPoolId) {
+      newBattery = pendingRingPool.find(b => b.id === fromPoolId);
+      if (!newBattery) throw new Error('Selected battery not found');
+    } else {
+      // Try to find by name across full pool
+      const all = await mq(`{ boards(ids:[${RB_BOARD}]) { items_page(limit:500) { items { id name column_values(ids:["${RB_CYC_C}"]) { id text } } } } }`);
+      const items = all?.boards?.[0]?.items_page?.items || [];
+      const existing = items.find(it => it.name.trim() === manualNum);
+      if (existing) {
+        newBattery = { id: existing.id, name: existing.name, cycles: parseFloat(existing.column_values?.[0]?.text)||0 };
+      } else {
+        const createData = await mq(
+          `mutation($b:ID!,$n:String!,$v:JSON!){ create_item(board_id:$b,item_name:$n,column_values:$v,create_labels_if_missing:true){ id } }`,
+          { b: RB_BOARD, n: String(manualNum), v: JSON.stringify({
+            [RB_STATE_C]: { label:'Charged' },
+            [RB_NOTES_C]: `[${nowStamp()} — ${author}] Created on swap into ${dev.name}`,
+          }) }
+        );
+        newBattery = { id: createData?.create_item?.id, name: String(manualNum), cycles: 0 };
+      }
+    }
+
+    const today = todayISO();
+    const stamp = `${nowStamp()} — ${author}`;
+    const noteSuffix = note ? ` · ${note}` : '';
+
+    // 1) Update old battery (if any)
+    if (dev.battery) {
+      try {
+        const oldLookup = await mq(`{ boards(ids:[${RB_BOARD}]) { items_page(limit:500) { items { id name column_values(ids:["${RB_NOTES_C}"]) { id text value } } } } }`);
+        const oldItems = oldLookup?.boards?.[0]?.items_page?.items || [];
+        const old = oldItems.find(it => it.name.trim() === dev.battery.trim());
+        if (old) {
+          const prevNotes = pj(old.column_values?.[0]?.value)?.text || old.column_values?.[0]?.text || '';
+          const oldNewNotes = (prevNotes ? prevNotes.trim() + '\n\n' : '') + `[${stamp}] Removed from ${dev.name} → ${oldFate}${noteSuffix}`;
+          await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`, {
+            b: RB_BOARD, i: old.id,
+            v: JSON.stringify({
+              [RB_STATE_C]: { label: oldFate },
+              [RB_CURR_C]: '',
+              [RB_REM_C]:  { date: today },
+              [RB_NOTES_C]: oldNewNotes,
+            })
+          });
+        }
+      } catch (e) {
+        console.warn('Old battery update failed:', e);
+      }
+    }
+
+    // 2) Update new battery — fit it, increment cycles, set first-in-service if missing
+    {
+      const lookupNew = await mq(`{ items(ids:[${newBattery.id}]) { column_values(ids:["${RB_NOTES_C}","${RB_FIRST_C}"]) { id text value } } }`);
+      const cv = lookupNew?.items?.[0]?.column_values || [];
+      const prevNotes = pj(cv.find(c=>c.id===RB_NOTES_C)?.value)?.text || cv.find(c=>c.id===RB_NOTES_C)?.text || '';
+      const firstSet  = pj(cv.find(c=>c.id===RB_FIRST_C)?.value)?.date;
+      const newNotes  = (prevNotes ? prevNotes.trim() + '\n\n' : '') + `[${stamp}] Fitted to ${dev.name}${noteSuffix}`;
+      const newBattCv = {
+        [RB_STATE_C]: { label:'In device' },
+        [RB_CURR_C]:  dev.name,
+        [RB_FIT_C]:   { date: today },
+        [RB_CYC_C]:   (newBattery.cycles || 0) + 1,
+        [RB_NOTES_C]: newNotes,
+      };
+      if (!firstSet) newBattCv[RB_FIRST_C] = { date: today };
+      await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+        { b: RB_BOARD, i: newBattery.id, v: JSON.stringify(newBattCv) });
+    }
+
+    // 3) Update device row — new battery, last swap, reset reading to 100/OK
+    {
+      const devNotesLookup = await mq(`{ items(ids:[${dev.id}]) { column_values(ids:["${RD_NOTES_C}"]) { id text value } } }`);
+      const prevNotes = pj(devNotesLookup?.items?.[0]?.column_values?.[0]?.value)?.text || devNotesLookup?.items?.[0]?.column_values?.[0]?.text || '';
+      const devNotes  = (prevNotes ? prevNotes.trim() + '\n\n' : '') + `[${stamp}] Swapped ${dev.battery ? `#${dev.battery} → ` : ''}#${newBattery.name}${noteSuffix}`;
+      await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`, {
+        b: RD_BOARD, i: dev.id,
+        v: JSON.stringify({
+          [RD_BATTERY]: newBattery.name,
+          [RD_LAST_SW]: { date: today },
+          [RD_LAST_RP]: 100,
+          [RD_LAST_RD]: { date: today },
+          [RD_STAT_C]:  { label: 'OK' },
+          [RD_NOTES_C]: devNotes,
+        })
+      });
+    }
+
+    // 4) Close the task with a structured completion block
+    const completionLines = [
+      `Battery swap completed`,
+      `Fitted: #${newBattery.name}`,
+    ];
+    if (dev.battery) completionLines.push(`Removed: #${dev.battery} → ${oldFate}`);
+    if (note) completionLines.push(`Note: ${note}`);
+    const completionBlock = `[${stamp}] ${completionLines.join('\n')}`;
+    const newTaskDesc = (t.description ? t.description.trim() + '\n\n' : '') + completionBlock;
+
+    await mq(
+      `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+      { b: ADHOC_BOARD, i: taskId, v: JSON.stringify({ [COLS.status]:{ label:'Completed' }, [COLS.desc]: newTaskDesc }) }
+    );
+
+    // Post a summary Monday Update for the task too
+    postUpdate(taskId,
+      `**Change:**\n` +
+      `• Status: ${t.status} → Completed\n` +
+      `• Battery fitted: #${newBattery.name}\n` +
+      (dev.battery ? `• Battery removed: #${dev.battery} → ${oldFate}\n` : '') +
+      (note ? `• Note: ${note}\n` : '') +
+      `• Ring Devices register updated for ${t.property}`
+    ).catch(()=>{});
+
+    // Local state
+    tasks = tasks.filter(x => x.id !== taskId);
+    dirty.delete(taskId);
+    cancelRingSwap();
+    showToast(`Swapped to #${newBattery.name} · task closed`,'ok');
+    render();
+    updateSavePendingBtn();
+  } catch (e) {
+    showToast('Swap failed: '+e.message,'err');
+  } finally { btn.disabled = false; }
 }
 
 let pendingCompletionTaskId = null;
@@ -1563,6 +1961,7 @@ function parseSourceLink(src) {
 
 async function syncRegisterOnComplete(parsed) {
   const cfg = REGISTER_CFG[parsed.type];
+  if (cfg.noAutoSync) return;   // ring: handled via swap on its own page
   const cv = {
     [cfg.lastDateCol]: { date: todayISO() },
     [cfg.schedCol]:    null,

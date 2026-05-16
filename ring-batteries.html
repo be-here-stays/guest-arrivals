@@ -367,7 +367,7 @@ const AH_SCHED       = 'date_mm2stp44';
 const AH_STATUS      = 'color_mm2sf7a8';
 const AH_DUE         = 'date_mm2vw7qh';
 const AH_GUEST       = 'dropdown_mm2vpbet';
-const AH_PRIO        = 'color_mm2sy0cn';
+const AH_PRIO        = 'color_mm3dkf6d';
 const AH_REQUESTER   = 'text_mm3ck8dq';
 const AH_SOURCE      = 'text_mm3chd09';
 
@@ -1141,8 +1141,11 @@ async function createBatteryReplaceTask(device, urgency, reasonText) {
 
   const priority = urgency === 'Critical' ? 'Urgent' : urgency === 'Low' ? 'High' : 'Medium';
   const modelLabel = device.model || 'Battery swap';
-  const taskName = `${device.name} · Replace Ring battery${urgency ? ' ('+urgency+')' : ''}`;
-  const desc = `${reasonText}\n\nCurrent battery #${device.battery || '—'} · model: ${modelLabel}\nUse the Ring Batteries page to do the swap — that closes this task automatically.\n\nReported by: ${author} at ${nowStamp()}`;
+  const actionLabel = /hardwired/i.test(modelLabel) ? 'Check Ring connectivity'
+                      : modelLabel === 'Full unit charge' ? 'Charge Ring unit'
+                      : 'Replace Ring battery';
+  const taskName = `${device.name} · ${actionLabel}`;
+  const desc = `${reasonText}\n\nCurrent battery #${device.battery || '—'} · model: ${modelLabel}\nClick Mark complete on this task when the work is done — the battery / connectivity capture happens there, and the Ring Doorbells page updates automatically.\n\nReported by: ${author} at ${nowStamp()}`;
 
   const cv = {
     [AH_PROP]:      device.name,

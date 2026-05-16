@@ -900,9 +900,14 @@ async function fetchBookings() {
   const arrivals = raw.map(it => {
     const cv = {};
     for (const c of it.column_values) cv[c.id] = { value: c.value, text: c.text };
+    // Guest name = Arrival item's name, stripped of any " — <date>" suffix
+    // added by guesty-sync.html. Make-created Arrivals are named just by
+    // guest, so the split is a no-op for those.
+    const guestName = (it.name || '').split(/ +— +/)[0].trim();
     return {
       arrivalId:   it.id,
       property:    pj(cv[AR_PROP]?.value)    || cv[AR_PROP]?.text    || it.name,
+      guestName,
       checkin:     pj(cv[AR_DATE]?.value)?.date     || cv[AR_DATE]?.text     || '',
       checkout:    pj(cv[AR_CHECKOUT]?.value)?.date || cv[AR_CHECKOUT]?.text || '',
       bookingRef:  pj(cv[AR_BOOKREF]?.value) || cv[AR_BOOKREF]?.text || '',
@@ -1006,17 +1011,20 @@ function aggregateBookings(arrivals) {
 
       out.push({
         property,
-        arrivalId:   cur.arrivalId,
-        bookingRef:  cur.bookingRef,
-        currIn:      cur.checkin,
+        arrivalId:      cur.arrivalId,
+        bookingRef:     cur.bookingRef,
+        guestName:      cur.guestName || '',
+        currIn:         cur.checkin,
         currOut,
         nextIn,
         nextOut,
-        nextArrivalId: nxt ? nxt.arrivalId : null,
+        nextArrivalId:  nxt ? nxt.arrivalId  : null,
+        nextBookingRef: nxt ? (nxt.bookingRef || '') : '',
+        nextGuestName:  nxt ? (nxt.guestName  || '') : '',
         todayStatus,
-        formStatus:  cur.formStatus,
-        reviewFlag:  cur.reviewFlag,
-        source:      'monday',
+        formStatus:     cur.formStatus,
+        reviewFlag:     cur.reviewFlag,
+        source:         'monday',
       });
     }
   }
@@ -1271,9 +1279,11 @@ function derivedCleans() {
       todayStatus: b.todayStatus,
       // The "next" booking is the one whose check-in we're cleaning for,
       // so the next booking's arrivalId is what a freshly-created clean
-      // should link to.
-      arrivalId: b.nextArrivalId || null,
-      bookingRef: b.bookingRef || '',
+      // should link to — and the next booking's guest/ref is what the
+      // card should display ("Tap to plan for <next guest>").
+      arrivalId:  b.nextArrivalId  || null,
+      bookingRef: b.nextBookingRef || b.bookingRef || '',
+      guestName:  b.nextGuestName  || '',
     });
   }
 
@@ -1311,8 +1321,9 @@ function derivedCleans() {
       windowEnd: first.currIn,
       source: first.source,
       todayStatus: first.todayStatus,
-      arrivalId: first.arrivalId,
+      arrivalId:  first.arrivalId,
       bookingRef: first.bookingRef || '',
+      guestName:  first.guestName  || '',
     });
   }
   return out;
@@ -1877,11 +1888,21 @@ function renderUnplannedCard(d, dayStr) {
   if (prop.defCheckin) meta.push(`in ${prop.defCheckin}`);
   if (d.nextIn && !isSameDay) meta.push(`next ${shortDate(d.nextIn)}`);
 
+  // Guest + booking ref line — mirrors the equivalent info on materialised
+  // Cleans-row cards so virtual ("Tap to plan") cards aren't visually
+  // anaemic on the rota.
+  const guestParts = [];
+  if (d.guestName)  guestParts.push(escapeAttr(d.guestName));
+  if (d.bookingRef) guestParts.push(`<span style="opacity:.7">${escapeAttr(d.bookingRef)}</span>`);
+  const guestLine = guestParts.length
+    ? `<div class="cc-meta" style="margin-top:1px">${guestParts.join(' · ')}</div>`
+    : '';
   return `<div class="${cls}" data-key="${escapeAttr(d.key)}"
             onclick="planNewClean('${escapeAttr(d.key)}','${dayStr}')">
     <div class="cc-top"><span class="cc-name" title="${escapeAttr(d.property)}">${d.property}</span>
       <div class="cc-badges">${badges.join('')}</div></div>
     <div class="cc-meta">${meta.join(' · ')}</div>
+    ${guestLine}
     <div class="cc-staff-empty">Tap to plan${isLocal ? ' (override local)' : ''}</div>
   </div>`;
 }

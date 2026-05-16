@@ -1,45 +1,62 @@
-# Make scenario: Guesty → Cleans board
+# DEPRECATED — Do NOT auto-create Cleans rows from Guesty
 
-When a new booking flows in from the Guesty CSV, Make should create ONE item on the Cleans board (id 5095134636) per booking. Column mapping:
+> **Status — deprecated as of May 2026.** Any Make scenario based on this
+> mapping must be **switched off**. Recreating Cleans rows from new Guesty
+> bookings is the wrong architecture and re-introduces a class of bug that
+> we explicitly removed (same fix applied to the Hot Tub rota — see
+> `hot-tub-rota.html` around `MATERIALISE_ON_SAVE = false`).
 
-| Guesty field | Cleans column | Column id | Notes |
-|---|---|---|---|
-| CHECK-IN (date) | Check-in date | `date_mm2p6tck` | The immovable right-end anchor of the drag window |
-| CHECK-OUT (date) | Check-out | `date_mm2pb8rs` | This booking's own check-out; read by the NEXT clean at the same property to set its earliest drag day |
-| CHECK-IN (date) | Clean date | `date_mm2pphc` | The scheduled day of the clean — initial value = CHECK-IN. Cleaners can later drag this backwards toward the prior guest's check-out. |
-| LISTING (property name) | Property | `board_relation_mm2psy0b` | Match to Properties board item and link via `{ "item_ids": [<id>] }` |
+## Current architecture (as of May 2026)
 
-## Item name
-Format as `"<Short day> <DD> · <property short name>"` — e.g. `"Thu 30 · Firefly"`. The frontend parses this if the Property relation is missing.
+- **Arrivals board (`5094453064`)** is the single source of truth for every
+  booking. It carries the booking ref, guest name, dates, property, and
+  party counts.
+- **Rota planner (`rota-planner.html`) derives the rota view directly from
+  Arrivals.** Every Arrival that lacks a paired Cleans row renders as a
+  **virtual "Tap to plan" card** built on the fly. No Cleans row exists at
+  this stage.
+- **Cleans board rows (`5095134636`) are materialised only when a job is
+  rota'd** — i.e. when at least one cleaner is dragged onto the card and
+  the planner clicks Save. This is the same pattern used by Hot Tub Cleans
+  and Linen Bags.
 
-## Do NOT populate
-- `date_mm2phd58` (Earliest) — deprecated; rota-planner now derives the earliest from the prior sibling clean's Check-out column. Leave empty on all new items.
-- `color_mm2prq2f` (Status) — leave empty. Planner sets it to "Unassigned" / "Planned" as cleaners get assigned.
-- Cleaner, hours, times — all set by the planner.
-- `color_mm2pnast` (Laundry run) + `dropdown_mm2ptbe7` (Laundry driver) — legacy single-field columns, being phased out. New cleans should leave these empty.
-- Linen-in / Dirties-out columns (see below) — all housekeeping-managed, not populated from Guesty.
+## Why creating Cleans rows from Guesty is wrong
 
-## Laundry columns (planner-managed, not from Guesty)
+- It produces "phantom" Cleans rows that have no cleaner, no hours, and no
+  laundry plan. The rota planner treats these as real cleans, so they show
+  up twice — once as a virtual derived card and once as the materialised
+  empty row — depending on which side resolved first.
+- It diverges the Cleans board from the Arrivals board. If a booking is
+  cancelled or moved on Arrivals, the orphaned Cleans row remains.
+- It creates a dependency: anyone re-running the Make scenario can flood
+  the Cleans board with rows that no one asked for.
+- The Hot Tub Cleans board hit exactly this issue in early 2026; the fix
+  was to stop auto-materialising rows and treat virtual cards as the
+  default.
 
-Added for the two-event laundry flow:
+## What to do instead
 
-| Column | Column id | Type | Purpose |
-|---|---|---|---|
-| Linen-in method | `color_mm2pgdm5` | status | Laundry van / Maintenance team / Management / Cleaner |
-| Linen-in driver | `dropdown_mm2pmr0f` | dropdown | Named person delivering (when not the van) |
-| Linen-in date | `date_mm2phz49` | date | Delivery day; may be earlier than clean day |
-| Linen source property | `board_relation_mm2pke5q` | board_relation | Sibling property where clean linen is left for cleaners to collect |
-| Dirties-out method | `color_mm2pd9tb` | status | Same options as Linen-in. Always happens before next check-in. |
-| Dirties-out driver | `dropdown_mm2pwdwg` | dropdown | Named person collecting dirties |
+- **Manual booking ingress (last-minute / fixes) → `guesty-sync.html`.**
+  This creates **only** the Arrivals row. The rota planner picks the new
+  Arrival up on next refresh and renders a virtual card.
+- **Bulk booking ingress (nightly catch-up) → the Make Booking Watcher
+  scenario.** This too should write **only** to Arrivals.
+- **Rota'ing a job → `rota-planner.html` drag-and-drop.** The planner
+  creates the Cleans row at the moment a cleaner is assigned, with the
+  Arrival linked via `board_relation_mm31mkyp`.
 
-## Quality Check rule
+## Historical column-mapping reference
 
-If `color_mm2pznw1` (Check type) is `Quality Check` (i.e. Guest Ready is not ticked), the rota-planner now REQUIRES a checker to be assigned before save. There is no middle ground — checker is either not required (Guest Ready) or mandatory (Quality Check).
+> Kept for archival reference only. Do **not** use this to wire a new
+> scenario — see the section above.
 
-## How the frontend uses these
+| Guesty field | Cleans column | Column id |
+|---|---|---|
+| CHECK-IN  | Check-in date | `date_mm2p6tck` |
+| CHECK-OUT | Check-out     | `date_mm2pb8rs` |
+| CHECK-IN  | Clean date    | `date_mm2pphc`  |
+| LISTING   | Property      | `board_relation_mm2psy0b` |
 
-The rota-planner walks the Cleans list for each open clean `C` and finds the most recent prior clean `S` at the same property whose scheduled day is earlier than `C.checkinDate`. It then pulls `S.checkoutDate` as the earliest day `C` can be dragged back to. This means:
-
-- Each booking's departure naturally caps the next booking's movable window.
-- No back-fill of "previous guest's check-out" onto each row is needed — the data is already on the prior row.
-- If a property has no prior clean in the loaded window, the earliest falls back to the legacy `CL_EARLIEST` column, then to the clean's own check-in.
+The columns themselves are still in use — but they are populated by
+`rota-planner.html` at rota time, drawing the dates from the linked
+Arrival row.

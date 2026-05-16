@@ -1614,7 +1614,11 @@ async function createSelected() {
         continue;
       }
 
-      const itemName = `${g.guestName || g.propName} — ${g.checkIn}`;
+      // Name = guest name only, to match the Booking Watcher convention
+      // (see "Guesty → Booking watcher" blueprint, module 9). The check-in
+      // date previously appended here caused a board-wide name mismatch and
+      // confused downstream parsers.
+      const itemName = (g.guestName || g.propName || 'Unknown Guest').replace(/"/g, '');
       const cv = {
         [AR_DATE]:     { date: g.checkIn },
         [AR_CHECKOUT]: { date: g.checkOut },

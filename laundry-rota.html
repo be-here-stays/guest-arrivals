@@ -79,8 +79,34 @@
 
     /* ── DAY COLUMN ── */
     .day-col { background: rgba(255,255,255,0.3); border-radius: 8px;
-               padding: 6px 5px 5px; min-width: 0; }
+               padding: 6px 5px 5px; min-width: 0;
+               transition: background 0.12s, outline-color 0.12s;
+               outline: 2px dashed transparent; outline-offset: -3px; }
     .day-col.day-past { opacity: 0.65; }
+    /* ── MOVED-EARLY VISUAL FLAG ── */
+    /* Any bag whose assignedDay is earlier than its check-in (originalDay)
+       gets a soft amber background plus a visible pill, so it's easy to
+       spot pulled-forward jobs at a glance on either the daily or weekly
+       view. The left border-colour for type (own/regency) is preserved. */
+    .entry-card.moved-early { background: linear-gradient(180deg, #fff4d6 0%, #fffbf2 70%); }
+    .daily-card.moved-early { background: #fff8e6;
+                              box-shadow: inset 3px 0 0 var(--amber); }
+    .early-pill { display: inline-flex; align-items: center; gap: 2px;
+                  padding: 2px 7px; background: var(--amber-light);
+                  color: var(--amber); border-radius: 10px; font-size: 9px;
+                  font-weight: 700; letter-spacing: 0.4px; margin-left: 6px;
+                  vertical-align: middle; text-transform: uppercase;
+                  border: 1px solid #e8d5b3; white-space: nowrap; }
+    .daily-card .early-pill { font-size: 10px; padding: 3px 9px; }
+
+    /* ── DRAG-DROP STATE STYLES ── */
+    /* On drag start, every column gets either drop-ok or drop-blocked. */
+    .day-col.drop-ok      { background: rgba(82, 183, 136, 0.10); outline-color: rgba(82, 183, 136, 0.35); }
+    .day-col.drop-blocked { opacity: 0.35; }
+    .day-col.drop-hover   { background: rgba(82, 183, 136, 0.28); outline-color: #2d6a4f; }
+    .entry-card[draggable="true"] { cursor: grab; }
+    .entry-card[draggable="true"]:active { cursor: grabbing; }
+    .entry-card.dragging { opacity: 0.45; }
     .day-col-hdr { font-size: 10px; font-weight: 700; color: var(--green-dark);
                    margin-bottom: 5px; padding-bottom: 4px;
                    border-bottom: 1.5px solid rgba(0,0,0,0.08);
@@ -285,8 +311,24 @@
     .daily-card-row { display: flex; align-items: center; gap: 8px; }
     .daily-card-name { flex: 1; font-size: 15px; font-weight: 700;
                        white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    /* Legacy header-icon variant — kept for the weekly view */
     .daily-card-btns { display: flex; gap: 3px; flex-shrink: 0; }
     .daily-card-btns .cb { padding: 5px 8px; font-size: 11px; border-radius: 5px; }
+    /* New labelled action row for daily cards — tap-friendly on phones */
+    .daily-card-actions { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+    .daily-card-actions .cb-act {
+      flex: 1 1 0; min-width: 70px;
+      display: inline-flex; align-items: center; justify-content: center; gap: 4px;
+      padding: 9px 10px; font-size: 12px; font-weight: 600; font-family: inherit;
+      background: #fff; color: #444; border: 1.5px solid var(--border); border-radius: 7px;
+      cursor: pointer; transition: all 0.12s;
+    }
+    .daily-card-actions .cb-act:hover { border-color: #888; background: #fafafa; }
+    .daily-card-actions .cb-act.on { background: #fef7e6; border-color: var(--amber); color: var(--amber); }
+    .daily-card-actions .cb-act.danger { color: #c0392b; }
+    .daily-card-actions .cb-act.danger:hover { border-color: #c0392b; background: #fff1ef; }
+    .daily-card-actions .cb-act.move { color: var(--own); }
+    .daily-card-actions .cb-act.move:hover { border-color: var(--own); background: var(--own-light); }
     .daily-card-sub { font-size: 12px; color: #666; padding: 4px 0 0 0;
                       line-height: 1.4; }
     .daily-card-note { font-size: 12px; color: #7b5ea7; background: #f8f4fd;
@@ -732,7 +774,7 @@
         id name
         group { id title }
         column_values(ids:[
-          "date_mm2adtwg","text_mm2ahbrx","text_mm2ab56m",
+          "date_mm2adtwg","date_mm31c5jt","text_mm2ahbrx","text_mm2ab56m",
           "numeric_mm2a5s8r","numeric_mm2add81","numeric_mm2ahz0x"
         ]){ id value }
       } } } }`);
@@ -750,14 +792,16 @@
       const p = v => { try { return JSON.parse(v); } catch { return null; } };
       const dv = p(cv['date_mm2adtwg']);
       const prop = p(cv['text_mm2ahbrx']) || item.name || '';
+      const checkoutDv = p(cv['date_mm31c5jt']);
       const row = {
-        id:          item.id,
-        property:    prop.trim(),
-        arrivalDate: dv?.date || null,
-        bedConfig:   p(cv['text_mm2ab56m']) || '',
-        adults:      parseInt(p(cv['numeric_mm2a5s8r'])) || 0,
-        children:    parseInt(p(cv['numeric_mm2add81'])) || 0,
-        pets:        parseInt(p(cv['numeric_mm2ahz0x'])) || 0,
+        id:           item.id,
+        property:     prop.trim(),
+        arrivalDate:  dv?.date || null,
+        checkoutDate: checkoutDv?.date || null,
+        bedConfig:    p(cv['text_mm2ab56m']) || '',
+        adults:       parseInt(p(cv['numeric_mm2a5s8r'])) || 0,
+        children:     parseInt(p(cv['numeric_mm2add81'])) || 0,
+        pets:         parseInt(p(cv['numeric_mm2ahz0x'])) || 0,
       };
       if (row.arrivalDate && row.property) out.push(row);
     }
@@ -1035,6 +1079,19 @@
       console.log(`[laundry-rota] Pruned ${dropped} stale/duplicate rota entries (Arrivals is canonical)`);
     }
 
+    // Diagnostic (2026-05-11): surface non-Arrival-backed entries so
+    // phantom properties (e.g. Malachite showing on the rota but absent
+    // from Guest Arrivals) can be identified and reasoned about. These
+    // are entries that survive STEP 1 but aren't directly anchored to a
+    // live Arrival id — typically `source: 'manual'` one-offs.
+    {
+      const unbacked = rota.filter(r => !arrivalIds.has(String(r.id)));
+      if (unbacked.length) {
+        console.warn(`[laundry-rota] ${unbacked.length} rota entr${unbacked.length===1?'y is':'ies are'} not backed by a live Arrival (manual / phantom):`,
+          unbacked.map(r => ({ id: r.id, property: r.property, day: r.assignedDay, source: r.source || '(untagged)' })));
+      }
+    }
+
     // STEP 2: Add new arrivals / refresh existing ones, same as before.
     const existingIds = new Set(rota.map(r => String(r.id)));
     for (const a of arrivals) {
@@ -1045,6 +1102,7 @@
           type:        getLaundryType(a.property),
           assignedDay: a.arrivalDate,
           originalDay: a.arrivalDate,
+          checkoutDay: a.checkoutDate || null,
           bagged:      false,
           note:        '',
           source:      'arrival',
@@ -1058,6 +1116,7 @@
         const entry = rota.find(r => String(r.id) === String(a.id));
         if (entry) {
           entry.originalDay = a.arrivalDate;
+          entry.checkoutDay = a.checkoutDate || entry.checkoutDay || null;
           entry.adults    = a.adults;
           entry.children  = a.children;
           entry.pets      = a.pets;
@@ -1101,7 +1160,11 @@
           ? entries.map(e => renderCard(e)).join('')
           : '<div class="day-empty">—</div>';
         return `
-          <div class="day-col ${isPast ? 'day-past' : ''} ${isToday ? 'day-today' : ''}">
+          <div class="day-col ${isPast ? 'day-past' : ''} ${isToday ? 'day-today' : ''}"
+               data-day="${dayStr}"
+               ondragover="onDayDragOver(event, '${dayStr}')"
+               ondragleave="onDayDragLeave(event)"
+               ondrop="onDayDrop(event, '${dayStr}')">
             <div class="day-col-hdr">${isToday ? '📍 ' : ''}${hdr}</div>
             ${cards}
             <button class="add-btn" onclick="showAddModal('${dayStr}')">+</button>
@@ -1248,22 +1311,34 @@
     }
     const bagAddBtn = !bags.length ? `<button class="daily-bag-add" onclick="openBagModal('${entry.id}')">+ Bag this property</button>` : '';
 
+    // Labelled action row — moved out of the header so the buttons are
+    // big enough to tap reliably on a phone, and so 'Move' is visible
+    // (the old ↕ icon was invisible to staff).
+    const actionsHtml = `
+      <div class="daily-card-actions">
+        <button class="cb-act move"   onclick="showMoveModal('${entry.id}')">↕ Move</button>
+        <button class="cb-act${entry.note ? ' on' : ''}" onclick="editNote('${entry.id}')">📝 Note</button>
+        <button class="cb-act${entry.bedConfig ? ' on' : ''}" onclick="editBeds('${entry.id}')">🛏 Beds</button>
+        <button class="cb-act danger" onclick="removeEntry('${entry.id}')">✕ Remove</button>
+      </div>`;
+
+    const _early = daysEarly(entry);
+    const earlyCls = _early > 0 ? ' moved-early' : '';
+    const earlyPill = _early > 0
+      ? `<span class="early-pill" title="Pulled forward from check-in (${fmtShort(entry.originalDay)})">↩ ${_early}d early</span>`
+      : '';
+
     return `
-      <div class="daily-card ${typeCls} ${baggedCls}" id="card-${entry.id}">
+      <div class="daily-card ${typeCls} ${baggedCls}${earlyCls}" id="card-${entry.id}">
         <div class="daily-card-row">
           ${typeBadge}
-          <span class="daily-card-name" title="${entry.property}">${entry.property}</span>
-          <div class="daily-card-btns">
-            <button class="cb note ${entry.note ? 'on' : ''}" onclick="editNote('${entry.id}')" title="Note">📝</button>
-            <button class="cb beds ${entry.bedConfig ? 'on' : ''}" onclick="editBeds('${entry.id}')" title="Edit bed config">🛏</button>
-            <button class="cb" onclick="showMoveModal('${entry.id}')" title="Move">↕</button>
-            <button class="cb" onclick="removeEntry('${entry.id}')" title="Remove">✕</button>
-          </div>
+          <span class="daily-card-name" title="${entry.property}">${entry.property}${earlyPill}</span>
         </div>
         ${subHtml}
         ${noteHtml}
         ${bagListHtml}
         ${bagAddBtn}
+        ${actionsHtml}
       </div>`;
   }
 
@@ -1315,10 +1390,19 @@
          </div>`
       : '';
 
+    const _wEarly = daysEarly(entry);
+    const wEarlyCls = _wEarly > 0 ? ' moved-early' : '';
+    const wEarlyPill = _wEarly > 0
+      ? `<span class="early-pill" title="Pulled forward from check-in (${fmtShort(entry.originalDay)})">↩ ${_wEarly}d</span>`
+      : '';
+
     return `
-      <div class="entry-card ${typeCls} ${baggedCls}" id="card-${entry.id}">
+      <div class="entry-card ${typeCls} ${baggedCls}${wEarlyCls}" id="card-${entry.id}"
+           draggable="true"
+           ondragstart="onCardDragStart(event, '${entry.id}')"
+           ondragend="onCardDragEnd(event)">
         <div class="card-row">
-          <span class="card-name" title="${entry.property}">${entry.property}${bagPill}</span>
+          <span class="card-name" title="${entry.property}">${entry.property}${bagPill}${wEarlyPill}</span>
           <div class="card-btns">
             <button class="cb bag ${bagged ? 'on' : ''}" onclick="openBagModal('${entry.id}')"
                     title="${bagged ? 'Add another bag' : 'Bag this property'}">${bagged ? '+ Bag' : '○ Bag'}</button>
@@ -1933,6 +2017,128 @@
   }
 
   // ── MOVE MODAL ──
+  /* How many days a bag has been pulled forward from its booking's
+     check-in. Returns 0 when it hasn't moved or has been moved later. */
+  function daysEarly(entry) {
+    if (!entry || !entry.originalDay || !entry.assignedDay) return 0;
+    if (entry.assignedDay >= entry.originalDay) return 0;
+    const a = new Date(entry.assignedDay + 'T00:00:00');
+    const o = new Date(entry.originalDay + 'T00:00:00');
+    return Math.max(0, Math.round((o - a) / 86400000));
+  }
+
+  // ── DRAG-AND-DROP (weekly view only) ──
+  // Each property card on the 2-week grid is draggable. A drop is allowed
+  // when the target day is between the PREVIOUS guest's check-out
+  // (inclusive) and THIS guest's check-in (inclusive) for that property.
+  // The drop window is computed at drag-start from the live rota state so
+  // it always reflects the current Arrivals data.
+  let dragEntryId = null;
+  let dragWindow  = null;   // { from: 'YYYY-MM-DD', to: 'YYYY-MM-DD' }
+
+  function getDragWindow(entry) {
+    if (!entry) return { from: null, to: null };
+    // Upper bound — the booking's own check-in day (where it landed
+    // originally; if that's missing, use whatever is currently assigned).
+    const to = entry.originalDay || entry.assignedDay || null;
+    if (!to) return { from: null, to: null };
+
+    // Manual (non-arrival) entries don't have a previous guest to anchor
+    // off — give a generous 14-day backward window so the user can shuffle
+    // freely.
+    if (entry.source === 'manual') {
+      const d = new Date(to); d.setDate(d.getDate() - 14);
+      return { from: d.toISOString().slice(0,10), to };
+    }
+
+    // Find the latest prior arrival on the same property whose check-in
+    // is strictly earlier than this one's.
+    const sameProp = rota
+      .filter(r => r.id !== entry.id
+                && r.property === entry.property
+                && r.source === 'arrival'
+                && r.originalDay
+                && r.originalDay < to)
+      .sort((a, b) => a.originalDay.localeCompare(b.originalDay));
+    const prev = sameProp.length ? sameProp[sameProp.length - 1] : null;
+
+    let from;
+    if (prev && prev.checkoutDay) {
+      from = prev.checkoutDay;
+    } else if (prev && prev.originalDay) {
+      // Fallback if Monday hasn't filled the checkout column yet — use
+      // the day after the previous guest's check-in as a conservative
+      // earliest, then nudge once more in case it equals 'to'.
+      const d = new Date(prev.originalDay); d.setDate(d.getDate() + 1);
+      from = d.toISOString().slice(0,10);
+    } else {
+      // No prior arrival recorded — assume a clean 7-day window.
+      const d = new Date(to); d.setDate(d.getDate() - 7);
+      from = d.toISOString().slice(0,10);
+    }
+    // Safety: don't return a from later than to.
+    if (from > to) from = to;
+    return { from, to };
+  }
+
+  function onCardDragStart(ev, entryId) {
+    const entry = rota.find(r => String(r.id) === String(entryId));
+    if (!entry) return;
+    dragEntryId = entryId;
+    dragWindow  = getDragWindow(entry);
+    ev.dataTransfer.setData('text/plain', entryId);
+    ev.dataTransfer.effectAllowed = 'move';
+    ev.currentTarget.classList.add('dragging');
+    // Mark every day column as ok / blocked
+    document.querySelectorAll('.day-col[data-day]').forEach(col => {
+      const d = col.dataset.day;
+      if (dragWindow.from && d >= dragWindow.from && d <= dragWindow.to) {
+        col.classList.add('drop-ok');
+      } else {
+        col.classList.add('drop-blocked');
+      }
+    });
+  }
+
+  function onCardDragEnd(ev) {
+    dragEntryId = null;
+    dragWindow  = null;
+    document.querySelectorAll('.day-col').forEach(col => {
+      col.classList.remove('drop-ok', 'drop-blocked', 'drop-hover');
+    });
+    document.querySelectorAll('.entry-card.dragging').forEach(c => c.classList.remove('dragging'));
+  }
+
+  function onDayDragOver(ev, dayStr) {
+    if (!dragEntryId || !dragWindow) return;
+    if (dayStr < dragWindow.from || dayStr > dragWindow.to) {
+      ev.dataTransfer.dropEffect = 'none';
+      return;
+    }
+    ev.preventDefault();
+    ev.dataTransfer.dropEffect = 'move';
+    ev.currentTarget.classList.add('drop-hover');
+  }
+
+  function onDayDragLeave(ev) {
+    ev.currentTarget.classList.remove('drop-hover');
+  }
+
+  function onDayDrop(ev, dayStr) {
+    ev.preventDefault();
+    if (!dragEntryId || !dragWindow) return;
+    if (dayStr < dragWindow.from || dayStr > dragWindow.to) {
+      showToast(`Outside booking window (${dragWindow.from} → ${dragWindow.to})`);
+      return;
+    }
+    const entry = rota.find(r => String(r.id) === String(dragEntryId));
+    if (entry && entry.assignedDay !== dayStr) {
+      entry.assignedDay = dayStr;
+      saveRota();
+      render();
+    }
+  }
+
   function showMoveModal(id) {
     movingId = id;
     const entry = rota.find(r => r.id === id);

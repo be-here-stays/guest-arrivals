@@ -44,9 +44,10 @@
       key: 'audience',
       title: 'Audience',
       column_type: 'status',
-      defaults: { labels: { '0':'All staff', '1':'Direct' }},
+      defaults: { labels: { '0':'All staff', '1':'Direct', '2':'Group' }},
     },
     { key: 'recipients',  title: 'Recipients',    column_type: 'board_relation' },
+    { key: 'roles',       title: 'Roles',         column_type: 'dropdown' },
     { key: 'postedAt',    title: 'Posted at',     column_type: 'date' },
     { key: 'expiresAt',   title: 'Expires at',    column_type: 'date' },
     { key: 'threadId',    title: 'Thread ID',     column_type: 'text' },
@@ -63,8 +64,12 @@
   // Audience labels mirror the status defaults — keep in sync.
   const AUDIENCES = [
     { key: 'All staff', desc: 'Every active staff member sees this on My Day.' },
+    { key: 'Group',     desc: 'Everyone with one of the roles you pick (Maintenance, Housekeepers, etc).' },
     { key: 'Direct',    desc: 'Only the people you pick will see it.' },
   ];
+
+  // Role labels — keep in sync with Staff board ST_ROLE column labels.
+  const ROLES = ['Housekeeper', 'Maintenance', 'Checker', 'Van driver', 'Manager', 'A Team', 'Owner'];
 
   function readCache() {
     try { return JSON.parse(localStorage.getItem(CACHE_KEY) || 'null'); } catch (_) { return null; }
@@ -179,15 +184,27 @@
 
   /* Should `me` (Staff item id) see this message?
      - Audience "All staff" → yes, unless explicitly dismissed.
+     - Audience "Group"     → yes if my role matches one of the message's roles.
      - Audience "Direct"    → yes if me is in recipients OR is the sender,
                               minus dismissed.
-     Withdrawn / expired messages return false. */
-  function visibleToStaff(msg, meStaffId, today) {
+     Withdrawn / expired messages return false.
+     `meRole` is optional but required for Group matching to work — pass
+     me.role from staff.html (or the role string from messages.html's _me). */
+  function visibleToStaff(msg, meStaffId, today, meRole) {
     if (!msg) return false;
     if (msg.status === 'Withdrawn') return false;
     if (msg.expiresAt && msg.expiresAt < today) return false;
     if ((msg.dismissedBy || []).map(String).includes(String(meStaffId))) return false;
     if (msg.audience === 'All staff') return true;
+    if (msg.audience === 'Group') {
+      // Sender of the message always sees their own group post (so they can
+      // edit / withdraw it) regardless of whether their role matches.
+      if (String(msg.senderStaffId) === String(meStaffId)) return true;
+      if (!meRole) return false;
+      const myRoles = String(meRole).split(/\s*,\s*/).map(s => s.trim().toLowerCase()).filter(Boolean);
+      const targetRoles = (msg.roles || []).map(r => String(r).trim().toLowerCase());
+      return targetRoles.some(r => myRoles.includes(r));
+    }
     // Direct
     if ((msg.recipients || []).map(String).includes(String(meStaffId))) return true;
     if (String(msg.senderStaffId) === String(meStaffId)) return true;
@@ -205,6 +222,7 @@
     STAFF_BOARD,
     COLUMN_DEFS,
     AUDIENCES,
+    ROLES,
     getMessagesConfig,
     createMessagesBoard,
     findMessagesBoard,

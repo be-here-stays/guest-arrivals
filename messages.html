@@ -181,8 +181,14 @@
         <label>Audience <span class="req">*</span></label>
         <div class="audience-row">
           <button type="button" class="aud-chip active" id="audAll"    onclick="setAudience('All staff', this)">📣 All staff<span class="desc">Everyone sees it</span></button>
+          <button type="button" class="aud-chip"        id="audGroup"  onclick="setAudience('Group', this)">👥 Group<span class="desc">By role: Maint, HK, etc.</span></button>
           <button type="button" class="aud-chip"        id="audDirect" onclick="setAudience('Direct', this)">👤 Direct<span class="desc">Pick recipients</span></button>
         </div>
+      </div>
+
+      <div class="field hide" id="rolesField">
+        <label>Roles <span class="req">*</span></label>
+        <div class="recip-grid" id="rolesGrid"></div>
       </div>
 
       <div class="field hide" id="recipField">
@@ -226,6 +232,7 @@ let _me           = null;        // { id, name, role }
 let _messages     = [];          // raw parsed messages, all visible to me + sent by me
 let _selectedAud  = 'All staff';
 let _selectedRecips = new Set();
+let _selectedRoles  = new Set();  // for Audience = Group
 let _expandedId   = null;        // currently expanded thread root id
 
 /* ─── Plumbing ──────────────────────────────────────────── */
@@ -272,6 +279,22 @@ function setAudience(a, btn) {
   document.querySelectorAll('.aud-chip').forEach(c => c.classList.remove('active'));
   btn.classList.add('active');
   document.getElementById('recipField').classList.toggle('hide', a !== 'Direct');
+  document.getElementById('rolesField').classList.toggle('hide', a !== 'Group');
+  if (a === 'Group') renderRolesGrid();
+}
+
+function renderRolesGrid() {
+  const grid = document.getElementById('rolesGrid');
+  if (!grid) return;
+  const roles = (window.MessagesSchema && window.MessagesSchema.ROLES) || [];
+  grid.innerHTML = roles.map(r =>
+    `<button type="button" class="recip-chip${_selectedRoles.has(r) ? ' on' : ''}" data-role="${escapeHtml(r)}" onclick="toggleRole('${escapeHtml(r).replace(/'/g, "\\'")}',this)">${escapeHtml(r)}</button>`
+  ).join('');
+}
+
+function toggleRole(role, el) {
+  if (_selectedRoles.has(role)) { _selectedRoles.delete(role); el.classList.remove('on'); }
+  else                          { _selectedRoles.add(role);    el.classList.add('on'); }
 }
 
 /* ─── Staff identification ────────────────────────────────────
@@ -429,6 +452,8 @@ function parseMessage(it) {
   const recipientIds    = (c.recipients  && cv[c.recipients]?.linked_item_ids)  || [];
   const readByIds       = (c.readBy      && cv[c.readBy]?.linked_item_ids)      || [];
   const dismissedByIds  = (c.dismissedBy && cv[c.dismissedBy]?.linked_item_ids) || [];
+  const rolesText       = (c.roles && cv[c.roles]?.text) || '';
+  const roles = rolesText.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean);
   return {
     id: it.id,
     title: it.name,
@@ -437,6 +462,7 @@ function parseMessage(it) {
     senderStaffId: senderStaffIds.length ? String(senderStaffIds[0]) : '',
     audience:    (cv[c.audience]?.text || 'All staff').trim(),
     recipients:  recipientIds.map(String),
+    roles,
     postedAt:    postedObj?.date ? `${postedObj.date}T${postedObj.time || '00:00:00'}` : '',
     expiresAt:   expiresObj?.date || '',
     threadId:    (cv[c.threadId]?.text || '').trim() || it.id,    // root msg uses its own id
@@ -469,7 +495,7 @@ function groupThreads(msgs) {
 /* ─── Inbox tab ────────────────────────────────────────── */
 function renderInbox() {
   const today = todayISO();
-  const visible = _messages.filter(m => window.MessagesSchema.visibleToStaff(m, _me.id, today));
+  const visible = _messages.filter(m => window.MessagesSchema.visibleToStaff(m, _me.id, today, _me.role));
   const threads = groupThreads(visible);
   const div = document.getElementById('paneInbox');
   if (!threads.length) {
@@ -494,7 +520,7 @@ function renderSent() {
 function updateInboxBadge() {
   const today = todayISO();
   const unread = _messages.filter(m =>
-    window.MessagesSchema.visibleToStaff(m, _me.id, today) &&
+    window.MessagesSchema.visibleToStaff(m, _me.id, today, _me.role) &&
     window.MessagesSchema.isUnreadFor(m, _me.id)
   ).length;
   const badge = document.getElementById('badgeInbox');
@@ -692,6 +718,9 @@ async function sendMessage() {
   if (_selectedAud === 'Direct' && _selectedRecips.size === 0) {
     showMsg('Pick at least one recipient', 'error'); return;
   }
+  if (_selectedAud === 'Group' && _selectedRoles.size === 0) {
+    showMsg('Pick at least one role', 'error'); return;
+  }
 
   const c = _config.columns;
   const now = nowDateTime();
@@ -702,6 +731,9 @@ async function sendMessage() {
   if (c.audience)    cv[c.audience]    = { label: _selectedAud };
   if (c.recipients && _selectedAud === 'Direct') {
     cv[c.recipients] = { item_ids: Array.from(_selectedRecips).map(Number) };
+  }
+  if (c.roles && _selectedAud === 'Group') {
+    cv[c.roles] = { labels: Array.from(_selectedRoles) };
   }
   if (c.postedAt)    cv[c.postedAt]    = { date: now.date, time: now.time };
   if (c.expiresAt && expires) cv[c.expiresAt] = { date: expires };
@@ -721,7 +753,9 @@ async function sendMessage() {
     document.getElementById('cExpires').value = '';
     delete document.getElementById('cTitle').dataset.threadRoot;
     _selectedRecips.clear();
+    _selectedRoles.clear();
     renderRecipChips();
+    renderRolesGrid();
     document.getElementById('audAll').click();
     await refreshMessages();
     switchTab('inbox');

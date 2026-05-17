@@ -992,7 +992,7 @@ async function loadMessages() {
   const today = todayISO();
   const parsed = all.map(it => parseMessageRow(it, c));
   _myMessages = parsed
-    .filter(m => window.MessagesSchema.visibleToStaff(m, me.id, today))
+    .filter(m => window.MessagesSchema.visibleToStaff(m, me.id, today, me.role))
     .filter(m => String(m.senderStaffId) !== String(me.id))   // don't surface my own posts as MOTD
     .sort((a,b) => (b.postedAt || '').localeCompare(a.postedAt || ''));
 
@@ -1003,6 +1003,10 @@ function parseMessageRow(it, c) {
   const cv = Object.fromEntries((it.column_values || []).map(x => [x.id, x]));
   const postedObj  = c.postedAt  ? pj(cv[c.postedAt]?.value)  : null;
   const expiresObj = c.expiresAt ? pj(cv[c.expiresAt]?.value) : null;
+  // Roles is a dropdown — value is JSON like {"ids":[1,2,...]} but we read
+  // the human-readable text and split on comma since that's what we filter on.
+  const rolesText = (c.roles && cv[c.roles]?.text) || '';
+  const roles = rolesText.split(/\s*,\s*/).map(s => s.trim()).filter(Boolean);
   return {
     id: it.id,
     title: it.name,
@@ -1011,6 +1015,7 @@ function parseMessageRow(it, c) {
     senderStaffId: ((c.senderStaff && cv[c.senderStaff]?.linked_item_ids) || [])[0] || '',
     audience:    (cv[c.audience]?.text || 'All staff').trim(),
     recipients:  ((c.recipients  && cv[c.recipients]?.linked_item_ids)  || []).map(String),
+    roles,
     postedAt:    postedObj?.date ? `${postedObj.date}T${postedObj.time || '00:00:00'}` : '',
     expiresAt:   expiresObj?.date || '',
     threadId:    (cv[c.threadId]?.text || '').trim() || it.id,
@@ -1602,14 +1607,19 @@ function renderDay() {
     if (active.length) {
       parts.push('<div class="section-label">Messages <span class="count">' + active.length + '</span></div>');
       for (const m of active) {
-        const isAll = m.audience === 'All staff';
+        const isAll   = m.audience === 'All staff';
+        const isGroup = m.audience === 'Group';
+        const audLabel = isAll   ? 'to all staff'
+                      : isGroup ? `to ${m.roles && m.roles.length ? m.roles.join(', ') : 'group'}`
+                      :           'direct';
+        const audIcon  = isAll ? '📣 ' : isGroup ? '👥 ' : '👤 ';
         const senderLine = (m.senderName || 'Unknown') +
-          (isAll ? ' · to all staff' : ' · direct') +
+          ' · ' + audLabel +
           (m.expiresAt ? ' · expires ' + prettyDate(m.expiresAt) : '');
         const linkUrl = `messages.html?from=staff&name=${encodeURIComponent(me.name)}`;
         parts.push(`<div class="msg-card${isAll ? ' all' : ''}">
           <div class="msg-card-hdr">
-            <div class="msg-card-title">${isAll ? '📣 ' : '👤 '}${escapeHtml(m.title || '(no subject)')}</div>
+            <div class="msg-card-title">${audIcon}${escapeHtml(m.title || '(no subject)')}</div>
           </div>
           <div class="msg-card-meta">${escapeHtml(senderLine)}</div>
           ${m.body ? `<div class="msg-card-body">${escapeHtml(m.body.slice(0, 280))}${m.body.length > 280 ? '…' : ''}</div>` : ''}
@@ -1819,9 +1829,13 @@ function renderCleanCard(c) {
   // the full block to clipboard. Only surfaced on cleaner cards (the
   // person who needs to physically enter the property); checker-only
   // cards skip this since they're typically arriving after the cleaner.
+  // Lock codes are shown on every property card (cleans, hot tub, maint)
+  // — anyone working at the property needs to be able to get in. The role
+  // gate that used to restrict this to cleaners has been removed; the
+  // copyCodes helper handles missing-codes silently.
   const codesText = _propLockCodes[c.property] || '';
-  const codesBlock = (codesText && isCleanerRole(c.roles))
-    ? `<div class="cc-codes" onclick="copyCodes(this, ${JSON.stringify(c.property).replace(/"/g,'&quot;')})" title="Tap to copy"><div class="cc-codes-hdr">🔐 Codes <span class="cc-codes-copy">tap to copy</span></div><pre class="cc-codes-body">${escapeHtml(codesText)}</pre></div>`
+  const codesBlock = codesText
+    ? `<div class="cc-codes" onclick="copyCodes(this, ${JSON.stringify(c.property).replace(/"/g,'&quot;')})" title="Tap to copy"><div class="cc-codes-hdr">🔐 Property access <span class="cc-codes-copy">tap to copy</span></div><pre class="cc-codes-body">${escapeHtml(codesText)}</pre></div>`
     : '';
 
   // Action: Mark complete → open changeover-form prefilled
@@ -2348,6 +2362,13 @@ function renderHotTubCleanCard(h) {
     ? `<div class="cc-actions" data-htid="${h.id}">${statusBtns}${logBtn}${issueBtn}</div>`
     : '';
 
+  // Lock codes — same block as cleans cards; surfaces gate / door codes from
+  // Property Config so the hot tub engineer can get in without hunting for them.
+  const htCodesText = _propLockCodes[h.property] || '';
+  const htCodesBlock = htCodesText
+    ? `<div class="cc-codes" onclick="copyCodes(this, ${JSON.stringify(h.property).replace(/"/g,'&quot;')})" title="Tap to copy"><div class="cc-codes-hdr">🔐 Property access <span class="cc-codes-copy">tap to copy</span></div><pre class="cc-codes-body">${escapeHtml(htCodesText)}</pre></div>`
+    : '';
+
   return `<div class="clean-card${completed?' completed':''}${cancelled?' absorbed':''}"
     data-htid="${h.id}"
     style="border-left-color:${typeColor}; background:${typeBg}">
@@ -2357,6 +2378,7 @@ function renderHotTubCleanCard(h) {
     </div>
     <div class="cc-meta">${escapeHtml(typeLabel)} · earliest ${escapeHtml(h.start)} · ~${h.duration||45}m</div>
     ${h.notes ? `<div class="cc-notes">${escapeHtml(h.notes)}</div>` : ''}
+    ${htCodesBlock}
     ${actions}
   </div>`;
 }
@@ -2658,6 +2680,13 @@ function renderMaintTaskCard(m, day) {
   // Billable badge
   const billBadge = m.isBillable ? `<span class="cc-badge" style="background:#eaf4fb;color:#1a5276;font-weight:700">CHARGEABLE</span>` : '';
 
+  // Lock codes — surfaces gate / door codes from Property Config so the
+  // maintenance person can let themselves in without hunting around.
+  const mCodesText = _propLockCodes[m.property] || '';
+  const mCodesBlock = mCodesText
+    ? `<div class="cc-codes" onclick="copyCodes(this, ${JSON.stringify(m.property).replace(/"/g,'&quot;')})" title="Tap to copy"><div class="cc-codes-hdr">🔐 Property access <span class="cc-codes-copy">tap to copy</span></div><pre class="cc-codes-body">${escapeHtml(mCodesText)}</pre></div>`
+    : '';
+
   return `<div class="clean-card" data-mid="${m.id}" data-src="${m.sourceKey}"
     style="border-left-color:${src.color}; background:${src.bg}">
     <div class="cc-top">
@@ -2673,6 +2702,7 @@ function renderMaintTaskCard(m, day) {
       </div>
     </div>
     ${descBlock}
+    ${mCodesBlock}
     <div class="cc-actions">
       ${primaryBtn}
       ${!isComplete ? `<button class="cc-btn secondary" onclick="openMaintException('${m.id}','${m.sourceKey}')">🔄 Refer back</button>` : ''}
@@ -2693,8 +2723,11 @@ async function markMaintStarted(itemId, sourceKey, btnEl) {
   const src = MAINT_SOURCES.find(s => s.key === sourceKey);
   const m = maintTasks.find(x => x.id === itemId && x.sourceKey === sourceKey);
   if (!src || !m) return;
-  // Optimistically update local status
+  const prev = m.status;
+  // Optimistically update local status — and persist immediately so the
+  // pre-Start state doesn't reappear after the user navigates away.
   m.status = 'In Progress';
+  try { localStorage.setItem('cache_maint', JSON.stringify(maintTasks)); } catch (_) {}
   renderDay();
   try {
     const cv = {};
@@ -2704,7 +2737,9 @@ async function markMaintStarted(itemId, sourceKey, btnEl) {
     toast(`▶ ${src.label} started`);
   } catch (e) {
     if (e.message === 'OFFLINE_QUEUED') { toast('▶ Offline: status queued'); return; }
-    m.status = ''; renderDay();
+    m.status = prev;
+    try { localStorage.setItem('cache_maint', JSON.stringify(maintTasks)); } catch (_) {}
+    renderDay();
     toast('Update failed: ' + e.message, 'err');
   }
 }
@@ -2725,6 +2760,7 @@ async function addMaintNote(itemId, sourceKey, boardId) {
     const q = `mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v){ id } }`;
     await mondayFetch(q, { b: src.boardId, i: itemId, v: JSON.stringify(cv) }, true);
     if (m) m.description = appended;
+    try { localStorage.setItem('cache_maint', JSON.stringify(maintTasks)); } catch (_) {}
     if (areaEl) areaEl.value = '';
     renderDay();
     toast('📝 Note saved');
@@ -2746,8 +2782,10 @@ async function markMaintComplete(itemId, sourceKey, btnEl) {
     const card = btnEl.closest('.clean-card');
     if (card) card.querySelectorAll('button, a.cc-btn').forEach(b => { b.style.pointerEvents = 'none'; b.style.opacity = '0.6'; });
   }
-  // Optimistically remove from view
+  // Optimistically remove from view + persist immediately so the deleted
+  // card doesn't reappear after a back/forward navigation.
   maintTasks = maintTasks.filter(x => !(x.id === itemId && x.sourceKey === sourceKey));
+  try { localStorage.setItem('cache_maint', JSON.stringify(maintTasks)); } catch (_) {}
   renderDay();
   renderDayNav();
   try {
@@ -2770,8 +2808,9 @@ async function markMaintComplete(itemId, sourceKey, btnEl) {
       toast(`✓ Offline: ${src.label} queued`);
       return;
     }
-    // Revert local state
+    // Revert local state — and persist the revert
     maintTasks.push(m);
+    try { localStorage.setItem('cache_maint', JSON.stringify(maintTasks)); } catch (_) {}
     renderDay();
     renderDayNav();
     toast('Update failed: ' + e.message, 'err');
@@ -2956,6 +2995,10 @@ async function setHotTubStatus(itemId, newStatus, btnEl) {
   if (!h) return;
   const prev = h.status;
   h.status = newStatus;
+  // Persist to localStorage IMMEDIATELY so navigating away (e.g. to hot-tub.html
+  // to take readings) and back doesn't show the stale pre-Start state from the
+  // cache before the background re-fetch lands.
+  try { localStorage.setItem('cache_hot_tubs', JSON.stringify(hotTubCleans)); } catch (_) {}
   // Visual: disable buttons in this card while in flight to prevent double-tap
   if (btnEl) {
     const card = btnEl.closest('.clean-card');
@@ -2968,8 +3011,9 @@ async function setHotTubStatus(itemId, newStatus, btnEl) {
     await mondayFetch(q);
     toast(`Status: ${newStatus}`);
   } catch (e) {
-    // Revert on failure so the UI doesn't lie
+    // Revert on failure so the UI doesn't lie — and persist the revert too
     h.status = prev;
+    try { localStorage.setItem('cache_hot_tubs', JSON.stringify(hotTubCleans)); } catch (_) {}
     renderDay();
     renderDayNav();
     toast('Update failed: ' + e.message, 'err');

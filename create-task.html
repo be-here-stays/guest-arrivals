@@ -62,6 +62,15 @@
   .type-chip.active.paddle      { border-color:#1a5276; background:#eaf4fb; color:#1a5276; }
   .type-chip.active.adhoc       { border-color:var(--sage); background:#f6f4ed; color:var(--sage); }
   .type-chip.active.investigate { border-color:var(--red); background:var(--red-bg); color:var(--red); }
+  .type-chip.active.ring        { border-color:#2d6a4f; background:#edf7f2; color:#2d6a4f; }
+
+  /* Ring info card — current battery / model shown after lodge picked */
+  .ring-info { background:#edf7f2; border:1.5px solid #2d6a4f; border-radius:10px; padding:10px 14px; margin-top:6px; font-size:13px; color:#1f4a36; display:none; }
+  .ring-info.show { display:block; }
+  .ring-info .ri-row { display:flex; gap:10px; flex-wrap:wrap; align-items:baseline; }
+  .ring-info .ri-lbl { font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:#2d6a4f; font-weight:700; }
+  .ring-info .ri-val { font-size:14px; font-weight:700; color:#1f4a36; }
+  .ring-info .ri-warn { color:#a86c00; font-weight:700; }
 
   /* Urgency chips */
   .urg-row { display:grid; grid-template-columns:repeat(4,1fr); gap:8px; }
@@ -177,6 +186,7 @@
         <button type="button" class="type-chip" data-type="jet"><span class="tc-icon">💦</span>Jet wash</button>
         <button type="button" class="type-chip" data-type="pat"><span class="tc-icon">⚡</span>PAT test</button>
         <button type="button" class="type-chip" data-type="paddle"><span class="tc-icon">🛟</span>Paddleboards</button>
+        <button type="button" class="type-chip" data-type="ring"><span class="tc-icon">🔔</span>Ring doorbell</button>
         <button type="button" class="type-chip active adhoc" data-type="adhoc"><span class="tc-icon">🔧</span>Ad-hoc / repair</button>
       </div>
       <div class="hint" id="typeHint">Anything not on a recurring board — fix dishwasher, deck repair, etc.</div>
@@ -185,9 +195,27 @@
     <!-- Property -->
     <div class="field">
       <label class="lbl" for="propertySel">Property <span class="req">*</span></label>
-      <select id="propertySel" required>
+      <select id="propertySel" required onchange="onPropertyChange()">
         <option value="" disabled selected>— pick a property —</option>
       </select>
+      <div id="ringInfo" class="ring-info">
+        <div class="ri-row">
+          <span class="ri-lbl">Model</span><span class="ri-val" id="ringModel">—</span>
+          <span class="ri-lbl">Battery fitted</span><span class="ri-val" id="ringBattery">—</span>
+          <span class="ri-lbl">Last reading</span><span class="ri-val" id="ringLastRead">—</span>
+        </div>
+        <div class="ri-row" style="margin-top:6px"><span class="ri-warn" id="ringWarn"></span></div>
+      </div>
+    </div>
+
+    <!-- Ring sub-fields — Ring doorbell only -->
+    <div class="field" id="ringFields" style="display:none">
+      <label class="lbl">What's happening?</label>
+      <div class="sub-row" id="ringActionRow" style="grid-template-columns:1fr 1fr 1fr">
+        <button type="button" class="sub-chip active" data-ringact="Replace battery">🔋 Replace battery</button>
+        <button type="button" class="sub-chip"        data-ringact="Charge unit">🔌 Charge unit</button>
+        <button type="button" class="sub-chip"        data-ringact="Check connectivity">📶 Check online</button>
+      </div>
     </div>
 
     <!-- Urgency chips — investigate only -->
@@ -356,6 +384,18 @@ const ADHOC_BOARD = 5095296374;
 const ST_ROLE     = 'color_mm2psadz';
 const ST_STATUS   = 'color_mm2psvh2';
 
+// Property Config — Ring fields used to filter properties for Ring tasks
+const PC_HAS_RING = 'color_mm3c5nm3';
+const PC_RING_MODEL = 'color_mm3ckfe3';
+
+// Ring Devices — to look up current battery for the info card + source link
+const RD_BOARD       = 5096545628;
+const RD_MODEL       = 'color_mm3c57c1';
+const RD_BATTERY     = 'text_mm3c5s41';
+const RD_LAST_READ_D = 'date_mm3crwbw';
+const RD_LAST_READ_P = 'numeric_mm3crw9p';
+const RD_STATUS      = 'color_mm3cdj31';
+
 const WINDOWS_BOARD = 1987064628; const W_SCHED = 'date_mm2sn17y'; const W_ASSIGN = 'dropdown_mm2se9z7';
 const DECKING_BOARD = 5092955038; const D_SCHED = 'date_mm2s2qpv'; const D_ASSIGN = 'dropdown_mm2shyxp';
 const PAT_BOARD     = 5092954987; const P_SCHED = 'date_mm2srjzv'; const P_ASSIGN = 'dropdown_mm2sxqvv';
@@ -374,16 +414,19 @@ const TYPE_CONFIG = {
   jet:        { label:'Jet wash',         hint:'Updates the Decking board for that property.',                boardId:DECKING_BOARD, schedCol:D_SCHED, assignCol:D_ASSIGN, billCol:AH_BILLABLE, prioCol:AH_PRIO },
   pat:        { label:'PAT test',         hint:'Updates the PAT Testing board for that property.',           boardId:PAT_BOARD,     schedCol:P_SCHED, assignCol:P_ASSIGN, billCol:AH_BILLABLE, prioCol:AH_PRIO },
   paddle:     { label:'Paddleboard move', hint:'Drop-off + checks, then collection 24–48h later.' },
+  ring:       { label:'Ring doorbell',    hint:'Routine swap / charge / connectivity check for a Ring doorbell. Routes back to the Ring page on completion.' },
   adhoc:      { label:'Ad-hoc / repair',  hint:'Anything not on a recurring board — fix dishwasher, deck repair, etc.' },
 };
 
 let activeType = 'adhoc';
 let moveType   = 'Drop-off';
 let activeUrg  = 'Medium';
+let activeRingAct = 'Replace battery';
 let timeMode   = 'clock';
 let matCount   = 0;
-let properties = [];
+let properties = [];           // [{ name, hasRing, ringModel }]
 let staffNames = [];
+let ringDevices = [];          // [{ id, name, model, battery, lastReadP, lastReadD, status }]
 
 function gql(query, variables) {
   return fetch(URL_API, {
@@ -427,16 +470,35 @@ document.getElementById('dateSel').value = tomorrowISO();
 // ── Boot ─────────────────────────────────────────────────────
 async function boot() {
   try {
-    const [pcData, stData] = await Promise.all([
-      gql(`{ boards(ids:[${PC_BOARD}]){ items_page(limit:200){ items{ id name } } } }`),
+    const [pcData, stData, rdData] = await Promise.all([
+      gql(`{ boards(ids:[${PC_BOARD}]){ items_page(limit:200){ items{ id name column_values(ids:["${PC_HAS_RING}","${PC_RING_MODEL}"]){ id text } } } } }`),
       gql(`{ boards(ids:[${STAFF_BOARD}]){ items_page(limit:200){ items{ id name column_values(ids:["${ST_ROLE}","${ST_STATUS}"]){ id text } } } } }`),
+      gql(`{ boards(ids:[${RD_BOARD}]){ items_page(limit:500){ items{ id name column_values(ids:["${RD_MODEL}","${RD_BATTERY}","${RD_LAST_READ_D}","${RD_LAST_READ_P}","${RD_STATUS}"]){ id text } } } } }`).catch(() => null),
     ]);
 
-    properties = (pcData?.boards?.[0]?.items_page?.items || []).map(p => p.name).sort();
+    properties = (pcData?.boards?.[0]?.items_page?.items || []).map(p => {
+      const cv = Object.fromEntries(p.column_values.map(c => [c.id, c.text]));
+      return {
+        name: p.name,
+        hasRing: /yes/i.test(cv[PC_HAS_RING] || ''),
+        ringModel: cv[PC_RING_MODEL] || 'Battery swap',
+      };
+    }).sort((a,b) => a.name.localeCompare(b.name));
+
+    ringDevices = (rdData?.boards?.[0]?.items_page?.items || []).map(it => {
+      const cv = Object.fromEntries(it.column_values.map(c => [c.id, c.text]));
+      return {
+        id: it.id, name: it.name,
+        model: cv[RD_MODEL] || 'Battery swap',
+        battery: cv[RD_BATTERY] || '',
+        lastReadP: parseFloat(cv[RD_LAST_READ_P]) || null,
+        lastReadD: cv[RD_LAST_READ_D] || '',
+        status: cv[RD_STATUS] || 'OK',
+      };
+    });
+
+    renderPropertyOptions();   // builds the dropdown according to activeType
     const propSel = document.getElementById('propertySel');
-    for (const name of properties) {
-      const o = document.createElement('option'); o.value = name; o.textContent = name; propSel.appendChild(o);
-    }
     if (window._preProperty) propSel.value = window._preProperty;
 
     staffNames = (stData?.boards?.[0]?.items_page?.items || [])
@@ -462,15 +524,68 @@ boot();
 // ── Type switching ───────────────────────────────────────────
 document.querySelectorAll('.type-chip').forEach(b => b.addEventListener('click', () => setType(b.dataset.type)));
 
+function renderPropertyOptions() {
+  const propSel = document.getElementById('propertySel');
+  const keep = propSel.value;
+  // Wipe options except the placeholder
+  while (propSel.options.length > 1) propSel.remove(1);
+  const list = activeType === 'ring'
+    ? properties.filter(p => p.hasRing)
+    : properties;
+  for (const p of list) {
+    const o = document.createElement('option'); o.value = p.name; o.textContent = p.name; propSel.appendChild(o);
+  }
+  // Restore previous selection if still in the list
+  if (keep && [...propSel.options].some(o => o.value === keep)) propSel.value = keep;
+  else propSel.selectedIndex = 0;
+  onPropertyChange();
+}
+
+function onPropertyChange() {
+  if (activeType !== 'ring') return;
+  const name = document.getElementById('propertySel').value;
+  const card = document.getElementById('ringInfo');
+  if (!name) { card.classList.remove('show'); return; }
+  const dev = ringDevices.find(d => d.name.trim().toLowerCase() === name.trim().toLowerCase());
+  const prop = properties.find(p => p.name === name);
+  const model = dev?.model || prop?.ringModel || 'Battery swap';
+  document.getElementById('ringModel').textContent = model;
+  document.getElementById('ringBattery').textContent = dev?.battery ? '#'+dev.battery : (/hardwired/i.test(model) ? 'n/a (hardwired)' : '— not recorded —');
+  document.getElementById('ringLastRead').textContent = dev?.lastReadP != null
+    ? `${dev.lastReadP}%${dev.lastReadD ? ' on '+dev.lastReadD : ''}`
+    : '—';
+  const warn = document.getElementById('ringWarn');
+  warn.textContent = !dev
+    ? '⚠ No Ring Devices row found — task will still be created but the source link can\'t be wired. Visit the Ring page to set up the device row.'
+    : '';
+  card.classList.add('show');
+  // Update which action chips are sensible for this model
+  const isHW = /hardwired/i.test(model);
+  document.querySelectorAll('[data-ringact]').forEach(b => {
+    const a = b.dataset.ringact;
+    const ok = isHW ? (a === 'Check connectivity')
+                    : (model === 'Full unit charge' ? (a === 'Charge unit' || a === 'Check connectivity')
+                                                    : true);
+    b.style.display = ok ? '' : 'none';
+    if (!ok && b.classList.contains('active')) b.classList.remove('active');
+  });
+  // If nothing is active any more, pick the first visible
+  if (!document.querySelector('[data-ringact].active')) {
+    const first = document.querySelector('[data-ringact]:not([style*="display: none"])');
+    if (first) { first.classList.add('active'); activeRingAct = first.dataset.ringact; }
+  }
+}
+
 function setType(t) {
   activeType = t;
-  document.querySelectorAll('.type-chip').forEach(x => x.classList.remove('active','investigate','window','jet','pat','paddle','adhoc'));
+  document.querySelectorAll('.type-chip').forEach(x => x.classList.remove('active','investigate','window','jet','pat','paddle','adhoc','ring'));
   const chip = document.querySelector(`.type-chip[data-type="${t}"]`);
   if (chip) chip.classList.add('active', t);
 
   document.getElementById('typeHint').textContent = TYPE_CONFIG[t]?.hint || '';
 
   const isInvestigate = t === 'investigate';
+  const isRing        = t === 'ring';
 
   // Banner and header
   document.getElementById('investigateBanner').style.display = isInvestigate ? '' : 'none';
@@ -488,26 +603,52 @@ function setType(t) {
     if (el) el.style.display = isInvestigate ? 'none' : (id === 'dateRow' || id === 'assigneeRow' ? 'grid' : '');
   });
 
+  // Ring: routine maintenance — no time / labour / materials / billable
+  if (isRing) {
+    ['billableRow','timeDivider','timeField','matDivider','matField'].forEach(id => {
+      const el = document.getElementById(id); if (el) el.style.display = 'none';
+    });
+  }
+
   // Paddle fields
   document.getElementById('paddleFields').style.display = t === 'paddle' ? '' : 'none';
+
+  // Ring sub-fields and info card
+  document.getElementById('ringFields').style.display = isRing ? '' : 'none';
+  document.getElementById('ringInfo').classList.toggle('show', false);
+
+  // Re-filter property dropdown for Ring (only Has-Ring lodges)
+  renderPropertyOptions();
+  if (isRing) onPropertyChange();
 
   // Notes label + hint
   document.getElementById('notesLabel').textContent = isInvestigate ? 'What did you find? *' : 'Description / notes';
   document.getElementById('notesArea').placeholder  = isInvestigate
     ? 'Describe the problem in as much detail as you can — location, what you saw, when you noticed it…'
-    : 'Anything else they need to know';
+    : isRing
+      ? 'Any observations — e.g. "Battery flashing red", "Doorbell unresponsive after router restart"'
+      : 'Anything else they need to know';
   document.getElementById('notesHint').textContent = t === 'adhoc'
     ? 'Required — describe what needs doing.'
     : isInvestigate ? '' : 'Optional.';
 
   // Submit button
   const btn = document.getElementById('submitBtn');
-  btn.textContent = isInvestigate ? '🔍 Report this problem' : 'Schedule task';
+  btn.textContent = isInvestigate ? '🔍 Report this problem'
+                  : isRing        ? '🔔 Schedule Ring task'
+                  : 'Schedule task';
   btn.className   = 'submit-btn' + (isInvestigate ? ' investigate-btn' : '');
 
   // Billable change may affect required state
-  if (!isInvestigate) onBillableChange();
+  if (!isInvestigate && !isRing) onBillableChange();
 }
+
+// ── Ring action sub-chips ────────────────────────────────────
+document.querySelectorAll('[data-ringact]').forEach(b => b.addEventListener('click', () => {
+  document.querySelectorAll('[data-ringact]').forEach(x => x.classList.remove('active'));
+  b.classList.add('active');
+  activeRingAct = b.dataset.ringact;
+}));
 
 // ── Urgency chips ────────────────────────────────────────────
 document.querySelectorAll('.urg-chip').forEach(b => b.addEventListener('click', () => {
@@ -741,6 +882,36 @@ async function submit() {
       await createAdhoc(property, desc, date, labels, `${count==='1'?'Paddleboard':'Paddleboards'} ${moveType.toLowerCase()}`,
         { due, prio, guest, billable, labourCost, matTotal, timeNote, matNote });
       showSuccess(`Paddleboard ${moveType.toLowerCase()} (${count}) scheduled at ${property} for ${date}.`);
+
+    } else if (activeType === 'ring') {
+      // Routine Ring task — link back to the device so Mark Complete on the backlog
+      // routes to the right Ring modal (swap / charge / connectivity).
+      const dev = ringDevices.find(d => d.name.trim().toLowerCase() === property.trim().toLowerCase());
+      const source = dev ? `ring:${RD_BOARD}:${dev.id}` : null;
+      const model  = dev?.model || properties.find(p => p.name===property)?.ringModel || 'Battery swap';
+      const taskAction = activeRingAct;   // "Replace battery" / "Charge unit" / "Check connectivity"
+      const battStr = dev?.battery ? `#${dev.battery}` : '—';
+      const ringDesc =
+        `${taskAction} — model: ${model} · currently fitted: ${battStr}` +
+        (notes ? `\n\nNotes: ${notes}` : '') +
+        `\n\nClick Mark complete on this task when the work is done — the battery / connectivity capture happens there, and the Ring Doorbells page updates automatically.`;
+      // Build the cv directly so the name reads cleanly: "Lodge · Replace battery"
+      const ringName = `${property} · ${taskAction}`;
+      const ringCv = {
+        [AH_PROP]:     property,
+        [AH_DESC]:     ringDesc,
+        [AH_SCHED]:    { date },
+        [AH_ASSIGNEE]: { labels },
+        [AH_STATUS]:   { label: 'Scheduled' },
+        [AH_GUEST]:    { labels: ['Guests OK'] },
+        [AH_PRIO]:     { label: prio },
+        [AH_BILLABLE]: { checked: false },
+      };
+      if (due)    ringCv[AH_DUE]    = { date: due };
+      if (source) ringCv[AH_SOURCE] = source;
+      await gql(`mutation($b:ID!,$n:String!,$v:JSON!){ create_item(board_id:$b,item_name:$n,column_values:$v,create_labels_if_missing:true){ id } }`,
+        { b: ADHOC_BOARD, n: ringName, v: JSON.stringify(ringCv) });
+      showSuccess(`${taskAction} scheduled at ${property} for ${date}. Mark complete on the backlog when done — Ring Doorbells page updates automatically.`);
 
     } else {
       await createAdhoc(property, notes, date, labels, null,

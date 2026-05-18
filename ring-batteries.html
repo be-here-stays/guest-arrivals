@@ -330,6 +330,40 @@
   </div>
 </div>
 
+<!-- ── Modal: Assign battery to device ──────────────────────────── -->
+<div class="veil" id="assignVeil" onclick="if(event.target===this)closeModal('assign')">
+  <div class="modal-card">
+    <div class="modal-title">Assign battery to a doorbell</div>
+    <div class="modal-sub" id="assignSub">Pick the lodge this battery is going into. The Ring Devices row updates to show this battery fitted.</div>
+    <div class="modal-row">
+      <label>Lodge / doorbell</label>
+      <select id="assignDevice">
+        <option value="">— pick a doorbell —</option>
+      </select>
+    </div>
+    <div class="modal-row" id="assignWarnRow" style="display:none">
+      <div class="modal-summary" id="assignWarn" style="color:var(--amber)"></div>
+    </div>
+    <div class="modal-row" id="assignFateRow" style="display:none">
+      <label>What happens to the battery currently fitted?</label>
+      <div class="radio-pair">
+        <input type="radio" name="assignFate" id="assignFateCharge" value="Charging" checked>
+        <label for="assignFateCharge">⚡ Send to charge</label>
+        <input type="radio" name="assignFate" id="assignFateRetire" value="Retired">
+        <label for="assignFateRetire">🗑 Retire (worn out)</label>
+      </div>
+    </div>
+    <div class="modal-row">
+      <label>Note (optional)</label>
+      <textarea id="assignNote" placeholder="e.g. 'Fitted during routine swap'"></textarea>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-cancel" onclick="closeModal('assign')">Cancel</button>
+      <button class="btn btn-swap" id="assignSaveBtn" onclick="submitAssign()">Assign &amp; save</button>
+    </div>
+  </div>
+</div>
+
 <div id="toast" class="toast"></div>
 
 <script src="secrets.js"></script>
@@ -841,6 +875,9 @@ function batteryExpandHtml(b) {
   const chargeBtn = b.state === 'Charging'
     ? `<button class="btn btn-primary" onclick="event.stopPropagation();markCharged('${b.id}')">⚡ Mark charged</button>`
     : '';
+  const assignBtn = b.state === 'Charged'
+    ? `<button class="btn btn-swap" onclick="event.stopPropagation();openAssign('${b.id}')">🔗 Assign to doorbell</button>`
+    : '';
   return `
     <div class="expand-grid">
       <div class="stat-cell"><div class="stat-lbl">Cycles</div><div class="stat-val">${b.cycles}</div></div>
@@ -850,6 +887,7 @@ function batteryExpandHtml(b) {
       <div class="stat-cell"><div class="stat-lbl">Rate / year</div><div class="stat-val">${cyclesPerYear}</div></div>
     </div>
     <div class="action-row">
+      ${assignBtn}
       ${chargeBtn}
       ${retireBtn}
     </div>
@@ -918,9 +956,138 @@ function openOnlineCheck(deviceId) {
 function closeModal(which) {
   document.getElementById(({
     reading:'readingVeil',swap:'swapVeil',unit:'unitVeil',
-    return:'returnVeil',addBatt:'addBattVeil',online:'onlineVeil'
+    return:'returnVeil',addBatt:'addBattVeil',online:'onlineVeil',
+    assign:'assignVeil'
   })[which]).classList.remove('show');
-  if (which !== 'addBatt') pendingDeviceId = null;
+  if (which !== 'addBatt' && which !== 'assign') pendingDeviceId = null;
+  if (which === 'assign') pendingBatteryId = null;
+}
+
+// ── Modal: Assign battery → device (from the battery side) ────────
+let pendingBatteryId = null;
+function openAssign(batteryId) {
+  const b = batteries.find(x => x.id === batteryId);
+  if (!b) return;
+  if (b.state !== 'Charged') {
+    showToast('Only charged batteries can be assigned','err');
+    return;
+  }
+  pendingBatteryId = batteryId;
+  document.getElementById('assignSub').textContent =
+    `Battery #${b.name} — pick the doorbell this battery is going into. The Ring Devices row updates to show this battery fitted.`;
+  // Only Has-Ring lodges that need batteries (skip hardwired models — they don't take swappable batteries)
+  const candidates = devices.filter(d => !/hardwired/i.test(d.model || ''))
+                            .sort((a,b) => a.name.localeCompare(b.name));
+  const sel = document.getElementById('assignDevice');
+  sel.innerHTML = '<option value="">— pick a doorbell —</option>' +
+    candidates.map(d => {
+      const fitted = d.battery ? ` (currently #${esc(d.battery)})` : ' (empty)';
+      return `<option value="${d.id}">${esc(d.name)}${fitted}</option>`;
+    }).join('');
+  sel.onchange = onAssignDevicePicked;
+  document.getElementById('assignFateRow').style.display = 'none';
+  document.getElementById('assignWarnRow').style.display = 'none';
+  document.getElementById('assignWarn').textContent = '';
+  document.getElementById('assignFateCharge').checked = true;
+  document.getElementById('assignNote').value = '';
+  document.getElementById('assignVeil').classList.add('show');
+}
+
+function onAssignDevicePicked() {
+  const deviceId = document.getElementById('assignDevice').value;
+  const d = devices.find(x => x.id === deviceId);
+  const warnRow = document.getElementById('assignWarnRow');
+  const fateRow = document.getElementById('assignFateRow');
+  if (!d) { warnRow.style.display = 'none'; fateRow.style.display = 'none'; return; }
+  if (d.battery) {
+    warnRow.style.display = '';
+    fateRow.style.display = '';
+    document.getElementById('assignWarn').textContent =
+      `⚠ ${d.name} already has battery #${d.battery} fitted. Choose what happens to it below.`;
+  } else {
+    warnRow.style.display = 'none';
+    fateRow.style.display = 'none';
+  }
+}
+
+async function submitAssign() {
+  const battId = pendingBatteryId; if (!battId) return;
+  const newBattery = batteries.find(x => x.id === battId); if (!newBattery) return;
+  const deviceId = document.getElementById('assignDevice').value;
+  const d = devices.find(x => x.id === deviceId);
+  const author = getUserName();
+  if (!author) { showToast('Need a name to sign actions','err'); return; }
+  if (!d) { showToast('Pick a doorbell first','err'); return; }
+  const note = document.getElementById('assignNote').value.trim();
+  const oldFate = (document.querySelector('input[name="assignFate"]:checked') || {}).value || 'Charging';
+  const btn = document.getElementById('assignSaveBtn'); btn.disabled = true;
+
+  try {
+    // 1. Old battery (if any) → fate
+    if (d.battery) {
+      const old = batteries.find(x => x.name.trim() === d.battery.trim());
+      if (old) {
+        const oldNote = `[${nowStamp()} — ${author}] Removed from ${d.name} → ${oldFate}${note ? ` · ${note}` : ''}`;
+        const oldNewNotes = (old.notes ? old.notes.trim() + '\n\n' : '') + oldNote;
+        await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`, {
+          b: RB_BOARD, i: old.id,
+          v: JSON.stringify({
+            [RB_STATE]: { label: oldFate },
+            [RB_CURRENT]: '',
+            [RB_REMOVED]: { date: todayISO() },
+            [RB_NOTES]: oldNewNotes,
+          })
+        });
+        old.state = oldFate; old.currentDevice = ''; old.lastRemoved = todayISO(); old.notes = oldNewNotes;
+      }
+    }
+
+    // 2. New battery (fit it)
+    const fitNote = `[${nowStamp()} — ${author}] Fitted to ${d.name}${note ? ` · ${note}` : ''}`;
+    const newNotes = (newBattery.notes ? newBattery.notes.trim() + '\n\n' : '') + fitNote;
+    const updatedCycles = (newBattery.cycles || 0) + 1;
+    const cv = {
+      [RB_STATE]: { label: 'In device' },
+      [RB_CURRENT]: d.name,
+      [RB_FITTED]: { date: todayISO() },
+      [RB_CYCLES]: updatedCycles,
+      [RB_NOTES]: newNotes,
+    };
+    if (!newBattery.firstService) cv[RB_FIRST] = { date: todayISO() };
+    await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`,
+      { b: RB_BOARD, i: newBattery.id, v: JSON.stringify(cv) });
+    newBattery.state = 'In device'; newBattery.currentDevice = d.name;
+    newBattery.lastFitted = todayISO(); newBattery.cycles = updatedCycles;
+    if (!newBattery.firstService) newBattery.firstService = todayISO();
+    newBattery.notes = newNotes;
+
+    // 3. Device row
+    const devNote = `[${nowStamp()} — ${author}] Fitted #${newBattery.name}${d.battery ? ` (replaced #${d.battery})` : ''}${note ? ` · ${note}` : ''}`;
+    const devNewNotes = (d.notes ? d.notes.trim() + '\n\n' : '') + devNote;
+    await mq(`mutation($b:ID!,$i:ID!,$v:JSON!){ change_multiple_column_values(board_id:$b,item_id:$i,column_values:$v,create_labels_if_missing:true){ id } }`, {
+      b: RD_BOARD, i: d.id,
+      v: JSON.stringify({
+        [RD_BATTERY]: newBattery.name,
+        [RD_LAST_SWAP]: { date: todayISO() },
+        [RD_LAST_READ_P]: 100,
+        [RD_LAST_READ_D]: { date: todayISO() },
+        [RD_STATUS]: { label: 'OK' },
+        [RD_NOTES]: devNewNotes,
+      })
+    });
+    d.battery = newBattery.name; d.lastSwap = todayISO();
+    d.lastReadP = 100; d.lastReadD = todayISO(); d.status = 'OK'; d.notes = devNewNotes;
+
+    closeModal('assign');
+    renderKpis(); renderList();
+    showToast(`#${newBattery.name} → ${d.name}`,'ok');
+    // Auto-close any open Replace-battery task linked to this device
+    closeReplaceTaskAfterSwap(d, newBattery.name).then(closedId => {
+      if (closedId) showToast(`Linked backlog task auto-closed`,'ok');
+    }).catch(()=>{});
+  } catch (e) {
+    showToast('Assign failed: '+e.message,'err');
+  } finally { btn.disabled = false; }
 }
 
 function statusFromPct(pct) {
